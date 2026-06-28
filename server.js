@@ -17,12 +17,377 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// ── Sécurité ─────────────────────────────────────────────
+// ── Sécurité de base ──────────────────────────────────────
 app.use(helmet());
 app.use(cors());
 app.options('*', cors());
-  origin: '*',
-  credentials: false
+
+// Webhook Stripe AVANT express.json
+app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (e) {
+    return res.status(400).send('Webhook Error: ' + e.message);
+  }
+  if (event.type === 'payment_intent.succeeded') {
+    const pi = event.data.object;
+    await supabase.from('paiements').update({ statut: 'bloque' }).eq('stripe_payment_intent_id', pi.id);
+  }
+  res.json({ received: true });
+});
+
+app.use(express.json({ limit: '10mb' }));
+
+// ── Rate limiting ─────────────────────────────────────────
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+app.use('/api/', globalLimiter);
+
+// ── Middleware auth ───────────────────────────────────────
+const auth = async (req, res, next) => {
+  const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Non autorisé' });
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch (e) {
+    res.status(401).json({ error: 'Token invalide' });
+  }
+};
+
+const BLOCK_REGEX = /(\b0[67]\d{8}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
+
+// ── SANTÉ ─────────────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', app: 'Gleam API', version: '1.0.0', timestamp: new Date().toISOString() });
+});
+
+// ── INSCRIPTION ───────────────────────────────────────────
+app.post('/api/auth/register', authLimiter, async (req, res) => {
+  try {
+    const email = req.body.email;
+    const password = req.body.password;
+    const prenom = req.body.prenom;
+    const nom = req.body.nom;
+    const telephone = req.body.telephone;
+    const type = req.body.type;
+
+    if (!email || !password || !prenom || !nom || !type) {
+      return res.status(400).json({ error: 'Tous les champs sont requis.' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
+    }
+
+    const authResult = await supabase.auth.admin.createUser({
+      email: email.toLowerCase().trim(),
+      password: password,
+      email_confirm: true
+    });
+
+    if (authResult.error) {
+      return res.status(400).json({ error: authResult.error.message });
+    }
+
+    const insertResult = await supabase.from('users').insert({
+      id: authResult.data.user.id,
+      email: email.toLowerCase().trim(),
+      prenom: prenom.trim(),
+      nom: nom.trim(),
+      telephone: telephone || null,
+      type: type
+    }).select().single();
+
+    if (insertResult.error) {
+      return res.status(400).json({ error: insertResult.error.message });
+    }
+
+    res.status(201).json({ message: 'Compte Gleam créé !', user: insertResult.data });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ── CONNEXION ─────────────────────────────────────────────
+app.post('/api/auth/login', authLimiter, async (req, res) => {
+  try {
+    const email = req.body.email;
+    const password = req.body.password;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email et mot de passe requis.' });
+    }
+
+    const loginResult = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase().trim(),
+      password: password
+    });
+
+    if (loginResult.error) {
+      return res.status(401).json({ error: 'Identifiants incorrects.' });
+    }
+
+    const userResult = await supabase.from('users').select('*').eq('id', loginResult.data.user.id).single();
+
+    const token = jwt.sign(
+      { id: userResult.data.id, email: userResult.data.email, type: userResult.data.type },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ token: token, user: userResult.data });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ── MON PROFIL ────────────────────────────────────────────
+app.get('/api/auth/me', auth, async (req, res) => {
+  const result = await supabase.from('users').select('*').eq('id', req.user.id).single();
+  res.json(result.data);
+});
+
+// ── DEMANDES ─────────────────────────────────────────────
+app.post('/api/demandes', auth, async (req, res) => {
+  try {
+    const prestation = req.body.prestation;
+    const adresse = req.body.adresse;
+    const creneau = req.body.creneau;
+    const notes = req.body.notes;
+
+    if (!prestation || !adresse) {
+      return res.status(400).json({ error: 'Prestation et adresse requis.' });
+    }
+
+    const numero = 'Client #' + Math.floor(1000 + Math.random() * 9000);
+
+    const result = await supabase.from('demandes').insert({
+      client_id: req.user.id,
+      prestation: prestation,
+      adresse: adresse,
+      creneau: creneau || null,
+      notes: notes || null,
+      numero_anonyme: numero,
+      statut: 'en_attente'
+    }).select().single();
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error.message });
+    }
+    res.status(201).json(result.data);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/demandes', auth, async (req, res) => {
+  const result = await supabase.from('demandes').select('*').eq('client_id', req.user.id).order('created_at', { ascending: false });
+  res.json(result.data || []);
+});
+
+// ── DEVIS ─────────────────────────────────────────────────
+app.post('/api/devis', auth, async (req, res) => {
+  try {
+    const demande_id = req.body.demande_id;
+    const prix_ttc = req.body.prix_ttc;
+    const description = req.body.description;
+    const creneau_propose = req.body.creneau_propose;
+
+    if (!demande_id || !prix_ttc) {
+      return res.status(400).json({ error: 'Demande et prix requis.' });
+    }
+
+    const result = await supabase.from('devis').insert({
+      demande_id: demande_id,
+      societe_id: req.user.id,
+      prix_ttc: parseFloat(prix_ttc),
+      description: description || null,
+      creneau_propose: creneau_propose || null,
+      statut: 'envoye'
+    }).select().single();
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error.message });
+    }
+
+    await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', demande_id);
+    res.status(201).json(result.data);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/devis/demande/:id', auth, async (req, res) => {
+  const result = await supabase.from('devis').select('*').eq('demande_id', req.params.id).order('prix_ttc', { ascending: true });
+  res.json(result.data || []);
+});
+
+// ── MESSAGES ──────────────────────────────────────────────
+app.post('/api/messages', auth, async (req, res) => {
+  try {
+    const demande_id = req.body.demande_id;
+    const contenu = req.body.contenu;
+
+    if (!demande_id || !contenu) {
+      return res.status(400).json({ error: 'Message vide.' });
+    }
+
+    if (BLOCK_REGEX.test(contenu)) {
+      return res.status(400).json({ error: 'Gleam bloque les coordonnées avant paiement.', blocked: true });
+    }
+
+    const result = await supabase.from('messages').insert({
+      demande_id: demande_id,
+      expediteur_id: req.user.id,
+      contenu: contenu.trim(),
+      type: 'texte'
+    }).select().single();
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error.message });
+    }
+    res.status(201).json(result.data);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/messages/:demande_id', auth, async (req, res) => {
+  const result = await supabase.from('messages').select('*').eq('demande_id', req.params.demande_id).order('created_at', { ascending: true });
+  res.json(result.data || []);
+});
+
+// ── PAIEMENTS ─────────────────────────────────────────────
+app.post('/api/paiements/intent', auth, async (req, res) => {
+  try {
+    const devis_id = req.body.devis_id;
+    if (!devis_id) return res.status(400).json({ error: 'Devis requis.' });
+
+    const devisResult = await supabase.from('devis').select('*').eq('id', devis_id).single();
+    const devis = devisResult.data;
+    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+
+    const montant = Math.round(devis.prix_ttc * 100);
+    const commission = Math.round(montant * 0.25);
+
+    const intent = await stripe.paymentIntents.create({
+      amount: montant,
+      currency: 'eur',
+      application_fee_amount: commission,
+      metadata: { devis_id: devis_id, gleam: 'true' }
+    });
+
+    await supabase.from('paiements').insert({
+      demande_id: devis.demande_id,
+      devis_id: devis_id,
+      client_id: req.user.id,
+      societe_id: devis.societe_id,
+      montant_ttc: devis.prix_ttc,
+      commission: devis.prix_ttc * 0.25,
+      montant_societe: devis.prix_ttc * 0.75,
+      stripe_payment_intent_id: intent.id,
+      statut: 'en_attente'
+    });
+
+    res.json({ client_secret: intent.client_secret });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/paiements/liberer', auth, async (req, res) => {
+  try {
+    const paiement_id = req.body.paiement_id;
+    const result = await supabase.from('paiements').select('*').eq('id', paiement_id).single();
+    const paiement = result.data;
+
+    if (!paiement) return res.status(404).json({ error: 'Paiement introuvable.' });
+    if (paiement.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+
+    await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement_id);
+    await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
+
+    res.json({ message: 'Paiement Gleam libéré ✨' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ── EVALUATIONS ───────────────────────────────────────────
+app.post('/api/evaluations', auth, async (req, res) => {
+  try {
+    const demande_id = req.body.demande_id;
+    const evalue_id = req.body.evalue_id;
+    const note = req.body.note;
+    const commentaire = req.body.commentaire;
+
+    if (!demande_id || !evalue_id || !note) return res.status(400).json({ error: 'Champs manquants.' });
+    if (note < 1 || note > 5) return res.status(400).json({ error: 'Note entre 1 et 5.' });
+
+    const result = await supabase.from('evaluations').insert({
+      demande_id: demande_id,
+      evaluateur_id: req.user.id,
+      evalue_id: evalue_id,
+      note: parseInt(note),
+      commentaire: commentaire || null
+    }).select().single();
+
+    const notesResult = await supabase.from('evaluations').select('note').eq('evalue_id', evalue_id);
+    const notes = notesResult.data;
+    const moyenne = notes.reduce(function(a, b) { return a + b.note; }, 0) / notes.length;
+    await supabase.from('users').update({ note_moyenne: Math.round(moyenne * 10) / 10 }).eq('id', evalue_id);
+
+    res.status(201).json(result.data);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ── SOCIÉTÉS ──────────────────────────────────────────────
+app.get('/api/societes', auth, async (req, res) => {
+  const result = await supabase.from('users').select('id, prenom, nom, note_moyenne, disponible').eq('type', 'societe').eq('disponible', true);
+  res.json(result.data || []);
+});
+
+app.patch('/api/societes/disponibilite', auth, async (req, res) => {
+  const disponible = req.body.disponible;
+  await supabase.from('users').update({ disponible: Boolean(disponible) }).eq('id', req.user.id);
+  res.json({ message: 'Disponibilité mise à jour.' });
+});
+
+// ── DÉMARRAGE ─────────────────────────────────────────────
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, function() {
+  console.log('✨ Gleam API démarrée sur le port ' + PORT);
+  console.log('   Environnement : ' + (process.env.NODE_ENV || 'development'));
+});
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { createClient } = require('@supabase/supabase-js');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+
+const app = express();
+
+// ── Connexion Supabase ────────────────────────────────────
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+
+// ── Sécurité ─────────────────────────────────────────────
+app.use(helmet());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true
 }));
 
 // Webhook Stripe AVANT express.json (besoin du raw body)
