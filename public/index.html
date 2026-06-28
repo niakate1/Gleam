@@ -3,274 +3,440 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Gleam ✨ — Le nettoyage brillamment simple</title>
+<title>Gleam ✨</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
-:root{--g:#7C3AED;--gd:#5B21B6;--gl:#EDE9FE;--s:#F8F7FF;--w:#fff;--b:#E5E3F0;--t:#1a1a2e;--t2:#5a5680;--t3:#aaa8cc;--r:12px}
+:root{--g:#7C3AED;--gd:#5B21B6;--gl:#EDE9FE;--s:#F8F7FF;--w:#fff;--b:#E5E3F0;--t:#1a1a2e;--t2:#5a5680;--t3:#aaa8cc;--r:12px;--shadow:0 2px 12px rgba(124,58,237,.08)}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-size:15px;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .screen{display:none;flex-direction:column;height:100%;position:absolute;inset:0;background:var(--s)}
 .screen.active{display:flex}
-.topbar{background:var(--w);border-bottom:.5px solid var(--b);padding:46px 16px 13px;display:flex;align-items:center;gap:10px;flex-shrink:0}
-.topbar h1{font-size:17px;font-weight:700;flex:1}
+.topbar{background:var(--w);border-bottom:.5px solid var(--b);padding:46px 16px 13px;display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:var(--shadow)}
+.topbar h1{font-size:17px;font-weight:700;flex:1;letter-spacing:-.3px}
 .back{background:none;border:none;cursor:pointer;color:var(--t2);font-size:22px;padding:4px;margin:-4px}
-.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .pad{padding:16px}
 .lbl{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
-.inp{width:100%;padding:13px;border:.5px solid var(--b);border-radius:10px;font-size:15px;background:var(--w);color:var(--t);-webkit-appearance:none}
-.inp:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+.inp{width:100%;padding:13px;border:.5px solid var(--b);border-radius:10px;font-size:15px;background:var(--w);color:var(--t);-webkit-appearance:none;transition:border-color .2s,box-shadow .2s}
+.inp:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+textarea.inp{resize:none;line-height:1.6}
 .igrp{margin-bottom:14px}
-.igrp label{font-size:13px;color:var(--t2);display:block;margin-bottom:5px;font-weight:500}
-.btn{width:100%;padding:15px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;border:none}
-.btn:active{opacity:.85}
-.bp{background:linear-gradient(135deg,var(--g),var(--gd));color:#fff}
+.igrp label{font-size:13px;color:var(--t2);display:block;margin-bottom:5px;font-weight:600}
+.igrp .hint{font-size:11px;color:var(--t3);margin-top:4px}
+.btn{width:100%;padding:15px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;border:none;transition:opacity .15s,transform .1s;letter-spacing:-.2px}
+.btn:active{transform:scale(.98);opacity:.9}
+.bp{background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;box-shadow:0 4px 14px rgba(124,58,237,.3)}
 .bo{background:var(--w);color:var(--g);border:.5px solid var(--g)}
 .bt{background:none;border:none;color:var(--g);font-size:14px;cursor:pointer;width:100%;text-align:center;padding:10px;font-weight:600}
-.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.svc{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px}
-.svc:active{opacity:.7}.svc.on{border:2px solid var(--g);background:var(--gl)}
-.svc i{font-size:24px;color:var(--g)}.svc span{font-size:12px;font-weight:700;text-align:center;line-height:1.2}
-.card{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px}
-.hcard{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:10px}
-.hhead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
-.htitle{font-size:14px;font-weight:700}
-.hmeta{font-size:12px;color:var(--t2);margin-bottom:8px}
-.hfoot{display:flex;justify-content:space-between;align-items:center}
+.hero-grad{background:linear-gradient(135deg,var(--g),var(--gd))}
+
+/* Cards */
+.card{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;box-shadow:var(--shadow)}
+.hcard{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+
+/* Badge */
 .badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700}
-.bgg{background:var(--gl);color:var(--gd)}.bbl{background:#E6F1FB;color:#185FA5}.bam{background:#FAEEDA;color:#854F0B}
-.stars{color:#EF9F27;font-size:12px}
-.dcard{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:10px;cursor:pointer;position:relative}
-.dcard:active{opacity:.85}.dcard.sel{border:2px solid var(--g)}
-.dcard.top::before{content:'Recommandé';position:absolute;top:-1px;right:14px;background:var(--g);color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:0 0 8px 8px}
-.av{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.bgg{background:var(--gl);color:var(--gd)}.bbl{background:#E6F1FB;color:#185FA5}.bam{background:#FAEEDA;color:#854F0B}.brr{background:#FCEBEB;color:#A32D2D}
+
+/* Prestations principales */
+.svc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.svc-card{background:var(--w);border:2px solid var(--b);border-radius:var(--r);padding:16px 12px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all .2s;box-shadow:var(--shadow)}
+.svc-card:active{transform:scale(.97)}
+.svc-card.on{border-color:var(--g);background:var(--gl)}
+.svc-card .icon{width:44px;height:44px;border-radius:10px;background:var(--gl);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.svc-card.on .icon{background:rgba(124,58,237,.15)}
+.svc-card i{font-size:22px;color:var(--g)}
+.svc-card .info h4{font-size:14px;font-weight:700;margin-bottom:2px}
+.svc-card .info p{font-size:11px;color:var(--t2);line-height:1.4}
+
+/* Options voiture */
+.opt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.opt-btn{background:var(--w);border:2px solid var(--b);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;font-size:12px;font-weight:700;color:var(--t2);transition:all .2s}
+.opt-btn:active{transform:scale(.96)}
+.opt-btn.on{border-color:var(--g);background:var(--gl);color:var(--gd)}
+.opt-btn i{display:block;font-size:20px;color:var(--g);margin-bottom:4px}
+
+/* Autre prestation */
+.autre-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.autre-card{background:var(--w);border:2px solid var(--b);border-radius:var(--r);padding:14px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .2s;box-shadow:var(--shadow)}
+.autre-card:active{transform:scale(.97)}
+.autre-card.on{border-color:var(--g);background:var(--gl)}
+.autre-card i{font-size:22px;color:var(--g);flex-shrink:0}
+.autre-card b{font-size:13px;font-weight:700;display:block}
+.autre-card small{font-size:11px;color:var(--t2)}
+
+/* Photos */
+.photo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.photo-add{aspect-ratio:1;background:#f0edf8;border:2px dashed var(--b);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;font-size:11px;color:var(--t2);font-weight:600;transition:border-color .2s}
+.photo-add:hover{border-color:var(--g)}
+.photo-add i{font-size:22px;color:var(--g)}
+.photo-thumb{aspect-ratio:1;border-radius:10px;overflow:hidden;position:relative;border:.5px solid var(--b)}
+.photo-thumb img{width:100%;height:100%;object-fit:cover}
+.photo-del{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;border-radius:50%;width:20px;height:20px;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* Date/heure */
+.date-time-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* Devis */
+.dcard{background:var(--w);border:2px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:10px;cursor:pointer;position:relative;transition:all .2s;box-shadow:var(--shadow)}
+.dcard:active{transform:scale(.98)}
+.dcard.sel{border-color:var(--g);box-shadow:0 4px 16px rgba(124,58,237,.15)}
+.dcard.top::before{content:'⭐ Recommandé';position:absolute;top:-1px;right:14px;background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px}
+.av{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
 .row{display:flex;align-items:center;gap:10px}
-.pbig{font-size:24px;font-weight:800;color:var(--g)}
+.pbig{font-size:26px;font-weight:800;color:var(--g)}
 .drow{display:flex;justify-content:space-between;font-size:14px;padding:9px 0;border-bottom:.5px solid #f0edf8}
 .drow:last-child{border:none;font-weight:700;font-size:15px}
-.tl-step{display:flex;gap:12px;margin-bottom:16px}
-.tldot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-.tl-done{background:var(--gl);color:var(--gd)}.tl-on{background:var(--g);color:#fff}.tl-wait{background:#f0edf8;color:var(--t3)}
+.stars{color:#EF9F27;font-size:12px}
+
+/* Timeline */
+.tl-step{display:flex;gap:14px;margin-bottom:16px;align-items:flex-start}
+.tldot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.tl-done{background:var(--gl);color:var(--gd)}.tl-on{background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;box-shadow:0 4px 10px rgba(124,58,237,.3)}.tl-wait{background:#f0edf8;color:var(--t3)}
 .tlinfo h4{font-size:14px;font-weight:700;margin-bottom:2px}.tlinfo p{font-size:12px;color:var(--t2)}
-.ca{overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;height:140px}
-.msg{max-width:82%;padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5}
-.mi{background:var(--w);border:.5px solid var(--b);align-self:flex-start;border-radius:4px 14px 14px 14px}
-.mo{background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;align-self:flex-end;border-radius:14px 4px 14px 14px}
-.msys{align-self:center;background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:10px;padding:7px 12px;font-size:12px;color:#B44D00;font-weight:600;max-width:90%;text-align:center}
+
+/* Chat */
+.ca{overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
+.msg{max-width:82%;padding:11px 14px;border-radius:16px;font-size:14px;line-height:1.55;word-break:break-word}
+.mi{background:var(--w);border:.5px solid var(--b);align-self:flex-start;border-radius:4px 16px 16px 16px;box-shadow:var(--shadow)}
+.mo{background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;align-self:flex-end;border-radius:16px 4px 16px 16px}
+.msys{align-self:center;background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:10px;padding:8px 12px;font-size:12px;color:#B44D00;font-weight:600;max-width:90%;text-align:center}
 .ms{font-size:11px;color:var(--t2);margin-bottom:3px;font-weight:600}
+.mt{font-size:10px;color:var(--t3);margin-top:4px}
 .cbar{background:var(--w);border-top:.5px solid var(--b);padding:10px 12px;display:flex;gap:8px;flex-shrink:0}
-.cbar input{flex:1;padding:10px 13px;border:.5px solid var(--b);border-radius:22px;font-size:15px;background:#f0edf8}
-.cbar button{background:linear-gradient(135deg,var(--g),var(--gd));border:none;border-radius:50%;width:40px;height:40px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
-.stat{background:var(--w);border-radius:10px;padding:10px;text-align:center}
-.sv{font-size:18px;font-weight:700;color:var(--g)}.sl{font-size:11px;color:var(--t2);margin-top:2px}
-.togw{display:flex;align-items:center;justify-content:space-between;background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:12px}
-.tog{width:46px;height:26px;border-radius:13px;border:none;cursor:pointer;position:relative;transition:background .2s;background:#ccc;flex-shrink:0}
-.tog.on{background:var(--g)}.tog::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}.tog.on::after{transform:translateX(20px)}
-.mc{background:var(--w);border:.5px solid var(--b);border-radius:10px;padding:13px;margin-bottom:8px}
-.mch{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.mcm{font-size:12px;color:var(--t2);margin-bottom:8px}
-.brow{display:flex;gap:8px;flex-wrap:wrap}
-.bsm{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none}
-.bac{background:var(--gl);color:var(--gd)}.bde{background:#FCEBEB;color:#A32D2D}.bchat{background:#E6F1FB;color:#185FA5}
-.bnav{background:var(--w);border-top:.5px solid var(--b);display:flex;flex-shrink:0;padding-bottom:22px}
-.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0 6px;cursor:pointer;color:var(--t3);font-size:10px;font-weight:700;border:none;background:none}
+.cbar input{flex:1;padding:11px 14px;border:.5px solid var(--b);border-radius:22px;font-size:14px;background:#f0edf8}
+.cbar input:focus{outline:none;border-color:var(--g)}
+.cbar button{background:linear-gradient(135deg,var(--g),var(--gd));border:none;border-radius:50%;width:42px;height:42px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 10px rgba(124,58,237,.3)}
+
+/* Nav */
+.bnav{background:var(--w);border-top:.5px solid var(--b);display:flex;flex-shrink:0;padding-bottom:22px;box-shadow:0 -2px 10px rgba(0,0,0,.05)}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0 6px;cursor:pointer;color:var(--t3);font-size:10px;font-weight:700;border:none;background:none;letter-spacing:.02em;transition:color .2s}
 .ni.on{color:var(--g)}.ni i{font-size:22px}
-.pmenu{background:var(--w);border-radius:var(--r);overflow:hidden;border:.5px solid var(--b);margin-bottom:12px}
-.pitem{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:.5px solid #f0edf8;cursor:pointer;font-size:14px}
-.pitem:active{background:#f8f7ff}.pitem:last-child{border:none}.pitem i{font-size:20px;color:var(--g)}.pitem span{flex:1;font-weight:500}.pitem .arr{color:var(--t3)}
+.notif-dot{position:absolute;top:6px;right:16px;width:8px;height:8px;background:#E24B4A;border-radius:50%;border:2px solid var(--w)}
+
+/* Profil */
+.pmenu{background:var(--w);border-radius:var(--r);overflow:hidden;border:.5px solid var(--b);margin-bottom:12px;box-shadow:var(--shadow)}
+.pitem{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:.5px solid #f0edf8;cursor:pointer;font-size:14px;transition:background .15s}
+.pitem:active{background:#f8f7ff}.pitem:last-child{border:none}.pitem i{font-size:20px;color:var(--g);width:24px;text-align:center}.pitem span{flex:1;font-weight:500}.pitem .arr{color:var(--t3);font-size:16px}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.stat{background:var(--w);border-radius:12px;padding:12px;text-align:center;box-shadow:var(--shadow)}
+.sv{font-size:20px;font-weight:700;color:var(--g)}.sl{font-size:11px;color:var(--t2);margin-top:2px}
+
+/* Toggle */
+.togw{display:flex;align-items:center;justify-content:space-between;background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.tog{width:48px;height:28px;border-radius:14px;border:none;cursor:pointer;position:relative;transition:background .2s;background:#ccc;flex-shrink:0}
+.tog.on{background:linear-gradient(135deg,var(--g),var(--gd))}.tog::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.2)}.tog.on::after{transform:translateX(20px)}
+
+/* Mission pro */
+.mc{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.mch{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.mcm{font-size:12px;color:var(--t2);margin-bottom:10px;line-height:1.6}
+.brow{display:flex;gap:8px;flex-wrap:wrap}
+.bsm{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:opacity .15s}
+.bsm:active{opacity:.8}
+.bac{background:var(--gl);color:var(--gd)}.bde{background:#FCEBEB;color:#A32D2D}.bchat{background:#E6F1FB;color:#185FA5}
+
+/* Auth */
 .sbanner{background:#E6F1FB;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:#185FA5;margin-bottom:14px;font-weight:500}
 .sdiv{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--t2);font-size:13px}
 .sdiv::before,.sdiv::after{content:'';flex:1;height:.5px;background:var(--b)}
-.sbtn{width:100%;padding:13px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:.5px solid var(--b);background:var(--w);display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:10px}
+.sbtn{width:100%;padding:13px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:.5px solid var(--b);background:var(--w);display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:10px;box-shadow:var(--shadow)}
+.sbtn:active{background:#f8f7ff}
 .otp-wrap{display:flex;gap:8px;justify-content:center;margin:16px 0}
-.oi{width:44px;height:52px;border:.5px solid var(--b);border-radius:10px;text-align:center;font-size:22px;font-weight:700;background:var(--w);color:var(--t);-webkit-appearance:none}
-.oi:focus{outline:none;border-color:var(--g)}
-.sbar{height:4px;border-radius:2px;margin-top:6px;background:var(--b);overflow:hidden}
-.sfill{height:100%;border-radius:2px;transition:width .3s,background .3s;width:0}
-.ag{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.ac{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:13px 11px;cursor:pointer;display:flex;align-items:center;gap:10px}
-.ac:active{opacity:.7}.ac.on{border:2px solid var(--g);background:var(--gl)}
-.ac i{font-size:22px;color:var(--g);flex-shrink:0}
-.ac b{font-size:13px;font-weight:700;display:block}.ac small{font-size:11px;color:var(--t2)}
-.cl-item{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px}
-.cl-av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.oi{width:46px;height:54px;border:.5px solid var(--b);border-radius:10px;text-align:center;font-size:24px;font-weight:700;background:var(--w);color:var(--t);-webkit-appearance:none}
+.oi:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+.sbar{height:5px;border-radius:3px;margin-top:6px;background:var(--b);overflow:hidden}
+.sfill{height:100%;border-radius:3px;transition:width .3s,background .3s;width:0}
+.anon-tag{display:inline-flex;align-items:center;gap:4px;background:#f0edf8;border:.5px solid var(--b);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--t2);font-weight:600}
+.unlock-banner{background:linear-gradient(135deg,var(--g),var(--gd));border-radius:12px;padding:14px 16px;color:#fff;margin-bottom:14px}
+.unlock-banner h4{font-size:15px;font-weight:700;margin-bottom:6px}
+.gleam-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--g),var(--gd));border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;flex-shrink:0}
+.gleam-logo-lg{width:64px;height:64px;background:linear-gradient(135deg,var(--g),var(--gd));border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;margin:0 auto 14px;box-shadow:0 8px 24px rgba(124,58,237,.35)}
+.cl-item{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);transition:border-color .2s}
+.cl-item:active{border-color:var(--g)}
+.cl-av{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
 .cl-info{flex:1;min-width:0}
 .cl-name{font-size:14px;font-weight:700;margin-bottom:2px}
 .cl-prev{font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cl-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
-.cl-time{font-size:11px;color:var(--t3)}
-.unread-dot{width:18px;height:18px;background:var(--g);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
-.anon-tag{display:inline-flex;align-items:center;gap:4px;background:#f0edf8;border:.5px solid var(--b);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--t2);font-weight:600}
-.unlock-banner{background:linear-gradient(135deg,var(--g),var(--gd));border-radius:10px;padding:12px 14px;color:#fff;margin-bottom:12px;font-size:13px}
-.unlock-banner h4{font-size:14px;font-weight:700;margin-bottom:4px}
-.gleam-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--g),var(--gd));border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;flex-shrink:0}
-.gleam-logo-lg{width:60px;height:60px;background:linear-gradient(135deg,var(--g),var(--gd));border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;margin:0 auto 12px}
-.hero-grad{background:linear-gradient(135deg,var(--g),var(--gd))}
-.notif{position:relative}
-.notif::after{content:'';position:absolute;top:6px;right:14px;width:8px;height:8px;background:#E24B4A;border-radius:50%;border:2px solid var(--w)}
+.unread-dot{width:20px;height:20px;background:var(--g);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
 .cf{background:#f0edf8;border-radius:8px;padding:12px 13px;font-size:14px;color:var(--t2);margin-top:5px;font-family:monospace}
 @keyframes spin{to{transform:rotate(360deg)}}
 .spin{animation:spin 1.2s linear infinite}
+.selected-tag{display:inline-flex;align-items:center;gap:6px;background:var(--gl);color:var(--gd);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:700;margin-bottom:10px}
+.selected-tag button{background:none;border:none;cursor:pointer;color:var(--gd);font-size:14px;padding:0;line-height:1}
+
+/* Section titre */
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.section-header i{font-size:18px;color:var(--g)}
+.section-header h3{font-size:14px;font-weight:700;color:var(--t)}
 </style>
 </head>
 <body>
 
-<!-- AUTH -->
+<!-- ═══════════════════════════════════════════════════════
+     AUTH
+════════════════════════════════════════════════════════ -->
 <div class="screen active" id="s-auth">
   <div style="padding:52px 20px 0;text-align:center">
     <div class="gleam-logo-lg"><i class="ti ti-sparkles"></i></div>
-    <h1 style="font-size:28px;font-weight:800;letter-spacing:-.5px">Gleam</h1>
-    <p style="font-size:14px;color:var(--t2);margin-top:4px">Le nettoyage, brillamment simple ✨</p>
+    <h1 style="font-size:30px;font-weight:800;letter-spacing:-.6px">Gleam</h1>
+    <p style="font-size:15px;color:var(--t2);margin-top:6px;font-weight:500">Le nettoyage, brillamment simple ✨</p>
   </div>
-  <div class="scroll pad" style="margin-top:20px">
-    <div style="display:flex;background:#f0edf8;border-radius:10px;padding:3px;margin-bottom:16px">
-      <button onclick="sAuth('login')" id="tl" style="flex:1;padding:9px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;background:var(--w);color:var(--t)">Connexion</button>
-      <button onclick="sAuth('signup')" id="ts" style="flex:1;padding:9px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:var(--t2)">Inscription</button>
+  <div class="scroll pad" style="margin-top:24px">
+    <div style="display:flex;background:#f0edf8;border-radius:10px;padding:3px;margin-bottom:20px">
+      <button onclick="sAuth('login')" id="tl" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;background:var(--w);color:var(--t);box-shadow:var(--shadow)">Connexion</button>
+      <button onclick="sAuth('signup')" id="ts" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:var(--t2)">Inscription</button>
     </div>
+
+    <!-- LOGIN -->
     <div id="lf">
-      <div class="igrp"><label>Email</label><input class="inp" id="le" type="email" placeholder="vous@email.com" maxlength="100"></div>
+      <div class="igrp"><label>Adresse email</label><input class="inp" id="le" type="email" autocomplete="email" placeholder="vous@email.com" maxlength="100"></div>
       <div class="igrp"><label>Mot de passe</label>
-        <div style="position:relative"><input class="inp" id="lp" type="password" placeholder="••••••••" maxlength="64">
-        <button onclick="tP('lp',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t2);font-size:18px"><i class="ti ti-eye"></i></button></div>
+        <div style="position:relative"><input class="inp" id="lp" type="password" autocomplete="current-password" placeholder="••••••••" maxlength="64">
+        <button onclick="tP('lp',this)" style="position:absolute;right:13px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t2);font-size:19px"><i class="ti ti-eye"></i></button></div>
       </div>
-      <div id="lerr" style="color:#A32D2D;font-size:13px;margin-bottom:10px;display:none;font-weight:500"></div>
-      <button class="btn bp" style="margin-bottom:10px" onclick="doLogin()">Se connecter ✨</button>
+      <div id="lerr" style="color:#A32D2D;font-size:13px;margin-bottom:12px;display:none;font-weight:500;padding:8px 12px;background:#FCEBEB;border-radius:8px"></div>
+      <button class="btn bp" style="margin-bottom:10px" onclick="doLogin()">Se connecter</button>
       <button class="bt">Mot de passe oublié ?</button>
     </div>
+
+    <!-- SIGNUP -->
     <div id="sf2" style="display:none">
-      <div class="igrp"><label>Prénom et nom</label><input class="inp" id="sn" type="text" placeholder="Sophie Martin" maxlength="60"></div>
-      <div class="igrp"><label>Email</label><input class="inp" id="se" type="email" placeholder="vous@email.com" maxlength="100"></div>
-      <div class="igrp"><label>Téléphone</label><input class="inp" id="sp" type="tel" placeholder="06 12 34 56 78" maxlength="15"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="igrp"><label>Prénom</label><input class="inp" id="sprenom" type="text" autocomplete="given-name" placeholder="Sophie" maxlength="30"></div>
+        <div class="igrp"><label>Nom</label><input class="inp" id="snom" type="text" autocomplete="family-name" placeholder="Martin" maxlength="30"></div>
+      </div>
+      <div class="igrp"><label>Adresse email</label><input class="inp" id="se" type="email" autocomplete="email" placeholder="vous@email.com" maxlength="100"></div>
+      <div class="igrp"><label>Téléphone</label><input class="inp" id="sp" type="tel" autocomplete="tel" placeholder="06 12 34 56 78" maxlength="15"></div>
       <div class="igrp"><label>Mot de passe</label>
-        <div style="position:relative"><input class="inp" id="spw" type="password" placeholder="8 caractères minimum" maxlength="64" oninput="chkStr(this.value)">
-        <button onclick="tP('spw',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t2);font-size:18px"><i class="ti ti-eye"></i></button></div>
+        <div style="position:relative"><input class="inp" id="spw" type="password" autocomplete="new-password" placeholder="8 caractères minimum" maxlength="64" oninput="chkStr(this.value)">
+        <button onclick="tP('spw',this)" style="position:absolute;right:13px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t2);font-size:19px"><i class="ti ti-eye"></i></button></div>
         <div class="sbar"><div class="sfill" id="str-fill"></div></div>
         <div id="str-lbl" style="font-size:11px;margin-top:4px"></div>
       </div>
-      <div class="igrp"><label style="display:block;margin-bottom:8px">Je suis…</label>
-        <div style="display:flex;gap:8px">
-          <div id="rc" onclick="sRole('client')" style="flex:1;padding:12px 8px;border-radius:10px;border:2px solid var(--g);background:var(--gl);text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:var(--gd)"><i class="ti ti-user" style="display:block;font-size:22px;margin-bottom:4px"></i>Particulier</div>
-          <div id="rp" onclick="sRole('pro')" style="flex:1;padding:12px 8px;border-radius:10px;border:.5px solid var(--b);background:var(--w);text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:var(--t2)"><i class="ti ti-building" style="display:block;font-size:22px;margin-bottom:4px"></i>Société</div>
+      <div class="igrp">
+        <label style="display:block;margin-bottom:10px">Je suis…</label>
+        <div style="display:flex;gap:10px">
+          <div id="rc" onclick="sRole('client')" style="flex:1;padding:14px 10px;border-radius:12px;border:2px solid var(--g);background:var(--gl);text-align:center;cursor:pointer">
+            <i class="ti ti-user" style="display:block;font-size:26px;color:var(--g);margin-bottom:6px"></i>
+            <div style="font-size:13px;font-weight:700;color:var(--gd)">Particulier</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:2px">Je cherche un pro</div>
+          </div>
+          <div id="rp" onclick="sRole('pro')" style="flex:1;padding:14px 10px;border-radius:12px;border:2px solid var(--b);background:var(--w);text-align:center;cursor:pointer">
+            <i class="ti ti-building" style="display:block;font-size:26px;color:var(--t3);margin-bottom:6px"></i>
+            <div style="font-size:13px;font-weight:700;color:var(--t2)">Société</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:2px">Je propose mes services</div>
+          </div>
         </div>
       </div>
-      <div id="serr" style="color:#A32D2D;font-size:13px;margin-bottom:10px;display:none;font-weight:500"></div>
+      <div id="serr" style="color:#A32D2D;font-size:13px;margin-bottom:12px;display:none;font-weight:500;padding:8px 12px;background:#FCEBEB;border-radius:8px"></div>
       <button class="btn bp" onclick="doSignup()">Créer mon compte Gleam</button>
     </div>
-    <div class="sdiv">ou</div>
-    <button class="sbtn" onclick="doLogin()"><i class="ti ti-brand-google" style="font-size:18px;color:#EA4335"></i>Continuer avec Google</button>
-    <button class="sbtn" onclick="doLogin()"><i class="ti ti-brand-apple" style="font-size:18px"></i>Continuer avec Apple</button>
-    <p style="font-size:12px;color:var(--t2);text-align:center;margin-top:14px;line-height:1.7">En continuant, vous acceptez nos <span style="color:var(--g);font-weight:600">CGU</span> et notre <span style="color:var(--g);font-weight:600">Politique de confidentialité</span></p>
+
+    <div class="sdiv">ou continuer avec</div>
+    <button class="sbtn" onclick="doLogin()"><i class="ti ti-brand-google" style="font-size:20px;color:#EA4335"></i>Google</button>
+    <button class="sbtn" onclick="doLogin()"><i class="ti ti-brand-apple" style="font-size:20px"></i>Apple</button>
+    <p style="font-size:12px;color:var(--t2);text-align:center;margin-top:14px;line-height:1.8">En créant un compte, vous acceptez nos <span style="color:var(--g);font-weight:600">Conditions d'utilisation</span> et notre <span style="color:var(--g);font-weight:600">Politique de confidentialité</span></p>
   </div>
 </div>
 
 <!-- OTP -->
 <div class="screen" id="s-otp">
   <div class="topbar"><button class="back" onclick="go('s-auth')"><i class="ti ti-arrow-left"></i></button><h1>Vérification</h1></div>
-  <div class="pad" style="text-align:center;padding-top:24px">
-    <div style="width:64px;height:64px;background:var(--gl);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i class="ti ti-mail" style="font-size:30px;color:var(--g)"></i></div>
-    <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">Vérifiez votre email</h2>
-    <p style="font-size:14px;color:var(--t2)">Code envoyé à <b id="oe" style="color:var(--g)"></b></p>
-    <div class="otp-wrap">
-      <input class="oi" type="number" id="o0" oninput="oN(this,0)">
-      <input class="oi" type="number" id="o1" oninput="oN(this,1)">
-      <input class="oi" type="number" id="o2" oninput="oN(this,2)">
-      <input class="oi" type="number" id="o3" oninput="oN(this,3)">
-      <input class="oi" type="number" id="o4" oninput="oN(this,4)">
-      <input class="oi" type="number" id="o5" oninput="oN(this,5)">
-    </div>
-    <button class="btn bp" onclick="vOTP()" style="max-width:260px;margin:0 auto 10px">Vérifier ✨</button>
+  <div class="pad" style="text-align:center;padding-top:30px">
+    <div style="width:72px;height:72px;background:var(--gl);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><i class="ti ti-mail" style="font-size:34px;color:var(--g)"></i></div>
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:8px">Vérifiez votre email</h2>
+    <p style="font-size:14px;color:var(--t2);line-height:1.6">Un code de vérification a été envoyé à<br><b id="oe" style="color:var(--g)"></b></p>
+    <div class="otp-wrap"><input class="oi" type="number" id="o0" oninput="oN(this,0)"><input class="oi" type="number" id="o1" oninput="oN(this,1)"><input class="oi" type="number" id="o2" oninput="oN(this,2)"><input class="oi" type="number" id="o3" oninput="oN(this,3)"><input class="oi" type="number" id="o4" oninput="oN(this,4)"><input class="oi" type="number" id="o5" oninput="oN(this,5)"></div>
+    <button class="btn bp" onclick="vOTP()" style="max-width:280px;margin:0 auto 12px">Vérifier mon email</button>
     <button class="bt">Renvoyer le code</button>
   </div>
 </div>
 
-<!-- HOME -->
+<!-- ═══════════════════════════════════════════════════════
+     HOME CLIENT
+════════════════════════════════════════════════════════ -->
 <div class="screen" id="s-home">
-  <div class="hero-grad" style="padding:50px 16px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0">
-    <div style="flex:1"><div style="font-size:12px;color:rgba(255,255,255,.75);font-weight:600">Bonjour 👋</div><div style="font-size:20px;font-weight:800;color:#fff" id="uname">Sophie M.</div></div>
-    <div onclick="gN('s-profile')" style="background:rgba(255,255,255,.2);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;cursor:pointer" id="uav">SM</div>
+  <div class="hero-grad" style="padding:50px 16px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+    <div style="flex:1">
+      <div style="font-size:13px;color:rgba(255,255,255,.75);font-weight:500">Bonjour 👋</div>
+      <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-.4px" id="uname">Sophie M.</div>
+    </div>
+    <div onclick="gN('s-profile')" style="background:rgba(255,255,255,.2);border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;cursor:pointer" id="uav">SM</div>
   </div>
   <div class="scroll pad">
-    <div class="sbanner"><i class="ti ti-shield-check" style="font-size:18px;flex-shrink:0"></i><span>Gleam · Connexion sécurisée ✨</span></div>
-    <p class="lbl">Que souhaitez-vous faire briller ?</p>
-    <div class="svc-grid" style="margin-bottom:16px">
-      <div class="svc" onclick="qBook('Voiture')"><i class="ti ti-car"></i><span>Voiture</span></div>
-      <div class="svc" onclick="qBook('Tapis')"><i class="ti ti-layout-grid"></i><span>Tapis</span></div>
-      <div class="svc" onclick="qBook('Appartement')"><i class="ti ti-home"></i><span>Appartement</span></div>
-      <div class="svc" onclick="qBook('Vitres')"><i class="ti ti-window"></i><span>Vitres</span></div>
-      <div class="svc" onclick="qBook('Canapé')"><i class="ti ti-armchair"></i><span>Canapé</span></div>
-      <div class="svc" onclick="gN('s-autre')"><i class="ti ti-dots-circle-horizontal"></i><span>Autre</span></div>
+    <div class="sbanner" style="margin-bottom:16px"><i class="ti ti-shield-check" style="font-size:18px;flex-shrink:0"></i><span>Application sécurisée · Paiement protégé</span></div>
+
+    <div class="section-header"><i class="ti ti-sparkles"></i><h3>Que souhaitez-vous faire briller ?</h3></div>
+    <div class="svc-grid" style="margin-bottom:10px">
+      <div class="svc-card" onclick="qBook('voiture')">
+        <div class="icon"><i class="ti ti-car"></i></div>
+        <div class="info"><h4>Voiture</h4><p>Intérieur, extérieur ou complet</p></div>
+      </div>
+      <div class="svc-card" onclick="qBook('canape')">
+        <div class="icon"><i class="ti ti-armchair"></i></div>
+        <div class="info"><h4>Canapé</h4><p>Nettoyage en profondeur</p></div>
+      </div>
+      <div class="svc-card" onclick="qBook('matelas')">
+        <div class="icon"><i class="ti ti-bed"></i></div>
+        <div class="info"><h4>Matelas</h4><p>Simple, double, king size</p></div>
+      </div>
+      <div class="svc-card" onclick="qBook('terrasse')">
+        <div class="icon"><i class="ti ti-sun"></i></div>
+        <div class="info"><h4>Terrasse</h4><p>Karcher, balayage, joints</p></div>
+      </div>
+      <div class="svc-card" onclick="qBook('piscine')">
+        <div class="icon"><i class="ti ti-droplet"></i></div>
+        <div class="info"><h4>Piscine</h4><p>Nettoyage & traitement</p></div>
+      </div>
+      <div class="svc-card" onclick="qBook('toiture')">
+        <div class="icon"><i class="ti ti-home"></i></div>
+        <div class="info"><h4>Toiture</h4><p>Mousse, tuiles, gouttières</p></div>
+      </div>
+      <div class="svc-card" onclick="qBook('vitres')">
+        <div class="icon"><i class="ti ti-window"></i></div>
+        <div class="info"><h4>Vitres</h4><p>Intérieur et extérieur</p></div>
+      </div>
+      <div class="svc-card" onclick="qBook('autre')" style="border-style:dashed">
+        <div class="icon" style="background:#f0edf8"><i class="ti ti-plus"></i></div>
+        <div class="info"><h4>Autre</h4><p>Décrivez votre besoin librement</p></div>
+      </div>
     </div>
-    <p class="lbl">Dernière prestation</p>
+
+    <div class="section-header"><i class="ti ti-clock"></i><h3>Dernière prestation</h3></div>
     <div class="hcard">
-      <div class="hhead"><div class="htitle">Nettoyage voiture</div><span class="badge bgg">Terminé ✨</span></div>
-      <div class="hmeta"><i class="ti ti-calendar" style="font-size:12px"></i> 18 juin 2026 · ProClean Paris</div>
-      <div class="hfoot"><span style="font-size:14px;color:var(--g);font-weight:700">85€</span><span class="stars">★★★★★</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div style="font-size:15px;font-weight:700">Nettoyage voiture</div>
+        <span class="badge bgg">Terminé ✨</span>
+      </div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:10px"><i class="ti ti-calendar" style="font-size:12px"></i> 18 juin 2026 · ProClean Paris</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:16px;color:var(--g);font-weight:700">85€</span>
+        <span class="stars">★★★★★ <span style="color:var(--t2);font-size:11px">5.0</span></span>
+      </div>
     </div>
   </div>
   <div class="bnav">
     <button class="ni on"><i class="ti ti-home"></i>Accueil</button>
     <button class="ni" onclick="gN('s-request')"><i class="ti ti-plus-circle"></i>Demande</button>
-    <button class="ni notif" onclick="gN('s-chat-list')"><i class="ti ti-message-circle"></i>Messages</button>
+    <button class="ni" style="position:relative" onclick="gN('s-chat-list')"><i class="ti ti-message-circle"></i>Messages<div class="notif-dot"></div></button>
     <button class="ni" onclick="gN('s-profile')"><i class="ti ti-user"></i>Profil</button>
   </div>
 </div>
 
-<!-- AUTRE -->
+<!-- ═══════════════════════════════════════════════════════
+     AUTRE PRESTATION
+════════════════════════════════════════════════════════ -->
 <div class="screen" id="s-autre">
-  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Autres prestations</h1></div>
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Autre prestation</h1></div>
   <div class="scroll pad">
-    <div class="ag">
-      <div class="ac" onclick="sAutre(this,'Piscine')"><i class="ti ti-droplet"></i><div><b>Piscine</b><small>Nettoyage & traitement</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Terrasse')"><i class="ti ti-sun"></i><div><b>Terrasse</b><small>Karcher, balayage</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Cuisine pro')"><i class="ti ti-chef-hat"></i><div><b>Cuisine pro</b><small>Restauration</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Après travaux')"><i class="ti ti-tools"></i><div><b>Après travaux</b><small>Déblaiement</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Déménagement')"><i class="ti ti-truck"></i><div><b>Déménagement</b><small>Fin de bail</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Vitrine')"><i class="ti ti-building-store"></i><div><b>Vitrine</b><small>Commerce</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Parking')"><i class="ti ti-parking"></i><div><b>Parking</b><small>Sols, marquage</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Hôtellerie')"><i class="ti ti-bed"></i><div><b>Hôtellerie</b><small>Chambres</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Garde-meuble')"><i class="ti ti-box"></i><div><b>Garde-meuble</b><small>Box, entrepôt</small></div></div>
-      <div class="ac" onclick="sAutre(this,'Espace vert')"><i class="ti ti-plant"></i><div><b>Espace vert</b><small>Jardin, tonte</small></div></div>
+    <p style="font-size:14px;color:var(--t2);margin-bottom:16px;line-height:1.6">Vous ne trouvez pas votre prestation ? Sélectionnez-en une ci-dessous ou décrivez librement votre besoin.</p>
+    <div class="autre-grid" style="margin-bottom:16px">
+      <div class="autre-card" onclick="sAutre(this,'Matelas')"><i class="ti ti-bed"></i><div><b>Matelas</b><small>Simple, double, king size</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Piscine')"><i class="ti ti-droplet"></i><div><b>Piscine</b><small>Nettoyage & traitement</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Terrasse')"><i class="ti ti-sun"></i><div><b>Terrasse</b><small>Karcher, balayage</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Cuisine pro')"><i class="ti ti-chef-hat"></i><div><b>Cuisine pro</b><small>Restauration</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Après travaux')"><i class="ti ti-tools"></i><div><b>Après travaux</b><small>Déblaiement, poussière</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Déménagement')"><i class="ti ti-truck"></i><div><b>Déménagement</b><small>Nettoyage fin de bail</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Vitrine commerce')"><i class="ti ti-building-store"></i><div><b>Vitrine</b><small>Commerce, boutique</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Parking / Garage')"><i class="ti ti-parking"></i><div><b>Parking / Garage</b><small>Sols, marquage</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Hôtellerie')"><i class="ti ti-building"></i><div><b>Hôtellerie</b><small>Chambres, communs</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Espace vert')"><i class="ti ti-plant"></i><div><b>Espace vert</b><small>Jardin, tonte</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Rideau / Store')"><i class="ti ti-layout-rows"></i><div><b>Rideau / Store</b><small>Nettoyage textile</small></div></div>
+      <div class="autre-card" onclick="sAutre(this,'Chantier')"><i class="ti ti-hammer"></i><div><b>Chantier</b><small>Nettoyage de chantier</small></div></div>
     </div>
-    <button class="btn bp" style="margin-top:16px;opacity:.4" id="abt" onclick="cAutre()" disabled>Choisir cette prestation</button>
+
+    <!-- Prestation libre -->
+    <div style="background:var(--w);border:2px dashed var(--b);border-radius:var(--r);padding:14px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-pencil" style="color:var(--g)"></i>Décrire librement ma prestation</div>
+      <input class="inp" id="autre-libre" type="text" placeholder="Ex: Nettoyage de mon matelas double face…" maxlength="100">
+      <button class="btn bp" style="margin-top:10px" onclick="cAutreLibre()">Utiliser cette description</button>
+    </div>
+
+    <button class="btn bp" style="opacity:.4" id="abt" onclick="cAutre()" disabled>Choisir cette prestation</button>
   </div>
 </div>
 
-<!-- DEMANDE -->
+<!-- ═══════════════════════════════════════════════════════
+     DEMANDE
+════════════════════════════════════════════════════════ -->
 <div class="screen" id="s-request">
-  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Nouvelle demande</h1></div>
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Ma demande</h1></div>
   <div class="scroll pad">
-    <p class="lbl">Prestation</p>
-    <div class="svc-grid" style="margin-bottom:8px">
-      <div class="svc" data-s="Voiture" onclick="tSvc(this)"><i class="ti ti-car"></i><span>Voiture</span></div>
-      <div class="svc" data-s="Tapis" onclick="tSvc(this)"><i class="ti ti-layout-grid"></i><span>Tapis</span></div>
-      <div class="svc" data-s="Appartement" onclick="tSvc(this)"><i class="ti ti-home"></i><span>Appartement</span></div>
-      <div class="svc" data-s="Vitres" onclick="tSvc(this)"><i class="ti ti-window"></i><span>Vitres</span></div>
-      <div class="svc" data-s="Canapé" onclick="tSvc(this)"><i class="ti ti-armchair"></i><span>Canapé</span></div>
-      <div class="svc" onclick="gN('s-autre')" style="border-style:dashed"><i class="ti ti-plus" style="color:var(--t2)"></i><span style="color:var(--t2)">Autre</span></div>
+
+    <!-- Prestation sélectionnée -->
+    <div id="req-svc-display" style="display:none;margin-bottom:16px">
+      <div class="section-header"><i class="ti ti-check-circle"></i><h3>Prestation sélectionnée</h3></div>
+      <div id="svc-tag"></div>
     </div>
-    <div id="atag" style="display:none;margin-bottom:12px"><span style="background:var(--gl);color:var(--gd);padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700" id="atagl"></span></div>
-    <p class="lbl" style="margin-top:4px">Adresse & créneau</p>
-    <div class="igrp"><label>Adresse</label><input class="inp" id="addr" type="text" placeholder="12 rue de la Paix, Paris" maxlength="150"></div>
-    <div class="igrp"><label>Quand ?</label>
-      <select class="inp" id="slot">
-        <option>Aujourd'hui (après-midi)</option>
-        <option>Demain (matin)</option>
-        <option>Demain (après-midi)</option>
-        <option>Dans 2 jours</option>
-      </select>
+
+    <!-- Options voiture -->
+    <div id="car-options" style="display:none;margin-bottom:16px">
+      <div class="section-header"><i class="ti ti-car"></i><h3>Type de nettoyage</h3></div>
+      <div class="opt-grid">
+        <div class="opt-btn" id="opt-int" onclick="toggleOpt('int')"><i class="ti ti-layout-sidebar"></i>Intérieur</div>
+        <div class="opt-btn" id="opt-ext" onclick="toggleOpt('ext')"><i class="ti ti-sun"></i>Extérieur</div>
+        <div class="opt-btn" id="opt-both" onclick="toggleOpt('both')"><i class="ti ti-sparkles"></i>Les deux</div>
+      </div>
+      <p style="font-size:11px;color:var(--t3);margin-top:8px">Sélectionnez une ou plusieurs options</p>
     </div>
-    <div class="igrp"><label>Infos complémentaires</label><input class="inp" id="notes" type="text" placeholder="Ex: voiture SUV, tapis très sales…" maxlength="300"></div>
+
+    <!-- Description -->
     <div class="igrp">
-      <label>Photos <span style="color:var(--g);font-weight:600">(recommandé ✨)</span></label>
-      <div style="font-size:12px;color:var(--t2);margin-bottom:8px">Aidez les pros à faire un devis précis</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="photo-grid">
-        <label style="aspect-ratio:1;background:#f0edf8;border:1.5px dashed var(--b);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:11px;color:var(--t2);font-weight:600;gap:4px">
-          <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)">
-          <i class="ti ti-camera" style="font-size:22px;color:var(--g)"></i>Ajouter
-        </label>
+      <label>Description de votre demande <span style="color:var(--g)">*</span></label>
+      <textarea class="inp" id="description" rows="4" placeholder="Décrivez précisément ce que vous souhaitez nettoyer. Ex: Voiture SUV Peugeot 5008, taches sur les sièges avant, moquette très sale…" maxlength="500"></textarea>
+      <div class="hint">Soyez précis pour recevoir des devis exacts</div>
+    </div>
+
+    <!-- Adresse -->
+    <div class="igrp">
+      <label>Adresse d'intervention <span style="color:var(--g)">*</span></label>
+      <input class="inp" id="addr" type="text" autocomplete="street-address" placeholder="12 rue de la Paix, 75001 Paris" maxlength="150">
+    </div>
+
+    <!-- Date et heure -->
+    <div class="section-header" style="margin-top:4px"><i class="ti ti-calendar"></i><h3>Date et heure souhaitées</h3></div>
+    <div class="date-time-grid" style="margin-bottom:10px">
+      <div class="igrp"><label>Date</label><input class="inp" id="slot-date" type="date"></div>
+      <div class="igrp"><label>Heure</label>
+        <select class="inp" id="slot-heure">
+          <option value="">Flexible</option>
+          <option>7h00</option><option>7h30</option><option>8h00</option><option>8h30</option>
+          <option>9h00</option><option>9h30</option><option>10h00</option><option>10h30</option>
+          <option>11h00</option><option>11h30</option><option>12h00</option><option>12h30</option>
+          <option>13h00</option><option>13h30</option><option>14h00</option><option>14h30</option>
+          <option>15h00</option><option>15h30</option><option>16h00</option><option>16h30</option>
+          <option>17h00</option><option>17h30</option><option>18h00</option><option>18h30</option>
+          <option>19h00</option><option>19h30</option><option>20h00</option>
+        </select>
       </div>
     </div>
-    <button class="btn bp" onclick="sendReq()">Recevoir des devis Gleam ✨</button>
+    <div class="igrp">
+      <label>Flexibilité horaire</label>
+      <select class="inp" id="slot-flex">
+        <option>À l'heure exacte choisie</option>
+        <option>± 30 minutes</option>
+        <option>± 1 heure</option>
+        <option>Dans la matinée (8h–12h)</option>
+        <option>Dans l'après-midi (13h–18h)</option>
+        <option>Toute la journée</option>
+        <option>À convenir avec le prestataire</option>
+      </select>
+    </div>
+
+    <!-- Photos facultatives -->
+    <div class="section-header"><i class="ti ti-photo"></i><h3>Photos <span style="font-weight:400;color:var(--t2);font-size:12px">(facultatif mais recommandé)</span></h3></div>
+    <p style="font-size:12px;color:var(--t2);margin-bottom:10px;line-height:1.6">Ajoutez des photos pour aider les prestataires à établir un devis précis. Plus de photos = meilleur devis !</p>
+    <div class="photo-grid" id="photo-grid" style="margin-bottom:16px">
+      <label class="photo-add">
+        <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)">
+        <i class="ti ti-camera"></i>Ajouter
+      </label>
+    </div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:16px">Maximum 5 photos · JPG, PNG</p>
+
+    <button class="btn bp" onclick="sendReq()">Envoyer ma demande · Recevoir des devis</button>
+    <p style="font-size:11px;color:var(--t2);text-align:center;margin-top:10px">Gratuit · Sans engagement · Réponse sous 30 min</p>
   </div>
   <div class="bnav">
     <button class="ni" onclick="gN('s-home')"><i class="ti ti-home"></i>Accueil</button>
@@ -282,46 +448,66 @@ html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-si
 
 <!-- ATTENTE -->
 <div class="screen" id="s-wait">
-  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-x"></i></button><h1>Demande envoyée ✨</h1></div>
-  <div class="pad" style="text-align:center;padding-top:20px">
-    <div style="padding:20px;background:var(--gl);border-radius:var(--r);margin-bottom:16px">
-      <div style="font-size:32px;font-weight:800;color:var(--gd)" id="timer">2:58</div>
-      <div style="font-size:13px;color:var(--gd);margin-top:4px;font-weight:600">Devis en cours ✨</div>
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-x"></i></button><h1>Demande envoyée</h1></div>
+  <div class="pad" style="text-align:center;padding-top:30px">
+    <div style="padding:24px;background:var(--gl);border-radius:16px;margin-bottom:20px">
+      <div style="font-size:36px;font-weight:800;color:var(--gd)" id="timer">2:58</div>
+      <div style="font-size:14px;color:var(--gd);margin-top:6px;font-weight:600">Devis en cours de réception…</div>
     </div>
-    <i class="ti ti-loader spin" style="font-size:28px;color:var(--g);margin-bottom:12px;display:block"></i>
-    <p style="font-size:14px;color:var(--t2);line-height:1.6">3 pros Gleam proches reçoivent votre demande</p>
-    <div style="background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:10px;padding:12px;margin-top:14px;text-align:left">
-      <div style="font-size:12px;font-weight:700;color:#B44D00;margin-bottom:4px"><i class="ti ti-lock"></i> Identité protégée par Gleam</div>
-      <div style="font-size:12px;color:#B44D00;line-height:1.5">Vous apparaissez comme <b>Client #1042</b>. Coordonnées partagées après paiement uniquement.</div>
+    <i class="ti ti-loader spin" style="font-size:30px;color:var(--g);margin-bottom:14px;display:block"></i>
+    <p style="font-size:14px;color:var(--t2);line-height:1.7;margin-bottom:20px">Plusieurs prestataires proches reçoivent votre demande. Ils peuvent vous poser des questions avant d'envoyer leur devis.</p>
+    <div style="background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:12px;padding:14px;text-align:left;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:#B44D00;margin-bottom:6px"><i class="ti ti-shield"></i> Votre identité est protégée</div>
+      <div style="font-size:12px;color:#B44D00;line-height:1.6">Vous apparaissez sous le pseudonyme <b>Client #1042</b>. Vos coordonnées réelles ne seront partagées qu'après votre paiement.</div>
     </div>
-    <button class="btn bp" style="margin-top:20px" onclick="gN('s-chat-list')">Voir mes messages ✨</button>
+    <button class="btn bp" onclick="gN('s-chat-list')"><i class="ti ti-message-circle" style="margin-right:6px"></i>Voir mes messages</button>
   </div>
 </div>
 
 <!-- CHAT LIST -->
 <div class="screen" id="s-chat-list">
-  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Messages Gleam</h1></div>
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Mes messages</h1></div>
   <div class="scroll pad">
-    <div style="background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#B44D00;font-weight:500">
-      <i class="ti ti-shield"></i> <b>Mode anonyme Gleam</b> — Vous êtes <b>Client #1042</b>
+    <div style="background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#B44D00;font-weight:500;display:flex;align-items:center;gap:8px">
+      <i class="ti ti-shield" style="font-size:16px;flex-shrink:0"></i>
+      <span><b>Mode anonyme actif</b> — Vous êtes Client #1042. Vos coordonnées sont protégées.</span>
     </div>
-    <p class="lbl">3 pros en discussion</p>
-    <div class="cl-item" onclick="openChat('ProClean Paris','PC','#EDE9FE','#5B21B6',true,'Bonjour ! Pour votre voiture, intérieur seulement ou extérieur aussi ?')">
+    <div class="lbl" style="margin-bottom:12px">Prestataires en discussion (3)</div>
+    <div class="cl-item" onclick="openChat('ProClean Paris','PC','#EDE9FE','#5B21B6','Bonjour ! Pour votre voiture, souhaitez-vous un nettoyage intérieur, extérieur ou les deux ? Y a-t-il des taches particulières sur lesquelles vous souhaitez que j\'intervienne ?')">
       <div class="cl-av" style="background:#EDE9FE;color:#5B21B6">PC</div>
-      <div class="cl-info"><div class="cl-name">ProClean Paris</div><div class="cl-prev">Bonjour ! Pour votre voiture, intérieur…</div></div>
-      <div class="cl-meta"><div class="cl-time">14:32</div><div class="unread-dot">2</div></div>
+      <div class="cl-info">
+        <div class="cl-name">ProClean Paris</div>
+        <div class="cl-prev">Bonjour ! Pour votre voiture, souhaitez-vous…</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
+        <div style="font-size:11px;color:var(--t3)">14:32</div>
+        <div class="unread-dot">2</div>
+      </div>
     </div>
-    <div class="cl-item" onclick="openChat('Éclat Net','EN','#E6F1FB','#185FA5',false,'Bonjour Client #1042, quel modèle de véhicule ?')">
+    <div class="cl-item" onclick="openChat('Éclat Net','EN','#E6F1FB','#185FA5','Bonjour Client #1042 ! Quel est le modèle de votre véhicule et quelle est sa taille approximative ?')">
       <div class="cl-av" style="background:#E6F1FB;color:#185FA5">EN</div>
-      <div class="cl-info"><div class="cl-name">Éclat Net</div><div class="cl-prev">Bonjour Client #1042, quel modèle…</div></div>
-      <div class="cl-meta"><div class="cl-time">14:28</div><div class="unread-dot">1</div></div>
+      <div class="cl-info">
+        <div class="cl-name">Éclat Net</div>
+        <div class="cl-prev">Bonjour Client #1042 ! Quel est le modèle…</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
+        <div style="font-size:11px;color:var(--t3)">14:28</div>
+        <div class="unread-dot">1</div>
+      </div>
     </div>
-    <div class="cl-item" onclick="openChat('Shine & Go','SG','#FAEEDA','#854F0B',false,'Disponible demain matin.')">
+    <div class="cl-item" onclick="openChat('Shine & Go','SG','#FAEEDA','#854F0B','Disponible demain matin. Pouvez-vous me préciser si vous souhaitez également le traitement des plastiques et des vitres ?')">
       <div class="cl-av" style="background:#FAEEDA;color:#854F0B">SG</div>
-      <div class="cl-info"><div class="cl-name">Shine & Go</div><div class="cl-prev">Disponible demain matin.</div></div>
-      <div class="cl-meta"><div class="cl-time">14:25</div></div>
+      <div class="cl-info">
+        <div class="cl-name">Shine & Go</div>
+        <div class="cl-prev">Disponible demain matin. Pouvez-vous me…</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
+        <div style="font-size:11px;color:var(--t3)">14:25</div>
+      </div>
     </div>
-    <button class="btn bp" style="margin-top:16px" onclick="gN('s-devis')">Voir les devis reçus →</button>
+    <div style="text-align:center;margin-top:16px;margin-bottom:8px">
+      <button class="btn bp" onclick="gN('s-devis')">Voir les devis reçus →</button>
+    </div>
   </div>
   <div class="bnav">
     <button class="ni" onclick="gN('s-home')"><i class="ti ti-home"></i>Accueil</button>
@@ -335,96 +521,139 @@ html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-si
 <div class="screen" id="s-chat">
   <div class="topbar">
     <button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button>
-    <div class="cl-av" id="chat-av" style="width:32px;height:32px;font-size:12px;border-radius:8px;margin-right:4px"></div>
-    <div style="flex:1"><div style="font-size:15px;font-weight:700" id="chat-name"></div><div class="anon-tag" style="margin-top:2px"><i class="ti ti-eye-off" style="font-size:11px"></i> Anonyme Gleam</div></div>
+    <div class="cl-av" id="chat-av" style="width:34px;height:34px;font-size:12px;border-radius:9px;margin-right:4px"></div>
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:700" id="chat-name"></div>
+      <div class="anon-tag" style="margin-top:2px"><i class="ti ti-eye-off" style="font-size:11px"></i> Anonyme jusqu'au paiement</div>
+    </div>
   </div>
   <div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
-    <div style="padding:8px 16px;background:#f8f7ff;border-bottom:.5px solid var(--b);flex-shrink:0;font-size:12px;color:var(--t2)">Demande : <b id="chat-svc"></b></div>
-    <div class="ca" id="chat-area"><div><div class="ms" id="csend"></div><div class="msg mi" id="cmsg"></div></div></div>
-    <div style="padding:6px 12px;background:var(--w)"><div style="font-size:11px;color:#B44D00;background:#FFF0E6;border-radius:6px;padding:5px 8px;font-weight:600"><i class="ti ti-alert-triangle" style="font-size:11px"></i> Coordonnées bloquées par Gleam avant paiement</div></div>
+    <div style="padding:8px 16px;background:#f8f7ff;border-bottom:.5px solid var(--b);flex-shrink:0;font-size:12px;color:var(--t2)">
+      Demande : <b id="chat-svc-label"></b>
+    </div>
+    <div class="ca" id="chat-area">
+      <div class="msg msys">💬 Échangez avec le prestataire avant de recevoir son devis.<br>Vos coordonnées restent protégées.</div>
+    </div>
+    <div style="padding:6px 12px 4px;background:var(--w);flex-shrink:0">
+      <div style="font-size:11px;color:#B44D00;background:#FFF0E6;border-radius:6px;padding:5px 9px;font-weight:600"><i class="ti ti-alert-triangle" style="font-size:11px"></i> Numéros, emails et réseaux sociaux sont bloqués automatiquement</div>
+    </div>
     <div class="cbar">
-      <label style="cursor:pointer;color:var(--g);font-size:22px;display:flex;align-items:center;flex-shrink:0"><input type="file" accept="image/*" style="display:none" onchange="sendPhoto(this,'chat-area')"><i class="ti ti-photo"></i></label>
+      <label style="cursor:pointer;color:var(--g);font-size:22px;display:flex;align-items:center;flex-shrink:0;padding:0 4px">
+        <input type="file" accept="image/*" style="display:none" onchange="sendPhoto(this,'chat-area')">
+        <i class="ti ti-photo"></i>
+      </label>
       <input id="cinp" placeholder="Écrire un message…" maxlength="500" onkeydown="if(event.key==='Enter')sendMsg()">
       <button onclick="sendMsg()"><i class="ti ti-send"></i></button>
     </div>
   </div>
 </div>
 
-<!-- DEVIS -->
+<!-- DEVIS LIST -->
 <div class="screen" id="s-devis">
-  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Devis Gleam ✨</h1></div>
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Devis reçus</h1></div>
   <div style="padding:10px 16px;background:var(--w);border-bottom:.5px solid var(--b);font-size:13px;color:var(--t2);font-weight:500" id="dsumm"></div>
   <div class="scroll pad">
-    <p class="lbl">3 devis reçus — Choisissez votre pro</p>
-    <div class="dcard top" id="d1" onclick="selDev('d1','ProClean Paris','4.9','127','800 m','85','Intérieur + extérieur, aspiration, shampooing sièges. Demain matin.')">
-      <div class="row" style="margin-bottom:10px">
+    <p style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6">Comparez les devis et choisissez le prestataire qui correspond le mieux à vos attentes.</p>
+
+    <div class="dcard top" id="d1" onclick="selDev('d1','ProClean Paris','PC','#EDE9FE','#5B21B6','4.9','127','800 m','85','Nettoyage intérieur + extérieur complet · Aspiration sièges · Shampooing moquette · Traitement plastiques · Nettoyage vitres. SUV bienvenu.')">
+      <div class="row" style="margin-bottom:12px">
         <div class="av" style="background:#EDE9FE;color:#5B21B6">PC</div>
-        <div style="flex:1"><div style="font-size:15px;font-weight:700">ProClean Paris</div><div style="font-size:12px;color:var(--t2)"><span class="stars">★★★★★</span> 4.9 · 127 avis · <span style="color:var(--g)">800 m</span></div></div>
-        <div style="text-align:right"><div class="pbig">85€</div><div style="font-size:11px;color:var(--t2)">tout inclus</div></div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">ProClean Paris</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px"><span class="stars">★★★★★</span> <b>4.9</b> · 127 avis · <span style="color:var(--g);font-weight:600">800 m</span></div>
+        </div>
+        <div style="text-align:right">
+          <div class="pbig">85€</div>
+          <div style="font-size:11px;color:var(--t2)">tout inclus</div>
+        </div>
       </div>
-      <div style="font-size:13px;color:var(--t2);background:#f0edf8;padding:9px 11px;border-radius:8px;margin-bottom:9px;line-height:1.5">"Intérieur + extérieur, aspiration, shampooing sièges. Demain matin."</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge bgg">Demain matin</span><span class="badge bbl">Certifié Gleam</span><span class="badge bam">Top pro</span></div>
+      <div style="font-size:13px;color:var(--t2);background:#f8f7ff;padding:10px 12px;border-radius:10px;margin-bottom:10px;line-height:1.6;border:.5px solid var(--b)">"Intérieur + extérieur complet, aspiration, shampooing moquette, traitement plastiques. Disponible demain matin 9h."</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="badge bgg"><i class="ti ti-check" style="font-size:10px"></i> Demain 9h</span>
+        <span class="badge bbl"><i class="ti ti-certificate" style="font-size:10px"></i> Certifié</span>
+        <span class="badge bam">⭐ Top prestataire</span>
+      </div>
     </div>
-    <div class="dcard" id="d2" onclick="selDev('d2','Éclat Net','4.7','89','1,2 km','72','Intérieur complet, produits éco-certifiés. Aujourd\'hui.')">
-      <div class="row" style="margin-bottom:10px">
+
+    <div class="dcard" id="d2" onclick="selDev('d2','Éclat Net','EN','#E6F1FB','#185FA5','4.7','89','1,2 km','72','Nettoyage intérieur complet avec produits éco-certifiés. Aspirateur eau et poussière. Disponible aujourd\'hui après-midi.')">
+      <div class="row" style="margin-bottom:12px">
         <div class="av" style="background:#E6F1FB;color:#185FA5">EN</div>
-        <div style="flex:1"><div style="font-size:15px;font-weight:700">Éclat Net</div><div style="font-size:12px;color:var(--t2)"><span class="stars">★★★★☆</span> 4.7 · 89 avis · <span style="color:var(--g)">1,2 km</span></div></div>
-        <div style="text-align:right"><div class="pbig">72€</div><div style="font-size:11px;color:var(--t2)">tout inclus</div></div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Éclat Net</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px"><span class="stars">★★★★☆</span> <b>4.7</b> · 89 avis · <span style="color:var(--g);font-weight:600">1,2 km</span></div>
+        </div>
+        <div style="text-align:right">
+          <div class="pbig">72€</div>
+          <div style="font-size:11px;color:var(--t2)">tout inclus</div>
+        </div>
       </div>
-      <div style="font-size:13px;color:var(--t2);background:#f0edf8;padding:9px 11px;border-radius:8px;margin-bottom:9px">"Intérieur complet, éco-certifié. Aujourd'hui."</div>
-      <div style="display:flex;gap:6px"><span class="badge bgg">Auj. après-midi</span><span class="badge bbl">Éco</span></div>
+      <div style="font-size:13px;color:var(--t2);background:#f8f7ff;padding:10px 12px;border-radius:10px;margin-bottom:10px;line-height:1.6;border:.5px solid var(--b)">"Nettoyage intérieur complet, produits éco-certifiés. Disponible aujourd'hui après-midi."</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="badge bgg"><i class="ti ti-check" style="font-size:10px"></i> Auj. après-midi</span>
+        <span class="badge bbl">🌿 Éco-certifié</span>
+      </div>
     </div>
-    <div class="dcard" id="d3" onclick="selDev('d3','Shine & Go','4.5','54','2,1 km','58','Extérieur + vitres haute pression. Dans 2 jours.')">
-      <div class="row" style="margin-bottom:10px">
+
+    <div class="dcard" id="d3" onclick="selDev('d3','Shine & Go','SG','#FAEEDA','#854F0B','4.5','54','2,1 km','58','Nettoyage extérieur haute pression + vitrages. Disponible dans 2 jours.')">
+      <div class="row" style="margin-bottom:12px">
         <div class="av" style="background:#FAEEDA;color:#854F0B">SG</div>
-        <div style="flex:1"><div style="font-size:15px;font-weight:700">Shine & Go</div><div style="font-size:12px;color:var(--t2)"><span class="stars">★★★★½</span> 4.5 · 54 avis · 2,1 km</div></div>
-        <div style="text-align:right"><div class="pbig">58€</div><div style="font-size:11px;color:var(--t2)">tout inclus</div></div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Shine & Go</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px"><span class="stars">★★★★½</span> <b>4.5</b> · 54 avis · 2,1 km</div>
+        </div>
+        <div style="text-align:right">
+          <div class="pbig">58€</div>
+          <div style="font-size:11px;color:var(--t2)">tout inclus</div>
+        </div>
       </div>
-      <div style="font-size:13px;color:var(--t2);background:#f0edf8;padding:9px 11px;border-radius:8px;margin-bottom:9px">"Extérieur + vitres haute pression. Dans 2 jours."</div>
-      <div style="display:flex;gap:6px"><span class="badge bam">Dans 2 jours</span></div>
+      <div style="font-size:13px;color:var(--t2);background:#f8f7ff;padding:10px 12px;border-radius:10px;margin-bottom:10px;line-height:1.6;border:.5px solid var(--b)">"Extérieur haute pression + vitrages. Dans 2 jours."</div>
+      <div style="display:flex;gap:6px"><span class="badge bam">📅 Dans 2 jours</span></div>
     </div>
   </div>
 </div>
 
-<!-- DETAIL -->
+<!-- DETAIL DEVIS -->
 <div class="screen" id="s-detail">
   <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1 id="dc"></h1></div>
   <div class="scroll pad">
-    <div class="card" style="margin-bottom:12px">
+    <div class="card" style="margin-bottom:14px">
       <div class="drow"><span>Prestataire</span><span id="dn" style="font-weight:700"></span></div>
       <div class="drow"><span>Note</span><span id="drat"></span></div>
       <div class="drow"><span>Distance</span><span id="ddist"></span></div>
-      <div class="drow"><span>Créneau</span><span id="dsl"></span></div>
-      <div class="drow"><span style="color:var(--g);font-weight:700">Total</span><span id="dprice" style="color:var(--g);font-weight:800"></span></div>
+      <div class="drow"><span>Disponibilité</span><span id="dsl"></span></div>
+      <div class="drow"><span>Détail</span><span id="ddesc" style="font-size:12px;color:var(--t2);text-align:right;max-width:55%;line-height:1.4"></span></div>
+      <div class="drow"><span style="color:var(--g);font-weight:700">Total TTC</span><span id="dprice" style="color:var(--g);font-weight:800;font-size:18px"></span></div>
     </div>
     <div class="unlock-banner">
-      <h4><i class="ti ti-lock-open" style="font-size:14px"></i> Après paiement Gleam :</h4>
-      <div style="font-size:12px;opacity:.9;line-height:1.7">✓ Nom complet · ✓ Téléphone direct · ✓ Email · ✓ Devis PDF</div>
+      <h4><i class="ti ti-lock-open" style="font-size:15px"></i> Après confirmation du paiement :</h4>
+      <div style="font-size:13px;opacity:.92;line-height:1.8">✓ Nom et prénom du responsable<br>✓ Numéro de téléphone direct<br>✓ Adresse email professionnelle<br>✓ Devis officiel en PDF</div>
     </div>
-    <button class="btn bp" onclick="gN('s-payment')">Accepter et payer ✨</button>
-    <button class="btn bo" style="margin-top:8px" onclick="gB()">Choisir un autre pro</button>
+    <button class="btn bp" style="margin-bottom:10px" onclick="gN('s-payment')"><i class="ti ti-lock" style="margin-right:6px"></i>Accepter et payer en sécurité</button>
+    <button class="btn bo" onclick="gB()">Choisir un autre prestataire</button>
   </div>
 </div>
 
 <!-- PAIEMENT -->
 <div class="screen" id="s-payment">
-  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Paiement Gleam ✨</h1></div>
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Paiement sécurisé</h1></div>
   <div class="scroll pad">
-    <div class="sbanner"><i class="ti ti-lock" style="font-size:18px;flex-shrink:0"></i><span>SSL 256 bits · 3D Secure · Fonds bloqués</span></div>
+    <div class="sbanner" style="margin-bottom:16px"><i class="ti ti-shield-lock" style="font-size:18px;flex-shrink:0"></i><span>Chiffrement SSL 256 bits · 3D Secure · Fonds bloqués jusqu'à validation</span></div>
     <div class="card" style="margin-bottom:14px">
       <div class="drow"><span>Prestataire</span><span id="pn" style="font-weight:700"></span></div>
-      <div class="drow"><span>Prestation</span><span id="psvc"></span></div>
-      <div class="drow"><span style="color:var(--g);font-weight:700">Total</span><span id="ptot" style="color:var(--g);font-weight:800"></span></div>
+      <div class="drow"><span>Prestation</span><span id="psvc" style="text-align:right;max-width:55%;font-size:13px"></span></div>
+      <div class="drow"><span style="color:var(--g);font-weight:700">Total TTC</span><span id="ptot" style="color:var(--g);font-weight:800;font-size:18px"></span></div>
     </div>
     <div class="card" style="margin-bottom:14px">
-      <p class="lbl" style="margin-bottom:10px">Carte bancaire</p>
-      <div class="igrp"><label>Numéro</label><div class="cf">•••• •••• •••• 4242</div></div>
+      <p class="lbl" style="margin-bottom:12px">Carte bancaire</p>
+      <div class="igrp"><label>Numéro de carte</label><div class="cf">•••• •••• •••• 4242</div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="igrp"><label>Expiration</label><div class="cf">12 / 27</div></div>
+        <div class="igrp"><label>Date d'expiration</label><div class="cf">12 / 27</div></div>
         <div class="igrp"><label>CVV</label><div class="cf">•••</div></div>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--t2);font-weight:500"><i class="ti ti-shield-check" style="color:var(--g);font-size:16px"></i>Vos données bancaires ne sont jamais stockées</div>
     </div>
-    <button class="btn bp" onclick="confirmPay()">Payer <span id="pbtn"></span> avec Gleam ✨</button>
+    <button class="btn bp" onclick="confirmPay()">Payer <span id="pbtn"></span> en toute sécurité</button>
+    <p style="font-size:11px;color:var(--t2);text-align:center;margin-top:10px;line-height:1.6">Les fonds sont bloqués et libérés uniquement après votre validation de la prestation</p>
   </div>
 </div>
 
@@ -432,66 +661,79 @@ html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-si
 <div class="screen" id="s-unlocked">
   <div class="topbar"><h1>Contact déverrouillé ✨</h1></div>
   <div class="scroll pad" style="text-align:center">
-    <div style="width:64px;height:64px;background:var(--gl);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i class="ti ti-lock-open" style="font-size:30px;color:var(--g)"></i></div>
-    <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">Paiement confirmé ✨</h2>
-    <p style="font-size:14px;color:var(--t2);margin-bottom:16px">Contactez votre pro Gleam directement.</p>
+    <div style="width:72px;height:72px;background:var(--gl);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 8px 24px rgba(124,58,237,.2)"><i class="ti ti-lock-open" style="font-size:34px;color:var(--g)"></i></div>
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:6px">Paiement confirmé !</h2>
+    <p style="font-size:14px;color:var(--t2);margin-bottom:20px;line-height:1.6">Vous pouvez maintenant contacter votre prestataire directement.</p>
     <div class="card" style="text-align:left;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Coordonnées du prestataire</div>
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid #f0edf8"><i class="ti ti-user" style="font-size:18px;color:var(--g)"></i><div><div style="font-size:12px;color:var(--t2)">Responsable</div><div style="font-size:14px;font-weight:700" id="ul-name"></div></div></div>
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid #f0edf8"><i class="ti ti-phone" style="font-size:18px;color:var(--g)"></i><div><div style="font-size:12px;color:var(--t2)">Téléphone</div><div style="font-size:14px;font-weight:700;color:var(--g)" id="ul-phone"></div></div></div>
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 0"><i class="ti ti-mail" style="font-size:18px;color:var(--g)"></i><div><div style="font-size:12px;color:var(--t2)">Email</div><div style="font-size:14px;font-weight:700" id="ul-email"></div></div></div>
+      <div style="font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Coordonnées du prestataire</div>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:.5px solid #f0edf8"><i class="ti ti-user" style="font-size:20px;color:var(--g);width:24px;text-align:center"></i><div><div style="font-size:12px;color:var(--t2)">Responsable</div><div style="font-size:15px;font-weight:700" id="ul-name"></div></div></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:.5px solid #f0edf8"><i class="ti ti-phone" style="font-size:20px;color:var(--g);width:24px;text-align:center"></i><div><div style="font-size:12px;color:var(--t2)">Téléphone direct</div><div style="font-size:15px;font-weight:700;color:var(--g)" id="ul-phone"></div></div></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0"><i class="ti ti-mail" style="font-size:20px;color:var(--g);width:24px;text-align:center"></i><div><div style="font-size:12px;color:var(--t2)">Email</div><div style="font-size:14px;font-weight:600" id="ul-email"></div></div></div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button class="btn bp" style="flex:1;padding:12px" onclick="alert('Appel en cours…')"><i class="ti ti-phone"></i> Appeler</button>
-      <button class="btn bo" style="flex:1;padding:12px" onclick="gN('s-tracking')"><i class="ti ti-map"></i> Suivre</button>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <button class="btn bp" style="flex:1;padding:13px" onclick="alert('Appel en cours…')"><i class="ti ti-phone" style="margin-right:6px"></i>Appeler</button>
+      <button class="btn bo" style="flex:1;padding:13px" onclick="gN('s-tracking')"><i class="ti ti-map" style="margin-right:6px"></i>Suivi</button>
     </div>
-    <button class="btn bp" onclick="gN('s-tracking')">Suivre la prestation</button>
+    <button class="btn bp" onclick="gN('s-tracking')">Suivre ma prestation</button>
   </div>
 </div>
 
 <!-- SUIVI -->
 <div class="screen" id="s-tracking">
-  <div class="topbar"><button class="back" onclick="gN('s-home')"><i class="ti ti-x"></i></button><h1>Suivi Gleam ✨</h1></div>
+  <div class="topbar"><button class="back" onclick="gN('s-home')"><i class="ti ti-x"></i></button><h1>Suivi en direct</h1></div>
   <div style="padding:14px 16px;background:var(--w);border-bottom:.5px solid var(--b);flex-shrink:0">
-    <div style="font-size:12px;color:var(--t2);font-weight:600">Pro Gleam confirmé</div>
-    <div style="font-size:16px;font-weight:700;margin-top:2px" id="tname"></div>
-    <div style="font-size:13px;color:var(--g);margin-top:2px;font-weight:600">En route · ~18 min ✨</div>
+    <div style="font-size:12px;color:var(--t2);font-weight:500">Prestataire confirmé</div>
+    <div style="font-size:17px;font-weight:700;margin-top:2px" id="tname"></div>
+    <div style="font-size:13px;color:var(--g);margin-top:3px;font-weight:600"><i class="ti ti-clock" style="font-size:13px"></i> En route · Arrivée estimée ~18 min</div>
   </div>
-  <div class="scroll" style="padding:16px">
-    <div class="tl-step"><div class="tldot tl-done"><i class="ti ti-check"></i></div><div class="tlinfo"><h4>Paiement sécurisé</h4><p>Fonds bloqués</p></div></div>
+  <div class="scroll" style="padding:18px 16px">
+    <div class="tl-step"><div class="tldot tl-done"><i class="ti ti-check"></i></div><div class="tlinfo"><h4>Paiement sécurisé</h4><p>Fonds bloqués — libérés après prestation</p></div></div>
     <div class="tl-step"><div class="tldot tl-done"><i class="ti ti-check"></i></div><div class="tlinfo"><h4>Devis accepté</h4><p>Prestataire confirmé</p></div></div>
-    <div class="tl-step"><div class="tldot tl-on"><i class="ti ti-car"></i></div><div class="tlinfo"><h4>En route</h4><p>~18 min</p></div></div>
-    <div class="tl-step"><div class="tldot tl-wait"><i class="ti ti-spray"></i></div><div class="tlinfo"><h4>Prestation en cours</h4><p>En attente</p></div></div>
-    <div class="tl-step"><div class="tldot tl-wait"><i class="ti ti-sparkles"></i></div><div class="tlinfo"><h4>Terminé ✨</h4><p>En attente</p></div></div>
+    <div class="tl-step"><div class="tldot tl-done"><i class="ti ti-check"></i></div><div class="tlinfo"><h4>Coordonnées échangées</h4><p>Contact direct possible</p></div></div>
+    <div class="tl-step"><div class="tldot tl-on"><i class="ti ti-car"></i></div><div class="tlinfo"><h4>En route</h4><p>Arrivée estimée dans ~18 minutes</p></div></div>
+    <div class="tl-step"><div class="tldot tl-wait"><i class="ti ti-sparkles"></i></div><div class="tlinfo"><h4>Prestation en cours</h4><p>En attente</p></div></div>
+    <div class="tl-step"><div class="tldot tl-wait"><i class="ti ti-circle-check"></i></div><div class="tlinfo"><h4>Terminé — paiement libéré</h4><p>En attente de votre validation</p></div></div>
   </div>
-  <div style="padding:0 16px 26px"><button class="btn bp" onclick="gN('s-rating')">Simuler : prestation terminée</button></div>
+  <div style="padding:0 16px 26px"><button class="btn bp" onclick="gN('s-rating')">Valider la fin de prestation</button></div>
 </div>
 
 <!-- NOTATION -->
 <div class="screen" id="s-rating">
-  <div class="topbar"><h1>Évaluer sur Gleam</h1></div>
+  <div class="topbar"><h1>Évaluer la prestation</h1></div>
   <div class="scroll pad" style="text-align:center">
-    <i class="ti ti-sparkles" style="font-size:56px;color:var(--g);margin-bottom:12px;display:block"></i>
-    <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">C'est brillant ! ✨</h2>
-    <div style="background:var(--gl);border-radius:10px;padding:11px;margin:12px 0;font-size:13px;color:var(--gd);font-weight:700"><i class="ti ti-shield-check"></i> Paiement libéré · <span id="ramt"></span></div>
-    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px">
-      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(1)">★</span>
-      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(2)">★</span>
-      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(3)">★</span>
-      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(4)">★</span>
-      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(5)">★</span>
+    <i class="ti ti-sparkles" style="font-size:60px;color:var(--g);margin-bottom:14px;display:block"></i>
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:6px">Prestation terminée !</h2>
+    <p style="font-size:14px;color:var(--t2);margin-bottom:14px">Votre paiement a été libéré au prestataire.</p>
+    <div style="background:var(--gl);border-radius:12px;padding:12px;margin-bottom:22px;font-size:14px;color:var(--gd);font-weight:600"><i class="ti ti-shield-check"></i> Paiement de <span id="ramt"></span> traité avec succès</div>
+    <p style="font-size:14px;font-weight:600;margin-bottom:14px">Comment s'est passée votre expérience ?</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-bottom:20px">
+      <span style="font-size:42px;cursor:pointer;color:#D3D1C7;transition:color .1s" class="star-btn" onclick="rate(1)">★</span>
+      <span style="font-size:42px;cursor:pointer;color:#D3D1C7;transition:color .1s" class="star-btn" onclick="rate(2)">★</span>
+      <span style="font-size:42px;cursor:pointer;color:#D3D1C7;transition:color .1s" class="star-btn" onclick="rate(3)">★</span>
+      <span style="font-size:42px;cursor:pointer;color:#D3D1C7;transition:color .1s" class="star-btn" onclick="rate(4)">★</span>
+      <span style="font-size:42px;cursor:pointer;color:#D3D1C7;transition:color .1s" class="star-btn" onclick="rate(5)">★</span>
     </div>
-    <div class="igrp" style="text-align:left"><label>Commentaire</label><textarea class="inp" style="resize:none;height:90px" placeholder="Travail brillant, je recommande Gleam !" maxlength="500"></textarea></div>
-    <button class="btn bp" style="margin-top:8px" onclick="gN('s-home')">Envoyer ✨</button>
+    <div class="igrp" style="text-align:left"><label>Commentaire (optionnel)</label><textarea class="inp" style="height:100px" placeholder="Travail soigné, prestataire ponctuel et professionnel. Je recommande vivement !" maxlength="500"></textarea></div>
+    <button class="btn bp" style="margin-top:10px" onclick="gN('s-home')">Envoyer mon évaluation</button>
   </div>
 </div>
 
 <!-- HISTORIQUE -->
 <div class="screen" id="s-history">
-  <div class="topbar"><div class="gleam-logo"><i class="ti ti-sparkles"></i></div><h1>Historique Gleam</h1></div>
+  <div class="topbar"><div class="gleam-logo"><i class="ti ti-sparkles"></i></div><h1>Mes prestations</h1></div>
   <div class="scroll pad" id="hist-list">
-    <div class="hcard"><div class="hhead"><div class="htitle">Nettoyage voiture</div><span class="badge bgg">Terminé ✨</span></div><div class="hmeta"><i class="ti ti-calendar" style="font-size:12px"></i> 18 juin 2026 · ProClean Paris</div><div class="hfoot"><span style="font-size:14px;color:var(--g);font-weight:700">85€</span><span class="stars">★★★★★</span></div></div>
-    <div class="hcard"><div class="hhead"><div class="htitle">Tapis & moquette</div><span class="badge bgg">Terminé ✨</span></div><div class="hmeta"><i class="ti ti-calendar" style="font-size:12px"></i> 3 juin 2026 · Éclat Net</div><div class="hfoot"><span style="font-size:14px;color:var(--g);font-weight:700">110€</span><span class="stars">★★★★☆</span></div></div>
+    <div class="hcard">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px"><div style="font-size:15px;font-weight:700">Nettoyage voiture</div><span class="badge bgg">Terminé</span></div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:4px">Intérieur + Extérieur · SUV</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:10px"><i class="ti ti-calendar" style="font-size:12px"></i> 18 juin 2026 · ProClean Paris</div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:16px;color:var(--g);font-weight:700">85€</span><span class="stars">★★★★★ <span style="color:var(--t2);font-size:11px">5.0</span></span></div>
+    </div>
+    <div class="hcard">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px"><div style="font-size:15px;font-weight:700">Tapis & moquette</div><span class="badge bgg">Terminé</span></div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:4px">3 pièces · Taches détartrées</div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:10px"><i class="ti ti-calendar" style="font-size:12px"></i> 3 juin 2026 · Éclat Net</div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:16px;color:var(--g);font-weight:700">110€</span><span class="stars">★★★★☆ <span style="color:var(--t2);font-size:11px">4.0</span></span></div>
+    </div>
   </div>
   <div class="bnav">
     <button class="ni" onclick="gN('s-home')"><i class="ti ti-home"></i>Accueil</button>
@@ -503,25 +745,27 @@ html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-si
 
 <!-- PROFIL -->
 <div class="screen" id="s-profile">
-  <div class="hero-grad" style="padding:50px 16px 20px;text-align:center;color:#fff;flex-shrink:0">
-    <div style="width:68px;height:68px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;margin:0 auto 10px" id="pav">SM</div>
-    <div style="font-size:17px;font-weight:700" id="pname">Sophie Martin</div>
-    <div style="font-size:13px;opacity:.8;margin-top:3px">Membre Gleam ✨</div>
+  <div class="hero-grad" style="padding:50px 16px 24px;text-align:center;color:#fff;flex-shrink:0">
+    <div style="width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;margin:0 auto 12px;box-shadow:0 4px 16px rgba(0,0,0,.15)" id="pav">SM</div>
+    <div style="font-size:18px;font-weight:700" id="pname">Sophie Martin</div>
+    <div style="font-size:13px;opacity:.8;margin-top:4px">Membre Gleam depuis juin 2026</div>
   </div>
   <div class="scroll pad">
     <div class="stat-grid">
       <div class="stat"><div class="sv" id="pcnt">3</div><div class="sl">Prestations</div></div>
-      <div class="stat"><div class="sv">4.9</div><div class="sl">Note Gleam</div></div>
-      <div class="stat"><div class="sv" id="ptotal">290€</div><div class="sl">Dépensé</div></div>
+      <div class="stat"><div class="sv">4.9</div><div class="sl">Note moyenne</div></div>
+      <div class="stat"><div class="sv" id="ptotal">290€</div><div class="sl">Total dépensé</div></div>
     </div>
     <div class="pmenu">
-      <div class="pitem" onclick="gN('s-history')"><i class="ti ti-clock"></i><span>Historique Gleam</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem" onclick="gN('s-history')"><i class="ti ti-clock"></i><span>Mes prestations</span><i class="ti ti-chevron-right arr"></i></div>
       <div class="pitem" onclick="gN('s-chat-list')"><i class="ti ti-message-circle"></i><span>Mes messages</span><i class="ti ti-chevron-right arr"></i></div>
       <div class="pitem"><i class="ti ti-credit-card"></i><span>Moyens de paiement</span><i class="ti ti-chevron-right arr"></i></div>
-      <div class="pitem"><i class="ti ti-shield"></i><span>Sécurité</span><i class="ti ti-chevron-right arr"></i></div>
-      <div class="pitem"><i class="ti ti-help"></i><span>Aide Gleam</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem"><i class="ti ti-map-pin"></i><span>Mes adresses</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem"><i class="ti ti-bell"></i><span>Notifications</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem"><i class="ti ti-shield"></i><span>Sécurité du compte</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem"><i class="ti ti-help"></i><span>Aide & support</span><i class="ti ti-chevron-right arr"></i></div>
     </div>
-    <button class="btn bo" onclick="go('s-auth')">Se déconnecter</button>
+    <button class="btn bo" style="margin-bottom:8px" onclick="go('s-auth')">Se déconnecter</button>
   </div>
   <div class="bnav">
     <button class="ni" onclick="gN('s-home')"><i class="ti ti-home"></i>Accueil</button>
@@ -531,36 +775,67 @@ html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-si
   </div>
 </div>
 
-<!-- PRO -->
+<!-- PRO DASHBOARD -->
 <div class="screen" id="s-pro">
-  <div class="hero-grad" style="padding:50px 16px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0">
-    <div style="flex:1"><div style="font-size:12px;color:rgba(255,255,255,.75);font-weight:600">Gleam Pro ✨</div><div style="font-size:18px;font-weight:800;color:#fff">ProClean Paris</div></div>
-    <div onclick="go('s-auth')" style="background:rgba(255,255,255,.2);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;cursor:pointer">PC</div>
+  <div class="hero-grad" style="padding:50px 16px 18px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+    <div style="flex:1">
+      <div style="font-size:12px;color:rgba(255,255,255,.75);font-weight:500">Espace prestataire</div>
+      <div style="font-size:20px;font-weight:800;color:#fff">ProClean Paris</div>
+    </div>
+    <div onclick="go('s-auth')" style="background:rgba(255,255,255,.2);border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;cursor:pointer">PC</div>
   </div>
   <div class="scroll pad">
-    <div class="togw"><div><div style="font-size:14px;font-weight:700">Disponibilité</div><div style="font-size:12px;color:var(--t2)" id="dlbl">Disponible ✨</div></div><button class="tog on" id="dtog" onclick="tDispo()"></button></div>
+    <div class="togw">
+      <div>
+        <div style="font-size:14px;font-weight:700">Disponibilité</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:2px" id="dlbl">✅ Disponible — vous recevez des demandes</div>
+      </div>
+      <button class="tog on" id="dtog" onclick="tDispo()"></button>
+    </div>
     <div class="stat-grid">
       <div class="stat"><div class="sv">12</div><div class="sl">Missions</div></div>
       <div class="stat"><div class="sv">4.8</div><div class="sl">Note</div></div>
       <div class="stat"><div class="sv">1 380€</div><div class="sl">Gains nets</div></div>
     </div>
-    <p class="lbl">Nouvelles demandes</p>
+
+    <div class="section-header"><i class="ti ti-bell"></i><h3>Nouvelles demandes</h3></div>
+
     <div class="mc">
-      <div class="mch"><span style="font-size:14px;font-weight:700">Voiture · Client #1042</span><span class="badge bam">Nouveau ✨</span></div>
-      <div class="mcm"><i class="ti ti-map-pin" style="font-size:12px"></i> 15e arr. · 800 m · Demain matin</div>
+      <div class="mch">
+        <span style="font-size:14px;font-weight:700">Voiture · Client #1042</span>
+        <span class="badge bam">🆕 Nouveau</span>
+      </div>
+      <div class="mcm">
+        <div><i class="ti ti-map-pin" style="font-size:12px"></i> 15e arr. · 800 m · Demain matin</div>
+        <div style="margin-top:4px;font-style:italic">"SUV Peugeot 5008, intérieur + extérieur, taches sur sièges avant et moquette très sale"</div>
+        <div style="margin-top:4px;color:var(--g);font-weight:600">📸 3 photos jointes</div>
+      </div>
       <div class="brow">
         <button class="bsm bchat" onclick="gN('s-pro-chat')"><i class="ti ti-message-circle"></i> Questions</button>
         <button class="bsm bde" onclick="decCard(this)"><i class="ti ti-x"></i> Passer</button>
       </div>
     </div>
+
     <div class="mc">
-      <div class="mch"><span style="font-size:14px;font-weight:700">Tapis · Client #1089</span><span class="badge bgg">Clarifié ✨</span></div>
-      <div class="mcm"><i class="ti ti-map-pin" style="font-size:12px"></i> 11e arr. · 1,4 km</div>
-      <div class="igrp"><label>Votre prix Gleam</label><input class="inp" placeholder="Ex: 120€" id="pq2" maxlength="10" inputmode="numeric"></div>
+      <div class="mch">
+        <span style="font-size:14px;font-weight:700">Matelas · Client #1089</span>
+        <span class="badge bgg">✅ Clarifié</span>
+      </div>
+      <div class="mcm">
+        <div><i class="ti ti-map-pin" style="font-size:12px"></i> 11e arr. · 1,4 km · Demain après-midi</div>
+        <div style="margin-top:4px;font-style:italic">"Matelas double 160x200, taches d'humidité, besoin désinfection"</div>
+      </div>
+      <div class="igrp"><label>Votre prix tout inclus (TTC)</label><input class="inp" placeholder="Ex: 75€" id="pq2" maxlength="10" inputmode="numeric" type="text"></div>
       <div class="brow">
-        <button class="bsm bac" onclick="subDev(this,'pq2')"><i class="ti ti-send"></i> Envoyer devis</button>
+        <button class="bsm bac" onclick="subDev(this,'pq2')"><i class="ti ti-send"></i> Envoyer le devis</button>
         <button class="bsm bde" onclick="decCard(this)"><i class="ti ti-x"></i> Passer</button>
       </div>
+    </div>
+
+    <div class="section-header" style="margin-top:8px"><i class="ti ti-history"></i><h3>Mission en cours</h3></div>
+    <div class="mc" style="border:2px solid var(--g)">
+      <div class="mch"><span style="font-size:14px;font-weight:700">Appartement 70m²</span><span class="badge bgg">🔄 En cours</span></div>
+      <div class="mcm"><i class="ti ti-map-pin" style="font-size:12px"></i> 8e arr. · Sophie M. · Aujourd'hui 10h<br><span style="color:var(--g);font-weight:600"><i class="ti ti-credit-card" style="font-size:12px"></i> Paiement de 95€ sécurisé — libéré à la fin</span></div>
     </div>
   </div>
 </div>
@@ -569,170 +844,366 @@ html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-si
 <div class="screen" id="s-pro-chat">
   <div class="topbar">
     <button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button>
-    <div style="flex:1"><div style="font-size:15px;font-weight:700">Client #1042</div><div class="anon-tag" style="margin-top:2px"><i class="ti ti-eye-off" style="font-size:11px"></i> Anonyme Gleam</div></div>
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:700">Client #1042</div>
+      <div class="anon-tag" style="margin-top:2px"><i class="ti ti-eye-off" style="font-size:11px"></i> Anonyme · Voiture</div>
+    </div>
   </div>
   <div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
-    <div style="padding:8px 16px;background:#f8f7ff;border-bottom:.5px solid var(--b);flex-shrink:0;font-size:12px;color:#B44D00;font-weight:600"><i class="ti ti-alert-triangle" style="font-size:11px"></i> Coordonnées bloquées par Gleam avant paiement</div>
+    <div style="padding:10px 16px;background:#f8f7ff;border-bottom:.5px solid var(--b);flex-shrink:0;font-size:12px;color:#B44D00;font-weight:600"><i class="ti ti-alert-triangle" style="font-size:12px"></i> Posez vos questions avant d'envoyer votre devis · Coordonnées bloquées</div>
     <div class="ca" id="pro-chat-area">
-      <div class="msg msys">✨ Gleam — Posez vos questions pour un devis précis</div>
-      <div style="display:flex;justify-content:flex-end"><div class="msg mo">Bonjour ! Intérieur ou extérieur pour la voiture ?</div></div>
-      <div><div class="ms">Client #1042</div><div class="msg mi">Les deux ! C'est un SUV avec des taches sur les sièges.</div></div>
+      <div class="msg msys">Nouvelle demande · Clarifiez les détails avant d'établir votre devis</div>
+      <div style="display:flex;justify-content:flex-end"><div class="msg mo">Bonjour ! Votre voiture est un SUV, souhaitez-vous le nettoyage intérieur + extérieur ou seulement l'un des deux ?</div></div>
+      <div><div class="ms">Client #1042</div><div class="msg mi">Bonjour ! Les deux s'il vous plaît. Il y a surtout des taches sur les sièges avant et la moquette est très sale.</div></div>
+      <div style="display:flex;justify-content:flex-end"><div class="msg mo">Merci ! Y a-t-il des taches huileuses ou plutôt des taches alimentaires ? Cela m'aidera à préparer les bons produits.</div></div>
+      <div><div class="ms">Client #1042</div><div class="msg mi">Alimentaires principalement. Il y a aussi des traces de boue sur les tapis.</div></div>
     </div>
+    <div style="padding:6px 12px 4px;background:var(--w);flex-shrink:0"><div style="font-size:11px;color:#B44D00;background:#FFF0E6;border-radius:6px;padding:5px 9px;font-weight:600"><i class="ti ti-alert-triangle" style="font-size:11px"></i> Coordonnées personnelles bloquées automatiquement</div></div>
     <div class="cbar">
-      <input id="pro-cinp" placeholder="Poser une question…" maxlength="500" onkeydown="if(event.key==='Enter')sendProMsg()">
+      <input id="pro-cinp" placeholder="Poser une question au client…" maxlength="500" onkeydown="if(event.key==='Enter')sendProMsg()">
       <button onclick="sendProMsg()"><i class="ti ti-send"></i></button>
     </div>
   </div>
-  <div style="padding:10px 16px 16px;background:var(--w);border-top:.5px solid var(--b)">
-    <button class="btn bp" onclick="gN('s-pro-devis-form')">Envoyer le devis Gleam ✨</button>
+  <div style="padding:12px 16px 18px;background:var(--w);border-top:.5px solid var(--b)">
+    <button class="btn bp" onclick="gN('s-pro-devis-form')">J'ai assez d'infos · Envoyer le devis</button>
   </div>
 </div>
 
 <!-- PRO DEVIS FORM -->
 <div class="screen" id="s-pro-devis-form">
-  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Devis Gleam</h1></div>
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Envoyer un devis</h1></div>
   <div class="scroll pad">
-    <div style="background:var(--gl);border-radius:10px;padding:12px;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:700;color:var(--gd);margin-bottom:6px">Récapitulatif</div>
-      <div style="font-size:13px;color:var(--gd)">Client #1042 · Voiture SUV<br>Intérieur + extérieur · Demain matin</div>
+    <div style="background:var(--gl);border-radius:12px;padding:14px;margin-bottom:16px;border:.5px solid var(--b)">
+      <div style="font-size:11px;font-weight:700;color:var(--gd);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Récapitulatif de la demande</div>
+      <div style="font-size:13px;color:var(--gd);line-height:1.7">👤 Client #1042 · Voiture SUV<br>🔧 Intérieur + extérieur · Taches sièges + moquette boueuse<br>📅 Demain matin · 15e arrondissement</div>
     </div>
-    <div class="igrp"><label>Prix tout inclus TTC</label><input class="inp" id="pro-price" type="text" inputmode="numeric" placeholder="Ex: 85€" maxlength="10"></div>
-    <div class="igrp"><label>Description</label><textarea class="inp" id="pro-desc" style="resize:none;height:90px" placeholder="Nettoyage intérieur + extérieur SUV…" maxlength="300"></textarea></div>
-    <div class="igrp"><label>Créneau proposé</label>
-      <select class="inp" id="pro-slot">
-        <option>Demain matin (9h–12h)</option>
-        <option>Demain après-midi (14h–18h)</option>
-        <option>Dans 2 jours matin</option>
+    <div class="igrp">
+      <label>Prix tout inclus TTC <span style="color:var(--g)">*</span></label>
+      <input class="inp" id="pro-price" type="text" inputmode="numeric" placeholder="Ex: 85€" maxlength="10">
+      <div class="hint">Incluez tous les frais (déplacement, produits, main d'œuvre)</div>
+    </div>
+    <div class="igrp">
+      <label>Description détaillée de la prestation <span style="color:var(--g)">*</span></label>
+      <textarea class="inp" id="pro-desc" rows="4" placeholder="Ex: Nettoyage intérieur complet (aspiration, shampooing moquette et sièges, nettoyage plastiques) + extérieur (lavage haute pression, vitres). Produits professionnels écologiques." maxlength="400"></textarea>
+    </div>
+    <div class="igrp">
+      <label>Créneau d'intervention proposé</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <input class="inp" id="pro-date" type="date">
+        <select class="inp" id="pro-heure">
+          <option>8h00</option><option>8h30</option><option>9h00</option><option>9h30</option>
+          <option>10h00</option><option>10h30</option><option>11h00</option><option>14h00</option>
+          <option>14h30</option><option>15h00</option><option>15h30</option><option>16h00</option>
+        </select>
+      </div>
+    </div>
+    <div class="igrp">
+      <label>Durée estimée</label>
+      <select class="inp" id="pro-duree">
+        <option>1 heure</option><option>1h30</option><option>2 heures</option>
+        <option>2h30</option><option>3 heures</option><option>3h30</option><option>4 heures et plus</option>
       </select>
     </div>
-    <button class="btn bp" onclick="sendProDevis()">Envoyer ce devis ✨</button>
+    <button class="btn bp" onclick="sendProDevis()">Envoyer ce devis au client</button>
+    <p style="font-size:11px;color:var(--t2);text-align:center;margin-top:10px">Le client sera notifié immédiatement</p>
   </div>
 </div>
 
 <script>
 const san=s=>String(s).replace(/[<>"'&]/g,c=>({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#x27;','&':'&amp;'}[c]||c));
-const BLOCK=/(\b0[67]\d{8}\b|\b\+33[67][\d\s]{8,}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram|signal|snapchat)/i;
-const API = 'https://gleam-production-9b95.up.railway.app';
+const BLOCK=/(\b0[67]\d{8}\b|\b\+33[67][\d\s]{8,}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram|signal|snapchat|facebook)/i;
+const API='https://gleam-production-9b95.up.railway.app';
 
-let _h=['s-auth'],_ch={},_sel=[],_aC='',_dispo=true,_att=0,_lock=0,_role='client',_hCnt=3,_hTot=290,_token=null;
-
+let _h=['s-auth'],_ch={},_sel=[],_aC='',_autreLib='',_carOpts=[],_dispo=true,_att=0,_lock=0,_role='client',_hCnt=3,_hTot=290,_token=null,_repIdx=0;
 const vE=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)&&e.length<=100;
 const vP=p=>p&&p.length>=8;
 const rl=()=>{if(Date.now()<_lock)return false;_att++;if(_att>=5){_lock=Date.now()+30000;_att=0;return false;}return true;};
 const now=()=>{const d=new Date();return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');};
+const today=()=>new Date().toISOString().split('T')[0];
 
-function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');}
+// ── Navigation ────────────────────────────────────────────
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById(id);if(el)el.classList.add('active');
+  if(id==='s-request'){
+    const d=document.getElementById('slot-date');
+    if(d){d.min=today();if(!d.value)d.value=today();}
+    const pd=document.getElementById('pro-date');
+    if(pd){pd.min=today();if(!pd.value)pd.value=today();}
+  }
+  window.scrollTo(0,0);
+}
 function gN(id){_h.push(id);go(id);}
 function gB(){if(_h.length>1)_h.pop();go(_h[_h.length-1]||'s-home');}
 
+// ── Auth ──────────────────────────────────────────────────
 function sAuth(m){
   document.getElementById('lf').style.display=m==='login'?'':'none';
   document.getElementById('sf2').style.display=m==='signup'?'':'none';
-  ['login','signup'].forEach(t=>{const b=document.getElementById(t==='login'?'tl':'ts'),on=t===m;b.style.background=on?'var(--w)':'transparent';b.style.color=on?'var(--t)':'var(--t2)';});
+  ['login','signup'].forEach(t=>{
+    const b=document.getElementById(t==='login'?'tl':'ts'),on=t===m;
+    b.style.background=on?'var(--w)':'transparent';
+    b.style.color=on?'var(--t)':'var(--t2)';
+    b.style.boxShadow=on?'var(--shadow)':'none';
+  });
 }
 function tP(id,btn){const i=document.getElementById(id);const show=i.type==='password';i.type=show?'text':'password';btn.querySelector('i').className='ti ti-eye'+(show?'-off':'');}
-function chkStr(p){const f=document.getElementById('str-fill'),l=document.getElementById('str-lbl');if(!p){f.style.width='0';l.textContent='';return;}let s=0;if(p.length>=8)s++;if(p.length>=12)s++;if(/[A-Z]/.test(p))s++;if(/[0-9]/.test(p))s++;if(/[^a-zA-Z0-9]/.test(p))s++;const lv=[['0%',''],['25%','Faible','#E24B4A'],['50%','Moyen','#EF9F27'],['75%','Bien','var(--g)'],['100%','Fort','var(--gd)'],['100%','Très fort','var(--gd)']];const[w,t,c]=lv[s]||lv[0];f.style.width=w;f.style.background=c||'#ccc';l.textContent=t;l.style.color=c||'var(--t2)';}
-function sRole(r){_role=r;['client','pro'].forEach(role=>{const el=document.getElementById(role==='client'?'rc':'rp'),on=role===r;el.style.border=on?'2px solid var(--g)':'.5px solid var(--b)';el.style.background=on?'var(--gl)':'var(--w)';el.style.color=on?'var(--gd)':'var(--t2)';});}
+function chkStr(p){
+  const f=document.getElementById('str-fill'),l=document.getElementById('str-lbl');
+  if(!p){f.style.width='0';l.textContent='';return;}
+  let s=0;
+  if(p.length>=8)s++;if(p.length>=12)s++;
+  if(/[A-Z]/.test(p))s++;if(/[0-9]/.test(p))s++;if(/[^a-zA-Z0-9]/.test(p))s++;
+  const lv=[['0%',''],['20%','Très faible','#E24B4A'],['40%','Faible','#F97316'],['60%','Moyen','#EF9F27'],['80%','Fort','var(--g)'],['100%','Très fort','var(--gd)']];
+  const[w,t,c]=lv[s]||lv[0];
+  f.style.width=w;f.style.background=c||'#ccc';l.textContent=t;l.style.color=c||'var(--t2)';
+}
+function sRole(r){
+  _role=r;
+  const rc=document.getElementById('rc'),rp=document.getElementById('rp'),on=r==='client';
+  rc.style.border=on?'2px solid var(--g)':'2px solid var(--b)';rc.style.background=on?'var(--gl)':'var(--w)';rc.querySelector('i').style.color=on?'var(--g)':'var(--t3)';rc.querySelector('div').style.color=on?'var(--gd)':'var(--t2)';
+  rp.style.border=!on?'2px solid var(--g)':'2px solid var(--b)';rp.style.background=!on?'var(--gl)':'var(--w)';rp.querySelector('i').style.color=!on?'var(--g)':'var(--t3)';rp.querySelector('div').style.color=!on?'var(--gd)':'var(--t2)';
+}
 function sErr(id,m){const el=document.getElementById(id);if(el){el.textContent=m;el.style.display='block';}}
 function hErr(id){const el=document.getElementById(id);if(el)el.style.display='none';}
 
 async function doLogin(){
-  if(!rl()){sErr('lerr','Trop de tentatives. Attendez 30s.');return;}
+  if(!rl()){sErr('lerr','Trop de tentatives. Attendez 30 secondes.');return;}
   const email=document.getElementById('le').value.trim();
   const pass=document.getElementById('lp').value;
-  if(!vE(email)){sErr('lerr','Email invalide.');return;}
-  if(!vP(pass)){sErr('lerr','Mot de passe trop court.');return;}
+  if(!vE(email)){sErr('lerr','Adresse email invalide.');return;}
+  if(!vP(pass)){sErr('lerr','Mot de passe trop court (8 caractères min.).');return;}
   hErr('lerr');
   try{
     const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
     const d=await r.json();
-    if(!r.ok){sErr('lerr',d.error||'Erreur connexion.');return;}
-    _token=d.token;
-    const name=san(d.user.prenom||email.split('@')[0]);
-    const ini=name.slice(0,2).toUpperCase();
-    document.getElementById('uname').textContent=name;
-    document.getElementById('uav').textContent=ini;
-    document.getElementById('pname').textContent=name;
-    document.getElementById('pav').textContent=ini;
+    if(!r.ok){sErr('lerr',d.error||'Identifiants incorrects.');return;}
+    _token=d.token;_role=d.user.type==='societe'?'pro':'client';
+    setUser(d.user.prenom+' '+d.user.nom,san(email));
     document.getElementById('oe').textContent=san(email);
-    _role=d.user.type==='societe'?'pro':'client';
     gN('s-otp');
-  }catch(e){sErr('lerr','Erreur réseau. Réessayez.');}
+  }catch(e){sErr('lerr','Erreur réseau. Vérifiez votre connexion.');}
 }
 
 async function doSignup(){
-  const name=document.getElementById('sn').value.trim();
+  const prenom=document.getElementById('sprenom').value.trim();
+  const nom=document.getElementById('snom').value.trim();
   const email=document.getElementById('se').value.trim();
-  const pass=document.getElementById('spw').value;
   const tel=document.getElementById('sp').value.trim();
-  if(!name||name.length<2){sErr('serr','Nom invalide.');return;}
-  if(!vE(email)){sErr('serr','Email invalide.');return;}
-  if(!vP(pass)){sErr('serr','8 caractères minimum.');return;}
+  const pass=document.getElementById('spw').value;
+  if(!prenom){sErr('serr','Prénom requis.');return;}
+  if(!nom){sErr('serr','Nom requis.');return;}
+  if(!vE(email)){sErr('serr','Adresse email invalide.');return;}
+  if(!vP(pass)){sErr('serr','Mot de passe : 8 caractères minimum.');return;}
   hErr('serr');
   try{
-    const parts=name.trim().split(' ');
-    const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,prenom:parts[0],nom:parts.slice(1).join(' ')||parts[0],telephone:tel,type:_role==='pro'?'societe':'client'})});
+    const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,prenom,nom,telephone:tel,type:_role==='pro'?'societe':'client'})});
     const d=await r.json();
-    if(!r.ok){sErr('serr',d.error||'Erreur inscription.');return;}
-    const sn=san(name),ini=sn.split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'??';
-    document.getElementById('uname').textContent=sn.split(' ')[0];
-    document.getElementById('uav').textContent=ini;
-    document.getElementById('pname').textContent=sn;
-    document.getElementById('pav').textContent=ini;
+    if(!r.ok){sErr('serr',d.error||'Erreur lors de l\'inscription.');return;}
+    _role=d.user?.type==='societe'?'pro':'client';
+    setUser(prenom+' '+nom,san(email));
     document.getElementById('oe').textContent=san(email);
     gN('s-otp');
-  }catch(e){sErr('serr','Erreur réseau. Réessayez.');}
+  }catch(e){sErr('serr','Erreur réseau. Vérifiez votre connexion.');}
+}
+
+function setUser(name,email){
+  const sn=san(name),ini=sn.split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'??';
+  document.getElementById('uname').textContent=sn.split(' ')[0];
+  document.getElementById('uav').textContent=ini;
+  document.getElementById('pname').textContent=sn;
+  document.getElementById('pav').textContent=ini;
+  if(document.getElementById('pemail'))document.getElementById('pemail').textContent=email;
 }
 
 function oN(inp,idx){inp.value=inp.value.slice(-1).replace(/[^0-9]/g,'');if(inp.value&&idx<5)document.getElementById('o'+(idx+1)).focus();}
 function vOTP(){gN(_role==='pro'?'s-pro':'s-home');}
 
-function sAutre(el,name){document.querySelectorAll('.ac').forEach(c=>c.classList.remove('on'));el.classList.add('on');_aC=name;const btn=document.getElementById('abt');if(btn){btn.disabled=false;btn.style.opacity='1';}}
-function cAutre(){if(!_aC)return;if(!_sel.includes(_aC))_sel.push(_aC);const t=document.getElementById('atag'),l=document.getElementById('atagl');if(t&&l){l.textContent=_aC;t.style.display='block';}gN('s-request');}
-function qBook(svc){_sel=[svc];document.querySelectorAll('#s-request .svc[data-s]').forEach(el=>el.classList.toggle('on',el.dataset.s===svc));gN('s-request');}
-function tSvc(el){el.classList.toggle('on');const s=el.dataset.s;if(el.classList.contains('on'))_sel.push(s);else _sel=_sel.filter(x=>x!==s);}
+// ── Prestations ───────────────────────────────────────────
+const SVCS={
+  voiture:{label:'Voiture',icon:'ti-car',desc:'Intérieur, extérieur ou complet',showOpts:true},
+  canape:{label:'Canapé',icon:'ti-armchair',desc:'Nettoyage en profondeur',showOpts:false},
+  matelas:{label:'Matelas',icon:'ti-bed',desc:'Simple, double, king size',showOpts:false},
+  terrasse:{label:'Terrasse',icon:'ti-sun',desc:'Karcher, balayage, joints',showOpts:false},
+  piscine:{label:'Piscine',icon:'ti-droplet',desc:'Nettoyage & traitement',showOpts:false},
+  toiture:{label:'Toiture',icon:'ti-home',desc:'Mousse, tuiles, gouttières',showOpts:false},
+  vitres:{label:'Vitres',icon:'ti-window',desc:'Intérieur et extérieur',showOpts:false},
+  autre:{label:'Autre',icon:'ti-plus',desc:'Prestation personnalisée',showOpts:false},
+};
 
+function qBook(svc){
+  _sel=[svc];_aC='';_carOpts=[];
+  if(svc==='autre'){
+    gN('s-request');
+    // Afficher champ libre
+    const display=document.getElementById('req-svc-display');
+    const tag=document.getElementById('svc-tag');
+    if(display&&tag){
+      display.style.display='block';
+      tag.innerHTML='<div class="selected-tag"><i class="ti ti-plus" style="font-size:16px"></i>Autre prestation<button onclick="clearSvc()">✕</button></div><div style="margin-top:10px"><input class="inp" id="autre-inline" type="text" placeholder="Ex: nettoyage de mon matelas, bateau, jacuzzi…" maxlength="100"></div>';
+    }
+    document.getElementById('car-options').style.display='none';
+    const d=document.getElementById('slot-date');if(d&&!d.value){d.min=today();d.value=today();}
+  }else{
+    gN('s-request');
+    showReqSvc(svc);
+  }
+}
+
+function showReqSvc(svc){
+  const s=SVCS[svc];if(!s)return;
+  const display=document.getElementById('req-svc-display');
+  const tag=document.getElementById('svc-tag');
+  if(display&&tag){
+    display.style.display='block';
+    tag.innerHTML='<div class="selected-tag"><i class="ti '+s.icon+'" style="font-size:16px"></i>'+san(s.label)+'<button onclick="clearSvc()">✕</button></div>';
+  }
+  const carOpts=document.getElementById('car-options');
+  if(carOpts)carOpts.style.display=s.showOpts?'block':'none';
+  const d=document.getElementById('slot-date');if(d&&!d.value){d.min=today();d.value=today();}
+}
+
+function clearSvc(){
+  _sel=[];_aC='';_carOpts=[];
+  document.getElementById('req-svc-display').style.display='none';
+  document.getElementById('car-options').style.display='none';
+}
+
+function toggleOpt(opt){
+  const el=document.getElementById('opt-'+opt);
+  if(_carOpts.includes(opt)){
+    _carOpts=_carOpts.filter(x=>x!==opt);
+    el.classList.remove('on');
+  }else{
+    _carOpts.push(opt);
+    el.classList.add('on');
+  }
+}
+
+// ── Autre prestation ──────────────────────────────────────
+function sAutre(el,name){
+  document.querySelectorAll('.autre-card').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');_aC=name;_autreLib='';
+  const btn=document.getElementById('abt');if(btn){btn.disabled=false;btn.style.opacity='1';}
+}
+function cAutre(){
+  if(!_aC)return;
+  _sel=[_aC];
+  gN('s-request');
+  showSvcLibre(_aC);
+}
+function cAutreLibre(){
+  const val=document.getElementById('autre-libre').value.trim();
+  if(!val){alert('Veuillez décrire votre prestation.');return;}
+  _aC=val;_autreLib=val;_sel=[val];
+  gN('s-request');
+  showSvcLibre(val);
+}
+function showSvcLibre(label){
+  const display=document.getElementById('req-svc-display');
+  const tag=document.getElementById('svc-tag');
+  if(display&&tag){
+    display.style.display='block';
+    tag.innerHTML='<div class="selected-tag"><i class="ti ti-sparkles" style="font-size:16px"></i>'+san(label)+'<button onclick="clearSvc()">✕</button></div>';
+  }
+  document.getElementById('car-options').style.display='none';
+  const d=document.getElementById('slot-date');if(d&&!d.value){d.min=today();d.value=today();}
+}
+
+// ── Envoi demande ─────────────────────────────────────────
+async function sendReq(){
+  const desc=document.getElementById('description').value.trim();
+  const addr=document.getElementById('addr').value.trim();
+  const date=document.getElementById('slot-date').value;
+  const heure=document.getElementById('slot-heure').value||'Flexible';
+  const flex=document.getElementById('slot-flex').value;
+
+  if(!(_sel.length||_aC)){alert('Veuillez choisir une prestation.');return;}
+  if(!desc){alert('Veuillez décrire votre demande.');return;}
+  if(!addr){alert('Veuillez entrer une adresse.');return;}
+  if(!date){alert('Veuillez choisir une date.');return;}
+
+  // Si "autre", récupérer le texte libre
+  if(_sel[0]==='autre'){
+    const autreInp=document.getElementById('autre-inline');
+    const autreVal=autreInp?autreInp.value.trim():'';
+    if(!autreVal){alert('Veuillez décrire votre prestation dans le champ "Autre".');return;}
+    svcLabel=autreVal;
+  }
+    const optLabels={int:'Intérieur',ext:'Extérieur',both:'Intérieur + Extérieur'};
+    svcLabel='Voiture · '+_carOpts.map(o=>optLabels[o]||o).join(' + ');
+  }else{
+    svcLabel=SVCS[svcLabel]?.label||svcLabel;
+  }
+
+  const slot=date+' à '+heure+' ('+flex+')';
+  const fullDesc=svcLabel+' — '+desc;
+
+  document.getElementById('dsumm').textContent=svcLabel+' · '+date+' · '+addr;
+  document.getElementById('psvc').textContent=svcLabel;
+  _ch.svc=svcLabel;_ch.addr=san(addr);_ch.slot=slot;_ch.desc=san(desc);
+  document.getElementById('chat-svc-label').textContent=svcLabel;
+
+  try{
+    await fetch(API+'/api/demandes',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(_token||'')},body:JSON.stringify({prestation:svcLabel,adresse:addr,creneau:slot,notes:desc})});
+  }catch(e){}
+
+  gN('s-wait');
+  let t=178,iv=setInterval(()=>{
+    t--;
+    const m=Math.floor(t/60),s=t%60;
+    const el=document.getElementById('timer');
+    if(el)el.textContent=m+':'+(s<10?'0':'')+s;
+    if(t<=0)clearInterval(iv);
+  },1000);
+}
+
+// ── Photos ────────────────────────────────────────────────
 function addPhotos(input){
   const grid=document.getElementById('photo-grid');
-  Array.from(input.files).slice(0,5).forEach(file=>{
-    if(grid.querySelectorAll('img').length>=5)return;
+  const existing=grid.querySelectorAll('.photo-thumb').length;
+  Array.from(input.files).slice(0,5-existing).forEach(file=>{
     const reader=new FileReader();
     reader.onload=e=>{
-      const wrap=document.createElement('div');wrap.style.cssText='position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:.5px solid var(--b)';
-      const img=document.createElement('img');img.src=e.target.result;img.style.cssText='width:100%;height:100%;object-fit:cover';
-      const del=document.createElement('button');del.innerHTML='<i class="ti ti-x"></i>';del.style.cssText='position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;border-radius:50%;width:20px;height:20px;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0';del.onclick=()=>wrap.remove();
-      wrap.appendChild(img);wrap.appendChild(del);grid.insertBefore(wrap,grid.lastElementChild);
+      const wrap=document.createElement('div');wrap.className='photo-thumb';
+      const img=document.createElement('img');img.src=e.target.result;
+      const del=document.createElement('button');del.className='photo-del';
+      del.innerHTML='<i class="ti ti-x" style="font-size:11px"></i>';
+      del.onclick=()=>wrap.remove();
+      wrap.appendChild(img);wrap.appendChild(del);
+      grid.insertBefore(wrap,grid.lastElementChild);
     };reader.readAsDataURL(file);
   });input.value='';
 }
 
-async function sendReq(){
-  const addr=document.getElementById('addr').value.trim().slice(0,150)||'Paris';
-  const slot=document.getElementById('slot').value;
-  const svc=san(_sel.length?_sel.join(', '):'Nettoyage');
-  document.getElementById('dsumm').textContent=svc+' · '+slot+' · '+san(addr);
-  document.getElementById('dsl').textContent=slot;
-  document.getElementById('psvc').textContent=svc;
-  _ch.svc=svc;_ch.addr=san(addr);_ch.slot=slot;
-  try{
-    await fetch(API+'/api/demandes',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_token},body:JSON.stringify({prestation:svc,adresse:addr,creneau:slot})});
-  }catch(e){}
-  gN('s-wait');
-  let t=178,iv=setInterval(()=>{t--;const m=Math.floor(t/60),s=t%60;const el=document.getElementById('timer');if(el)el.textContent=m+':'+(s<10?'0':'')+s;if(t<=0)clearInterval(iv);},1000);
-}
+// ── Chat ──────────────────────────────────────────────────
+const _repClient=["D'accord, merci pour la précision !","Intérieur et extérieur s'il vous plaît.","C'est un SUV, environ 4m80 de long.","Oui, principalement des taches alimentaires.","Demain matin c'est parfait pour moi.","Vers 9h si possible.","Merci pour votre réactivité !"];
 
-function openChat(name,init,bg,fg,hasMsg,firstMsg){
+function openChat(name,init,bg,fg,firstMsg){
   _ch.name=san(name);
   document.getElementById('chat-name').textContent=san(name);
   const av=document.getElementById('chat-av');av.textContent=init;av.style.background=bg;av.style.color=fg;
-  const cs=document.getElementById('chat-svc');if(cs)cs.textContent=_ch.svc||'Voiture';
   const area=document.getElementById('chat-area');
-  area.innerHTML='<div class="msg msys">✨ Gleam — Vous êtes <b>Client #1042</b> · Anonyme jusqu\'au paiement</div>';
-  if(firstMsg){const d=document.createElement('div');d.innerHTML='<div class="ms">'+san(name)+'</div><div class="msg mi">'+san(firstMsg)+'</div>';area.appendChild(d);}
-  area.scrollTop=area.scrollHeight;gN('s-chat');
+  area.innerHTML='<div class="msg msys">💬 Échangez avec le prestataire avant de recevoir son devis.<br>Vos coordonnées restent protégées.</div>';
+  if(firstMsg){
+    const d=document.createElement('div');
+    const snd=document.createElement('div');snd.className='ms';snd.textContent=san(name);
+    const rb=document.createElement('div');rb.className='msg mi';rb.textContent=san(firstMsg);
+    const t=document.createElement('div');t.className='mt';t.textContent=now();
+    d.appendChild(snd);d.appendChild(rb);d.appendChild(t);area.appendChild(d);
+  }
+  area.scrollTop=area.scrollHeight;
+  gN('s-chat');
 }
 
-const _repClient=["Intérieur et extérieur s'il vous plaît !","C'est un SUV avec des taches.","Oui, demain matin parfait !","Super, merci ✨","D'accord, je confirme."];let _repIdx=0;
+function sendMsg(){
+  const inp=document.getElementById('cinp');
+  const txt=inp.value.trim().slice(0,500);if(!txt)return;
+  if(BLOCK.test(txt)){addSysMsg('chat-area','⚠️ Ce message a été bloqué. Les coordonnées personnelles ne sont pas autorisées avant le paiement.');inp.value='';return;}
+  const area=document.getElementById('chat-area');
+  addMyMsg(area,txt);inp.value='';
+  setTimeout(()=>{addTheirMsg(area,_ch.name||'Prestataire',_repClient[_repIdx%_repClient.length]);_repIdx++;},1000);
+}
 
 function sendPhoto(input,areaId){
   const file=input.files[0];if(!file)return;
@@ -740,46 +1211,46 @@ function sendPhoto(input,areaId){
   reader.onload=e=>{
     const area=document.getElementById(areaId);
     const wrap=document.createElement('div');wrap.style.cssText='display:flex;justify-content:flex-end;margin:4px 0';
-    const img=document.createElement('img');img.src=e.target.result;img.style.cssText='max-width:180px;max-height:140px;border-radius:12px;object-fit:cover;cursor:pointer';
-    const bubble=document.createElement('div');bubble.className='msg mo';bubble.style.padding='5px';bubble.appendChild(img);
-    const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;align-items:flex-end';col.appendChild(bubble);wrap.appendChild(col);
+    const img=document.createElement('img');img.src=e.target.result;
+    img.style.cssText='max-width:200px;max-height:160px;border-radius:12px;object-fit:cover;cursor:pointer;box-shadow:var(--shadow)';
+    img.onclick=()=>{
+      const ov=document.createElement('div');
+      ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;z-index:999;cursor:pointer';
+      const bi=document.createElement('img');bi.src=e.target.result;bi.style.cssText='max-width:92%;max-height:88vh;border-radius:12px';
+      ov.appendChild(bi);ov.onclick=()=>ov.remove();document.body.appendChild(ov);
+    };
+    const bubble=document.createElement('div');bubble.className='msg mo';bubble.style.padding='6px';bubble.appendChild(img);
+    const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;align-items:flex-end';
+    const t=document.createElement('div');t.className='mt';t.textContent=now();
+    col.appendChild(bubble);col.appendChild(t);wrap.appendChild(col);
     area.appendChild(wrap);area.scrollTop=area.scrollHeight;
-    setTimeout(()=>{addTheirMsg(area,_ch.name||'Pro Gleam',"Merci pour les photos ✨ Très utile pour le devis !");},1000);
+    setTimeout(()=>{addTheirMsg(area,_ch.name||'Prestataire',"Merci pour la photo, c'est très utile pour établir un devis précis !");},1200);
   };reader.readAsDataURL(file);input.value='';
 }
 
-async function sendMsg(){
-  const inp=document.getElementById('cinp');const txt=inp.value.trim().slice(0,500);if(!txt)return;
-  if(BLOCK.test(txt)){addSysMsg('chat-area','⚠️ Gleam bloque les coordonnées avant paiement.');inp.value='';return;}
-  addMyMsg(document.getElementById('chat-area'),txt);inp.value='';
-  try{await fetch(API+'/api/messages',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_token},body:JSON.stringify({demande_id:'demo',contenu:txt})});}catch(e){}
-  setTimeout(()=>{addTheirMsg(document.getElementById('chat-area'),_ch.name||'Pro Gleam',_repClient[_repIdx%_repClient.length]);_repIdx++;},900);
-}
-
 function sendProMsg(){
-  const inp=document.getElementById('pro-cinp');const txt=inp.value.trim().slice(0,500);if(!txt)return;
-  if(BLOCK.test(txt)){addSysMsg('pro-chat-area','⚠️ Gleam bloque les coordonnées avant paiement.');inp.value='';return;}
-  addMyMsg(document.getElementById('pro-chat-area'),txt);inp.value='';
-  const reps=["Merci !","D'accord.","Je prépare le devis ✨","Parfait, c'est noté."];
-  setTimeout(()=>{addTheirMsg(document.getElementById('pro-chat-area'),'Client #1042',reps[Math.floor(Math.random()*reps.length)]);},900);
-}
-
-function sendProDevis(){
-  const price=document.getElementById('pro-price').value||'85';
-  alert('✨ Devis Gleam de '+san(price)+'€ envoyé au Client #1042 !');gB();
+  const inp=document.getElementById('pro-cinp');
+  const txt=inp.value.trim().slice(0,500);if(!txt)return;
+  if(BLOCK.test(txt)){addSysMsg('pro-chat-area','⚠️ Coordonnées bloquées. Partagez-les après paiement uniquement.');inp.value='';return;}
+  const area=document.getElementById('pro-chat-area');
+  addMyMsg(area,txt);inp.value='';
+  const reps=["Merci pour ces précisions !","C'est noté, je prépare votre devis.","Parfait, j'ai toutes les informations nécessaires.","D'accord, je vous envoie le devis dans quelques minutes."];
+  setTimeout(()=>{addTheirMsg(area,'Client #1042',reps[Math.floor(Math.random()*reps.length)]);},1000);
 }
 
 function addMyMsg(area,txt){
-  const d=document.createElement('div');d.style.cssText='display:flex;justify-content:flex-end';
+  const wrap=document.createElement('div');wrap.style.cssText='display:flex;justify-content:flex-end';
   const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;align-items:flex-end';
   const m=document.createElement('div');m.className='msg mo';m.textContent=txt;
-  col.appendChild(m);d.appendChild(col);area.appendChild(d);area.scrollTop=area.scrollHeight;
+  const t=document.createElement('div');t.className='mt';t.textContent=now();
+  col.appendChild(m);col.appendChild(t);wrap.appendChild(col);area.appendChild(wrap);area.scrollTop=area.scrollHeight;
 }
 function addTheirMsg(area,sender,txt){
   const r=document.createElement('div');
   const snd=document.createElement('div');snd.className='ms';snd.textContent=san(sender);
   const rb=document.createElement('div');rb.className='msg mi';rb.textContent=san(txt);
-  r.appendChild(snd);r.appendChild(rb);area.appendChild(r);area.scrollTop=area.scrollHeight;
+  const t=document.createElement('div');t.className='mt';t.textContent=now();
+  r.appendChild(snd);r.appendChild(rb);r.appendChild(t);area.appendChild(r);area.scrollTop=area.scrollHeight;
 }
 function addSysMsg(areaId,txt){
   const area=document.getElementById(areaId);if(!area)return;
@@ -787,15 +1258,17 @@ function addSysMsg(areaId,txt){
   area.appendChild(d);area.scrollTop=area.scrollHeight;
 }
 
-function selDev(id,name,rating,reviews,dist,price,msg){
+// ── Devis ─────────────────────────────────────────────────
+function selDev(id,name,init,bg,fg,rating,reviews,dist,price,desc){
   document.querySelectorAll('.dcard').forEach(c=>c.classList.remove('sel'));
   document.getElementById(id).classList.add('sel');
-  _ch={..._ch,name:san(name),price:parseInt(price)||0,msg:san(msg)};
+  _ch={..._ch,name:san(name),price:parseInt(price)||0,desc:san(desc)};
   document.getElementById('dc').textContent=name;
   document.getElementById('dn').textContent=name;
   document.getElementById('drat').textContent='★ '+rating+' ('+reviews+' avis)';
   document.getElementById('ddist').textContent=dist;
-  document.getElementById('dprice').textContent=price+'€ tout inclus';
+  document.getElementById('ddesc').textContent=san(desc);
+  document.getElementById('dprice').textContent=price+'€ TTC';
   document.getElementById('pn').textContent=name;
   document.getElementById('ptot').textContent=price+'€';
   document.getElementById('pbtn').textContent=price+'€';
@@ -805,7 +1278,11 @@ function selDev(id,name,rating,reviews,dist,price,msg){
 }
 
 function confirmPay(){
-  const coords={'ProClean Paris':{name:'Jean-Marc Dupont',phone:'06 12 34 56 78',email:'contact@proclean-paris.fr'},'Éclat Net':{name:'Marie Lefebvre',phone:'07 23 45 67 89',email:'info@eclat-net.fr'},'Shine & Go':{name:'Kevin Martin',phone:'06 45 67 89 01',email:'hello@shinegopro.fr'}};
+  const coords={
+    'ProClean Paris':{name:'Jean-Marc Dupont',phone:'06 12 34 56 78',email:'contact@proclean-paris.fr'},
+    'Éclat Net':{name:'Marie Lefebvre',phone:'07 23 45 67 89',email:'info@eclat-net.fr'},
+    'Shine & Go':{name:'Kevin Martin',phone:'06 45 67 89 01',email:'hello@shinegopro.fr'}
+  };
   const c=coords[_ch.name]||{name:'Jean-Marc Dupont',phone:'06 12 34 56 78',email:'contact@gleam.fr'};
   document.getElementById('ul-name').textContent=c.name;
   document.getElementById('ul-phone').textContent=c.phone;
@@ -814,11 +1291,36 @@ function confirmPay(){
 }
 
 function rate(n){document.querySelectorAll('.star-btn').forEach((s,i)=>s.style.color=i<n?'#EF9F27':'#D3D1C7');}
-function tDispo(){_dispo=!_dispo;document.getElementById('dtog').classList.toggle('on',_dispo);document.getElementById('dlbl').textContent=_dispo?'Disponible ✨':'Non disponible';}
-function subDev(btn,id){const val=san(document.getElementById(id).value||'envoyé');const c=btn.closest('.mc');c.querySelector('.badge').textContent='Envoyé ✨';c.querySelector('.badge').className='badge bgg';const br=c.querySelector('.brow');const sp=document.createElement('span');sp.style.cssText='font-size:13px;color:var(--gd);font-weight:700';sp.innerHTML='<i class="ti ti-check"></i> Devis '+val+' envoyé ✨';br.replaceWith(sp);try{c.querySelector('.igrp').remove();}catch(e){}}
+
+function tDispo(){
+  _dispo=!_dispo;
+  document.getElementById('dtog').classList.toggle('on',_dispo);
+  document.getElementById('dlbl').textContent=_dispo?'✅ Disponible — vous recevez des demandes':'❌ Non disponible — demandes suspendues';
+}
+
+function sendProDevis(){
+  const price=document.getElementById('pro-price').value||'85';
+  const desc=document.getElementById('pro-desc').value||'Prestation de nettoyage professionnelle';
+  const date=document.getElementById('pro-date').value;
+  const heure=document.getElementById('pro-heure').value;
+  const duree=document.getElementById('pro-duree').value;
+  if(!price){alert('Veuillez entrer un prix.');return;}
+  alert('✅ Devis de '+san(price)+'€ envoyé au Client #1042 !\n\nLe client sera notifié immédiatement et pourra l\'accepter depuis son application Gleam.');
+  gB();
+}
+
+function subDev(btn,id){
+  const val=san(document.getElementById(id).value||'');
+  if(!val){alert('Veuillez entrer un prix.');return;}
+  const c=btn.closest('.mc');
+  c.querySelector('.badge').textContent='✅ Devis envoyé';c.querySelector('.badge').className='badge bgg';
+  const br=c.querySelector('.brow');
+  const sp=document.createElement('div');sp.style.cssText='font-size:13px;color:var(--gd);font-weight:600;padding:4px 0';
+  sp.innerHTML='<i class="ti ti-check-circle" style="font-size:14px"></i> Devis de '+val+'€ envoyé · En attente de réponse';
+  br.replaceWith(sp);
+  try{c.querySelector('.igrp').remove();}catch(e){}
+}
 function decCard(btn){const c=btn.closest('.mc');c.style.opacity='.4';c.style.pointerEvents='none';}
 </script>
-</body>
-</html>
 </body>
 </html>
