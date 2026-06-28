@@ -20,8 +20,10 @@ const supabase = createClient(
 // ── Sécurité ─────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
+  origin: '*',
+  credentials: false,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization']
 }));
 
 // Webhook Stripe AVANT express.json (besoin du raw body)
