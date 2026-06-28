@@ -529,7 +529,7 @@ app.patch('/api/societes/disponibilite', auth, async (req, res) => {
 // ════════════════════════════════════════════════════════════
 // DÉMARRAGE
 // ════════════════════════════════════════════════════════════
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`✨ Gleam API démarrée sur le port ${PORT}`);
   console.log(`   Environnement : ${process.env.NODE_ENV || 'development'}`);
