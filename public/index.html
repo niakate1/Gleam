@@ -2,20 +2,823 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gleam ✨</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Gleam ✨ — Le nettoyage brillamment simple</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
-body{margin:0;font-family:system-ui;background:#7C3AED;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;color:white}
-.box{padding:40px}
-h1{font-size:48px;font-weight:800;margin-bottom:10px}
-p{font-size:18px;opacity:.85}
+:root{--g:#7C3AED;--gd:#5B21B6;--gl:#EDE9FE;--s:#F8F7FF;--w:#fff;--b:#E5E3F0;--t:#1a1a2e;--t2:#5a5680;--t3:#aaa8cc;--r:12px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+html,body{height:100%;overflow:hidden;background:var(--s);color:var(--t);font-size:15px;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.screen{display:none;flex-direction:column;height:100%;position:absolute;inset:0;background:var(--s)}
+.screen.active{display:flex}
+.topbar{background:var(--w);border-bottom:.5px solid var(--b);padding:46px 16px 13px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.topbar h1{font-size:17px;font-weight:700;flex:1}
+.back{background:none;border:none;cursor:pointer;color:var(--t2);font-size:22px;padding:4px;margin:-4px}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.pad{padding:16px}
+.lbl{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+.inp{width:100%;padding:13px;border:.5px solid var(--b);border-radius:10px;font-size:15px;background:var(--w);color:var(--t);-webkit-appearance:none}
+.inp:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+.igrp{margin-bottom:14px}
+.igrp label{font-size:13px;color:var(--t2);display:block;margin-bottom:5px;font-weight:500}
+.btn{width:100%;padding:15px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;border:none}
+.btn:active{opacity:.85}
+.bp{background:linear-gradient(135deg,var(--g),var(--gd));color:#fff}
+.bo{background:var(--w);color:var(--g);border:.5px solid var(--g)}
+.bt{background:none;border:none;color:var(--g);font-size:14px;cursor:pointer;width:100%;text-align:center;padding:10px;font-weight:600}
+.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.svc{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px}
+.svc:active{opacity:.7}.svc.on{border:2px solid var(--g);background:var(--gl)}
+.svc i{font-size:24px;color:var(--g)}.svc span{font-size:12px;font-weight:700;text-align:center;line-height:1.2}
+.card{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px}
+.hcard{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.hhead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
+.htitle{font-size:14px;font-weight:700}
+.hmeta{font-size:12px;color:var(--t2);margin-bottom:8px}
+.hfoot{display:flex;justify-content:space-between;align-items:center}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.bgg{background:var(--gl);color:var(--gd)}.bbl{background:#E6F1FB;color:#185FA5}.bam{background:#FAEEDA;color:#854F0B}
+.stars{color:#EF9F27;font-size:12px}
+.dcard{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:10px;cursor:pointer;position:relative}
+.dcard:active{opacity:.85}.dcard.sel{border:2px solid var(--g)}
+.dcard.top::before{content:'Recommandé';position:absolute;top:-1px;right:14px;background:var(--g);color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:0 0 8px 8px}
+.av{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.row{display:flex;align-items:center;gap:10px}
+.pbig{font-size:24px;font-weight:800;color:var(--g)}
+.drow{display:flex;justify-content:space-between;font-size:14px;padding:9px 0;border-bottom:.5px solid #f0edf8}
+.drow:last-child{border:none;font-weight:700;font-size:15px}
+.tl-step{display:flex;gap:12px;margin-bottom:16px}
+.tldot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.tl-done{background:var(--gl);color:var(--gd)}.tl-on{background:var(--g);color:#fff}.tl-wait{background:#f0edf8;color:var(--t3)}
+.tlinfo h4{font-size:14px;font-weight:700;margin-bottom:2px}.tlinfo p{font-size:12px;color:var(--t2)}
+.ca{overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;height:140px}
+.msg{max-width:82%;padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5}
+.mi{background:var(--w);border:.5px solid var(--b);align-self:flex-start;border-radius:4px 14px 14px 14px}
+.mo{background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;align-self:flex-end;border-radius:14px 4px 14px 14px}
+.msys{align-self:center;background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:10px;padding:7px 12px;font-size:12px;color:#B44D00;font-weight:600;max-width:90%;text-align:center}
+.ms{font-size:11px;color:var(--t2);margin-bottom:3px;font-weight:600}
+.cbar{background:var(--w);border-top:.5px solid var(--b);padding:10px 12px;display:flex;gap:8px;flex-shrink:0}
+.cbar input{flex:1;padding:10px 13px;border:.5px solid var(--b);border-radius:22px;font-size:15px;background:#f0edf8}
+.cbar button{background:linear-gradient(135deg,var(--g),var(--gd));border:none;border-radius:50%;width:40px;height:40px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat{background:var(--w);border-radius:10px;padding:10px;text-align:center}
+.sv{font-size:18px;font-weight:700;color:var(--g)}.sl{font-size:11px;color:var(--t2);margin-top:2px}
+.togw{display:flex;align-items:center;justify-content:space-between;background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.tog{width:46px;height:26px;border-radius:13px;border:none;cursor:pointer;position:relative;transition:background .2s;background:#ccc;flex-shrink:0}
+.tog.on{background:var(--g)}.tog::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}.tog.on::after{transform:translateX(20px)}
+.mc{background:var(--w);border:.5px solid var(--b);border-radius:10px;padding:13px;margin-bottom:8px}
+.mch{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.mcm{font-size:12px;color:var(--t2);margin-bottom:8px}
+.brow{display:flex;gap:8px;flex-wrap:wrap}
+.bsm{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none}
+.bac{background:var(--gl);color:var(--gd)}.bde{background:#FCEBEB;color:#A32D2D}.bchat{background:#E6F1FB;color:#185FA5}
+.bnav{background:var(--w);border-top:.5px solid var(--b);display:flex;flex-shrink:0;padding-bottom:22px}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0 6px;cursor:pointer;color:var(--t3);font-size:10px;font-weight:700;border:none;background:none}
+.ni.on{color:var(--g)}.ni i{font-size:22px}
+.pmenu{background:var(--w);border-radius:var(--r);overflow:hidden;border:.5px solid var(--b);margin-bottom:12px}
+.pitem{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:.5px solid #f0edf8;cursor:pointer;font-size:14px}
+.pitem:active{background:#f8f7ff}.pitem:last-child{border:none}.pitem i{font-size:20px;color:var(--g)}.pitem span{flex:1;font-weight:500}.pitem .arr{color:var(--t3)}
+.sbanner{background:#E6F1FB;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:#185FA5;margin-bottom:14px;font-weight:500}
+.sdiv{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--t2);font-size:13px}
+.sdiv::before,.sdiv::after{content:'';flex:1;height:.5px;background:var(--b)}
+.sbtn{width:100%;padding:13px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:.5px solid var(--b);background:var(--w);display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:10px}
+.otp-wrap{display:flex;gap:8px;justify-content:center;margin:16px 0}
+.oi{width:44px;height:52px;border:.5px solid var(--b);border-radius:10px;text-align:center;font-size:22px;font-weight:700;background:var(--w);color:var(--t);-webkit-appearance:none}
+.oi:focus{outline:none;border-color:var(--g)}
+.sbar{height:4px;border-radius:2px;margin-top:6px;background:var(--b);overflow:hidden}
+.sfill{height:100%;border-radius:2px;transition:width .3s,background .3s;width:0}
+.ag{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ac{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:13px 11px;cursor:pointer;display:flex;align-items:center;gap:10px}
+.ac:active{opacity:.7}.ac.on{border:2px solid var(--g);background:var(--gl)}
+.ac i{font-size:22px;color:var(--g);flex-shrink:0}
+.ac b{font-size:13px;font-weight:700;display:block}.ac small{font-size:11px;color:var(--t2)}
+.cl-item{background:var(--w);border:.5px solid var(--b);border-radius:var(--r);padding:13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px}
+.cl-av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.cl-info{flex:1;min-width:0}
+.cl-name{font-size:14px;font-weight:700;margin-bottom:2px}
+.cl-prev{font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.cl-time{font-size:11px;color:var(--t3)}
+.unread-dot{width:18px;height:18px;background:var(--g);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+.anon-tag{display:inline-flex;align-items:center;gap:4px;background:#f0edf8;border:.5px solid var(--b);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--t2);font-weight:600}
+.unlock-banner{background:linear-gradient(135deg,var(--g),var(--gd));border-radius:10px;padding:12px 14px;color:#fff;margin-bottom:12px;font-size:13px}
+.unlock-banner h4{font-size:14px;font-weight:700;margin-bottom:4px}
+.gleam-logo{width:36px;height:36px;background:linear-gradient(135deg,var(--g),var(--gd));border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;flex-shrink:0}
+.gleam-logo-lg{width:60px;height:60px;background:linear-gradient(135deg,var(--g),var(--gd));border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;margin:0 auto 12px}
+.hero-grad{background:linear-gradient(135deg,var(--g),var(--gd))}
+.notif{position:relative}
+.notif::after{content:'';position:absolute;top:6px;right:14px;width:8px;height:8px;background:#E24B4A;border-radius:50%;border:2px solid var(--w)}
+.cf{background:#f0edf8;border-radius:8px;padding:12px 13px;font-size:14px;color:var(--t2);margin-top:5px;font-family:monospace}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin 1.2s linear infinite}
 </style>
 </head>
 <body>
-<div class="box">
-  <h1>✨ Gleam</h1>
-  <p>Le nettoyage, brillamment simple.</p>
-  <p>Application en cours de lancement...</p>
+
+<!-- AUTH -->
+<div class="screen active" id="s-auth">
+  <div style="padding:52px 20px 0;text-align:center">
+    <div class="gleam-logo-lg"><i class="ti ti-sparkles"></i></div>
+    <h1 style="font-size:28px;font-weight:800;letter-spacing:-.5px">Gleam</h1>
+    <p style="font-size:14px;color:var(--t2);margin-top:4px">Le nettoyage, brillamment simple ✨</p>
+  </div>
+  <div class="scroll pad" style="margin-top:20px">
+    <div style="display:flex;background:#f0edf8;border-radius:10px;padding:3px;margin-bottom:16px">
+      <button onclick="sAuth('login')" id="tl" style="flex:1;padding:9px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;background:var(--w);color:var(--t)">Connexion</button>
+      <button onclick="sAuth('signup')" id="ts" style="flex:1;padding:9px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:var(--t2)">Inscription</button>
+    </div>
+    <div id="lf">
+      <div class="igrp"><label>Email</label><input class="inp" id="le" type="email" placeholder="vous@email.com" maxlength="100"></div>
+      <div class="igrp"><label>Mot de passe</label>
+        <div style="position:relative"><input class="inp" id="lp" type="password" placeholder="••••••••" maxlength="64">
+        <button onclick="tP('lp',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t2);font-size:18px"><i class="ti ti-eye"></i></button></div>
+      </div>
+      <div id="lerr" style="color:#A32D2D;font-size:13px;margin-bottom:10px;display:none;font-weight:500"></div>
+      <button class="btn bp" style="margin-bottom:10px" onclick="doLogin()">Se connecter ✨</button>
+      <button class="bt">Mot de passe oublié ?</button>
+    </div>
+    <div id="sf2" style="display:none">
+      <div class="igrp"><label>Prénom et nom</label><input class="inp" id="sn" type="text" placeholder="Sophie Martin" maxlength="60"></div>
+      <div class="igrp"><label>Email</label><input class="inp" id="se" type="email" placeholder="vous@email.com" maxlength="100"></div>
+      <div class="igrp"><label>Téléphone</label><input class="inp" id="sp" type="tel" placeholder="06 12 34 56 78" maxlength="15"></div>
+      <div class="igrp"><label>Mot de passe</label>
+        <div style="position:relative"><input class="inp" id="spw" type="password" placeholder="8 caractères minimum" maxlength="64" oninput="chkStr(this.value)">
+        <button onclick="tP('spw',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t2);font-size:18px"><i class="ti ti-eye"></i></button></div>
+        <div class="sbar"><div class="sfill" id="str-fill"></div></div>
+        <div id="str-lbl" style="font-size:11px;margin-top:4px"></div>
+      </div>
+      <div class="igrp"><label style="display:block;margin-bottom:8px">Je suis…</label>
+        <div style="display:flex;gap:8px">
+          <div id="rc" onclick="sRole('client')" style="flex:1;padding:12px 8px;border-radius:10px;border:2px solid var(--g);background:var(--gl);text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:var(--gd)"><i class="ti ti-user" style="display:block;font-size:22px;margin-bottom:4px"></i>Particulier</div>
+          <div id="rp" onclick="sRole('pro')" style="flex:1;padding:12px 8px;border-radius:10px;border:.5px solid var(--b);background:var(--w);text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:var(--t2)"><i class="ti ti-building" style="display:block;font-size:22px;margin-bottom:4px"></i>Société</div>
+        </div>
+      </div>
+      <div id="serr" style="color:#A32D2D;font-size:13px;margin-bottom:10px;display:none;font-weight:500"></div>
+      <button class="btn bp" onclick="doSignup()">Créer mon compte Gleam</button>
+    </div>
+    <div class="sdiv">ou</div>
+    <button class="sbtn" onclick="doLogin()"><i class="ti ti-brand-google" style="font-size:18px;color:#EA4335"></i>Continuer avec Google</button>
+    <button class="sbtn" onclick="doLogin()"><i class="ti ti-brand-apple" style="font-size:18px"></i>Continuer avec Apple</button>
+    <p style="font-size:12px;color:var(--t2);text-align:center;margin-top:14px;line-height:1.7">En continuant, vous acceptez nos <span style="color:var(--g);font-weight:600">CGU</span> et notre <span style="color:var(--g);font-weight:600">Politique de confidentialité</span></p>
+  </div>
 </div>
+
+<!-- OTP -->
+<div class="screen" id="s-otp">
+  <div class="topbar"><button class="back" onclick="go('s-auth')"><i class="ti ti-arrow-left"></i></button><h1>Vérification</h1></div>
+  <div class="pad" style="text-align:center;padding-top:24px">
+    <div style="width:64px;height:64px;background:var(--gl);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i class="ti ti-mail" style="font-size:30px;color:var(--g)"></i></div>
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">Vérifiez votre email</h2>
+    <p style="font-size:14px;color:var(--t2)">Code envoyé à <b id="oe" style="color:var(--g)"></b></p>
+    <div class="otp-wrap">
+      <input class="oi" type="number" id="o0" oninput="oN(this,0)">
+      <input class="oi" type="number" id="o1" oninput="oN(this,1)">
+      <input class="oi" type="number" id="o2" oninput="oN(this,2)">
+      <input class="oi" type="number" id="o3" oninput="oN(this,3)">
+      <input class="oi" type="number" id="o4" oninput="oN(this,4)">
+      <input class="oi" type="number" id="o5" oninput="oN(this,5)">
+    </div>
+    <button class="btn bp" onclick="vOTP()" style="max-width:260px;margin:0 auto 10px">Vérifier ✨</button>
+    <button class="bt">Renvoyer le code</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="screen" id="s-home">
+  <div class="hero-grad" style="padding:50px 16px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <div style="flex:1"><div style="font-size:12px;color:rgba(255,255,255,.75);font-weight:600">Bonjour 👋</div><div style="font-size:20px;font-weight:800;color:#fff" id="uname">Sophie M.</div></div>
+    <div onclick="gN('s-profile')" style="background:rgba(255,255,255,.2);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;cursor:pointer" id="uav">SM</div>
+  </div>
+  <div class="scroll pad">
+    <div class="sbanner"><i class="ti ti-shield-check" style="font-size:18px;flex-shrink:0"></i><span>Gleam · Connexion sécurisée ✨</span></div>
+    <p class="lbl">Que souhaitez-vous faire briller ?</p>
+    <div class="svc-grid" style="margin-bottom:16px">
+      <div class="svc" onclick="qBook('Voiture')"><i class="ti ti-car"></i><span>Voiture</span></div>
+      <div class="svc" onclick="qBook('Tapis')"><i class="ti ti-layout-grid"></i><span>Tapis</span></div>
+      <div class="svc" onclick="qBook('Appartement')"><i class="ti ti-home"></i><span>Appartement</span></div>
+      <div class="svc" onclick="qBook('Vitres')"><i class="ti ti-window"></i><span>Vitres</span></div>
+      <div class="svc" onclick="qBook('Canapé')"><i class="ti ti-armchair"></i><span>Canapé</span></div>
+      <div class="svc" onclick="gN('s-autre')"><i class="ti ti-dots-circle-horizontal"></i><span>Autre</span></div>
+    </div>
+    <p class="lbl">Dernière prestation</p>
+    <div class="hcard">
+      <div class="hhead"><div class="htitle">Nettoyage voiture</div><span class="badge bgg">Terminé ✨</span></div>
+      <div class="hmeta"><i class="ti ti-calendar" style="font-size:12px"></i> 18 juin 2026 · ProClean Paris</div>
+      <div class="hfoot"><span style="font-size:14px;color:var(--g);font-weight:700">85€</span><span class="stars">★★★★★</span></div>
+    </div>
+  </div>
+  <div class="bnav">
+    <button class="ni on"><i class="ti ti-home"></i>Accueil</button>
+    <button class="ni" onclick="gN('s-request')"><i class="ti ti-plus-circle"></i>Demande</button>
+    <button class="ni notif" onclick="gN('s-chat-list')"><i class="ti ti-message-circle"></i>Messages</button>
+    <button class="ni" onclick="gN('s-profile')"><i class="ti ti-user"></i>Profil</button>
+  </div>
+</div>
+
+<!-- AUTRE -->
+<div class="screen" id="s-autre">
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Autres prestations</h1></div>
+  <div class="scroll pad">
+    <div class="ag">
+      <div class="ac" onclick="sAutre(this,'Piscine')"><i class="ti ti-droplet"></i><div><b>Piscine</b><small>Nettoyage & traitement</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Terrasse')"><i class="ti ti-sun"></i><div><b>Terrasse</b><small>Karcher, balayage</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Cuisine pro')"><i class="ti ti-chef-hat"></i><div><b>Cuisine pro</b><small>Restauration</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Après travaux')"><i class="ti ti-tools"></i><div><b>Après travaux</b><small>Déblaiement</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Déménagement')"><i class="ti ti-truck"></i><div><b>Déménagement</b><small>Fin de bail</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Vitrine')"><i class="ti ti-building-store"></i><div><b>Vitrine</b><small>Commerce</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Parking')"><i class="ti ti-parking"></i><div><b>Parking</b><small>Sols, marquage</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Hôtellerie')"><i class="ti ti-bed"></i><div><b>Hôtellerie</b><small>Chambres</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Garde-meuble')"><i class="ti ti-box"></i><div><b>Garde-meuble</b><small>Box, entrepôt</small></div></div>
+      <div class="ac" onclick="sAutre(this,'Espace vert')"><i class="ti ti-plant"></i><div><b>Espace vert</b><small>Jardin, tonte</small></div></div>
+    </div>
+    <button class="btn bp" style="margin-top:16px;opacity:.4" id="abt" onclick="cAutre()" disabled>Choisir cette prestation</button>
+  </div>
+</div>
+
+<!-- DEMANDE -->
+<div class="screen" id="s-request">
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Nouvelle demande</h1></div>
+  <div class="scroll pad">
+    <p class="lbl">Prestation</p>
+    <div class="svc-grid" style="margin-bottom:8px">
+      <div class="svc" data-s="Voiture" onclick="tSvc(this)"><i class="ti ti-car"></i><span>Voiture</span></div>
+      <div class="svc" data-s="Tapis" onclick="tSvc(this)"><i class="ti ti-layout-grid"></i><span>Tapis</span></div>
+      <div class="svc" data-s="Appartement" onclick="tSvc(this)"><i class="ti ti-home"></i><span>Appartement</span></div>
+      <div class="svc" data-s="Vitres" onclick="tSvc(this)"><i class="ti ti-window"></i><span>Vitres</span></div>
+      <div class="svc" data-s="Canapé" onclick="tSvc(this)"><i class="ti ti-armchair"></i><span>Canapé</span></div>
+      <div class="svc" onclick="gN('s-autre')" style="border-style:dashed"><i class="ti ti-plus" style="color:var(--t2)"></i><span style="color:var(--t2)">Autre</span></div>
+    </div>
+    <div id="atag" style="display:none;margin-bottom:12px"><span style="background:var(--gl);color:var(--gd);padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700" id="atagl"></span></div>
+    <p class="lbl" style="margin-top:4px">Adresse & créneau</p>
+    <div class="igrp"><label>Adresse</label><input class="inp" id="addr" type="text" placeholder="12 rue de la Paix, Paris" maxlength="150"></div>
+    <div class="igrp"><label>Quand ?</label>
+      <select class="inp" id="slot">
+        <option>Aujourd'hui (après-midi)</option>
+        <option>Demain (matin)</option>
+        <option>Demain (après-midi)</option>
+        <option>Dans 2 jours</option>
+      </select>
+    </div>
+    <div class="igrp"><label>Infos complémentaires</label><input class="inp" id="notes" type="text" placeholder="Ex: voiture SUV, tapis très sales…" maxlength="300"></div>
+    <div class="igrp">
+      <label>Photos <span style="color:var(--g);font-weight:600">(recommandé ✨)</span></label>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:8px">Aidez les pros à faire un devis précis</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="photo-grid">
+        <label style="aspect-ratio:1;background:#f0edf8;border:1.5px dashed var(--b);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:11px;color:var(--t2);font-weight:600;gap:4px">
+          <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this)">
+          <i class="ti ti-camera" style="font-size:22px;color:var(--g)"></i>Ajouter
+        </label>
+      </div>
+    </div>
+    <button class="btn bp" onclick="sendReq()">Recevoir des devis Gleam ✨</button>
+  </div>
+  <div class="bnav">
+    <button class="ni" onclick="gN('s-home')"><i class="ti ti-home"></i>Accueil</button>
+    <button class="ni on"><i class="ti ti-plus-circle"></i>Demande</button>
+    <button class="ni" onclick="gN('s-chat-list')"><i class="ti ti-message-circle"></i>Messages</button>
+    <button class="ni" onclick="gN('s-profile')"><i class="ti ti-user"></i>Profil</button>
+  </div>
+</div>
+
+<!-- ATTENTE -->
+<div class="screen" id="s-wait">
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-x"></i></button><h1>Demande envoyée ✨</h1></div>
+  <div class="pad" style="text-align:center;padding-top:20px">
+    <div style="padding:20px;background:var(--gl);border-radius:var(--r);margin-bottom:16px">
+      <div style="font-size:32px;font-weight:800;color:var(--gd)" id="timer">2:58</div>
+      <div style="font-size:13px;color:var(--gd);margin-top:4px;font-weight:600">Devis en cours ✨</div>
+    </div>
+    <i class="ti ti-loader spin" style="font-size:28px;color:var(--g);margin-bottom:12px;display:block"></i>
+    <p style="font-size:14px;color:var(--t2);line-height:1.6">3 pros Gleam proches reçoivent votre demande</p>
+    <div style="background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:10px;padding:12px;margin-top:14px;text-align:left">
+      <div style="font-size:12px;font-weight:700;color:#B44D00;margin-bottom:4px"><i class="ti ti-lock"></i> Identité protégée par Gleam</div>
+      <div style="font-size:12px;color:#B44D00;line-height:1.5">Vous apparaissez comme <b>Client #1042</b>. Coordonnées partagées après paiement uniquement.</div>
+    </div>
+    <button class="btn bp" style="margin-top:20px" onclick="gN('s-chat-list')">Voir mes messages ✨</button>
+  </div>
+</div>
+
+<!-- CHAT LIST -->
+<div class="screen" id="s-chat-list">
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Messages Gleam</h1></div>
+  <div class="scroll pad">
+    <div style="background:#FFF0E6;border:.5px solid #FDDCBC;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#B44D00;font-weight:500">
+      <i class="ti ti-shield"></i> <b>Mode anonyme Gleam</b> — Vous êtes <b>Client #1042</b>
+    </div>
+    <p class="lbl">3 pros en discussion</p>
+    <div class="cl-item" onclick="openChat('ProClean Paris','PC','#EDE9FE','#5B21B6',true,'Bonjour ! Pour votre voiture, intérieur seulement ou extérieur aussi ?')">
+      <div class="cl-av" style="background:#EDE9FE;color:#5B21B6">PC</div>
+      <div class="cl-info"><div class="cl-name">ProClean Paris</div><div class="cl-prev">Bonjour ! Pour votre voiture, intérieur…</div></div>
+      <div class="cl-meta"><div class="cl-time">14:32</div><div class="unread-dot">2</div></div>
+    </div>
+    <div class="cl-item" onclick="openChat('Éclat Net','EN','#E6F1FB','#185FA5',false,'Bonjour Client #1042, quel modèle de véhicule ?')">
+      <div class="cl-av" style="background:#E6F1FB;color:#185FA5">EN</div>
+      <div class="cl-info"><div class="cl-name">Éclat Net</div><div class="cl-prev">Bonjour Client #1042, quel modèle…</div></div>
+      <div class="cl-meta"><div class="cl-time">14:28</div><div class="unread-dot">1</div></div>
+    </div>
+    <div class="cl-item" onclick="openChat('Shine & Go','SG','#FAEEDA','#854F0B',false,'Disponible demain matin.')">
+      <div class="cl-av" style="background:#FAEEDA;color:#854F0B">SG</div>
+      <div class="cl-info"><div class="cl-name">Shine & Go</div><div class="cl-prev">Disponible demain matin.</div></div>
+      <div class="cl-meta"><div class="cl-time">14:25</div></div>
+    </div>
+    <button class="btn bp" style="margin-top:16px" onclick="gN('s-devis')">Voir les devis reçus →</button>
+  </div>
+  <div class="bnav">
+    <button class="ni" onclick="gN('s-home')"><i class="ti ti-home"></i>Accueil</button>
+    <button class="ni" onclick="gN('s-request')"><i class="ti ti-plus-circle"></i>Demande</button>
+    <button class="ni on"><i class="ti ti-message-circle"></i>Messages</button>
+    <button class="ni" onclick="gN('s-profile')"><i class="ti ti-user"></i>Profil</button>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div class="screen" id="s-chat">
+  <div class="topbar">
+    <button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button>
+    <div class="cl-av" id="chat-av" style="width:32px;height:32px;font-size:12px;border-radius:8px;margin-right:4px"></div>
+    <div style="flex:1"><div style="font-size:15px;font-weight:700" id="chat-name"></div><div class="anon-tag" style="margin-top:2px"><i class="ti ti-eye-off" style="font-size:11px"></i> Anonyme Gleam</div></div>
+  </div>
+  <div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div style="padding:8px 16px;background:#f8f7ff;border-bottom:.5px solid var(--b);flex-shrink:0;font-size:12px;color:var(--t2)">Demande : <b id="chat-svc"></b></div>
+    <div class="ca" id="chat-area"><div><div class="ms" id="csend"></div><div class="msg mi" id="cmsg"></div></div></div>
+    <div style="padding:6px 12px;background:var(--w)"><div style="font-size:11px;color:#B44D00;background:#FFF0E6;border-radius:6px;padding:5px 8px;font-weight:600"><i class="ti ti-alert-triangle" style="font-size:11px"></i> Coordonnées bloquées par Gleam avant paiement</div></div>
+    <div class="cbar">
+      <label style="cursor:pointer;color:var(--g);font-size:22px;display:flex;align-items:center;flex-shrink:0"><input type="file" accept="image/*" style="display:none" onchange="sendPhoto(this,'chat-area')"><i class="ti ti-photo"></i></label>
+      <input id="cinp" placeholder="Écrire un message…" maxlength="500" onkeydown="if(event.key==='Enter')sendMsg()">
+      <button onclick="sendMsg()"><i class="ti ti-send"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- DEVIS -->
+<div class="screen" id="s-devis">
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Devis Gleam ✨</h1></div>
+  <div style="padding:10px 16px;background:var(--w);border-bottom:.5px solid var(--b);font-size:13px;color:var(--t2);font-weight:500" id="dsumm"></div>
+  <div class="scroll pad">
+    <p class="lbl">3 devis reçus — Choisissez votre pro</p>
+    <div class="dcard top" id="d1" onclick="selDev('d1','ProClean Paris','4.9','127','800 m','85','Intérieur + extérieur, aspiration, shampooing sièges. Demain matin.')">
+      <div class="row" style="margin-bottom:10px">
+        <div class="av" style="background:#EDE9FE;color:#5B21B6">PC</div>
+        <div style="flex:1"><div style="font-size:15px;font-weight:700">ProClean Paris</div><div style="font-size:12px;color:var(--t2)"><span class="stars">★★★★★</span> 4.9 · 127 avis · <span style="color:var(--g)">800 m</span></div></div>
+        <div style="text-align:right"><div class="pbig">85€</div><div style="font-size:11px;color:var(--t2)">tout inclus</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--t2);background:#f0edf8;padding:9px 11px;border-radius:8px;margin-bottom:9px;line-height:1.5">"Intérieur + extérieur, aspiration, shampooing sièges. Demain matin."</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge bgg">Demain matin</span><span class="badge bbl">Certifié Gleam</span><span class="badge bam">Top pro</span></div>
+    </div>
+    <div class="dcard" id="d2" onclick="selDev('d2','Éclat Net','4.7','89','1,2 km','72','Intérieur complet, produits éco-certifiés. Aujourd\'hui.')">
+      <div class="row" style="margin-bottom:10px">
+        <div class="av" style="background:#E6F1FB;color:#185FA5">EN</div>
+        <div style="flex:1"><div style="font-size:15px;font-weight:700">Éclat Net</div><div style="font-size:12px;color:var(--t2)"><span class="stars">★★★★☆</span> 4.7 · 89 avis · <span style="color:var(--g)">1,2 km</span></div></div>
+        <div style="text-align:right"><div class="pbig">72€</div><div style="font-size:11px;color:var(--t2)">tout inclus</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--t2);background:#f0edf8;padding:9px 11px;border-radius:8px;margin-bottom:9px">"Intérieur complet, éco-certifié. Aujourd'hui."</div>
+      <div style="display:flex;gap:6px"><span class="badge bgg">Auj. après-midi</span><span class="badge bbl">Éco</span></div>
+    </div>
+    <div class="dcard" id="d3" onclick="selDev('d3','Shine & Go','4.5','54','2,1 km','58','Extérieur + vitres haute pression. Dans 2 jours.')">
+      <div class="row" style="margin-bottom:10px">
+        <div class="av" style="background:#FAEEDA;color:#854F0B">SG</div>
+        <div style="flex:1"><div style="font-size:15px;font-weight:700">Shine & Go</div><div style="font-size:12px;color:var(--t2)"><span class="stars">★★★★½</span> 4.5 · 54 avis · 2,1 km</div></div>
+        <div style="text-align:right"><div class="pbig">58€</div><div style="font-size:11px;color:var(--t2)">tout inclus</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--t2);background:#f0edf8;padding:9px 11px;border-radius:8px;margin-bottom:9px">"Extérieur + vitres haute pression. Dans 2 jours."</div>
+      <div style="display:flex;gap:6px"><span class="badge bam">Dans 2 jours</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div class="screen" id="s-detail">
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1 id="dc"></h1></div>
+  <div class="scroll pad">
+    <div class="card" style="margin-bottom:12px">
+      <div class="drow"><span>Prestataire</span><span id="dn" style="font-weight:700"></span></div>
+      <div class="drow"><span>Note</span><span id="drat"></span></div>
+      <div class="drow"><span>Distance</span><span id="ddist"></span></div>
+      <div class="drow"><span>Créneau</span><span id="dsl"></span></div>
+      <div class="drow"><span style="color:var(--g);font-weight:700">Total</span><span id="dprice" style="color:var(--g);font-weight:800"></span></div>
+    </div>
+    <div class="unlock-banner">
+      <h4><i class="ti ti-lock-open" style="font-size:14px"></i> Après paiement Gleam :</h4>
+      <div style="font-size:12px;opacity:.9;line-height:1.7">✓ Nom complet · ✓ Téléphone direct · ✓ Email · ✓ Devis PDF</div>
+    </div>
+    <button class="btn bp" onclick="gN('s-payment')">Accepter et payer ✨</button>
+    <button class="btn bo" style="margin-top:8px" onclick="gB()">Choisir un autre pro</button>
+  </div>
+</div>
+
+<!-- PAIEMENT -->
+<div class="screen" id="s-payment">
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Paiement Gleam ✨</h1></div>
+  <div class="scroll pad">
+    <div class="sbanner"><i class="ti ti-lock" style="font-size:18px;flex-shrink:0"></i><span>SSL 256 bits · 3D Secure · Fonds bloqués</span></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="drow"><span>Prestataire</span><span id="pn" style="font-weight:700"></span></div>
+      <div class="drow"><span>Prestation</span><span id="psvc"></span></div>
+      <div class="drow"><span style="color:var(--g);font-weight:700">Total</span><span id="ptot" style="color:var(--g);font-weight:800"></span></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <p class="lbl" style="margin-bottom:10px">Carte bancaire</p>
+      <div class="igrp"><label>Numéro</label><div class="cf">•••• •••• •••• 4242</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="igrp"><label>Expiration</label><div class="cf">12 / 27</div></div>
+        <div class="igrp"><label>CVV</label><div class="cf">•••</div></div>
+      </div>
+    </div>
+    <button class="btn bp" onclick="confirmPay()">Payer <span id="pbtn"></span> avec Gleam ✨</button>
+  </div>
+</div>
+
+<!-- UNLOCK -->
+<div class="screen" id="s-unlocked">
+  <div class="topbar"><h1>Contact déverrouillé ✨</h1></div>
+  <div class="scroll pad" style="text-align:center">
+    <div style="width:64px;height:64px;background:var(--gl);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i class="ti ti-lock-open" style="font-size:30px;color:var(--g)"></i></div>
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">Paiement confirmé ✨</h2>
+    <p style="font-size:14px;color:var(--t2);margin-bottom:16px">Contactez votre pro Gleam directement.</p>
+    <div class="card" style="text-align:left;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Coordonnées du prestataire</div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid #f0edf8"><i class="ti ti-user" style="font-size:18px;color:var(--g)"></i><div><div style="font-size:12px;color:var(--t2)">Responsable</div><div style="font-size:14px;font-weight:700" id="ul-name"></div></div></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid #f0edf8"><i class="ti ti-phone" style="font-size:18px;color:var(--g)"></i><div><div style="font-size:12px;color:var(--t2)">Téléphone</div><div style="font-size:14px;font-weight:700;color:var(--g)" id="ul-phone"></div></div></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0"><i class="ti ti-mail" style="font-size:18px;color:var(--g)"></i><div><div style="font-size:12px;color:var(--t2)">Email</div><div style="font-size:14px;font-weight:700" id="ul-email"></div></div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn bp" style="flex:1;padding:12px" onclick="alert('Appel en cours…')"><i class="ti ti-phone"></i> Appeler</button>
+      <button class="btn bo" style="flex:1;padding:12px" onclick="gN('s-tracking')"><i class="ti ti-map"></i> Suivre</button>
+    </div>
+    <button class="btn bp" onclick="gN('s-tracking')">Suivre la prestation</button>
+  </div>
+</div>
+
+<!-- SUIVI -->
+<div class="screen" id="s-tracking">
+  <div class="topbar"><button class="back" onclick="gN('s-home')"><i class="ti ti-x"></i></button><h1>Suivi Gleam ✨</h1></div>
+  <div style="padding:14px 16px;background:var(--w);border-bottom:.5px solid var(--b);flex-shrink:0">
+    <div style="font-size:12px;color:var(--t2);font-weight:600">Pro Gleam confirmé</div>
+    <div style="font-size:16px;font-weight:700;margin-top:2px" id="tname"></div>
+    <div style="font-size:13px;color:var(--g);margin-top:2px;font-weight:600">En route · ~18 min ✨</div>
+  </div>
+  <div class="scroll" style="padding:16px">
+    <div class="tl-step"><div class="tldot tl-done"><i class="ti ti-check"></i></div><div class="tlinfo"><h4>Paiement sécurisé</h4><p>Fonds bloqués</p></div></div>
+    <div class="tl-step"><div class="tldot tl-done"><i class="ti ti-check"></i></div><div class="tlinfo"><h4>Devis accepté</h4><p>Prestataire confirmé</p></div></div>
+    <div class="tl-step"><div class="tldot tl-on"><i class="ti ti-car"></i></div><div class="tlinfo"><h4>En route</h4><p>~18 min</p></div></div>
+    <div class="tl-step"><div class="tldot tl-wait"><i class="ti ti-spray"></i></div><div class="tlinfo"><h4>Prestation en cours</h4><p>En attente</p></div></div>
+    <div class="tl-step"><div class="tldot tl-wait"><i class="ti ti-sparkles"></i></div><div class="tlinfo"><h4>Terminé ✨</h4><p>En attente</p></div></div>
+  </div>
+  <div style="padding:0 16px 26px"><button class="btn bp" onclick="gN('s-rating')">Simuler : prestation terminée</button></div>
+</div>
+
+<!-- NOTATION -->
+<div class="screen" id="s-rating">
+  <div class="topbar"><h1>Évaluer sur Gleam</h1></div>
+  <div class="scroll pad" style="text-align:center">
+    <i class="ti ti-sparkles" style="font-size:56px;color:var(--g);margin-bottom:12px;display:block"></i>
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">C'est brillant ! ✨</h2>
+    <div style="background:var(--gl);border-radius:10px;padding:11px;margin:12px 0;font-size:13px;color:var(--gd);font-weight:700"><i class="ti ti-shield-check"></i> Paiement libéré · <span id="ramt"></span></div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px">
+      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(1)">★</span>
+      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(2)">★</span>
+      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(3)">★</span>
+      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(4)">★</span>
+      <span style="font-size:36px;cursor:pointer;color:#D3D1C7" class="star-btn" onclick="rate(5)">★</span>
+    </div>
+    <div class="igrp" style="text-align:left"><label>Commentaire</label><textarea class="inp" style="resize:none;height:90px" placeholder="Travail brillant, je recommande Gleam !" maxlength="500"></textarea></div>
+    <button class="btn bp" style="margin-top:8px" onclick="gN('s-home')">Envoyer ✨</button>
+  </div>
+</div>
+
+<!-- HISTORIQUE -->
+<div class="screen" id="s-history">
+  <div class="topbar"><div class="gleam-logo"><i class="ti ti-sparkles"></i></div><h1>Historique Gleam</h1></div>
+  <div class="scroll pad" id="hist-list">
+    <div class="hcard"><div class="hhead"><div class="htitle">Nettoyage voiture</div><span class="badge bgg">Terminé ✨</span></div><div class="hmeta"><i class="ti ti-calendar" style="font-size:12px"></i> 18 juin 2026 · ProClean Paris</div><div class="hfoot"><span style="font-size:14px;color:var(--g);font-weight:700">85€</span><span class="stars">★★★★★</span></div></div>
+    <div class="hcard"><div class="hhead"><div class="htitle">Tapis & moquette</div><span class="badge bgg">Terminé ✨</span></div><div class="hmeta"><i class="ti ti-calendar" style="font-size:12px"></i> 3 juin 2026 · Éclat Net</div><div class="hfoot"><span style="font-size:14px;color:var(--g);font-weight:700">110€</span><span class="stars">★★★★☆</span></div></div>
+  </div>
+  <div class="bnav">
+    <button class="ni" onclick="gN('s-home')"><i class="ti ti-home"></i>Accueil</button>
+    <button class="ni" onclick="gN('s-request')"><i class="ti ti-plus-circle"></i>Demande</button>
+    <button class="ni" onclick="gN('s-chat-list')"><i class="ti ti-message-circle"></i>Messages</button>
+    <button class="ni on"><i class="ti ti-clock"></i>Historique</button>
+  </div>
+</div>
+
+<!-- PROFIL -->
+<div class="screen" id="s-profile">
+  <div class="hero-grad" style="padding:50px 16px 20px;text-align:center;color:#fff;flex-shrink:0">
+    <div style="width:68px;height:68px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;margin:0 auto 10px" id="pav">SM</div>
+    <div style="font-size:17px;font-weight:700" id="pname">Sophie Martin</div>
+    <div style="font-size:13px;opacity:.8;margin-top:3px">Membre Gleam ✨</div>
+  </div>
+  <div class="scroll pad">
+    <div class="stat-grid">
+      <div class="stat"><div class="sv" id="pcnt">3</div><div class="sl">Prestations</div></div>
+      <div class="stat"><div class="sv">4.9</div><div class="sl">Note Gleam</div></div>
+      <div class="stat"><div class="sv" id="ptotal">290€</div><div class="sl">Dépensé</div></div>
+    </div>
+    <div class="pmenu">
+      <div class="pitem" onclick="gN('s-history')"><i class="ti ti-clock"></i><span>Historique Gleam</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem" onclick="gN('s-chat-list')"><i class="ti ti-message-circle"></i><span>Mes messages</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem"><i class="ti ti-credit-card"></i><span>Moyens de paiement</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem"><i class="ti ti-shield"></i><span>Sécurité</span><i class="ti ti-chevron-right arr"></i></div>
+      <div class="pitem"><i class="ti ti-help"></i><span>Aide Gleam</span><i class="ti ti-chevron-right arr"></i></div>
+    </div>
+    <button class="btn bo" onclick="go('s-auth')">Se déconnecter</button>
+  </div>
+  <div class="bnav">
+    <button class="ni" onclick="gN('s-home')"><i class="ti ti-home"></i>Accueil</button>
+    <button class="ni" onclick="gN('s-request')"><i class="ti ti-plus-circle"></i>Demande</button>
+    <button class="ni" onclick="gN('s-chat-list')"><i class="ti ti-message-circle"></i>Messages</button>
+    <button class="ni on"><i class="ti ti-user"></i>Profil</button>
+  </div>
+</div>
+
+<!-- PRO -->
+<div class="screen" id="s-pro">
+  <div class="hero-grad" style="padding:50px 16px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <div style="flex:1"><div style="font-size:12px;color:rgba(255,255,255,.75);font-weight:600">Gleam Pro ✨</div><div style="font-size:18px;font-weight:800;color:#fff">ProClean Paris</div></div>
+    <div onclick="go('s-auth')" style="background:rgba(255,255,255,.2);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;cursor:pointer">PC</div>
+  </div>
+  <div class="scroll pad">
+    <div class="togw"><div><div style="font-size:14px;font-weight:700">Disponibilité</div><div style="font-size:12px;color:var(--t2)" id="dlbl">Disponible ✨</div></div><button class="tog on" id="dtog" onclick="tDispo()"></button></div>
+    <div class="stat-grid">
+      <div class="stat"><div class="sv">12</div><div class="sl">Missions</div></div>
+      <div class="stat"><div class="sv">4.8</div><div class="sl">Note</div></div>
+      <div class="stat"><div class="sv">1 380€</div><div class="sl">Gains nets</div></div>
+    </div>
+    <p class="lbl">Nouvelles demandes</p>
+    <div class="mc">
+      <div class="mch"><span style="font-size:14px;font-weight:700">Voiture · Client #1042</span><span class="badge bam">Nouveau ✨</span></div>
+      <div class="mcm"><i class="ti ti-map-pin" style="font-size:12px"></i> 15e arr. · 800 m · Demain matin</div>
+      <div class="brow">
+        <button class="bsm bchat" onclick="gN('s-pro-chat')"><i class="ti ti-message-circle"></i> Questions</button>
+        <button class="bsm bde" onclick="decCard(this)"><i class="ti ti-x"></i> Passer</button>
+      </div>
+    </div>
+    <div class="mc">
+      <div class="mch"><span style="font-size:14px;font-weight:700">Tapis · Client #1089</span><span class="badge bgg">Clarifié ✨</span></div>
+      <div class="mcm"><i class="ti ti-map-pin" style="font-size:12px"></i> 11e arr. · 1,4 km</div>
+      <div class="igrp"><label>Votre prix Gleam</label><input class="inp" placeholder="Ex: 120€" id="pq2" maxlength="10" inputmode="numeric"></div>
+      <div class="brow">
+        <button class="bsm bac" onclick="subDev(this,'pq2')"><i class="ti ti-send"></i> Envoyer devis</button>
+        <button class="bsm bde" onclick="decCard(this)"><i class="ti ti-x"></i> Passer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRO CHAT -->
+<div class="screen" id="s-pro-chat">
+  <div class="topbar">
+    <button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button>
+    <div style="flex:1"><div style="font-size:15px;font-weight:700">Client #1042</div><div class="anon-tag" style="margin-top:2px"><i class="ti ti-eye-off" style="font-size:11px"></i> Anonyme Gleam</div></div>
+  </div>
+  <div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div style="padding:8px 16px;background:#f8f7ff;border-bottom:.5px solid var(--b);flex-shrink:0;font-size:12px;color:#B44D00;font-weight:600"><i class="ti ti-alert-triangle" style="font-size:11px"></i> Coordonnées bloquées par Gleam avant paiement</div>
+    <div class="ca" id="pro-chat-area">
+      <div class="msg msys">✨ Gleam — Posez vos questions pour un devis précis</div>
+      <div style="display:flex;justify-content:flex-end"><div class="msg mo">Bonjour ! Intérieur ou extérieur pour la voiture ?</div></div>
+      <div><div class="ms">Client #1042</div><div class="msg mi">Les deux ! C'est un SUV avec des taches sur les sièges.</div></div>
+    </div>
+    <div class="cbar">
+      <input id="pro-cinp" placeholder="Poser une question…" maxlength="500" onkeydown="if(event.key==='Enter')sendProMsg()">
+      <button onclick="sendProMsg()"><i class="ti ti-send"></i></button>
+    </div>
+  </div>
+  <div style="padding:10px 16px 16px;background:var(--w);border-top:.5px solid var(--b)">
+    <button class="btn bp" onclick="gN('s-pro-devis-form')">Envoyer le devis Gleam ✨</button>
+  </div>
+</div>
+
+<!-- PRO DEVIS FORM -->
+<div class="screen" id="s-pro-devis-form">
+  <div class="topbar"><button class="back" onclick="gB()"><i class="ti ti-arrow-left"></i></button><h1>Devis Gleam</h1></div>
+  <div class="scroll pad">
+    <div style="background:var(--gl);border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--gd);margin-bottom:6px">Récapitulatif</div>
+      <div style="font-size:13px;color:var(--gd)">Client #1042 · Voiture SUV<br>Intérieur + extérieur · Demain matin</div>
+    </div>
+    <div class="igrp"><label>Prix tout inclus TTC</label><input class="inp" id="pro-price" type="text" inputmode="numeric" placeholder="Ex: 85€" maxlength="10"></div>
+    <div class="igrp"><label>Description</label><textarea class="inp" id="pro-desc" style="resize:none;height:90px" placeholder="Nettoyage intérieur + extérieur SUV…" maxlength="300"></textarea></div>
+    <div class="igrp"><label>Créneau proposé</label>
+      <select class="inp" id="pro-slot">
+        <option>Demain matin (9h–12h)</option>
+        <option>Demain après-midi (14h–18h)</option>
+        <option>Dans 2 jours matin</option>
+      </select>
+    </div>
+    <button class="btn bp" onclick="sendProDevis()">Envoyer ce devis ✨</button>
+  </div>
+</div>
+
+<script>
+const san=s=>String(s).replace(/[<>"'&]/g,c=>({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#x27;','&':'&amp;'}[c]||c));
+const BLOCK=/(\b0[67]\d{8}\b|\b\+33[67][\d\s]{8,}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram|signal|snapchat)/i;
+const API = 'https://gleam-production-9b95.up.railway.app';
+
+let _h=['s-auth'],_ch={},_sel=[],_aC='',_dispo=true,_att=0,_lock=0,_role='client',_hCnt=3,_hTot=290,_token=null;
+
+const vE=e=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)&&e.length<=100;
+const vP=p=>p&&p.length>=8;
+const rl=()=>{if(Date.now()<_lock)return false;_att++;if(_att>=5){_lock=Date.now()+30000;_att=0;return false;}return true;};
+const now=()=>{const d=new Date();return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');};
+
+function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');}
+function gN(id){_h.push(id);go(id);}
+function gB(){if(_h.length>1)_h.pop();go(_h[_h.length-1]||'s-home');}
+
+function sAuth(m){
+  document.getElementById('lf').style.display=m==='login'?'':'none';
+  document.getElementById('sf2').style.display=m==='signup'?'':'none';
+  ['login','signup'].forEach(t=>{const b=document.getElementById(t==='login'?'tl':'ts'),on=t===m;b.style.background=on?'var(--w)':'transparent';b.style.color=on?'var(--t)':'var(--t2)';});
+}
+function tP(id,btn){const i=document.getElementById(id);const show=i.type==='password';i.type=show?'text':'password';btn.querySelector('i').className='ti ti-eye'+(show?'-off':'');}
+function chkStr(p){const f=document.getElementById('str-fill'),l=document.getElementById('str-lbl');if(!p){f.style.width='0';l.textContent='';return;}let s=0;if(p.length>=8)s++;if(p.length>=12)s++;if(/[A-Z]/.test(p))s++;if(/[0-9]/.test(p))s++;if(/[^a-zA-Z0-9]/.test(p))s++;const lv=[['0%',''],['25%','Faible','#E24B4A'],['50%','Moyen','#EF9F27'],['75%','Bien','var(--g)'],['100%','Fort','var(--gd)'],['100%','Très fort','var(--gd)']];const[w,t,c]=lv[s]||lv[0];f.style.width=w;f.style.background=c||'#ccc';l.textContent=t;l.style.color=c||'var(--t2)';}
+function sRole(r){_role=r;['client','pro'].forEach(role=>{const el=document.getElementById(role==='client'?'rc':'rp'),on=role===r;el.style.border=on?'2px solid var(--g)':'.5px solid var(--b)';el.style.background=on?'var(--gl)':'var(--w)';el.style.color=on?'var(--gd)':'var(--t2)';});}
+function sErr(id,m){const el=document.getElementById(id);if(el){el.textContent=m;el.style.display='block';}}
+function hErr(id){const el=document.getElementById(id);if(el)el.style.display='none';}
+
+async function doLogin(){
+  if(!rl()){sErr('lerr','Trop de tentatives. Attendez 30s.');return;}
+  const email=document.getElementById('le').value.trim();
+  const pass=document.getElementById('lp').value;
+  if(!vE(email)){sErr('lerr','Email invalide.');return;}
+  if(!vP(pass)){sErr('lerr','Mot de passe trop court.');return;}
+  hErr('lerr');
+  try{
+    const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
+    const d=await r.json();
+    if(!r.ok){sErr('lerr',d.error||'Erreur connexion.');return;}
+    _token=d.token;
+    const name=san(d.user.prenom||email.split('@')[0]);
+    const ini=name.slice(0,2).toUpperCase();
+    document.getElementById('uname').textContent=name;
+    document.getElementById('uav').textContent=ini;
+    document.getElementById('pname').textContent=name;
+    document.getElementById('pav').textContent=ini;
+    document.getElementById('oe').textContent=san(email);
+    _role=d.user.type==='societe'?'pro':'client';
+    gN('s-otp');
+  }catch(e){sErr('lerr','Erreur réseau. Réessayez.');}
+}
+
+async function doSignup(){
+  const name=document.getElementById('sn').value.trim();
+  const email=document.getElementById('se').value.trim();
+  const pass=document.getElementById('spw').value;
+  const tel=document.getElementById('sp').value.trim();
+  if(!name||name.length<2){sErr('serr','Nom invalide.');return;}
+  if(!vE(email)){sErr('serr','Email invalide.');return;}
+  if(!vP(pass)){sErr('serr','8 caractères minimum.');return;}
+  hErr('serr');
+  try{
+    const parts=name.trim().split(' ');
+    const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,prenom:parts[0],nom:parts.slice(1).join(' ')||parts[0],telephone:tel,type:_role==='pro'?'societe':'client'})});
+    const d=await r.json();
+    if(!r.ok){sErr('serr',d.error||'Erreur inscription.');return;}
+    const sn=san(name),ini=sn.split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'??';
+    document.getElementById('uname').textContent=sn.split(' ')[0];
+    document.getElementById('uav').textContent=ini;
+    document.getElementById('pname').textContent=sn;
+    document.getElementById('pav').textContent=ini;
+    document.getElementById('oe').textContent=san(email);
+    gN('s-otp');
+  }catch(e){sErr('serr','Erreur réseau. Réessayez.');}
+}
+
+function oN(inp,idx){inp.value=inp.value.slice(-1).replace(/[^0-9]/g,'');if(inp.value&&idx<5)document.getElementById('o'+(idx+1)).focus();}
+function vOTP(){gN(_role==='pro'?'s-pro':'s-home');}
+
+function sAutre(el,name){document.querySelectorAll('.ac').forEach(c=>c.classList.remove('on'));el.classList.add('on');_aC=name;const btn=document.getElementById('abt');if(btn){btn.disabled=false;btn.style.opacity='1';}}
+function cAutre(){if(!_aC)return;if(!_sel.includes(_aC))_sel.push(_aC);const t=document.getElementById('atag'),l=document.getElementById('atagl');if(t&&l){l.textContent=_aC;t.style.display='block';}gN('s-request');}
+function qBook(svc){_sel=[svc];document.querySelectorAll('#s-request .svc[data-s]').forEach(el=>el.classList.toggle('on',el.dataset.s===svc));gN('s-request');}
+function tSvc(el){el.classList.toggle('on');const s=el.dataset.s;if(el.classList.contains('on'))_sel.push(s);else _sel=_sel.filter(x=>x!==s);}
+
+function addPhotos(input){
+  const grid=document.getElementById('photo-grid');
+  Array.from(input.files).slice(0,5).forEach(file=>{
+    if(grid.querySelectorAll('img').length>=5)return;
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const wrap=document.createElement('div');wrap.style.cssText='position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:.5px solid var(--b)';
+      const img=document.createElement('img');img.src=e.target.result;img.style.cssText='width:100%;height:100%;object-fit:cover';
+      const del=document.createElement('button');del.innerHTML='<i class="ti ti-x"></i>';del.style.cssText='position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);border:none;border-radius:50%;width:20px;height:20px;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0';del.onclick=()=>wrap.remove();
+      wrap.appendChild(img);wrap.appendChild(del);grid.insertBefore(wrap,grid.lastElementChild);
+    };reader.readAsDataURL(file);
+  });input.value='';
+}
+
+async function sendReq(){
+  const addr=document.getElementById('addr').value.trim().slice(0,150)||'Paris';
+  const slot=document.getElementById('slot').value;
+  const svc=san(_sel.length?_sel.join(', '):'Nettoyage');
+  document.getElementById('dsumm').textContent=svc+' · '+slot+' · '+san(addr);
+  document.getElementById('dsl').textContent=slot;
+  document.getElementById('psvc').textContent=svc;
+  _ch.svc=svc;_ch.addr=san(addr);_ch.slot=slot;
+  try{
+    await fetch(API+'/api/demandes',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_token},body:JSON.stringify({prestation:svc,adresse:addr,creneau:slot})});
+  }catch(e){}
+  gN('s-wait');
+  let t=178,iv=setInterval(()=>{t--;const m=Math.floor(t/60),s=t%60;const el=document.getElementById('timer');if(el)el.textContent=m+':'+(s<10?'0':'')+s;if(t<=0)clearInterval(iv);},1000);
+}
+
+function openChat(name,init,bg,fg,hasMsg,firstMsg){
+  _ch.name=san(name);
+  document.getElementById('chat-name').textContent=san(name);
+  const av=document.getElementById('chat-av');av.textContent=init;av.style.background=bg;av.style.color=fg;
+  const cs=document.getElementById('chat-svc');if(cs)cs.textContent=_ch.svc||'Voiture';
+  const area=document.getElementById('chat-area');
+  area.innerHTML='<div class="msg msys">✨ Gleam — Vous êtes <b>Client #1042</b> · Anonyme jusqu\'au paiement</div>';
+  if(firstMsg){const d=document.createElement('div');d.innerHTML='<div class="ms">'+san(name)+'</div><div class="msg mi">'+san(firstMsg)+'</div>';area.appendChild(d);}
+  area.scrollTop=area.scrollHeight;gN('s-chat');
+}
+
+const _repClient=["Intérieur et extérieur s'il vous plaît !","C'est un SUV avec des taches.","Oui, demain matin parfait !","Super, merci ✨","D'accord, je confirme."];let _repIdx=0;
+
+function sendPhoto(input,areaId){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const area=document.getElementById(areaId);
+    const wrap=document.createElement('div');wrap.style.cssText='display:flex;justify-content:flex-end;margin:4px 0';
+    const img=document.createElement('img');img.src=e.target.result;img.style.cssText='max-width:180px;max-height:140px;border-radius:12px;object-fit:cover;cursor:pointer';
+    const bubble=document.createElement('div');bubble.className='msg mo';bubble.style.padding='5px';bubble.appendChild(img);
+    const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;align-items:flex-end';col.appendChild(bubble);wrap.appendChild(col);
+    area.appendChild(wrap);area.scrollTop=area.scrollHeight;
+    setTimeout(()=>{addTheirMsg(area,_ch.name||'Pro Gleam',"Merci pour les photos ✨ Très utile pour le devis !");},1000);
+  };reader.readAsDataURL(file);input.value='';
+}
+
+async function sendMsg(){
+  const inp=document.getElementById('cinp');const txt=inp.value.trim().slice(0,500);if(!txt)return;
+  if(BLOCK.test(txt)){addSysMsg('chat-area','⚠️ Gleam bloque les coordonnées avant paiement.');inp.value='';return;}
+  addMyMsg(document.getElementById('chat-area'),txt);inp.value='';
+  try{await fetch(API+'/api/messages',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+_token},body:JSON.stringify({demande_id:'demo',contenu:txt})});}catch(e){}
+  setTimeout(()=>{addTheirMsg(document.getElementById('chat-area'),_ch.name||'Pro Gleam',_repClient[_repIdx%_repClient.length]);_repIdx++;},900);
+}
+
+function sendProMsg(){
+  const inp=document.getElementById('pro-cinp');const txt=inp.value.trim().slice(0,500);if(!txt)return;
+  if(BLOCK.test(txt)){addSysMsg('pro-chat-area','⚠️ Gleam bloque les coordonnées avant paiement.');inp.value='';return;}
+  addMyMsg(document.getElementById('pro-chat-area'),txt);inp.value='';
+  const reps=["Merci !","D'accord.","Je prépare le devis ✨","Parfait, c'est noté."];
+  setTimeout(()=>{addTheirMsg(document.getElementById('pro-chat-area'),'Client #1042',reps[Math.floor(Math.random()*reps.length)]);},900);
+}
+
+function sendProDevis(){
+  const price=document.getElementById('pro-price').value||'85';
+  alert('✨ Devis Gleam de '+san(price)+'€ envoyé au Client #1042 !');gB();
+}
+
+function addMyMsg(area,txt){
+  const d=document.createElement('div');d.style.cssText='display:flex;justify-content:flex-end';
+  const col=document.createElement('div');col.style.cssText='display:flex;flex-direction:column;align-items:flex-end';
+  const m=document.createElement('div');m.className='msg mo';m.textContent=txt;
+  col.appendChild(m);d.appendChild(col);area.appendChild(d);area.scrollTop=area.scrollHeight;
+}
+function addTheirMsg(area,sender,txt){
+  const r=document.createElement('div');
+  const snd=document.createElement('div');snd.className='ms';snd.textContent=san(sender);
+  const rb=document.createElement('div');rb.className='msg mi';rb.textContent=san(txt);
+  r.appendChild(snd);r.appendChild(rb);area.appendChild(r);area.scrollTop=area.scrollHeight;
+}
+function addSysMsg(areaId,txt){
+  const area=document.getElementById(areaId);if(!area)return;
+  const d=document.createElement('div');d.className='msg msys';d.textContent=txt;
+  area.appendChild(d);area.scrollTop=area.scrollHeight;
+}
+
+function selDev(id,name,rating,reviews,dist,price,msg){
+  document.querySelectorAll('.dcard').forEach(c=>c.classList.remove('sel'));
+  document.getElementById(id).classList.add('sel');
+  _ch={..._ch,name:san(name),price:parseInt(price)||0,msg:san(msg)};
+  document.getElementById('dc').textContent=name;
+  document.getElementById('dn').textContent=name;
+  document.getElementById('drat').textContent='★ '+rating+' ('+reviews+' avis)';
+  document.getElementById('ddist').textContent=dist;
+  document.getElementById('dprice').textContent=price+'€ tout inclus';
+  document.getElementById('pn').textContent=name;
+  document.getElementById('ptot').textContent=price+'€';
+  document.getElementById('pbtn').textContent=price+'€';
+  document.getElementById('ramt').textContent=price+'€';
+  document.getElementById('tname').textContent=name;
+  gN('s-detail');
+}
+
+function confirmPay(){
+  const coords={'ProClean Paris':{name:'Jean-Marc Dupont',phone:'06 12 34 56 78',email:'contact@proclean-paris.fr'},'Éclat Net':{name:'Marie Lefebvre',phone:'07 23 45 67 89',email:'info@eclat-net.fr'},'Shine & Go':{name:'Kevin Martin',phone:'06 45 67 89 01',email:'hello@shinegopro.fr'}};
+  const c=coords[_ch.name]||{name:'Jean-Marc Dupont',phone:'06 12 34 56 78',email:'contact@gleam.fr'};
+  document.getElementById('ul-name').textContent=c.name;
+  document.getElementById('ul-phone').textContent=c.phone;
+  document.getElementById('ul-email').textContent=c.email;
+  gN('s-unlocked');
+}
+
+function rate(n){document.querySelectorAll('.star-btn').forEach((s,i)=>s.style.color=i<n?'#EF9F27':'#D3D1C7');}
+function tDispo(){_dispo=!_dispo;document.getElementById('dtog').classList.toggle('on',_dispo);document.getElementById('dlbl').textContent=_dispo?'Disponible ✨':'Non disponible';}
+function subDev(btn,id){const val=san(document.getElementById(id).value||'envoyé');const c=btn.closest('.mc');c.querySelector('.badge').textContent='Envoyé ✨';c.querySelector('.badge').className='badge bgg';const br=c.querySelector('.brow');const sp=document.createElement('span');sp.style.cssText='font-size:13px;color:var(--gd);font-weight:700';sp.innerHTML='<i class="ti ti-check"></i> Devis '+val+' envoyé ✨';br.replaceWith(sp);try{c.querySelector('.igrp').remove();}catch(e){}}
+function decCard(btn){const c=btn.closest('.mc');c.style.opacity='.4';c.style.pointerEvents='none';}
+</script>
+</body>
+</html>
 </body>
 </html>
