@@ -6,7 +6,7 @@
 <title>Gleam ✨</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#7C3AED;--p2:#6D28D9;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444}
+:root{--p:#7C3AED;--p2:#6D28D9;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#F9FAFB;color:#111827;min-height:100vh}
 .screen{display:none;min-height:100vh;flex-direction:column}
 .screen.active{display:flex}
@@ -30,20 +30,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .role-btn span{display:block;font-size:22px;margin-bottom:4px}
 .btn{width:100%;padding:13px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;transition:.2s}
 .btn:hover{background:var(--p2)}
-.btn:disabled{opacity:.6;cursor:not-allowed}
 .err{background:#FEF2F2;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none}
 .err.show{display:block}
-
-/* OTP */
-.otp-boxes{display:flex;gap:10px;justify-content:center;margin:20px 0}
-.otp-boxes input{width:46px;height:54px;text-align:center;font-size:22px;font-weight:700;border-radius:10px;padding:0}
 
 /* NAVBAR */
 .navbar{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
 .navbar .logo-sm{font-size:22px;font-weight:800;color:var(--p)}
-.nav-actions{display:flex;gap:8px;align-items:center}
-.nav-actions button{background:none;border:none;cursor:pointer;font-size:22px;padding:4px}
 .user-badge{background:var(--light);color:var(--p);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
+.pro-badge{background:#D1FAE5;color:var(--green);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
 
 /* BOTTOM NAV */
 .bottom-nav{background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:sticky;bottom:0}
@@ -51,17 +45,41 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .bnav-item.active{color:var(--p)}
 .bnav-item span:first-child{font-size:22px}
 
-/* HOME */
+/* HOME CLIENT */
 .home-content{flex:1;overflow-y:auto;padding:16px}
-.greeting{margin-bottom:18px}
-.greeting h2{font-size:22px;font-weight:800}
-.greeting p{color:var(--gray);font-size:14px;margin-top:2px}
+.greeting h2{font-size:22px;font-weight:800;margin-bottom:4px}
+.greeting p{color:var(--gray);font-size:14px;margin-bottom:18px}
 .section-title{font-size:16px;font-weight:700;margin-bottom:12px;color:#111827}
 .services-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
 .svc-card{background:#fff;border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;border:2px solid var(--border);transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .svc-card:hover{border-color:var(--p);transform:translateY(-2px)}
 .svc-card span:first-child{font-size:28px;display:block;margin-bottom:6px}
 .svc-card .svc-name{font-size:11px;font-weight:700;color:#374151}
+
+/* HOME PRO */
+.pro-content{flex:1;overflow-y:auto;padding:16px}
+.pro-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:14px;padding:16px;border:1px solid var(--border);text-align:center}
+.stat-card .stat-num{font-size:28px;font-weight:800;color:var(--p)}
+.stat-card .stat-label{font-size:12px;color:var(--gray);margin-top:4px}
+.dispo-toggle{background:#fff;border-radius:14px;padding:16px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.dispo-toggle .dispo-text{font-size:14px;font-weight:700}
+.dispo-toggle .dispo-sub{font-size:12px;color:var(--gray);margin-top:2px}
+.toggle-switch{width:48px;height:26px;background:#E5E7EB;border-radius:13px;cursor:pointer;position:relative;transition:.3s;border:none}
+.toggle-switch.on{background:var(--green)}
+.toggle-switch::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-switch.on::after{left:25px}
+.demande-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.demande-card .dc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.demande-card .dc-type{font-size:16px;font-weight:800;text-transform:capitalize;display:flex;align-items:center;gap:8px}
+.demande-card .dc-num{font-size:11px;color:var(--gray);background:#F3F4F6;padding:3px 8px;border-radius:10px}
+.demande-card .dc-info{font-size:13px;color:#374151;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.demande-card .dc-info span{font-size:15px}
+.devis-form{background:#F9FAFB;border-radius:10px;padding:14px;margin-top:12px;border:1px solid var(--border)}
+.devis-form label{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;margin-top:10px;display:block}
+.devis-form label:first-child{margin-top:0}
+.btn-devis{width:100%;padding:11px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px}
+.btn-voir{padding:8px 14px;background:var(--light);color:var(--p);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
 
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;justify-content:center}
@@ -78,120 +96,84 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .field-group{margin-bottom:14px}
 .field-group label{font-size:13px;font-weight:600;color:#374151;margin-bottom:5px;display:block}
 .optional{font-weight:400;color:var(--gray);font-size:11px}
-.input-with-unit{display:flex;gap:8px;align-items:center}
-.input-with-unit input{flex:1}
-.unit-label{font-size:13px;color:var(--gray);white-space:nowrap}
 .photo-zone{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:.2s}
 .photo-zone:hover{border-color:var(--p);background:var(--light)}
-.photo-zone p{font-size:13px;color:var(--gray);margin-top:4px}
 .photo-previews{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .photo-preview{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden}
 .photo-preview img{width:100%;height:100%;object-fit:cover}
-.photo-preview .del-photo{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.photo-preview .del-photo{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .datetime-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .flex-opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .flex-opt{padding:6px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#374151;transition:.2s}
 .flex-opt.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .divider{height:1px;background:var(--border);margin:16px 0}
-.modal-send-btn{width:100%;padding:14px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;transition:.2s}
-.modal-send-btn:hover{background:var(--p2)}
-.modal-close{position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray)}
+.modal-send-btn{width:100%;padding:14px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
+
+/* DEVIS CLIENT */
+.devis-list{flex:1;overflow-y:auto;padding:16px}
+.devis-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.devis-badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.badge-pending{background:#FEF3C7;color:#D97706}
+.badge-accepted{background:#D1FAE5;color:var(--green)}
+.btn-accept{flex:1;padding:10px;background:var(--p);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-refuse{flex:1;padding:10px;background:#fff;color:var(--red);border:2px solid var(--red);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
 
 /* MESSAGES */
 .messages-list{flex:1;overflow-y:auto;padding:16px}
-.msg-item{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:flex-start;cursor:pointer;transition:.2s}
-.msg-item:hover{border-color:var(--p)}
-.msg-avatar{width:44px;height:44px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.msg-body{flex:1;min-width:0}
-.msg-name{font-weight:700;font-size:14px}
-.msg-preview{color:var(--gray);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.msg-time{font-size:11px;color:var(--gray)}
-.unread-dot{width:9px;height:9px;background:var(--p);border-radius:50%;flex-shrink:0;margin-top:5px}
 .empty-state{text-align:center;padding:60px 20px;color:var(--gray)}
 .empty-state span{font-size:48px;display:block;margin-bottom:12px}
 .empty-state p{font-size:15px}
-
-/* DEVIS */
-.devis-list{flex:1;overflow-y:auto;padding:16px}
-.devis-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.devis-card .devis-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
-.devis-badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700}
-.badge-pending{background:#FEF3C7;color:#D97706}
-.badge-accepted{background:#D1FAE5;color:#059669}
-.devis-pro{font-weight:700;font-size:15px}
-.devis-price{font-size:22px;font-weight:800;color:var(--p);margin:8px 0}
-.devis-actions{display:flex;gap:8px;margin-top:12px}
-.btn-accept{flex:1;padding:10px;background:var(--p);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
-.btn-refuse{flex:1;padding:10px;background:#fff;color:var(--red);border:2px solid var(--red);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
 
 /* PROFIL */
 .profile-content{flex:1;overflow-y:auto;padding:16px}
 .profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;text-align:center}
 .profile-hero .avatar{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px}
 .profile-hero h3{font-size:20px;font-weight:800}
-.profile-hero p{opacity:.8;font-size:14px;margin-top:2px}
 .profile-menu{background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
 .profile-item{display:flex;align-items:center;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);gap:12px;transition:.2s}
 .profile-item:last-child{border-bottom:none}
 .profile-item:hover{background:#F9FAFB}
 .profile-item .pi-icon{font-size:20px;width:32px;text-align:center}
 .profile-item .pi-text{flex:1;font-size:14px;font-weight:600}
-.profile-item .pi-arrow{color:var(--gray);font-size:16px}
+.profile-item .pi-arrow{color:var(--gray)}
 .logout-btn{width:100%;margin-top:12px;padding:13px;background:#FEF2F2;color:var(--red);border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
-
-/* TOAST */
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1F2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:500;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* SUCCESS */
 .success-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
 .success-icon{width:80px;height:80px;background:var(--light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 20px}
-.success-screen h2{font-size:22px;font-weight:800;margin-bottom:8px}
-.success-screen p{color:var(--gray);font-size:14px;line-height:1.6}
-.success-screen .btn{margin-top:24px;max-width:300px}
+
+/* TOAST */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1F2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:500;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- SCREEN: AUTH -->
+<!-- AUTH -->
 <div class="screen active" id="s-auth">
   <div class="auth-wrap">
     <div class="auth-box">
-      <div class="logo">
-        <h1>✨ Gleam</h1>
-        <p>Le nettoyage, brillamment simple</p>
-      </div>
+      <div class="logo"><h1>✨ Gleam</h1><p>Le nettoyage, brillamment simple</p></div>
       <div class="tabs">
         <button class="tab active" onclick="switchTab('login')">Connexion</button>
         <button class="tab" onclick="switchTab('register')">Inscription</button>
       </div>
-
-      <!-- LOGIN -->
       <div id="form-login">
-        <label>Email</label>
-        <input type="email" id="le" placeholder="votre@email.com">
-        <label>Mot de passe</label>
-        <input type="password" id="lp" placeholder="••••••••">
-        <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600">Mot de passe oublié ?</button></div>
+        <label>Email</label><input type="email" id="le" placeholder="votre@email.com">
+        <label>Mot de passe</label><input type="password" id="lp" placeholder="••••••••">
         <button class="btn" onclick="doLogin()">Se connecter</button>
         <div class="err" id="lerr"></div>
       </div>
-
-      <!-- REGISTER -->
       <div id="form-register" style="display:none">
         <div class="row2">
           <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean"></div>
           <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont"></div>
         </div>
-        <label>Email</label>
-        <input type="email" id="re" placeholder="votre@email.com">
-        <label>Téléphone</label>
-        <input type="tel" id="rp" placeholder="06 00 00 00 00">
-        <label>Mot de passe</label>
-        <input type="password" id="rpw" placeholder="Minimum 8 caractères">
+        <label>Email</label><input type="email" id="re" placeholder="votre@email.com">
+        <label>Téléphone</label><input type="tel" id="rp" placeholder="06 00 00 00 00">
+        <label>Mot de passe</label><input type="password" id="rpw" placeholder="Minimum 8 caractères">
         <label>Vous êtes</label>
         <div class="role-select">
           <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
@@ -204,37 +186,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- SCREEN: OTP -->
-<div class="screen" id="s-otp">
-  <div class="auth-wrap">
-    <div class="auth-box">
-      <div class="logo">
-        <h1>✨ Gleam</h1>
-        <p>Vérification de votre email</p>
-      </div>
-      <p style="font-size:14px;color:#374151;text-align:center">Code envoyé à <strong id="otp-email"></strong></p>
-      <div class="otp-boxes">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,0)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,1)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,2)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,3)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,4)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,5)">
-      </div>
-      <button class="btn" onclick="doOTP()">Vérifier</button>
-      <div class="err" id="oerr"></div>
-      <div style="text-align:center;margin-top:14px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600">Renvoyer le code</button></div>
-    </div>
-  </div>
-</div>
-
-<!-- SCREEN: HOME (CLIENT) -->
+<!-- HOME CLIENT -->
 <div class="screen" id="s-home">
   <div class="navbar">
     <span class="logo-sm">✨ Gleam</span>
-    <div class="nav-actions">
-      <span class="user-badge" id="user-name-badge">Bonjour</span>
-    </div>
+    <span class="user-badge" id="user-name-badge">Bonjour</span>
   </div>
   <div class="home-content">
     <div class="greeting">
@@ -253,9 +209,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="svc-card" onclick="openService('autre')"><span>➕</span><div class="svc-name">Autre</div></div>
     </div>
     <div class="section-title">Mes dernières demandes</div>
-    <div id="recent-demands">
-      <div class="empty-state"><span>📋</span><p>Aucune demande pour l'instant.<br>Faites votre première demande !</p></div>
-    </div>
+    <div id="recent-demands"><div class="empty-state"><span>📋</span><p>Aucune demande pour l'instant.</p></div></div>
   </div>
   <div class="bottom-nav">
     <button class="bnav-item active" onclick="goTab('home')"><span>🏠</span>Accueil</button>
@@ -265,12 +219,92 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- SCREEN: MESSAGES -->
+<!-- HOME PRO -->
+<div class="screen" id="s-pro-home">
+  <div class="navbar">
+    <span class="logo-sm">✨ Gleam Pro</span>
+    <span class="pro-badge" id="pro-name-badge">Pro</span>
+  </div>
+  <div class="pro-content">
+    <div class="greeting">
+      <h2 id="pro-greeting">Bonjour 👋</h2>
+      <p>Voici les demandes disponibles</p>
+    </div>
+    <div class="pro-stats">
+      <div class="stat-card"><div class="stat-num" id="stat-demandes">0</div><div class="stat-label">Demandes disponibles</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-devis">0</div><div class="stat-label">Devis envoyés</div></div>
+    </div>
+    <div class="dispo-toggle">
+      <div>
+        <div class="dispo-text">Disponibilité</div>
+        <div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div>
+      </div>
+      <button class="toggle-switch on" id="dispo-toggle" onclick="toggleDispo()"></button>
+    </div>
+    <div class="section-title">📋 Demandes clients</div>
+    <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Aucune demande pour l'instant.</p></div></div>
+  </div>
+  <div class="bottom-nav">
+    <button class="bnav-item active" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
+    <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+  </div>
+</div>
+
+<!-- PRO MESSAGES -->
+<div class="screen" id="s-pro-messages">
+  <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
+  <div class="messages-list"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
+  <div class="bottom-nav">
+    <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
+    <button class="bnav-item active" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
+    <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+  </div>
+</div>
+
+<!-- PRO DEVIS ENVOYES -->
+<div class="screen" id="s-pro-devis">
+  <div class="navbar"><span class="logo-sm">💰 Mes devis envoyés</span></div>
+  <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l'instant.</p></div></div>
+  <div class="bottom-nav">
+    <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item active" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
+    <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+  </div>
+</div>
+
+<!-- PRO PROFILE -->
+<div class="screen" id="s-pro-profile">
+  <div class="navbar"><span class="logo-sm">👤 Mon Profil Pro</span></div>
+  <div class="profile-content">
+    <div class="profile-hero">
+      <div class="avatar">🏢</div>
+      <h3 id="pro-profile-name">Professionnel</h3>
+      <p id="pro-profile-email">email@exemple.com</p>
+    </div>
+    <div class="profile-menu">
+      <div class="profile-item"><span class="pi-icon">💰</span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon">⭐</span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon">🔔</span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon">❓</span><span class="pi-text">Aide & Support</span><span class="pi-arrow">›</span></div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
+  </div>
+  <div class="bottom-nav">
+    <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
+    <button class="bnav-item active" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+  </div>
+</div>
+
+<!-- MESSAGES CLIENT -->
 <div class="screen" id="s-messages">
   <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
-  <div class="messages-list" id="messages-list">
-    <div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.<br>Faites une demande pour recevoir des devis !</p></div>
-  </div>
+  <div class="messages-list"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
     <button class="bnav-item active" onclick="goTab('messages')"><span>💬</span>Messages</button>
@@ -279,12 +313,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- SCREEN: DEVIS -->
+<!-- DEVIS CLIENT -->
 <div class="screen" id="s-devis">
   <div class="navbar"><span class="logo-sm">📋 Mes Devis</span></div>
-  <div class="devis-list" id="devis-list">
-    <div class="empty-state"><span>📋</span><p>Aucun devis reçu.<br>Vos devis apparaîtront ici.</p></div>
-  </div>
+  <div class="devis-list" id="devis-list"><div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
     <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages</button>
@@ -293,7 +325,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- SCREEN: PROFILE -->
+<!-- PROFIL CLIENT -->
 <div class="screen" id="s-profile">
   <div class="navbar"><span class="logo-sm">👤 Mon Profil</span></div>
   <div class="profile-content">
@@ -308,7 +340,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="profile-item"><span class="pi-icon">💳</span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon">🔔</span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon">🔒</span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">❓</span><span class="pi-text">Aide & Support</span><span class="pi-arrow">›</span></div>
     </div>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
@@ -320,32 +351,28 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- SCREEN: SUCCESS -->
+<!-- SUCCESS -->
 <div class="screen" id="s-success">
   <div class="navbar"><span class="logo-sm">✨ Gleam</span></div>
   <div class="success-screen">
     <div class="success-icon">✨</div>
     <h2>Demande envoyée !</h2>
     <p>Votre demande a été transmise aux prestataires Gleam.<br>Vous recevrez des devis dans les plus brefs délais.</p>
-    <button class="btn" onclick="goTab('home')">Retour à l'accueil</button>
-    <button class="btn" style="background:#fff;color:var(--p);border:2px solid var(--p);margin-top:10px" onclick="goTab('devis')">Voir mes devis</button>
+    <button class="btn" onclick="goTab('home')" style="max-width:300px">Retour à l'accueil</button>
+    <button class="btn" style="background:#fff;color:var(--p);border:2px solid var(--p);margin-top:10px;max-width:300px" onclick="goTab('devis')">Voir mes devis</button>
   </div>
 </div>
 
 <!-- MODAL SERVICE -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
-  <div class="modal" id="modal-content">
-    <div class="modal-handle"></div>
-    <div id="modal-body"></div>
-  </div>
+  <div class="modal"><div class="modal-handle"></div><div id="modal-body"></div></div>
 </div>
 
 <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
 
 <script>
-const API = 'https://gleam-production-9b95.up.railway.app';
-let currentUser = null, userRole = 'client', photos = [], selectedFlexibility = 'exact';
-console.log('Gleam chargé, rôle par défaut:', userRole);
+const API='https://gleam-production-9b95.up.railway.app';
+let currentUser=null,userRole='client',photos=[],disponible=true;
 
 // ── UTILS ──
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
@@ -358,14 +385,23 @@ function switchTab(t){
   document.getElementById('form-login').style.display=t==='login'?'block':'none';
   document.getElementById('form-register').style.display=t==='register'?'block':'none';
 }
-function otpNext(el,i){if(el.value&&i<5)document.querySelectorAll('.otp-input')[i+1].focus()}
+function isPro(){const t=currentUser?.type;return t==='pro'||t==='societe'||t==='professionnel'}
+
 function goTab(tab){
   const map={home:'s-home',messages:'s-messages',devis:'s-devis',profile:'s-profile'};
   show(map[tab]);
-  document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.bnav-item').forEach((b,i)=>{const tabs=['home','messages','devis','profile'];if(tabs[i]===tab)b.classList.add('active')});
+  document.querySelectorAll('#s-home .bnav-item,#s-messages .bnav-item,#s-devis .bnav-item,#s-profile .bnav-item').forEach(b=>b.classList.remove('active'));
+  const idx={home:0,messages:1,devis:2,profile:3}[tab];
+  document.querySelectorAll(`#${map[tab]} .bnav-item`)[idx]?.classList.add('active');
   if(tab==='home')loadDemandes();
   if(tab==='devis')loadDevis();
+}
+
+function goProTab(tab){
+  const map={'pro-home':'s-pro-home','pro-messages':'s-pro-messages','pro-devis':'s-pro-devis','pro-profile':'s-pro-profile'};
+  show(map[tab]);
+  if(tab==='pro-home')loadProDemandes();
+  if(tab==='pro-devis')loadProDevis();
 }
 
 // ── AUTH ──
@@ -379,69 +415,63 @@ async function doLogin(){
     if(!r.ok){showErr('lerr',d.error||'Identifiants incorrects.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
     enterApp();
-  }catch(e){showErr('lerr','Erreur réseau. Vérifiez votre connexion.')}
-}
-async function doRegister(){
-  hideErr('rerr');
-  const fnEl=document.getElementById('rfn'),lnEl=document.getElementById('rln'),
-        eEl=document.getElementById('re'),phEl=document.getElementById('rp'),pwEl=document.getElementById('rpw');
-  if(!fnEl||!lnEl||!eEl||!phEl||!pwEl){showErr('rerr','Erreur formulaire. Rechargez la page.');return}
-  const fn=fnEl.value.trim(),ln=lnEl.value.trim(),email=eEl.value.trim(),phone=phEl.value.trim(),pw=pwEl.value;
-  if(!fn){showErr('rerr','Prénom requis.');return}
-  if(!ln){showErr('rerr','Nom requis.');return}
-  if(!email){showErr('rerr','Email requis.');return}
-  if(!phone){showErr('rerr','Téléphone requis.');return}
-  if(!pw){showErr('rerr','Mot de passe requis.');return}
-  if(pw.length<8){showErr('rerr','Mot de passe trop court (min 8 caractères).');return}
-  try{
-    console.log('Envoi inscription:', {firstName:fn,lastName:ln,email,phone,password:'***',role:userRole});
-    const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({firstName:fn,lastName:ln,email,phone:phone,password:pw,role:userRole,type:userRole,prenom:fn,nom:ln})});
-    const d=await r.json();
-    if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
-    document.getElementById('otp-email').textContent=email;
-    show('s-otp');
-  }catch(e){showErr('rerr','Erreur réseau. Vérifiez votre connexion.')}
-}
-async function doOTP(){
-  hideErr('oerr');
-  const inputs=document.querySelectorAll('.otp-input'),code=Array.from(inputs).map(i=>i.value).join('');
-  if(code.length<6){showErr('oerr','Entrez les 6 chiffres du code.');return}
-  const email=document.getElementById('otp-email').textContent;
-  try{
-    const r=await fetch(API+'/api/auth/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,token:code})});
-    const d=await r.json();
-    if(!r.ok){showErr('oerr',d.error||'Code incorrect.');return}
-    currentUser=d.user;localStorage.setItem('gleam_token',d.token);
-    enterApp();
-  }catch(e){showErr('oerr','Erreur réseau.')}
-}
-async function enterApp(){
-  const name=currentUser?.firstName||currentUser?.prenom||currentUser?.email||'';
-  document.getElementById('greeting-name').textContent=`Bonjour ${name} 👋`;
-  document.getElementById('user-name-badge').textContent=name;
-  document.getElementById('profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
-  document.getElementById('profile-email').textContent=currentUser?.email||'';
-  show('s-home');
-  toast('Bienvenue sur Gleam ✨');
-  await loadDemandes();
+  }catch(e){showErr('lerr','Erreur réseau.')}
 }
 
+async function doRegister(){
+  hideErr('rerr');
+  const fn=document.getElementById('rfn').value.trim(),ln=document.getElementById('rln').value.trim(),
+        email=document.getElementById('re').value.trim(),phone=document.getElementById('rp').value.trim(),pw=document.getElementById('rpw').value;
+  if(!fn)return showErr('rerr','Prénom requis.');
+  if(!ln)return showErr('rerr','Nom requis.');
+  if(!email)return showErr('rerr','Email requis.');
+  if(!phone)return showErr('rerr','Téléphone requis.');
+  if(!pw||pw.length<8)return showErr('rerr','Mot de passe min 8 caractères.');
+  try{
+    const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({firstName:fn,lastName:ln,prenom:fn,nom:ln,email,phone,telephone:phone,password:pw,role:userRole,type:userRole})});
+    const d=await r.json();
+    if(!r.ok)return showErr('rerr',d.error||'Erreur inscription.');
+    currentUser=d.user;localStorage.setItem('gleam_token',d.token);
+    enterApp();
+  }catch(e){showErr('rerr','Erreur réseau.')}
+}
+
+function enterApp(){
+  const name=currentUser?.firstName||currentUser?.prenom||currentUser?.email||'';
+  if(isPro()){
+    document.getElementById('pro-greeting').textContent=`Bonjour ${name} 👋`;
+    document.getElementById('pro-name-badge').textContent=name;
+    document.getElementById('pro-profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
+    document.getElementById('pro-profile-email').textContent=currentUser?.email||'';
+    show('s-pro-home');
+    loadProDemandes();
+  }else{
+    document.getElementById('greeting-name').textContent=`Bonjour ${name} 👋`;
+    document.getElementById('user-name-badge').textContent=name;
+    document.getElementById('profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
+    document.getElementById('profile-email').textContent=currentUser?.email||'';
+    show('s-home');
+    loadDemandes();
+  }
+  toast('Bienvenue sur Gleam ✨');
+}
+
+function doLogout(){localStorage.removeItem('gleam_token');currentUser=null;show('s-auth');toast('À bientôt !')}
+
+// ── CLIENT : DEMANDES ──
 async function loadDemandes(){
-  const token=localStorage.getItem('gleam_token');
-  if(!token)return;
+  const token=localStorage.getItem('gleam_token');if(!token)return;
   try{
     const r=await fetch(API+'/api/demandes',{headers:{'Authorization':'Bearer '+token}});
+    if(!r.ok)return;
     const data=await r.json();
-    const container=document.getElementById('recent-demands');
-    if(!data||data.length===0){
-      container.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\'instant.<br>Faites votre première demande !</p></div>';
-      return;
-    }
+    const c=document.getElementById('recent-demands');
+    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\'instant.</p></div>';return}
     const icons={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
     const statuts={en_attente:'⏳ En attente',devis_recus:'📋 Devis reçus',terminee:'✅ Terminée'};
-    container.innerHTML=data.map(d=>`
-      <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center">
+    c.innerHTML=data.map(d=>`
+      <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.05)">
         <span style="font-size:28px">${icons[d.prestation]||'✨'}</span>
         <div style="flex:1">
           <div style="font-weight:700;font-size:14px;text-transform:capitalize">${d.prestation}</div>
@@ -449,25 +479,118 @@ async function loadDemandes(){
           <div style="font-size:11px;color:var(--p);font-weight:600;margin-top:4px">${statuts[d.statut]||d.statut}</div>
         </div>
         <div style="font-size:11px;color:var(--gray)">${new Date(d.created_at).toLocaleDateString('fr-FR')}</div>
-      </div>
-    `).join('');
-  }catch(e){console.error('Erreur chargement demandes',e)}
+      </div>`).join('');
+  }catch(e){}
 }
-function doLogout(){localStorage.removeItem('gleam_token');currentUser=null;show('s-auth');toast('À bientôt !')}
 
-// ── SERVICES ──
+async function loadDevis(){
+  const token=localStorage.getItem('gleam_token');if(!token)return;
+  try{
+    const rd=await fetch(API+'/api/demandes',{headers:{'Authorization':'Bearer '+token}});
+    if(!rd.ok)return;
+    const demandes=await rd.json();
+    const c=document.getElementById('devis-list');
+    if(!demandes||!demandes.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div>';return}
+    let all=[];
+    for(const d of demandes){
+      const r=await fetch(API+'/api/devis/demande/'+d.id,{headers:{'Authorization':'Bearer '+token}});
+      if(r.ok){const dv=await r.json();all=[...all,...dv.map(v=>({...v,prestation:d.prestation}))]}
+    }
+    if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\'instant.</p></div>';return}
+    c.innerHTML=all.map(v=>`
+      <div class="devis-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div style="font-weight:700;font-size:15px">Prestataire Gleam</div>
+          <span class="devis-badge badge-pending">En attente</span>
+        </div>
+        <div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 ${v.prestation}</div>
+        <div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">${v.prix_ttc} €</div>
+        ${v.description?`<div style="font-size:13px;color:#374151">${v.description}</div>`:''}
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn-accept" onclick="toast('✅ Devis accepté !')">✅ Accepter</button>
+          <button class="btn-refuse" onclick="toast('❌ Devis refusé.')">❌ Refuser</button>
+        </div>
+      </div>`).join('');
+  }catch(e){}
+}
+
+// ── PRO : DEMANDES ──
+async function loadProDemandes(){
+  const token=localStorage.getItem('gleam_token');if(!token)return;
+  try{
+    const r=await fetch(API+'/api/demandes/all',{headers:{'Authorization':'Bearer '+token}});
+    const c=document.getElementById('pro-demandes-list');
+    if(!r.ok){
+      // Fallback — affiche message si route pas encore créée
+      c.innerHTML='<div class="empty-state"><span>📋</span><p>Les demandes clients apparaîtront ici.</p></div>';
+      document.getElementById('stat-demandes').textContent='0';
+      return;
+    }
+    const data=await r.json();
+    document.getElementById('stat-demandes').textContent=data.length||0;
+    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\'instant.<br>Revenez bientôt !</p></div>';return}
+    const icons={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
+    c.innerHTML=data.map(d=>`
+      <div class="demande-card">
+        <div class="dc-header">
+          <div class="dc-type">${icons[d.prestation]||'✨'} ${d.prestation}</div>
+          <span class="dc-num">${d.numero_anonyme||'#???'}</span>
+        </div>
+        <div class="dc-info"><span>📍</span>${d.adresse}</div>
+        ${d.creneau?`<div class="dc-info"><span>📅</span>${d.creneau}</div>`:''}
+        ${d.notes?`<div style="font-size:12px;color:var(--gray);margin-top:6px;background:#F9FAFB;padding:8px;border-radius:8px">${tryParseNotes(d.notes)}</div>`:''}
+        <div class="devis-form">
+          <label>💰 Votre prix (€ TTC)</label>
+          <input type="number" id="prix-${d.id}" placeholder="Ex: 150" min="1">
+          <label>📝 Message pour le client</label>
+          <textarea id="msg-${d.id}" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>
+          <button class="btn-devis" onclick="envoyerDevis('${d.id}')">✨ Envoyer mon devis</button>
+        </div>
+      </div>`).join('');
+  }catch(e){
+    document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Les demandes clients apparaîtront ici.</p></div>';
+  }
+}
+
+function tryParseNotes(notes){
+  try{const n=JSON.parse(notes);return n.description||''}catch(e){return notes||''}
+}
+
+async function loadProDevis(){
+  document.getElementById('pro-devis-list').innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\'instant.</p></div>';
+}
+
+async function envoyerDevis(demandeId){
+  const token=localStorage.getItem('gleam_token');
+  const prix=document.getElementById('prix-'+demandeId)?.value;
+  const msg=document.getElementById('msg-'+demandeId)?.value||'';
+  if(!prix||parseFloat(prix)<=0){toast('⚠️ Entrez un prix valide.');return}
+  try{
+    const r=await fetch(API+'/api/devis',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({demande_id:demandeId,prix_ttc:parseFloat(prix),description:msg})});
+    const d=await r.json();
+    if(!r.ok){toast('❌ '+( d.error||'Erreur'));return}
+    toast('✅ Devis envoyé au client !');
+    document.getElementById('stat-devis').textContent=parseInt(document.getElementById('stat-devis').textContent)+1;
+    document.getElementById('prix-'+demandeId).value='';
+    document.getElementById('msg-'+demandeId).value='';
+  }catch(e){toast('❌ Erreur réseau.')}
+}
+
+async function toggleDispo(){
+  disponible=!disponible;
+  const btn=document.getElementById('dispo-toggle');
+  btn.classList.toggle('on',disponible);
+  document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
+  const token=localStorage.getItem('gleam_token');
+  try{await fetch(API+'/api/societes/disponibilite',{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({disponible})})}catch(e){}
+  toast(disponible?'✅ Vous êtes disponible':'❌ Vous êtes indisponible');
+}
+
+// ── SERVICES CLIENT ──
 function openService(type){
   photos=[];
-  const bodies={
-    voiture: voitureForm,
-    canape: canapeForm,
-    matelas: matelasForm,
-    terrasse: terrasseForm,
-    piscine: piscineForm,
-    toiture: toitureForm,
-    vitres: vitresForm,
-    autre: autreForm,
-  };
+  const bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,autre:autreForm};
   document.getElementById('modal-body').innerHTML=bodies[type]();
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -475,277 +598,153 @@ function closeModal(e){if(e.target===document.getElementById('modal-overlay'))do
 
 function dateTimeBlock(){
   const today=new Date().toISOString().split('T')[0];
-  return `
-  <div class="divider"></div>
-  <div class="field-group">
-    <label>📅 Date et heure souhaitées</label>
-    <div class="datetime-row">
-      <input type="date" id="f-date" min="${today}" value="${today}">
-      <select id="f-time">${[...Array(27)].map((_,i)=>{const h=Math.floor(i/2)+7,m=i%2?'30':'00';return`<option value="${h}:${m}">${h}h${m}</option>`}).join('')}</select>
-    </div>
-    <label style="margin-top:12px">Flexibilité horaire <span class="optional">(optionnel)</span></label>
-    <div class="flex-opts">
-      ${['Heure exacte','± 30 min','± 1 heure','Matinée','Après-midi','Toute la journée'].map((l,i)=>`<button class="flex-opt${i===0?' sel':''}" onclick="selFlex(this)">${l}</button>`).join('')}
-    </div>
+  return`<div class="divider"></div>
+  <div class="field-group"><label>📅 Date et heure souhaitées</label>
+  <div class="datetime-row">
+    <input type="date" id="f-date" min="${today}" value="${today}">
+    <select id="f-time">${[...Array(27)].map((_,i)=>{const h=Math.floor(i/2)+7,m=i%2?'30':'00';return`<option>${h}h${m}</option>`}).join('')}</select>
   </div>
-  <div class="field-group">
-    <label>📍 Adresse d'intervention</label>
-    <input type="text" id="f-addr" placeholder="12 rue de la Paix, 75001 Paris">
-  </div>
-  <div class="field-group">
-    <label>📸 Photos <span class="optional">(optionnel — aide les pros à mieux devis)</span></label>
-    <div class="photo-zone" onclick="document.getElementById('photo-input').click()">
-      <span style="font-size:28px">📷</span>
-      <p>Touchez pour ajouter des photos</p>
-    </div>
-    <div class="photo-previews" id="photo-previews"></div>
-  </div>`;
+  <label style="margin-top:12px">Flexibilité <span class="optional">(optionnel)</span></label>
+  <div class="flex-opts">${['Heure exacte','± 30 min','± 1 heure','Matinée','Après-midi','Toute la journée'].map((l,i)=>`<button class="flex-opt${i===0?' sel':''}" onclick="selFlex(this)">${l}</button>`).join('')}</div></div>
+  <div class="field-group"><label>📍 Adresse d'intervention</label><input type="text" id="f-addr" placeholder="12 rue de la Paix, 75001 Paris"></div>
+  <div class="field-group"><label>📸 Photos <span class="optional">(optionnel)</span></label>
+  <div class="photo-zone" onclick="document.getElementById('photo-input').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>
+  <div class="photo-previews" id="photo-previews"></div></div>`
 }
-function descBlock(ph='Décrivez votre besoin...'){
-  return `<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="${ph}" style="resize:none"></textarea></div>`;
-}
+function descBlock(ph){return`<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="${ph}" style="resize:none"></textarea></div>`}
 function sendBtn(type){return`<button class="modal-send-btn" onclick="sendDemand('${type}')">✨ Envoyer ma demande</button>`}
 
-function voitureForm(){return`
-  <div class="modal-title">🚗 Nettoyage voiture</div>
-  <div class="modal-sub">Choisissez le type de nettoyage souhaité</div>
-  <div class="field-group"><label>Type de nettoyage</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'nettoyage-type')"><span>🪑</span>Intérieur</button>
-    <button class="opt-btn" onclick="selOpt(this,'nettoyage-type')"><span>✨</span>Extérieur</button>
-    <button class="opt-btn full" onclick="selOpt(this,'nettoyage-type')"><span>🔄</span>Intérieur + Extérieur</button>
+function voitureForm(){return`<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>
+  <div class="field-group"><label>Type de nettoyage</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'net-type')"><span>🪑</span>Intérieur</button>
+    <button class="opt-btn" onclick="selOpt(this,'net-type')"><span>✨</span>Extérieur</button>
+    <button class="opt-btn full" onclick="selOpt(this,'net-type')"><span>🔄</span>Intérieur + Extérieur</button>
   </div></div>
-  <div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'veh-type')"><span>🚗</span>Citadine</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh-type')"><span>🚙</span>SUV/4×4</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh-type')"><span>🚐</span>Monospace</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh-type')"><span>🚌</span>Utilitaire</button>
+  <div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'veh')"><span>🚗</span>Citadine</button>
+    <button class="opt-btn" onclick="selOpt(this,'veh')"><span>🚙</span>SUV/4×4</button>
+    <button class="opt-btn" onclick="selOpt(this,'veh')"><span>🚐</span>Monospace</button>
+    <button class="opt-btn" onclick="selOpt(this,'veh')"><span>🚌</span>Utilitaire</button>
   </div></div>
-  <div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
+  <div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label><div class="options-grid">
     <button class="opt-btn" onclick="selOpt(this,'seats')">2 places</button>
     <button class="opt-btn" onclick="selOpt(this,'seats')">5 places</button>
     <button class="opt-btn" onclick="selOpt(this,'seats')">7 places</button>
     <button class="opt-btn" onclick="selOpt(this,'seats')">9+ places</button>
   </div></div>
-  ${descBlock("Ex: Siège tâchés, odeur de cigarette, sol très sale...")}
-  ${dateTimeBlock()}
-  ${sendBtn('voiture')}`}
+  ${descBlock("Ex: Sièges tachés, odeur de cigarette...")}${dateTimeBlock()}${sendBtn('voiture')}`}
 
-function canapeForm(){return`
-  <div class="modal-title">🛋️ Nettoyage canapé</div>
-  <div class="modal-sub">Indiquez le type de canapé pour un devis précis</div>
-  <div class="field-group"><label>Type de canapé</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'canape-type')"><span>➡️</span>Canapé droit</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-type')"><span>📐</span>Canapé d'angle</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-type')"><span>🪑</span>Canapé lit</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-type')"><span>🪑</span>Chauffeuses</button>
+function canapeForm(){return`<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Indiquez le type de canapé</div>
+  <div class="field-group"><label>Type</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'can-type')"><span>➡️</span>Droit</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-type')"><span>📐</span>Angle</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-type')"><span>🪑</span>Canapé lit</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-type')"><span>🪑</span>Chauffeuses</button>
   </div></div>
-  <div class="field-group"><label>Nombre de places</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'canape-places')">2 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-places')">3 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-places')">4 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-places')">5+ places</button>
+  <div class="field-group"><label>Nombre de places</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'can-pl')">2 places</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-pl')">3 places</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-pl')">4 places</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-pl')">5+ places</button>
   </div></div>
-  <div class="field-group"><label>Matière <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'canape-mat')">Tissu</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-mat')">Cuir</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-mat')">Velours</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-mat')">Microfibre</button>
+  <div class="field-group"><label>Matière <span class="optional">(optionnel)</span></label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'can-mat')">Tissu</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-mat')">Cuir</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-mat')">Velours</button>
+    <button class="opt-btn" onclick="selOpt(this,'can-mat')">Microfibre</button>
   </div></div>
-  ${descBlock("Ex: Tâches de café, odeurs, poils d'animaux...")}
-  ${dateTimeBlock()}
-  ${sendBtn('canape')}`}
+  ${descBlock("Ex: Taches de café, poils d'animaux...")}${dateTimeBlock()}${sendBtn('canape')}`}
 
-function matelasForm(){return`
-  <div class="modal-title">🛏️ Nettoyage matelas</div>
-  <div class="modal-sub">Indiquez les dimensions pour un devis précis</div>
-  <div class="field-group"><label>Taille du matelas</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'matelas-taille')">90×190 cm<br><small style="color:var(--gray);font-size:10px">1 personne</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-taille')">140×190 cm<br><small style="color:var(--gray);font-size:10px">2 personnes</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-taille')">160×200 cm<br><small style="color:var(--gray);font-size:10px">Queen size</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-taille')">180×200 cm<br><small style="color:var(--gray);font-size:10px">King size</small></button>
+function matelasForm(){return`<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Indiquez les dimensions</div>
+  <div class="field-group"><label>Taille</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'mat-t')">90×190 cm<br><small style="color:var(--gray);font-size:10px">1 personne</small></button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-t')">140×190 cm<br><small style="color:var(--gray);font-size:10px">2 personnes</small></button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-t')">160×200 cm<br><small style="color:var(--gray);font-size:10px">Queen size</small></button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-t')">180×200 cm<br><small style="color:var(--gray);font-size:10px">King size</small></button>
   </div></div>
-  <div class="field-group"><label>Nombre de matelas</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'matelas-nb')">1 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-nb')">2 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-nb')">3 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-nb')">4+ matelas</button>
+  <div class="field-group"><label>Nombre</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'mat-nb')">1 matelas</button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-nb')">2 matelas</button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-nb')">3 matelas</button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-nb')">4+ matelas</button>
   </div></div>
-  ${descBlock("Ex: Tâches, acariens, odeurs, matelas pour enfant...")}
-  ${dateTimeBlock()}
-  ${sendBtn('matelas')}`}
+  ${descBlock("Ex: Taches, acariens, odeurs...")}${dateTimeBlock()}${sendBtn('matelas')}`}
 
-function terrasseForm(){return`
-  <div class="modal-title">☀️ Nettoyage terrasse</div>
-  <div class="modal-sub">Précisez la surface et le type de sol</div>
-  <div class="field-group"><label>Surface approximative</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-surf')">Moins de 20 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-surf')">20 à 50 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-surf')">50 à 100 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-surf')">Plus de 100 m²</button>
+function terrasseForm(){return`<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et type de sol</div>
+  <div class="field-group"><label>Surface</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'ter-s')">Moins de 20 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'ter-s')">20 à 50 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'ter-s')">50 à 100 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'ter-s')">Plus de 100 m²</button>
   </div></div>
-  <div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-sol')">Carrelage</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-sol')">Bois / composite</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-sol')">Béton</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-sol')">Pierre naturelle</button>
+  <div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'ter-sol')">Carrelage</button>
+    <button class="opt-btn" onclick="selOpt(this,'ter-sol')">Bois/composite</button>
+    <button class="opt-btn" onclick="selOpt(this,'ter-sol')">Béton</button>
+    <button class="opt-btn" onclick="selOpt(this,'ter-sol')">Pierre naturelle</button>
   </div></div>
-  ${descBlock("Ex: Mousse verte, carrelage très sale, joints noircis...")}
-  ${dateTimeBlock()}
-  ${sendBtn('terrasse')}`}
+  ${descBlock("Ex: Mousse verte, joints noircis...")}${dateTimeBlock()}${sendBtn('terrasse')}`}
 
-function piscineForm(){return`
-  <div class="modal-title">💧 Nettoyage piscine</div>
-  <div class="modal-sub">Indiquez les caractéristiques de votre piscine</div>
-  <div class="field-group"><label>Type de piscine</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'piscine-type')"><span>🏊</span>Enterrée</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-type')"><span>🏖️</span>Hors-sol</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-type')"><span>🌊</span>Semi-enterrée</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-type')"><span>🛁</span>Spa/Jacuzzi</button>
+function piscineForm(){return`<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Caractéristiques de votre piscine</div>
+  <div class="field-group"><label>Type</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'pisc-t')"><span>🏊</span>Enterrée</button>
+    <button class="opt-btn" onclick="selOpt(this,'pisc-t')"><span>🏖️</span>Hors-sol</button>
+    <button class="opt-btn" onclick="selOpt(this,'pisc-t')"><span>🌊</span>Semi-enterrée</button>
+    <button class="opt-btn" onclick="selOpt(this,'pisc-t')"><span>🛁</span>Spa/Jacuzzi</button>
   </div></div>
-  <div class="field-group"><label>Dimensions approximatives <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'piscine-size')">Petite (−25 m²)</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-size')">Moyenne (25−50 m²)</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-size')">Grande (50−80 m²)</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-size')">Très grande (+80 m²)</button>
+  <div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'pisc-s')">Moins de 25 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'pisc-s')">25 à 50 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'pisc-s')">50 à 80 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'pisc-s')">Plus de 80 m²</button>
   </div></div>
-  ${descBlock("Ex: Eau verte, liner abîmé, nettoyage de printemps...")}
-  ${dateTimeBlock()}
-  ${sendBtn('piscine')}`}
+  ${descBlock("Ex: Eau verte, nettoyage de printemps...")}${dateTimeBlock()}${sendBtn('piscine')}`}
 
-function toitureForm(){return`
-  <div class="modal-title">🏠 Nettoyage toiture</div>
-  <div class="modal-sub">Démoussage, nettoyage et traitement</div>
-  <div class="field-group"><label>Type de toiture</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'toit-type')">Tuiles</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-type')">Ardoises</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-type')">Fibrociment</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-type')">Zinc / Métal</button>
+function toitureForm(){return`<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>
+  <div class="field-group"><label>Type de toiture</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'toit-t')">Tuiles</button>
+    <button class="opt-btn" onclick="selOpt(this,'toit-t')">Ardoises</button>
+    <button class="opt-btn" onclick="selOpt(this,'toit-t')">Fibrociment</button>
+    <button class="opt-btn" onclick="selOpt(this,'toit-t')">Zinc/Métal</button>
   </div></div>
-  <div class="field-group"><label>Surface de toiture <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'toit-surf')">Moins de 50 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-surf')">50 à 100 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-surf')">100 à 200 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-surf')">Plus de 200 m²</button>
+  <div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'toit-s')">Moins de 50 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'toit-s')">50 à 100 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'toit-s')">100 à 200 m²</button>
+    <button class="opt-btn" onclick="selOpt(this,'toit-s')">Plus de 200 m²</button>
   </div></div>
-  ${descBlock("Ex: Mousse importante, gouttières à nettoyer, traitement hydrofuge souhaité...")}
-  ${dateTimeBlock()}
-  ${sendBtn('toiture')}`}
+  ${descBlock("Ex: Mousse importante, gouttières...")}${dateTimeBlock()}${sendBtn('toiture')}`}
 
-function vitresForm(){return`
-  <div class="modal-title">🪟 Nettoyage vitres</div>
-  <div class="modal-sub">Indiquez le nombre de vitres et le type de bien</div>
-  <div class="field-group"><label>Type de bien</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitres-bien')">🏠 Maison</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-bien')">🏢 Appartement</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-bien')">🏪 Commerce</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-bien')">🏭 Bureaux</button>
+function vitresForm(){return`<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien et nombre de vitres</div>
+  <div class="field-group"><label>Type de bien</label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'vitr-b')">🏠 Maison</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-b')">🏢 Appartement</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-b')">🏪 Commerce</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-b')">🏭 Bureaux</button>
   </div></div>
-  <div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitres-nb')">Moins de 5</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-nb')">5 à 10</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-nb')">10 à 20</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-nb')">Plus de 20</button>
+  <div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel)</span></label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">Moins de 5</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">5 à 10</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">10 à 20</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">Plus de 20</button>
   </div></div>
-  <div class="field-group"><label>Hauteur d'accès <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitres-h')">Rez-de-chaussée</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-h')">1er étage</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-h')">2e étage</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-h')">3e+ étage</button>
+  <div class="field-group"><label>Hauteur <span class="optional">(optionnel)</span></label><div class="options-grid">
+    <button class="opt-btn" onclick="selOpt(this,'vitr-h')">Rez-de-chaussée</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-h')">1er étage</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-h')">2e étage</button>
+    <button class="opt-btn" onclick="selOpt(this,'vitr-h')">3e+ étage</button>
   </div></div>
-  ${descBlock("Ex: Vitres très encrassées, velux, double vitrage, accès difficile...")}
-  ${dateTimeBlock()}
-  ${sendBtn('vitres')}`}
+  ${descBlock("Ex: Velux, double vitrage, accès difficile...")}${dateTimeBlock()}${sendBtn('vitres')}`}
 
-function autreForm(){return`
-  <div class="modal-title">➕ Autre prestation</div>
-  <div class="modal-sub">Décrivez librement votre besoin de nettoyage</div>
-  <div class="field-group">
-    <label>De quoi s'agit-il ?</label>
-    <input type="text" id="f-autre-type" placeholder="Ex: Matelas, bateau, salle de sport, jacuzzi...">
-  </div>
-  <div class="field-group">
-    <label>Décrivez votre besoin</label>
-    <textarea id="f-desc" rows="4" placeholder="Expliquez ce que vous souhaitez nettoyer, la taille, l'état actuel, vos attentes..." style="resize:none"></textarea>
-  </div>
-  ${dateTimeBlock()}
-  ${sendBtn('autre')}`}
+function autreForm(){return`<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez librement votre besoin</div>
+  <div class="field-group"><label>De quoi s'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: Bateau, jacuzzi, salle de sport..."></div>
+  <div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel, vos attentes..." style="resize:none"></textarea></div>
+  ${dateTimeBlock()}${sendBtn('autre')}`}
 
-async function loadDevis(){
-  const token=localStorage.getItem('gleam_token');
-  if(!token)return;
-  try{
-    const rd=await fetch(API+'/api/demandes',{headers:{'Authorization':'Bearer '+token}});
-    if(!rd.ok)return;
-    const demandes=await rd.json();
-    const container=document.getElementById('devis-list');
-    if(!demandes||demandes.length===0){
-      container.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu.<br>Vos devis apparaîtront ici.</p></div>';
-      return;
-    }
-    let allDevis=[];
-    for(const d of demandes){
-      const r=await fetch(API+'/api/devis/demande/'+d.id,{headers:{'Authorization':'Bearer '+token}});
-      if(r.ok){const dv=await r.json();allDevis=[...allDevis,...dv.map(v=>({...v,prestation:d.prestation}))]}
-    }
-    if(allDevis.length===0){
-      container.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\'instant.<br>Les pros vous contacteront bientôt !</p></div>';
-      return;
-    }
-    container.innerHTML=allDevis.map(v=>`
-      <div class="devis-card">
-        <div class="devis-header">
-          <div class="devis-pro">Prestataire Gleam</div>
-          <span class="devis-badge badge-pending">En attente</span>
-        </div>
-        <div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 ${v.prestation}</div>
-        <div class="devis-price">${v.prix_ttc} €</div>
-        ${v.description?`<div style="font-size:13px;color:#374151;margin-top:4px">${v.description}</div>`:''}
-        <div class="devis-actions">
-          <button class="btn-accept" onclick="acceptDevis('${v.id}')">✅ Accepter</button>
-          <button class="btn-refuse" onclick="refuserDevis('${v.id}')">❌ Refuser</button>
-        </div>
-      </div>`).join('');
-  }catch(e){console.error('Erreur devis',e)}
-}
-
-async function acceptDevis(id){toast('✅ Devis accepté ! Le prestataire va vous contacter.')}
-async function refuserDevis(id){toast('❌ Devis refusé.')}
-function selOpt(btn, group){
-  document.querySelectorAll(`[onclick*="selOpt(this,'${group}')"]`).forEach(b=>b.classList.remove('sel'));
-  btn.classList.add('sel');
-}
+function selOpt(btn,group){document.querySelectorAll(`[onclick*="selOpt(this,'${group}')"]`).forEach(b=>b.classList.remove('sel'));btn.classList.add('sel')}
 function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel')}
-function handlePhotos(input){
-  Array.from(input.files).forEach(f=>{
-    if(photos.length>=5)return;
-    const r=new FileReader();
-    r.onload=e=>{photos.push(e.target.result);renderPhotos()};
-    r.readAsDataURL(f);
-  });
-  input.value='';
-}
-function renderPhotos(){
-  const c=document.getElementById('photo-previews');
-  if(!c)return;
-  c.innerHTML=photos.map((p,i)=>`<div class="photo-preview"><img src="${p}"><button class="del-photo" onclick="removePhoto(${i})">×</button></div>`).join('');
-}
+function handlePhotos(input){Array.from(input.files).forEach(f=>{if(photos.length>=5)return;const r=new FileReader();r.onload=e=>{photos.push(e.target.result);renderPhotos()};r.readAsDataURL(f)});input.value=''}
+function renderPhotos(){const c=document.getElementById('photo-previews');if(!c)return;c.innerHTML=photos.map((p,i)=>`<div class="photo-preview"><img src="${p}"><button class="del-photo" onclick="removePhoto(${i})">×</button></div>`).join('')}
 function removePhoto(i){photos.splice(i,1);renderPhotos()}
 
 async function sendDemand(type){
@@ -758,21 +757,14 @@ async function sendDemand(type){
   const details={};
   document.querySelectorAll('.opt-btn.sel').forEach(b=>{const g=b.getAttribute('onclick').match(/'([^']+)'\)/)?.[1];if(g)details[g]=b.textContent.trim()});
   if(type==='autre'){const t=document.getElementById('f-autre-type')?.value.trim();if(t)details['type-prestation']=t}
-  const payload={type,address:addr,date,time,flexibility:flex,description:desc,details,photos:photos.slice(0,5)};
   const token=localStorage.getItem('gleam_token');
   try{
-    if(token){
-      await fetch(API+'/api/demandes',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(payload)});
-    }
+    if(token)await fetch(API+'/api/demandes',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({type,address:addr,date,time,flexibility:flex,description:desc,details,photos:photos.slice(0,5)})});
     document.getElementById('modal-overlay').classList.remove('open');
     photos=[];
     show('s-success');
-    await loadDemandes();
-  }catch(e){
-    document.getElementById('modal-overlay').classList.remove('open');
-    photos=[];
-    show('s-success');
-  }
+    loadDemandes();
+  }catch(e){document.getElementById('modal-overlay').classList.remove('open');photos=[];show('s-success')}
 }
 
 // Init
@@ -780,7 +772,7 @@ const tok=localStorage.getItem('gleam_token');
 if(tok){
   fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
     .then(r=>r.ok?r.json():null)
-    .then(u=>{if(u){currentUser=u;enterApp()}else{localStorage.removeItem('gleam_token')}})
+    .then(u=>{if(u){currentUser=u;enterApp()}else localStorage.removeItem('gleam_token')})
     .catch(()=>{});
 }
 </script>
