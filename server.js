@@ -9,6 +9,9 @@ const jwt = require('jsonwebtoken');
 
 const app = express();
 
+// ✅ FIX 1 — Trust proxy (Railway)
+app.set('trust proxy', 1);
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
@@ -35,7 +38,7 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
 app.use(express.json({ limit: '10mb' }));
 
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 app.use('/api/', globalLimiter);
 
 const auth = async (req, res, next) => {
@@ -57,7 +60,14 @@ app.get('/health', (req, res) => {
 
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
-    const { email, password, prenom, nom, telephone, type } = req.body;
+    // ✅ FIX 2 — Accepte firstName/lastName ET prenom/nom
+    const email = req.body.email;
+    const password = req.body.password;
+    const prenom = req.body.firstName || req.body.prenom;
+    const nom = req.body.lastName || req.body.nom;
+    const telephone = req.body.phone || req.body.telephone;
+    const type = req.body.role || req.body.type;
+
     if (!email || !password || !prenom || !nom || !type)
       return res.status(400).json({ error: 'Tous les champs sont requis.' });
     if (password.length < 8)
@@ -80,7 +90,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }).select().single();
 
     if (error) return res.status(400).json({ error: error.message });
-    res.status(201).json({ message: 'Compte Gleam créé !', user: data });
+    res.status(201).json({ message: 'Compte Gleam créé !', user: { ...data, firstName: data.prenom, lastName: data.nom } });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -105,7 +115,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.json({ token: token, user: user });
+    res.json({ token: token, user: { ...user, firstName: user.prenom, lastName: user.nom } });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -114,22 +124,25 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
 app.get('/api/auth/me', auth, async (req, res) => {
   const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
-  res.json(data);
+  res.json({ ...data, firstName: data.prenom, lastName: data.nom });
 });
 
 app.post('/api/demandes', auth, async (req, res) => {
   try {
-    const { prestation, adresse, creneau, notes } = req.body;
-    if (!prestation || !adresse)
-      return res.status(400).json({ error: 'Prestation et adresse requis.' });
+    const { type, address, date, time, flexibility, description, details } = req.body;
+    if (!address)
+      return res.status(400).json({ error: 'Adresse requise.' });
 
     const numero = 'Client #' + Math.floor(1000 + Math.random() * 9000);
+    const creneau = date && time ? date + ' à ' + time : null;
+    const notes = JSON.stringify({ description, details, flexibility });
+
     const { data, error } = await supabase.from('demandes').insert({
       client_id: req.user.id,
-      prestation: prestation,
-      adresse: adresse,
-      creneau: creneau || null,
-      notes: notes || null,
+      prestation: type || 'autre',
+      adresse: address,
+      creneau: creneau,
+      notes: notes,
       numero_anonyme: numero,
       statut: 'en_attente'
     }).select().single();
