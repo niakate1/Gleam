@@ -385,7 +385,11 @@ function switchTab(t){
   document.getElementById('form-login').style.display=t==='login'?'block':'none';
   document.getElementById('form-register').style.display=t==='register'?'block':'none';
 }
-function isPro(){const t=currentUser?.type;return t==='pro'||t==='societe'||t==='professionnel'}
+function isPro(){
+  const t=(currentUser?.type||'').toLowerCase().trim();
+  console.log('Type utilisateur:', t);
+  return t==='pro'||t==='societe'||t==='professionnel';
+}
 
 function goTab(tab){
   const map={home:'s-home',messages:'s-messages',devis:'s-devis',profile:'s-profile'};
