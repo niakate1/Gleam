@@ -109,7 +109,22 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     });
     if (error) return res.status(401).json({ error: 'Identifiants incorrects.' });
 
-    const { data: user } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+    let { data: user } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+
+    // Si l'utilisateur n'existe pas dans la table users, on le crée
+    if (!user) {
+      const { data: newUser } = await supabase.from('users').insert({
+        id: data.user.id,
+        email: data.user.email,
+        prenom: data.user.email.split('@')[0],
+        nom: '',
+        type: 'client'
+      }).select().single();
+      user = newUser;
+    }
+
+    if (!user) return res.status(500).json({ error: 'Utilisateur introuvable.' });
+
     const token = jwt.sign(
       { id: user.id, email: user.email, type: user.type },
       process.env.JWT_SECRET,
