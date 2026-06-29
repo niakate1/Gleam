@@ -345,6 +345,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <script>
 const API = 'https://gleam-production-9b95.up.railway.app';
 let currentUser = null, userRole = 'client', photos = [], selectedFlexibility = 'exact';
+console.log('Gleam chargé, rôle par défaut:', userRole);
 
 // ── UTILS ──
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
@@ -391,8 +392,9 @@ async function doRegister(){
   if(!pw){showErr('rerr','Mot de passe requis.');return}
   if(pw.length<8){showErr('rerr','Mot de passe trop court (min 8 caractères).');return}
   try{
+    console.log('Envoi inscription:', {firstName:fn,lastName:ln,email,phone,password:'***',role:userRole});
     const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({firstName:fn,lastName:ln,email,phone,password:pw,role:userRole})});
+      body:JSON.stringify({firstName:fn,lastName:ln,email,phone:phone,password:pw,role:userRole,type:userRole,prenom:fn,nom:ln})});
     const d=await r.json();
     if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
     document.getElementById('otp-email').textContent=email;
@@ -412,14 +414,42 @@ async function doOTP(){
     enterApp();
   }catch(e){showErr('oerr','Erreur réseau.')}
 }
-function enterApp(){
-  const name=currentUser?.firstName||currentUser?.email||'';
+async function enterApp(){
+  const name=currentUser?.firstName||currentUser?.prenom||currentUser?.email||'';
   document.getElementById('greeting-name').textContent=`Bonjour ${name} 👋`;
   document.getElementById('user-name-badge').textContent=name;
-  document.getElementById('profile-name').textContent=(currentUser?.firstName||'')+' '+(currentUser?.lastName||'');
+  document.getElementById('profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
   document.getElementById('profile-email').textContent=currentUser?.email||'';
   show('s-home');
   toast('Bienvenue sur Gleam ✨');
+  await loadDemandes();
+}
+
+async function loadDemandes(){
+  const token=localStorage.getItem('gleam_token');
+  if(!token)return;
+  try{
+    const r=await fetch(API+'/api/demandes',{headers:{'Authorization':'Bearer '+token}});
+    const data=await r.json();
+    const container=document.getElementById('recent-demands');
+    if(!data||data.length===0){
+      container.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\'instant.<br>Faites votre première demande !</p></div>';
+      return;
+    }
+    const icons={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
+    const statuts={en_attente:'⏳ En attente',devis_recus:'📋 Devis reçus',terminee:'✅ Terminée'};
+    container.innerHTML=data.map(d=>`
+      <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center">
+        <span style="font-size:28px">${icons[d.prestation]||'✨'}</span>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px;text-transform:capitalize">${d.prestation}</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:2px">${d.adresse}</div>
+          <div style="font-size:11px;color:var(--p);font-weight:600;margin-top:4px">${statuts[d.statut]||d.statut}</div>
+        </div>
+        <div style="font-size:11px;color:var(--gray)">${new Date(d.created_at).toLocaleDateString('fr-FR')}</div>
+      </div>
+    `).join('');
+  }catch(e){console.error('Erreur chargement demandes',e)}
 }
 function doLogout(){localStorage.removeItem('gleam_token');currentUser=null;show('s-auth');toast('À bientôt !')}
 
@@ -705,7 +735,12 @@ async function sendDemand(type){
 
 // Init
 const tok=localStorage.getItem('gleam_token');
-if(tok){enterApp()}
+if(tok){
+  fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
+    .then(r=>r.ok?r.json():null)
+    .then(u=>{if(u){currentUser=u;enterApp()}else{localStorage.removeItem('gleam_token')}})
+    .catch(()=>{});
+}
 </script>
 </body>
 </html>
