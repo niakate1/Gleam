@@ -380,10 +380,15 @@ async function doLogin(){
 }
 async function doRegister(){
   hideErr('rerr');
-  const fn=document.getElementById('rfn').value.trim(),ln=document.getElementById('rln').value.trim(),
-        email=document.getElementById('re').value.trim(),phone=document.getElementById('rp').value.trim(),
-        pw=document.getElementById('rpw').value;
-  if(!fn||!ln||!email||!phone||!pw){showErr('rerr','Remplissez tous les champs.');return}
+  const fnEl=document.getElementById('rfn'),lnEl=document.getElementById('rln'),
+        eEl=document.getElementById('re'),phEl=document.getElementById('rp'),pwEl=document.getElementById('rpw');
+  if(!fnEl||!lnEl||!eEl||!phEl||!pwEl){showErr('rerr','Erreur formulaire. Rechargez la page.');return}
+  const fn=fnEl.value.trim(),ln=lnEl.value.trim(),email=eEl.value.trim(),phone=phEl.value.trim(),pw=pwEl.value;
+  if(!fn){showErr('rerr','Prénom requis.');return}
+  if(!ln){showErr('rerr','Nom requis.');return}
+  if(!email){showErr('rerr','Email requis.');return}
+  if(!phone){showErr('rerr','Téléphone requis.');return}
+  if(!pw){showErr('rerr','Mot de passe requis.');return}
   if(pw.length<8){showErr('rerr','Mot de passe trop court (min 8 caractères).');return}
   try{
     const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
