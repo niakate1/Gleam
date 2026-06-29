@@ -109,7 +109,10 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     });
     if (error) return res.status(401).json({ error: 'Identifiants incorrects.' });
 
-    let { data: user } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+    console.log('Login - ID recherché:', data.user.id);
+    let { data: user, error: userError } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+    console.log('Login - User trouvé:', user);
+    console.log('Login - Erreur:', userError);
 
     // Si l'utilisateur n'existe pas dans la table users, on le crée
     if (!user) {
