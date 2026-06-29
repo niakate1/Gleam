@@ -177,6 +177,19 @@ app.get('/api/demandes', auth, async (req, res) => {
   res.json(data || []);
 });
 
+// Route pour les pros — voir toutes les demandes en attente
+app.get('/api/demandes/all', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (!user || (user.type !== 'pro' && user.type !== 'societe' && user.type !== 'professionnel'))
+      return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
+    const { data } = await supabase.from('demandes').select('*').eq('statut', 'en_attente').order('created_at', { ascending: false });
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 app.post('/api/devis', auth, async (req, res) => {
   try {
     const { demande_id, prix_ttc, description, creneau_propose } = req.body;
