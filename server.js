@@ -1,713 +1,306 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gleam ✨</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#7C3AED;--p2:#6D28D9;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#F9FAFB;color:#111827;min-height:100vh}
-.screen{display:none;min-height:100vh;flex-direction:column}
-.screen.active{display:flex}
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { createClient } = require('@supabase/supabase-js');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const jwt = require('jsonwebtoken');
 
-/* AUTH */
-.auth-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#7C3AED,#4F46E5)}
-.auth-box{background:#fff;border-radius:20px;padding:36px 32px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
-.logo{text-align:center;margin-bottom:28px}
-.logo h1{font-size:32px;font-weight:800;color:var(--p)}
-.logo p{color:var(--gray);font-size:14px;margin-top:4px}
-.tabs{display:flex;background:#F3F4F6;border-radius:10px;padding:4px;margin-bottom:24px;gap:4px}
-.tab{flex:1;padding:9px;border:none;background:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;color:var(--gray);transition:.2s}
-.tab.active{background:#fff;color:var(--p);box-shadow:0 1px 4px rgba(0,0,0,.1)}
-label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px;margin-top:14px}
-input,select,textarea{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;transition:.2s;background:#fff;font-family:inherit}
-input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.role-select{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-.role-btn{padding:12px;border:2px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:#374151;transition:.2s}
-.role-btn.sel{border-color:var(--p);background:var(--light);color:var(--p)}
-.role-btn span{display:block;font-size:22px;margin-bottom:4px}
-.btn{width:100%;padding:13px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;transition:.2s}
-.btn:hover{background:var(--p2)}
-.btn:disabled{opacity:.6;cursor:not-allowed}
-.err{background:#FEF2F2;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none}
-.err.show{display:block}
+const app = express();
 
-/* OTP */
-.otp-boxes{display:flex;gap:10px;justify-content:center;margin:20px 0}
-.otp-boxes input{width:46px;height:54px;text-align:center;font-size:22px;font-weight:700;border-radius:10px;padding:0}
+// ✅ FIX 1 — Trust proxy (Railway)
+app.set('trust proxy', 1);
 
-/* NAVBAR */
-.navbar{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
-.navbar .logo-sm{font-size:22px;font-weight:800;color:var(--p)}
-.nav-actions{display:flex;gap:8px;align-items:center}
-.nav-actions button{background:none;border:none;cursor:pointer;font-size:22px;padding:4px}
-.user-badge{background:var(--light);color:var(--p);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
-/* BOTTOM NAV */
-.bottom-nav{background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:sticky;bottom:0}
-.bnav-item{display:flex;flex-direction:column;align-items:center;padding:10px 0;cursor:pointer;border:none;background:none;color:var(--gray);font-size:11px;font-weight:600;gap:3px;transition:.2s}
-.bnav-item.active{color:var(--p)}
-.bnav-item span:first-child{font-size:22px}
+app.use(helmet());
+app.use(cors());
+app.options('*', cors());
 
-/* HOME */
-.home-content{flex:1;overflow-y:auto;padding:16px}
-.greeting{margin-bottom:18px}
-.greeting h2{font-size:22px;font-weight:800}
-.greeting p{color:var(--gray);font-size:14px;margin-top:2px}
-.section-title{font-size:16px;font-weight:700;margin-bottom:12px;color:#111827}
-.services-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
-.svc-card{background:#fff;border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;border:2px solid var(--border);transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.svc-card:hover{border-color:var(--p);transform:translateY(-2px)}
-.svc-card span:first-child{font-size:28px;display:block;margin-bottom:6px}
-.svc-card .svc-name{font-size:11px;font-weight:700;color:#374151}
-
-/* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;justify-content:center}
-.modal-overlay.open{display:flex}
-.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px 20px 32px}
-.modal-handle{width:40px;height:4px;background:#E5E7EB;border-radius:2px;margin:0 auto 20px}
-.modal-title{font-size:18px;font-weight:800;margin-bottom:6px}
-.modal-sub{font-size:13px;color:var(--gray);margin-bottom:20px}
-.options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.opt-btn{padding:12px 10px;border:2px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:#374151;transition:.2s}
-.opt-btn.sel{border-color:var(--p);background:var(--light);color:var(--p)}
-.opt-btn span{display:block;font-size:20px;margin-bottom:4px}
-.opt-btn.full{grid-column:1/-1}
-.field-group{margin-bottom:14px}
-.field-group label{font-size:13px;font-weight:600;color:#374151;margin-bottom:5px;display:block}
-.optional{font-weight:400;color:var(--gray);font-size:11px}
-.input-with-unit{display:flex;gap:8px;align-items:center}
-.input-with-unit input{flex:1}
-.unit-label{font-size:13px;color:var(--gray);white-space:nowrap}
-.photo-zone{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:.2s}
-.photo-zone:hover{border-color:var(--p);background:var(--light)}
-.photo-zone p{font-size:13px;color:var(--gray);margin-top:4px}
-.photo-previews{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.photo-preview{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden}
-.photo-preview img{width:100%;height:100%;object-fit:cover}
-.photo-preview .del-photo{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
-.datetime-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.flex-opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.flex-opt{padding:6px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#374151;transition:.2s}
-.flex-opt.sel{border-color:var(--p);background:var(--light);color:var(--p)}
-.divider{height:1px;background:var(--border);margin:16px 0}
-.modal-send-btn{width:100%;padding:14px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;transition:.2s}
-.modal-send-btn:hover{background:var(--p2)}
-.modal-close{position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray)}
-
-/* MESSAGES */
-.messages-list{flex:1;overflow-y:auto;padding:16px}
-.msg-item{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:flex-start;cursor:pointer;transition:.2s}
-.msg-item:hover{border-color:var(--p)}
-.msg-avatar{width:44px;height:44px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.msg-body{flex:1;min-width:0}
-.msg-name{font-weight:700;font-size:14px}
-.msg-preview{color:var(--gray);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.msg-time{font-size:11px;color:var(--gray)}
-.unread-dot{width:9px;height:9px;background:var(--p);border-radius:50%;flex-shrink:0;margin-top:5px}
-.empty-state{text-align:center;padding:60px 20px;color:var(--gray)}
-.empty-state span{font-size:48px;display:block;margin-bottom:12px}
-.empty-state p{font-size:15px}
-
-/* DEVIS */
-.devis-list{flex:1;overflow-y:auto;padding:16px}
-.devis-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.devis-card .devis-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
-.devis-badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700}
-.badge-pending{background:#FEF3C7;color:#D97706}
-.badge-accepted{background:#D1FAE5;color:#059669}
-.devis-pro{font-weight:700;font-size:15px}
-.devis-price{font-size:22px;font-weight:800;color:var(--p);margin:8px 0}
-.devis-actions{display:flex;gap:8px;margin-top:12px}
-.btn-accept{flex:1;padding:10px;background:var(--p);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
-.btn-refuse{flex:1;padding:10px;background:#fff;color:var(--red);border:2px solid var(--red);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
-
-/* PROFIL */
-.profile-content{flex:1;overflow-y:auto;padding:16px}
-.profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;text-align:center}
-.profile-hero .avatar{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px}
-.profile-hero h3{font-size:20px;font-weight:800}
-.profile-hero p{opacity:.8;font-size:14px;margin-top:2px}
-.profile-menu{background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
-.profile-item{display:flex;align-items:center;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);gap:12px;transition:.2s}
-.profile-item:last-child{border-bottom:none}
-.profile-item:hover{background:#F9FAFB}
-.profile-item .pi-icon{font-size:20px;width:32px;text-align:center}
-.profile-item .pi-text{flex:1;font-size:14px;font-weight:600}
-.profile-item .pi-arrow{color:var(--gray);font-size:16px}
-.logout-btn{width:100%;margin-top:12px;padding:13px;background:#FEF2F2;color:var(--red);border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
-
-/* TOAST */
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1F2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:500;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-/* SUCCESS */
-.success-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
-.success-icon{width:80px;height:80px;background:var(--light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 20px}
-.success-screen h2{font-size:22px;font-weight:800;margin-bottom:8px}
-.success-screen p{color:var(--gray);font-size:14px;line-height:1.6}
-.success-screen .btn{margin-top:24px;max-width:300px}
-</style>
-</head>
-<body>
-
-<!-- TOAST -->
-<div class="toast" id="toast"></div>
-
-<!-- SCREEN: AUTH -->
-<div class="screen active" id="s-auth">
-  <div class="auth-wrap">
-    <div class="auth-box">
-      <div class="logo">
-        <h1>✨ Gleam</h1>
-        <p>Le nettoyage, brillamment simple</p>
-      </div>
-      <div class="tabs">
-        <button class="tab active" onclick="switchTab('login')">Connexion</button>
-        <button class="tab" onclick="switchTab('register')">Inscription</button>
-      </div>
-
-      <!-- LOGIN -->
-      <div id="form-login">
-        <label>Email</label>
-        <input type="email" id="le" placeholder="votre@email.com">
-        <label>Mot de passe</label>
-        <input type="password" id="lp" placeholder="••••••••">
-        <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600">Mot de passe oublié ?</button></div>
-        <button class="btn" onclick="doLogin()">Se connecter</button>
-        <div class="err" id="lerr"></div>
-      </div>
-
-      <!-- REGISTER -->
-      <div id="form-register" style="display:none">
-        <div class="row2">
-          <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean"></div>
-          <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont"></div>
-        </div>
-        <label>Email</label>
-        <input type="email" id="re" placeholder="votre@email.com">
-        <label>Téléphone</label>
-        <input type="tel" id="rp" placeholder="06 00 00 00 00">
-        <label>Mot de passe</label>
-        <input type="password" id="rpw" placeholder="Minimum 8 caractères">
-        <label>Vous êtes</label>
-        <div class="role-select">
-          <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
-          <button class="role-btn" id="role-pro" onclick="setRole('pro')"><span>🏢</span>Professionnel</button>
-        </div>
-        <button class="btn" onclick="doRegister()">Créer mon compte Gleam</button>
-        <div class="err" id="rerr"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- SCREEN: OTP -->
-<div class="screen" id="s-otp">
-  <div class="auth-wrap">
-    <div class="auth-box">
-      <div class="logo">
-        <h1>✨ Gleam</h1>
-        <p>Vérification de votre email</p>
-      </div>
-      <p style="font-size:14px;color:#374151;text-align:center">Code envoyé à <strong id="otp-email"></strong></p>
-      <div class="otp-boxes">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,0)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,1)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,2)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,3)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,4)">
-        <input type="tel" maxlength="1" class="otp-input" oninput="otpNext(this,5)">
-      </div>
-      <button class="btn" onclick="doOTP()">Vérifier</button>
-      <div class="err" id="oerr"></div>
-      <div style="text-align:center;margin-top:14px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600">Renvoyer le code</button></div>
-    </div>
-  </div>
-</div>
-
-<!-- SCREEN: HOME (CLIENT) -->
-<div class="screen" id="s-home">
-  <div class="navbar">
-    <span class="logo-sm">✨ Gleam</span>
-    <div class="nav-actions">
-      <span class="user-badge" id="user-name-badge">Bonjour</span>
-    </div>
-  </div>
-  <div class="home-content">
-    <div class="greeting">
-      <h2 id="greeting-name">Bonjour 👋</h2>
-      <p>Que souhaitez-vous faire briller aujourd'hui ?</p>
-    </div>
-    <div class="section-title">Choisissez une prestation</div>
-    <div class="services-grid">
-      <div class="svc-card" onclick="openService('voiture')"><span>🚗</span><div class="svc-name">Voiture</div></div>
-      <div class="svc-card" onclick="openService('canape')"><span>🛋️</span><div class="svc-name">Canapé</div></div>
-      <div class="svc-card" onclick="openService('matelas')"><span>🛏️</span><div class="svc-name">Matelas</div></div>
-      <div class="svc-card" onclick="openService('terrasse')"><span>☀️</span><div class="svc-name">Terrasse</div></div>
-      <div class="svc-card" onclick="openService('piscine')"><span>💧</span><div class="svc-name">Piscine</div></div>
-      <div class="svc-card" onclick="openService('toiture')"><span>🏠</span><div class="svc-name">Toiture</div></div>
-      <div class="svc-card" onclick="openService('vitres')"><span>🪟</span><div class="svc-name">Vitres</div></div>
-      <div class="svc-card" onclick="openService('autre')"><span>➕</span><div class="svc-name">Autre</div></div>
-    </div>
-    <div class="section-title">Mes dernières demandes</div>
-    <div id="recent-demands">
-      <div class="empty-state"><span>📋</span><p>Aucune demande pour l'instant.<br>Faites votre première demande !</p></div>
-    </div>
-  </div>
-  <div class="bottom-nav">
-    <button class="bnav-item active" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages</button>
-    <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
-    <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
-  </div>
-</div>
-
-<!-- SCREEN: MESSAGES -->
-<div class="screen" id="s-messages">
-  <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
-  <div class="messages-list" id="messages-list">
-    <div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.<br>Faites une demande pour recevoir des devis !</p></div>
-  </div>
-  <div class="bottom-nav">
-    <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item active" onclick="goTab('messages')"><span>💬</span>Messages</button>
-    <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
-    <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
-  </div>
-</div>
-
-<!-- SCREEN: DEVIS -->
-<div class="screen" id="s-devis">
-  <div class="navbar"><span class="logo-sm">📋 Mes Devis</span></div>
-  <div class="devis-list" id="devis-list">
-    <div class="empty-state"><span>📋</span><p>Aucun devis reçu.<br>Vos devis apparaîtront ici.</p></div>
-  </div>
-  <div class="bottom-nav">
-    <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages</button>
-    <button class="bnav-item active" onclick="goTab('devis')"><span>📋</span>Devis</button>
-    <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
-  </div>
-</div>
-
-<!-- SCREEN: PROFILE -->
-<div class="screen" id="s-profile">
-  <div class="navbar"><span class="logo-sm">👤 Mon Profil</span></div>
-  <div class="profile-content">
-    <div class="profile-hero">
-      <div class="avatar">👤</div>
-      <h3 id="profile-name">Utilisateur</h3>
-      <p id="profile-email">email@exemple.com</p>
-    </div>
-    <div class="profile-menu">
-      <div class="profile-item"><span class="pi-icon">📋</span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">⭐</span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">💳</span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">🔔</span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">🔒</span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">❓</span><span class="pi-text">Aide & Support</span><span class="pi-arrow">›</span></div>
-    </div>
-    <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
-  </div>
-  <div class="bottom-nav">
-    <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages</button>
-    <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
-    <button class="bnav-item active" onclick="goTab('profile')"><span>👤</span>Profil</button>
-  </div>
-</div>
-
-<!-- SCREEN: SUCCESS -->
-<div class="screen" id="s-success">
-  <div class="navbar"><span class="logo-sm">✨ Gleam</span></div>
-  <div class="success-screen">
-    <div class="success-icon">✨</div>
-    <h2>Demande envoyée !</h2>
-    <p>Votre demande a été transmise aux prestataires Gleam.<br>Vous recevrez des devis dans les plus brefs délais.</p>
-    <button class="btn" onclick="goTab('home')">Retour à l'accueil</button>
-    <button class="btn" style="background:#fff;color:var(--p);border:2px solid var(--p);margin-top:10px" onclick="goTab('devis')">Voir mes devis</button>
-  </div>
-</div>
-
-<!-- MODAL SERVICE -->
-<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
-  <div class="modal" id="modal-content">
-    <div class="modal-handle"></div>
-    <div id="modal-body"></div>
-  </div>
-</div>
-
-<input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
-
-<script>
-const API = 'https://gleam-production-9b95.up.railway.app';
-let currentUser = null, userRole = 'client', photos = [], selectedFlexibility = 'exact';
-console.log('Gleam chargé, rôle par défaut:', userRole);
-
-// ── UTILS ──
-function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
-function toast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur)}
-function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.add('show')}
-function hideErr(id){document.getElementById(id).classList.remove('show')}
-function setRole(r){userRole=r;document.getElementById('role-client').classList.toggle('sel',r==='client');document.getElementById('role-pro').classList.toggle('sel',r==='pro')}
-function switchTab(t){
-  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(t==='login'&&i===0)||(t==='register'&&i===1)));
-  document.getElementById('form-login').style.display=t==='login'?'block':'none';
-  document.getElementById('form-register').style.display=t==='register'?'block':'none';
-}
-function otpNext(el,i){if(el.value&&i<5)document.querySelectorAll('.otp-input')[i+1].focus()}
-function goTab(tab){
-  const map={home:'s-home',messages:'s-messages',devis:'s-devis',profile:'s-profile'};
-  show(map[tab]);
-  document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.bnav-item').forEach((b,i)=>{const tabs=['home','messages','devis','profile'];if(tabs[i]===tab)b.classList.add('active')});
-}
-
-// ── AUTH ──
-async function doLogin(){
-  hideErr('lerr');
-  const email=document.getElementById('le').value.trim(),pw=document.getElementById('lp').value;
-  if(!email||!pw){showErr('lerr','Remplissez tous les champs.');return}
-  try{
-    const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
-    const d=await r.json();
-    if(!r.ok){showErr('lerr',d.error||'Identifiants incorrects.');return}
-    currentUser=d.user;localStorage.setItem('gleam_token',d.token);
-    enterApp();
-  }catch(e){showErr('lerr','Erreur réseau. Vérifiez votre connexion.')}
-}
-async function doRegister(){
-  hideErr('rerr');
-  const fnEl=document.getElementById('rfn'),lnEl=document.getElementById('rln'),
-        eEl=document.getElementById('re'),phEl=document.getElementById('rp'),pwEl=document.getElementById('rpw');
-  if(!fnEl||!lnEl||!eEl||!phEl||!pwEl){showErr('rerr','Erreur formulaire. Rechargez la page.');return}
-  const fn=fnEl.value.trim(),ln=lnEl.value.trim(),email=eEl.value.trim(),phone=phEl.value.trim(),pw=pwEl.value;
-  if(!fn){showErr('rerr','Prénom requis.');return}
-  if(!ln){showErr('rerr','Nom requis.');return}
-  if(!email){showErr('rerr','Email requis.');return}
-  if(!phone){showErr('rerr','Téléphone requis.');return}
-  if(!pw){showErr('rerr','Mot de passe requis.');return}
-  if(pw.length<8){showErr('rerr','Mot de passe trop court (min 8 caractères).');return}
-  try{
-    console.log('Envoi inscription:', {firstName:fn,lastName:ln,email,phone,password:'***',role:userRole});
-    const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({firstName:fn,lastName:ln,email,phone:phone,password:pw,role:userRole,type:userRole,prenom:fn,nom:ln})});
-    const d=await r.json();
-    if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
-    document.getElementById('otp-email').textContent=email;
-    show('s-otp');
-  }catch(e){showErr('rerr','Erreur réseau. Vérifiez votre connexion.')}
-}
-async function doOTP(){
-  hideErr('oerr');
-  const inputs=document.querySelectorAll('.otp-input'),code=Array.from(inputs).map(i=>i.value).join('');
-  if(code.length<6){showErr('oerr','Entrez les 6 chiffres du code.');return}
-  const email=document.getElementById('otp-email').textContent;
-  try{
-    const r=await fetch(API+'/api/auth/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,token:code})});
-    const d=await r.json();
-    if(!r.ok){showErr('oerr',d.error||'Code incorrect.');return}
-    currentUser=d.user;localStorage.setItem('gleam_token',d.token);
-    enterApp();
-  }catch(e){showErr('oerr','Erreur réseau.')}
-}
-function enterApp(){
-  const name=currentUser?.firstName||currentUser?.email||'';
-  document.getElementById('greeting-name').textContent=`Bonjour ${name} 👋`;
-  document.getElementById('user-name-badge').textContent=name;
-  document.getElementById('profile-name').textContent=(currentUser?.firstName||'')+' '+(currentUser?.lastName||'');
-  document.getElementById('profile-email').textContent=currentUser?.email||'';
-  show('s-home');
-  toast('Bienvenue sur Gleam ✨');
-}
-function doLogout(){localStorage.removeItem('gleam_token');currentUser=null;show('s-auth');toast('À bientôt !')}
-
-// ── SERVICES ──
-function openService(type){
-  photos=[];
-  const bodies={
-    voiture: voitureForm,
-    canape: canapeForm,
-    matelas: matelasForm,
-    terrasse: terrasseForm,
-    piscine: piscineForm,
-    toiture: toitureForm,
-    vitres: vitresForm,
-    autre: autreForm,
-  };
-  document.getElementById('modal-body').innerHTML=bodies[type]();
-  document.getElementById('modal-overlay').classList.add('open');
-}
-function closeModal(e){if(e.target===document.getElementById('modal-overlay'))document.getElementById('modal-overlay').classList.remove('open')}
-
-function dateTimeBlock(){
-  const today=new Date().toISOString().split('T')[0];
-  return `
-  <div class="divider"></div>
-  <div class="field-group">
-    <label>📅 Date et heure souhaitées</label>
-    <div class="datetime-row">
-      <input type="date" id="f-date" min="${today}" value="${today}">
-      <select id="f-time">${[...Array(27)].map((_,i)=>{const h=Math.floor(i/2)+7,m=i%2?'30':'00';return`<option value="${h}:${m}">${h}h${m}</option>`}).join('')}</select>
-    </div>
-    <label style="margin-top:12px">Flexibilité horaire <span class="optional">(optionnel)</span></label>
-    <div class="flex-opts">
-      ${['Heure exacte','± 30 min','± 1 heure','Matinée','Après-midi','Toute la journée'].map((l,i)=>`<button class="flex-opt${i===0?' sel':''}" onclick="selFlex(this)">${l}</button>`).join('')}
-    </div>
-  </div>
-  <div class="field-group">
-    <label>📍 Adresse d'intervention</label>
-    <input type="text" id="f-addr" placeholder="12 rue de la Paix, 75001 Paris">
-  </div>
-  <div class="field-group">
-    <label>📸 Photos <span class="optional">(optionnel — aide les pros à mieux devis)</span></label>
-    <div class="photo-zone" onclick="document.getElementById('photo-input').click()">
-      <span style="font-size:28px">📷</span>
-      <p>Touchez pour ajouter des photos</p>
-    </div>
-    <div class="photo-previews" id="photo-previews"></div>
-  </div>`;
-}
-function descBlock(ph='Décrivez votre besoin...'){
-  return `<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="${ph}" style="resize:none"></textarea></div>`;
-}
-function sendBtn(type){return`<button class="modal-send-btn" onclick="sendDemand('${type}')">✨ Envoyer ma demande</button>`}
-
-function voitureForm(){return`
-  <div class="modal-title">🚗 Nettoyage voiture</div>
-  <div class="modal-sub">Choisissez le type de nettoyage souhaité</div>
-  <div class="field-group"><label>Type de nettoyage</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'nettoyage-type')"><span>🪑</span>Intérieur</button>
-    <button class="opt-btn" onclick="selOpt(this,'nettoyage-type')"><span>✨</span>Extérieur</button>
-    <button class="opt-btn full" onclick="selOpt(this,'nettoyage-type')"><span>🔄</span>Intérieur + Extérieur</button>
-  </div></div>
-  <div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'veh-type')"><span>🚗</span>Citadine</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh-type')"><span>🚙</span>SUV/4×4</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh-type')"><span>🚐</span>Monospace</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh-type')"><span>🚌</span>Utilitaire</button>
-  </div></div>
-  <div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'seats')">2 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'seats')">5 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'seats')">7 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'seats')">9+ places</button>
-  </div></div>
-  ${descBlock("Ex: Siège tâchés, odeur de cigarette, sol très sale...")}
-  ${dateTimeBlock()}
-  ${sendBtn('voiture')}`}
-
-function canapeForm(){return`
-  <div class="modal-title">🛋️ Nettoyage canapé</div>
-  <div class="modal-sub">Indiquez le type de canapé pour un devis précis</div>
-  <div class="field-group"><label>Type de canapé</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'canape-type')"><span>➡️</span>Canapé droit</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-type')"><span>📐</span>Canapé d'angle</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-type')"><span>🪑</span>Canapé lit</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-type')"><span>🪑</span>Chauffeuses</button>
-  </div></div>
-  <div class="field-group"><label>Nombre de places</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'canape-places')">2 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-places')">3 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-places')">4 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-places')">5+ places</button>
-  </div></div>
-  <div class="field-group"><label>Matière <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'canape-mat')">Tissu</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-mat')">Cuir</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-mat')">Velours</button>
-    <button class="opt-btn" onclick="selOpt(this,'canape-mat')">Microfibre</button>
-  </div></div>
-  ${descBlock("Ex: Tâches de café, odeurs, poils d'animaux...")}
-  ${dateTimeBlock()}
-  ${sendBtn('canape')}`}
-
-function matelasForm(){return`
-  <div class="modal-title">🛏️ Nettoyage matelas</div>
-  <div class="modal-sub">Indiquez les dimensions pour un devis précis</div>
-  <div class="field-group"><label>Taille du matelas</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'matelas-taille')">90×190 cm<br><small style="color:var(--gray);font-size:10px">1 personne</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-taille')">140×190 cm<br><small style="color:var(--gray);font-size:10px">2 personnes</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-taille')">160×200 cm<br><small style="color:var(--gray);font-size:10px">Queen size</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-taille')">180×200 cm<br><small style="color:var(--gray);font-size:10px">King size</small></button>
-  </div></div>
-  <div class="field-group"><label>Nombre de matelas</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'matelas-nb')">1 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-nb')">2 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-nb')">3 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'matelas-nb')">4+ matelas</button>
-  </div></div>
-  ${descBlock("Ex: Tâches, acariens, odeurs, matelas pour enfant...")}
-  ${dateTimeBlock()}
-  ${sendBtn('matelas')}`}
-
-function terrasseForm(){return`
-  <div class="modal-title">☀️ Nettoyage terrasse</div>
-  <div class="modal-sub">Précisez la surface et le type de sol</div>
-  <div class="field-group"><label>Surface approximative</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-surf')">Moins de 20 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-surf')">20 à 50 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-surf')">50 à 100 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-surf')">Plus de 100 m²</button>
-  </div></div>
-  <div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-sol')">Carrelage</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-sol')">Bois / composite</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-sol')">Béton</button>
-    <button class="opt-btn" onclick="selOpt(this,'terrasse-sol')">Pierre naturelle</button>
-  </div></div>
-  ${descBlock("Ex: Mousse verte, carrelage très sale, joints noircis...")}
-  ${dateTimeBlock()}
-  ${sendBtn('terrasse')}`}
-
-function piscineForm(){return`
-  <div class="modal-title">💧 Nettoyage piscine</div>
-  <div class="modal-sub">Indiquez les caractéristiques de votre piscine</div>
-  <div class="field-group"><label>Type de piscine</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'piscine-type')"><span>🏊</span>Enterrée</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-type')"><span>🏖️</span>Hors-sol</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-type')"><span>🌊</span>Semi-enterrée</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-type')"><span>🛁</span>Spa/Jacuzzi</button>
-  </div></div>
-  <div class="field-group"><label>Dimensions approximatives <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'piscine-size')">Petite (−25 m²)</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-size')">Moyenne (25−50 m²)</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-size')">Grande (50−80 m²)</button>
-    <button class="opt-btn" onclick="selOpt(this,'piscine-size')">Très grande (+80 m²)</button>
-  </div></div>
-  ${descBlock("Ex: Eau verte, liner abîmé, nettoyage de printemps...")}
-  ${dateTimeBlock()}
-  ${sendBtn('piscine')}`}
-
-function toitureForm(){return`
-  <div class="modal-title">🏠 Nettoyage toiture</div>
-  <div class="modal-sub">Démoussage, nettoyage et traitement</div>
-  <div class="field-group"><label>Type de toiture</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'toit-type')">Tuiles</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-type')">Ardoises</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-type')">Fibrociment</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-type')">Zinc / Métal</button>
-  </div></div>
-  <div class="field-group"><label>Surface de toiture <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'toit-surf')">Moins de 50 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-surf')">50 à 100 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-surf')">100 à 200 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-surf')">Plus de 200 m²</button>
-  </div></div>
-  ${descBlock("Ex: Mousse importante, gouttières à nettoyer, traitement hydrofuge souhaité...")}
-  ${dateTimeBlock()}
-  ${sendBtn('toiture')}`}
-
-function vitresForm(){return`
-  <div class="modal-title">🪟 Nettoyage vitres</div>
-  <div class="modal-sub">Indiquez le nombre de vitres et le type de bien</div>
-  <div class="field-group"><label>Type de bien</label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitres-bien')">🏠 Maison</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-bien')">🏢 Appartement</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-bien')">🏪 Commerce</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-bien')">🏭 Bureaux</button>
-  </div></div>
-  <div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitres-nb')">Moins de 5</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-nb')">5 à 10</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-nb')">10 à 20</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-nb')">Plus de 20</button>
-  </div></div>
-  <div class="field-group"><label>Hauteur d'accès <span class="optional">(optionnel)</span></label>
-  <div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitres-h')">Rez-de-chaussée</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-h')">1er étage</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-h')">2e étage</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitres-h')">3e+ étage</button>
-  </div></div>
-  ${descBlock("Ex: Vitres très encrassées, velux, double vitrage, accès difficile...")}
-  ${dateTimeBlock()}
-  ${sendBtn('vitres')}`}
-
-function autreForm(){return`
-  <div class="modal-title">➕ Autre prestation</div>
-  <div class="modal-sub">Décrivez librement votre besoin de nettoyage</div>
-  <div class="field-group">
-    <label>De quoi s'agit-il ?</label>
-    <input type="text" id="f-autre-type" placeholder="Ex: Matelas, bateau, salle de sport, jacuzzi...">
-  </div>
-  <div class="field-group">
-    <label>Décrivez votre besoin</label>
-    <textarea id="f-desc" rows="4" placeholder="Expliquez ce que vous souhaitez nettoyer, la taille, l'état actuel, vos attentes..." style="resize:none"></textarea>
-  </div>
-  ${dateTimeBlock()}
-  ${sendBtn('autre')}`}
-
-// ── INTERACTIONS ──
-function selOpt(btn, group){
-  document.querySelectorAll(`[onclick*="selOpt(this,'${group}')"]`).forEach(b=>b.classList.remove('sel'));
-  btn.classList.add('sel');
-}
-function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel')}
-function handlePhotos(input){
-  Array.from(input.files).forEach(f=>{
-    if(photos.length>=5)return;
-    const r=new FileReader();
-    r.onload=e=>{photos.push(e.target.result);renderPhotos()};
-    r.readAsDataURL(f);
-  });
-  input.value='';
-}
-function renderPhotos(){
-  const c=document.getElementById('photo-previews');
-  if(!c)return;
-  c.innerHTML=photos.map((p,i)=>`<div class="photo-preview"><img src="${p}"><button class="del-photo" onclick="removePhoto(${i})">×</button></div>`).join('');
-}
-function removePhoto(i){photos.splice(i,1);renderPhotos()}
-
-async function sendDemand(type){
-  const addr=document.getElementById('f-addr')?.value.trim()||'';
-  const date=document.getElementById('f-date')?.value||'';
-  const time=document.getElementById('f-time')?.value||'';
-  const desc=document.getElementById('f-desc')?.value.trim()||'';
-  if(!addr){toast('⚠️ Veuillez indiquer une adresse.');return}
-  const flex=document.querySelector('.flex-opt.sel')?.textContent||'Heure exacte';
-  const details={};
-  document.querySelectorAll('.opt-btn.sel').forEach(b=>{const g=b.getAttribute('onclick').match(/'([^']+)'\)/)?.[1];if(g)details[g]=b.textContent.trim()});
-  if(type==='autre'){const t=document.getElementById('f-autre-type')?.value.trim();if(t)details['type-prestation']=t}
-  const payload={type,address:addr,date,time,flexibility:flex,description:desc,details,photos:photos.slice(0,5)};
-  const token=localStorage.getItem('gleam_token');
-  try{
-    if(token){
-      await fetch(API+'/api/demandes',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(payload)});
-    }
-    document.getElementById('modal-overlay').classList.remove('open');
-    photos=[];
-    show('s-success');
-  }catch(e){
-    document.getElementById('modal-overlay').classList.remove('open');
-    photos=[];
-    show('s-success');
+app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (e) {
+    return res.status(400).send('Webhook Error: ' + e.message);
   }
-}
+  if (event.type === 'payment_intent.succeeded') {
+    await supabase.from('paiements').update({ statut: 'bloque' }).eq('stripe_payment_intent_id', event.data.object.id);
+  }
+  res.json({ received: true });
+});
 
-// Init
-const tok=localStorage.getItem('gleam_token');
-if(tok){enterApp()}
-</script>
-</body>
-</html>
+app.use(express.json({ limit: '10mb' }));
+
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+app.use('/api/', globalLimiter);
+
+const auth = async (req, res, next) => {
+  const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Non autorisé' });
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch (e) {
+    res.status(401).json({ error: 'Token invalide' });
+  }
+};
+
+const BLOCK_REGEX = /(\b0[67]\d{8}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', app: 'Gleam API', version: '1.0.0', timestamp: new Date().toISOString() });
+});
+
+app.post('/api/auth/register', authLimiter, async (req, res) => {
+  try {
+    // ✅ FIX 2 — Accepte firstName/lastName ET prenom/nom
+    const email = req.body.email;
+    const password = req.body.password;
+    const prenom = req.body.firstName || req.body.prenom;
+    const nom = req.body.lastName || req.body.nom;
+    const telephone = req.body.phone || req.body.telephone;
+    const type = req.body.role || req.body.type;
+
+    if (!email || !password || !prenom || !nom || !type)
+      return res.status(400).json({ error: 'Tous les champs sont requis.' });
+    if (password.length < 8)
+      return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
+
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: email.toLowerCase().trim(),
+      password: password,
+      email_confirm: true
+    });
+    if (authError) return res.status(400).json({ error: authError.message });
+
+    const { data, error } = await supabase.from('users').insert({
+      id: authData.user.id,
+      email: email.toLowerCase().trim(),
+      prenom: prenom.trim(),
+      nom: nom.trim(),
+      telephone: telephone || null,
+      type: type
+    }).select().single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.status(201).json({ message: 'Compte Gleam créé !', user: { ...data, firstName: data.prenom, lastName: data.nom } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.post('/api/auth/login', authLimiter, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password)
+      return res.status(400).json({ error: 'Email et mot de passe requis.' });
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase().trim(),
+      password: password
+    });
+    if (error) return res.status(401).json({ error: 'Identifiants incorrects.' });
+
+    const { data: user } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+    const token = jwt.sign(
+      { id: user.id, email: user.email, type: user.type },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({ token: token, user: { ...user, firstName: user.prenom, lastName: user.nom } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/auth/me', auth, async (req, res) => {
+  const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
+  res.json({ ...data, firstName: data.prenom, lastName: data.nom });
+});
+
+app.post('/api/demandes', auth, async (req, res) => {
+  try {
+    const { type, address, date, time, flexibility, description, details } = req.body;
+    if (!address)
+      return res.status(400).json({ error: 'Adresse requise.' });
+
+    const numero = 'Client #' + Math.floor(1000 + Math.random() * 9000);
+    const creneau = date && time ? date + ' à ' + time : null;
+    const notes = JSON.stringify({ description, details, flexibility });
+
+    const { data, error } = await supabase.from('demandes').insert({
+      client_id: req.user.id,
+      prestation: type || 'autre',
+      adresse: address,
+      creneau: creneau,
+      notes: notes,
+      numero_anonyme: numero,
+      statut: 'en_attente'
+    }).select().single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.status(201).json(data);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/demandes', auth, async (req, res) => {
+  const { data } = await supabase.from('demandes').select('*').eq('client_id', req.user.id).order('created_at', { ascending: false });
+  res.json(data || []);
+});
+
+app.post('/api/devis', auth, async (req, res) => {
+  try {
+    const { demande_id, prix_ttc, description, creneau_propose } = req.body;
+    if (!demande_id || !prix_ttc)
+      return res.status(400).json({ error: 'Demande et prix requis.' });
+
+    const { data, error } = await supabase.from('devis').insert({
+      demande_id: demande_id,
+      societe_id: req.user.id,
+      prix_ttc: parseFloat(prix_ttc),
+      description: description || null,
+      creneau_propose: creneau_propose || null,
+      statut: 'envoye'
+    }).select().single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', demande_id);
+    res.status(201).json(data);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/devis/demande/:id', auth, async (req, res) => {
+  const { data } = await supabase.from('devis').select('*').eq('demande_id', req.params.id).order('prix_ttc', { ascending: true });
+  res.json(data || []);
+});
+
+app.post('/api/messages', auth, async (req, res) => {
+  try {
+    const { demande_id, contenu } = req.body;
+    if (!demande_id || !contenu)
+      return res.status(400).json({ error: 'Message vide.' });
+    if (BLOCK_REGEX.test(contenu))
+      return res.status(400).json({ error: 'Gleam bloque les coordonnées avant paiement.', blocked: true });
+
+    const { data, error } = await supabase.from('messages').insert({
+      demande_id: demande_id,
+      expediteur_id: req.user.id,
+      contenu: contenu.trim(),
+      type: 'texte'
+    }).select().single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.status(201).json(data);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/messages/:demande_id', auth, async (req, res) => {
+  const { data } = await supabase.from('messages').select('*').eq('demande_id', req.params.demande_id).order('created_at', { ascending: true });
+  res.json(data || []);
+});
+
+app.post('/api/paiements/intent', auth, async (req, res) => {
+  try {
+    const { devis_id } = req.body;
+    if (!devis_id) return res.status(400).json({ error: 'Devis requis.' });
+
+    const { data: devis } = await supabase.from('devis').select('*').eq('id', devis_id).single();
+    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+
+    const montant = Math.round(devis.prix_ttc * 100);
+    const commission = Math.round(montant * 0.25);
+
+    const intent = await stripe.paymentIntents.create({
+      amount: montant,
+      currency: 'eur',
+      application_fee_amount: commission,
+      metadata: { devis_id: devis_id, gleam: 'true' }
+    });
+
+    await supabase.from('paiements').insert({
+      demande_id: devis.demande_id,
+      devis_id: devis_id,
+      client_id: req.user.id,
+      societe_id: devis.societe_id,
+      montant_ttc: devis.prix_ttc,
+      commission: devis.prix_ttc * 0.25,
+      montant_societe: devis.prix_ttc * 0.75,
+      stripe_payment_intent_id: intent.id,
+      statut: 'en_attente'
+    });
+
+    res.json({ client_secret: intent.client_secret });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/paiements/liberer', auth, async (req, res) => {
+  try {
+    const { paiement_id } = req.body;
+    const { data: paiement } = await supabase.from('paiements').select('*').eq('id', paiement_id).single();
+    if (!paiement) return res.status(404).json({ error: 'Paiement introuvable.' });
+    if (paiement.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+
+    await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement_id);
+    await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
+    res.json({ message: 'Paiement Gleam libéré ✨' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.post('/api/evaluations', auth, async (req, res) => {
+  try {
+    const { demande_id, evalue_id, note, commentaire } = req.body;
+    if (!demande_id || !evalue_id || !note) return res.status(400).json({ error: 'Champs manquants.' });
+    if (note < 1 || note > 5) return res.status(400).json({ error: 'Note entre 1 et 5.' });
+
+    const { data } = await supabase.from('evaluations').insert({
+      demande_id: demande_id,
+      evaluateur_id: req.user.id,
+      evalue_id: evalue_id,
+      note: parseInt(note),
+      commentaire: commentaire || null
+    }).select().single();
+
+    const { data: notes } = await supabase.from('evaluations').select('note').eq('evalue_id', evalue_id);
+    const moyenne = notes.reduce(function(a, b) { return a + b.note; }, 0) / notes.length;
+    await supabase.from('users').update({ note_moyenne: Math.round(moyenne * 10) / 10 }).eq('id', evalue_id);
+
+    res.status(201).json(data);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/societes', auth, async (req, res) => {
+  const { data } = await supabase.from('users').select('id, prenom, nom, note_moyenne, disponible').eq('type', 'societe').eq('disponible', true);
+  res.json(data || []);
+});
+
+app.patch('/api/societes/disponibilite', auth, async (req, res) => {
+  await supabase.from('users').update({ disponible: Boolean(req.body.disponible) }).eq('id', req.user.id);
+  res.json({ message: 'Disponibilité mise à jour.' });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, function() {
+  console.log('✨ Gleam API démarrée sur le port ' + PORT);
+  console.log('   Environnement : ' + (process.env.NODE_ENV || 'development'));
+});
