@@ -273,7 +273,7 @@ app.post('/api/devis', auth, async (req, res) => {
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-    if (demande.statut !== 'en_attente')
+    if (demande.statut === 'acceptee' || demande.statut === 'terminee')
       return res.status(400).json({ error: 'Cette demande n\'est plus disponible.' });
 
     const { data: existing } = await supabase.from('devis').select('id').eq('demande_id', demande_id).eq('societe_id', req.user.id).maybeSingle();
