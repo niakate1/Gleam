@@ -163,6 +163,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .success-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
 .success-icon{width:80px;height:80px;background:var(--light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 20px}
 
+.detail-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;border:1px solid var(--border)}
+.detail-presta{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)}
+.detail-presta:last-child{border-bottom:none}
+.detail-presta-icon{font-size:24px}
+.detail-presta-name{font-weight:700;font-size:14px;text-transform:capitalize}
+.detail-presta-info{font-size:12px;color:var(--gray);margin-top:2px}
+.detail-actions{display:flex;gap:10px;margin-top:16px}
+.btn-modify{flex:1;padding:12px;background:var(--light);color:var(--p);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+.btn-delete{flex:1;padding:12px;background:#FEF2F2;color:var(--red);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+.locked-banner{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:10px;padding:12px;font-size:13px;margin-bottom:14px;display:flex;gap:8px;align-items:flex-start}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1F2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:500;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
@@ -367,6 +377,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
+<!-- DETAIL DEMANDE CLIENT -->
+<div class="screen" id="s-detail">
+  <div class="navbar">
+    <button class="back-btn" onclick="goTab('home')">←</button>
+    <span class="logo-sm" style="font-size:16px">Détail de la demande</span>
+    <span style="width:24px"></span>
+  </div>
+  <div class="home-content" id="detail-content"></div>
+</div>
+
 <!-- SUCCESS -->
 <div class="screen" id="s-success">
   <div class="navbar"><span class="logo-sm">✨ Gleam</span></div>
@@ -510,8 +530,8 @@ async function loadDemandes(){
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
     c.innerHTML=data.map(d=>{
       const st=STATUTS[d.statut]||['',''];
-      return `<div class="demand-row" onclick="goTab('devis')">
-        <span class="demand-icon">${ICONS[d.prestation]||'✨'}</span>
+      return `<div class="demand-row" onclick="openDetail('${d.id}')">
+        <span class="demand-icon">${ICONS[d.prestation.split(' + ')[0]]||'✨'}</span>
         <div class="demand-info">
           <div class="demand-type">${d.prestation}</div>
           <div class="demand-addr">${d.adresse}</div>
@@ -582,6 +602,106 @@ async function refuserDevis(devisId){
     toast('❌ Devis refusé.');
     loadDevis();
   }catch(e){toast('❌ Erreur réseau.')}
+}
+
+// ══════════════ DETAIL / MODIFICATION / SUPPRESSION DEMANDE ══════════════
+let currentDetailDemande=null;
+
+async function openDetail(demandeId){
+  try{
+    const r=await fetch(API+'/api/demandes/'+demandeId,{headers:authHeaders()});
+    if(!r.ok){toast('❌ Demande introuvable.');return}
+    const d=await r.json();
+    currentDetailDemande=d;
+    renderDetail(d);
+    show('s-detail');
+  }catch(e){toast('❌ Erreur réseau.')}
+}
+
+function renderDetail(d){
+  const c=document.getElementById('detail-content');
+  let prestations=[];
+  try{const n=JSON.parse(d.notes);if(n.prestations)prestations=n.prestations}catch(e){}
+  const st=STATUTS[d.statut]||['',''];
+  const locked=d.statut==='acceptee'||d.statut==='terminee';
+
+  let html='';
+  if(locked){
+    html+=`<div class="locked-banner"><span>🔒</span><div>Cette demande a été acceptée${d.statut==='acceptee'?' et est en cours':''}. Elle ne peut plus être modifiée ou annulée. Une annulation à ce stade peut entraîner des pénalités.</div></div>`;
+  }
+
+  html+=`<div class="detail-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-weight:700;font-size:13px;color:var(--gray)">${d.numero_anonyme||''}</span>
+      <span class="demand-status ${st[1]}" style="font-size:13px">${st[0]}</span>
+    </div>
+    ${prestations.length?prestations.map(p=>{
+      const detailsTxt=p.details&&Object.keys(p.details).length?Object.values(p.details).join(' • '):'';
+      return `<div class="detail-presta">
+        <span class="detail-presta-icon">${ICONS[p.type]||'✨'}</span>
+        <div>
+          <div class="detail-presta-name">${p.type}</div>
+          ${detailsTxt?`<div class="detail-presta-info">${detailsTxt}</div>`:''}
+          ${p.description?`<div class="detail-presta-info">${p.description}</div>`:''}
+        </div>
+      </div>`;
+    }).join(''):`<div class="detail-presta"><span class="detail-presta-icon">${ICONS[d.prestation]||'✨'}</span><div class="detail-presta-name">${d.prestation}</div></div>`}
+  </div>
+
+  <div class="detail-card">
+    <div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">${d.adresse}</div></div>
+    ${d.creneau?`<div class="field-group" style="margin-bottom:0"><label>📅 Créneau</label><div style="font-size:14px">${d.creneau}</div></div>`:''}
+  </div>
+
+  ${!locked?`<div class="detail-actions">
+    <button class="btn-modify" onclick="openModifyDemande()">✏️ Modifier</button>
+    <button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>
+  </div>`:''}
+  ${d.statut==='devis_recus'||d.statut==='acceptee'?`<button class="modal-send-btn" style="margin-top:14px" onclick="goTab('devis')">📋 Voir les devis reçus</button>`:''}`;
+
+  c.innerHTML=html;
+}
+
+async function deleteDemande(){
+  if(!currentDetailDemande)return;
+  if(!confirm('Supprimer définitivement cette demande ? Cette action est irréversible.'))return;
+  try{
+    const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id,{method:'DELETE',headers:authHeaders()});
+    const d=await r.json();
+    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
+    toast('🗑️ Demande supprimée.');
+    goTab('home');
+  }catch(e){toast('❌ Erreur réseau.')}
+}
+
+function openModifyDemande(){
+  if(!currentDetailDemande)return;
+  let prestations=[];
+  try{const n=JSON.parse(currentDetailDemande.notes);if(n.prestations)prestations=n.prestations}catch(e){}
+  if(!prestations.length)prestations=[{type:currentDetailDemande.prestation,description:'',details:{}}];
+
+  multiFlow={active:true,queue:prestations.map(p=>p.type),current:0,results:[],editMode:true,editId:currentDetailDemande.id,editData:prestations};
+  photos=[];
+  openServiceForm(multiFlow.queue[0]);
+  // Pré-remplit les champs après affichage
+  setTimeout(()=>prefillModifyForm(prestations[0]),50);
+}
+
+function prefillModifyForm(p){
+  if(!p)return;
+  if(p.description){const desc=document.getElementById('f-desc');if(desc)desc.value=p.description}
+  if(p.details){
+    Object.entries(p.details).forEach(([group,value])=>{
+      document.querySelectorAll(`[onclick*="selOpt(this,'${group}')"]`).forEach(b=>{
+        if(b.textContent.trim()===value){b.classList.add('sel')}
+      });
+    });
+  }
+  // Adresse / créneau pré-remplis seulement à la dernière étape
+  if(isLastInFlow()&&currentDetailDemande){
+    const addrEl=document.getElementById('f-addr');
+    if(addrEl)addrEl.value=currentDetailDemande.adresse||'';
+  }
 }
 
 // ══════════════ PRO : DEMANDES ══════════════
@@ -949,6 +1069,7 @@ async function sendDemand(type){
     multiFlow.results.push({type,description:desc,details});
     multiFlow.current++;
     openServiceForm(multiFlow.queue[multiFlow.current]);
+    if(multiFlow.editMode&&multiFlow.editData[multiFlow.current])setTimeout(()=>prefillModifyForm(multiFlow.editData[multiFlow.current]),50);
     return;
   }
 
@@ -970,15 +1091,25 @@ async function sendDemand(type){
   const btn=document.getElementById('send-demand-btn');
   if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>'}
   try{
-    const r=await fetch(API+'/api/demandes',{method:'POST',headers:authHeaders(),body:JSON.stringify({prestations,address:addr,date,time,flexibility:flex,photos:photos.slice(0,5)})});
+    const isEdit=multiFlow.editMode&&multiFlow.editId;
+    const url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
+    const method=isEdit?'PATCH':'POST';
+    const r=await fetch(url,{method,headers:authHeaders(),body:JSON.stringify({prestations,address:addr,date,time,flexibility:flex,photos:photos.slice(0,5)})});
     if(!r.ok){const d=await r.json();toast('❌ '+(d.error||'Erreur'));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
     photos=[];
     selectedServices=[];
+    const wasEdit=isEdit;
+    const editedId=multiFlow.editId;
     multiFlow={active:false,queue:[],current:0,results:[]};
     document.querySelectorAll('.svc-card').forEach(c=>c.classList.remove('selected'));
-    document.getElementById('continue-svc-btn').style.display='none';
-    show('s-success');
+    const cbtn=document.getElementById('continue-svc-btn');if(cbtn)cbtn.style.display='none';
+    if(wasEdit){
+      toast('✅ Demande modifiée !');
+      openDetail(editedId);
+    }else{
+      show('s-success');
+    }
     loadDemandes();
   }catch(e){toast('❌ Erreur réseau.');if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}}
 }
