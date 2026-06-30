@@ -255,6 +255,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="stat-card"><div class="stat-num" id="stat-demandes">0</div><div class="stat-label">Demandes disponibles</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-devis">0</div><div class="stat-label">Devis envoyés</div></div>
     </div>
+    <div class="dispo-toggle" id="fiabilite-card" style="display:none">
+      <div><div class="dispo-text">Taux de fiabilité</div><div class="dispo-sub" id="fiabilite-sub"></div></div>
+      <div id="fiabilite-num" style="font-size:24px;font-weight:800"></div>
+    </div>
     <div class="dispo-toggle">
       <div><div class="dispo-text">Disponibilité</div><div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div></div>
       <button class="toggle-switch on" id="dispo-toggle" onclick="toggleDispo()"></button>
@@ -490,6 +494,14 @@ function enterApp(){
     disponible=currentUser?.disponible!==false;
     document.getElementById('dispo-toggle').classList.toggle('on',disponible);
     document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
+    const taux=currentUser?.taux_fiabilite??100;
+    if(taux<100){
+      const card=document.getElementById('fiabilite-card');
+      card.style.display='flex';
+      document.getElementById('fiabilite-num').textContent=taux+'%';
+      document.getElementById('fiabilite-num').style.color=taux<80?'var(--red)':(taux<85?'#D97706':'var(--green)');
+      document.getElementById('fiabilite-sub').textContent=taux<80?'⚠️ Visibilité réduite auprès des clients':(taux<85?'⚠️ Attention, en baisse':'Bon niveau');
+    }
     show('s-pro-home');
     loadProDemandes();
   }else{
@@ -769,12 +781,13 @@ async function loadProDevis(){
 }
 
 async function annulerProDevis(devisId){
-  if(!confirm('Annuler ce devis accepté ? Cela peut affecter votre note si le créneau est proche. Le client sera notifié et pourra recevoir d\'autres devis.'))return;
+  if(!confirm('Annuler ce devis accepté ? Cela peut affecter votre taux de fiabilité si le créneau est proche. Le client sera notifié et pourra recevoir d\'autres devis.'))return;
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
     const d=await r.json();
     if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
-    toast('🚫 Devis annulé.');
+    toast(d.message||'🚫 Devis annulé.',5000);
+    if(currentUser&&d.taux_fiabilite!==undefined)currentUser.taux_fiabilite=d.taux_fiabilite;
     loadProDevis();
   }catch(e){toast('❌ Erreur réseau.')}
 }
