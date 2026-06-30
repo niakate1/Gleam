@@ -195,6 +195,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div id="form-login">
         <label>Email</label><input type="email" id="le" placeholder="votre@email.com">
         <label>Mot de passe</label><input type="password" id="lp" placeholder="••••••••">
+        <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600" onclick="forgotPassword()">Mot de passe oublié ?</button></div>
         <button class="btn" id="login-btn" onclick="doLogin()">Se connecter</button>
         <div class="err" id="lerr"></div>
       </div>
