@@ -448,6 +448,17 @@ function goProTab(tab){
 }
 
 // ══════════════ AUTH ══════════════
+async function forgotPassword(){
+  const email=document.getElementById('le').value.trim();
+  if(!email){toast('⚠️ Entrez votre email d\'abord.');return}
+  try{
+    const r=await fetch(API+'/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    const d=await r.json();
+    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
+    toast('📧 Email de réinitialisation envoyé !',5000);
+  }catch(e){toast('❌ Erreur réseau.')}
+}
+
 async function doLogin(){
   hideErr('lerr');
   const email=document.getElementById('le').value.trim(),pw=document.getElementById('lp').value;
