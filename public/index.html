@@ -534,6 +534,17 @@ function tryParseNotes(notes){
 function getPhotosFromNotes(notes){
   try{const n=JSON.parse(notes);return (n.photos&&Array.isArray(n.photos))?n.photos:[]}catch(e){return[]}
 }
+function formatCreneau(creneau){
+  if(!creneau)return'';
+  const match=creneau.match(/(\d{4})-(\d{2})-(\d{2})\s*à\s*(.+)/);
+  if(!match)return creneau;
+  const [,y,m,d]=match;
+  const time=match[4];
+  const date=new Date(y,m-1,d);
+  const jours=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const mois=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  return `${jours[date.getDay()]} ${parseInt(d)} ${mois[parseInt(m)-1]} ${y} à ${time}`;
+}
 
 // ══════════════ CLIENT : DEMANDES ══════════════
 async function loadDemandes(){
@@ -667,7 +678,7 @@ function renderDetail(d){
 
   <div class="detail-card">
     <div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">${d.adresse}</div></div>
-    ${d.creneau?`<div class="field-group" style="margin-bottom:0"><label>📅 Créneau</label><div style="font-size:14px">${d.creneau}</div></div>`:''}
+    ${d.creneau?`<div class="field-group" style="margin-bottom:0"><label>📅 Créneau</label><div style="font-size:14px">${formatCreneau(d.creneau)}</div></div>`:''}
   </div>
 
   ${!locked?`<div class="detail-actions">
@@ -737,7 +748,7 @@ async function loadProDemandes(){
           <span class="dc-num">${d.numero_anonyme||'#???'}</span>
         </div>
         <div class="dc-info"><span>📍</span>${d.adresse}</div>
-        ${d.creneau?`<div class="dc-info"><span>📅</span>${d.creneau}</div>`:''}
+        ${d.creneau?`<div class="dc-info"><span>📅</span>${formatCreneau(d.creneau)}</div>`:''}
         ${d.notes?`<div style="font-size:12px;color:var(--gray);margin-top:6px;background:#F9FAFB;padding:8px;border-radius:8px">${tryParseNotes(d.notes)}</div>`:''}
         ${getPhotosFromNotes(d.notes).length?`<div class="photo-previews" style="margin-top:8px">${getPhotosFromNotes(d.notes).map(p=>`<div class="photo-preview" style="cursor:pointer" onclick="window.open('${p}','_blank')"><img src="${p}"></div>`).join('')}</div>`:''}
         <div class="devis-form">
