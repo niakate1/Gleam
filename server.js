@@ -181,6 +181,60 @@ app.get('/api/demandes/:id', auth, async (req, res) => {
   res.json(data);
 });
 
+// Modifier une demande (uniquement si aucun devis n'a été accepté)
+app.patch('/api/demandes/:id', auth, async (req, res) => {
+  try {
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (demande.statut === 'acceptee' || demande.statut === 'terminee')
+      return res.status(400).json({ error: 'Impossible de modifier : un devis a déjà été accepté pour cette demande.' });
+
+    const { prestations, address, date, time, flexibility } = req.body;
+    if (!address) return res.status(400).json({ error: 'Adresse requise.' });
+
+    const creneau = date && time ? date + ' à ' + time : demande.creneau;
+    const listePrestations = prestations && Array.isArray(prestations) && prestations.length ? prestations : null;
+
+    const updateData = { adresse: address, creneau: creneau };
+    if (listePrestations) {
+      updateData.prestation = listePrestations.map(p => p.type).join(' + ');
+      updateData.notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations, modifiee: true });
+    }
+
+    const { data, error } = await supabase.from('demandes').update(updateData).eq('id', req.params.id).select().single();
+    if (error) return res.status(400).json({ error: error.message });
+
+    // Si la demande avait des devis en attente, on les marque comme "demande modifiée" pour notifier les pros
+    await supabase.from('devis').update({ demande_modifiee: true }).eq('demande_id', req.params.id).eq('statut', 'envoye');
+
+    res.json(data);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Supprimer une demande (uniquement si aucun devis n'a été accepté)
+app.delete('/api/demandes/:id', auth, async (req, res) => {
+  try {
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (demande.statut === 'acceptee' || demande.statut === 'terminee')
+      return res.status(400).json({ error: 'Impossible d\'annuler : un devis a déjà été accepté. Des pénalités peuvent s\'appliquer.' });
+
+    await supabase.from('devis').delete().eq('demande_id', req.params.id);
+    await supabase.from('messages').delete().eq('demande_id', req.params.id);
+    const { error } = await supabase.from('demandes').delete().eq('id', req.params.id);
+    if (error) return res.status(400).json({ error: error.message });
+
+    res.json({ message: 'Demande supprimée.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // Demandes disponibles pour les pros (en attente, pas encore acceptées)
 app.get('/api/demandes/all', auth, async (req, res) => {
   try {
