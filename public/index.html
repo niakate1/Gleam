@@ -745,8 +745,15 @@ async function loadProDevis(){
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\u2019instant.</p></div>';return}
     c.innerHTML=data.map(v=>{
       let badge='<span class="devis-badge badge-pending">⏳ En attente</span>',extra='';
-      if(v.statut==='accepte'){badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';extra=`<div style="margin-top:10px"><button class="btn-accept" onclick="goToChat('${v.demande_id}','Client')">💬 Discuter</button></div>`}
+      if(v.statut==='accepte'){
+        badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';
+        extra=`<div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn-accept" onclick="goToChat('${v.demande_id}','Client')">💬 Discuter</button>
+          <button class="btn-refuse" onclick="annulerProDevis('${v.id}')">🚫 Annuler</button>
+        </div>`;
+      }
       else if(v.statut==='refuse')badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
+      else if(v.statut==='annule_pro')badge='<span class="devis-badge badge-refused">🚫 Annulé par vous</span>';
       return `<div class="devis-card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <div style="font-weight:700;font-size:15px;text-transform:capitalize">${ICONS[v.demande?.prestation]||'✨'} ${v.demande?.prestation||''}</div>
@@ -759,6 +766,17 @@ async function loadProDevis(){
       </div>`;
     }).join('');
   }catch(e){}
+}
+
+async function annulerProDevis(devisId){
+  if(!confirm('Annuler ce devis accepté ? Cela peut affecter votre note si le créneau est proche. Le client sera notifié et pourra recevoir d\'autres devis.'))return;
+  try{
+    const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
+    const d=await r.json();
+    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
+    toast('🚫 Devis annulé.');
+    loadProDevis();
+  }catch(e){toast('❌ Erreur réseau.')}
 }
 
 async function envoyerDevis(demandeId){
