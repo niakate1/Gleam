@@ -8,8 +8,6 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const jwt = require('jsonwebtoken');
 
 const app = express();
-
-// ✅ FIX 1 — Trust proxy (Railway)
 app.set('trust proxy', 1);
 
 const supabase = createClient(
@@ -37,8 +35,8 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
 
 app.use(express.json({ limit: '10mb' }));
 
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30 });
 app.use('/api/', globalLimiter);
 
 const auth = async (req, res, next) => {
@@ -52,23 +50,25 @@ const auth = async (req, res, next) => {
   }
 };
 
+const isProType = (t) => t === 'pro' || t === 'societe' || t === 'professionnel';
 const BLOCK_REGEX = /(\b0[67]\d{8}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Gleam API', version: '1.0.0', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', app: 'Gleam API', version: '2.0.0', timestamp: new Date().toISOString() });
 });
+
+// ══════════════ AUTH ══════════════
 
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
-    // ✅ FIX 2 — Accepte firstName/lastName ET prenom/nom
     const email = req.body.email;
     const password = req.body.password;
     const prenom = req.body.firstName || req.body.prenom;
     const nom = req.body.lastName || req.body.nom;
     const telephone = req.body.phone || req.body.telephone;
-    const type = req.body.role || req.body.type;
+    const type = req.body.role || req.body.type || 'client';
 
-    if (!email || !password || !prenom || !nom || !type)
+    if (!email || !password || !prenom || !nom)
       return res.status(400).json({ error: 'Tous les champs sont requis.' });
     if (password.length < 8)
       return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
@@ -86,11 +86,14 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       prenom: prenom.trim(),
       nom: nom.trim(),
       telephone: telephone || null,
-      type: type
+      type: type,
+      disponible: true
     }).select().single();
 
     if (error) return res.status(400).json({ error: error.message });
-    res.status(201).json({ message: 'Compte Gleam créé !', user: { ...data, firstName: data.prenom, lastName: data.nom } });
+
+    const token = jwt.sign({ id: data.id, email: data.email, type: data.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.status(201).json({ message: 'Compte Gleam créé !', token, user: { ...data, firstName: data.prenom, lastName: data.nom } });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -109,31 +112,17 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     });
     if (error) return res.status(401).json({ error: 'Identifiants incorrects.' });
 
-    console.log('Login - ID recherché:', data.user.id);
-    let { data: user, error: userError } = await supabase.from('users').select('*').eq('id', data.user.id).single();
-    console.log('Login - User trouvé:', user);
-    console.log('Login - Erreur:', userError);
-
-    // Si l'utilisateur n'existe pas dans la table users, on le crée
+    let { data: user } = await supabase.from('users').select('*').eq('id', data.user.id).single();
     if (!user) {
       const { data: newUser } = await supabase.from('users').insert({
-        id: data.user.id,
-        email: data.user.email,
-        prenom: data.user.email.split('@')[0],
-        nom: '',
-        type: 'client'
+        id: data.user.id, email: data.user.email, prenom: data.user.email.split('@')[0], nom: '', type: 'client', disponible: true
       }).select().single();
       user = newUser;
     }
-
     if (!user) return res.status(500).json({ error: 'Utilisateur introuvable.' });
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, type: user.type },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-    res.json({ token: token, user: { ...user, firstName: user.prenom, lastName: user.nom } });
+    const token = jwt.sign({ id: user.id, email: user.email, type: user.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, user: { ...user, firstName: user.prenom, lastName: user.nom } });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -142,18 +131,20 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
 app.get('/api/auth/me', auth, async (req, res) => {
   const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
+  if (!data) return res.status(404).json({ error: 'Utilisateur introuvable.' });
   res.json({ ...data, firstName: data.prenom, lastName: data.nom });
 });
+
+// ══════════════ DEMANDES ══════════════
 
 app.post('/api/demandes', auth, async (req, res) => {
   try {
     const { type, address, date, time, flexibility, description, details } = req.body;
-    if (!address)
-      return res.status(400).json({ error: 'Adresse requise.' });
+    if (!address) return res.status(400).json({ error: 'Adresse requise.' });
 
     const numero = 'Client #' + Math.floor(1000 + Math.random() * 9000);
     const creneau = date && time ? date + ' à ' + time : null;
-    const notes = JSON.stringify({ description, details, flexibility });
+    const notes = JSON.stringify({ description: description || '', details: details || {}, flexibility: flexibility || '' });
 
     const { data, error } = await supabase.from('demandes').insert({
       client_id: req.user.id,
@@ -177,24 +168,49 @@ app.get('/api/demandes', auth, async (req, res) => {
   res.json(data || []);
 });
 
-// Route pour les pros — voir toutes les demandes en attente
+app.get('/api/demandes/:id', auth, async (req, res) => {
+  const { data } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+  if (!data) return res.status(404).json({ error: 'Demande introuvable.' });
+  res.json(data);
+});
+
+// Demandes disponibles pour les pros (en attente, pas encore acceptées)
 app.get('/api/demandes/all', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
-    if (!user || (user.type !== 'pro' && user.type !== 'societe' && user.type !== 'professionnel'))
+    if (!user || !isProType(user.type))
       return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
-    const { data } = await supabase.from('demandes').select('*').eq('statut', 'en_attente').order('created_at', { ascending: false });
-    res.json(data || []);
+
+    const { data: demandes } = await supabase.from('demandes').select('*').eq('statut', 'en_attente').order('created_at', { ascending: false });
+
+    // Exclut les demandes auxquelles ce pro a déjà répondu
+    const { data: mesDevis } = await supabase.from('devis').select('demande_id').eq('societe_id', req.user.id);
+    const idsRepondues = new Set((mesDevis || []).map(d => d.demande_id));
+    const filtered = (demandes || []).filter(d => !idsRepondues.has(d.id));
+
+    res.json(filtered);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
+
+// ══════════════ DEVIS ══════════════
 
 app.post('/api/devis', auth, async (req, res) => {
   try {
     const { demande_id, prix_ttc, description, creneau_propose } = req.body;
     if (!demande_id || !prix_ttc)
       return res.status(400).json({ error: 'Demande et prix requis.' });
+    if (parseFloat(prix_ttc) <= 0)
+      return res.status(400).json({ error: 'Le prix doit être positif.' });
+
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.statut !== 'en_attente')
+      return res.status(400).json({ error: 'Cette demande n\'est plus disponible.' });
+
+    const { data: existing } = await supabase.from('devis').select('id').eq('demande_id', demande_id).eq('societe_id', req.user.id).maybeSingle();
+    if (existing) return res.status(400).json({ error: 'Vous avez déjà envoyé un devis pour cette demande.' });
 
     const { data, error } = await supabase.from('devis').insert({
       demande_id: demande_id,
@@ -213,18 +229,84 @@ app.post('/api/devis', auth, async (req, res) => {
   }
 });
 
+// Devis reçus par un client pour une demande (avec infos pro)
 app.get('/api/devis/demande/:id', auth, async (req, res) => {
-  const { data } = await supabase.from('devis').select('*').eq('demande_id', req.params.id).order('prix_ttc', { ascending: true });
-  res.json(data || []);
+  const { data: devis } = await supabase.from('devis').select('*').eq('demande_id', req.params.id).order('prix_ttc', { ascending: true });
+  if (!devis || !devis.length) return res.json([]);
+
+  const proIds = [...new Set(devis.map(d => d.societe_id))];
+  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne').in('id', proIds);
+  const proMap = {};
+  (pros || []).forEach(p => proMap[p.id] = p);
+
+  const enriched = devis.map(d => ({ ...d, pro: proMap[d.societe_id] || null }));
+  res.json(enriched);
 });
+
+// Tous les devis envoyés par le pro connecté
+app.get('/api/devis/mes-devis', auth, async (req, res) => {
+  try {
+    const { data: devis } = await supabase.from('devis').select('*').eq('societe_id', req.user.id).order('created_at', { ascending: false });
+    if (!devis || !devis.length) return res.json([]);
+
+    const demandeIds = [...new Set(devis.map(d => d.demande_id))];
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme').in('id', demandeIds);
+    const demandeMap = {};
+    (demandes || []).forEach(d => demandeMap[d.id] = d);
+
+    const enriched = devis.map(d => ({ ...d, demande: demandeMap[d.demande_id] || null }));
+    res.json(enriched);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.post('/api/devis/:id/accepter', auth, async (req, res) => {
+  try {
+    const { data: devis } = await supabase.from('devis').select('*').eq('id', req.params.id).single();
+    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
+    if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (demande.statut === 'acceptee') return res.status(400).json({ error: 'Une demande a déjà été acceptée pour cette prestation.' });
+
+    await supabase.from('devis').update({ statut: 'accepte' }).eq('id', req.params.id);
+    await supabase.from('demandes').update({ statut: 'acceptee' }).eq('id', devis.demande_id);
+    await supabase.from('devis').update({ statut: 'refuse' }).eq('demande_id', devis.demande_id).neq('id', req.params.id);
+
+    res.json({ message: 'Devis accepté !', demande_id: devis.demande_id, societe_id: devis.societe_id });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.post('/api/devis/:id/refuser', auth, async (req, res) => {
+  try {
+    const { data: devis } = await supabase.from('devis').select('*').eq('id', req.params.id).single();
+    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
+    if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+
+    await supabase.from('devis').update({ statut: 'refuse' }).eq('id', req.params.id);
+    res.json({ message: 'Devis refusé.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ══════════════ MESSAGES ══════════════
 
 app.post('/api/messages', auth, async (req, res) => {
   try {
     const { demande_id, contenu } = req.body;
-    if (!demande_id || !contenu)
+    if (!demande_id || !contenu || !contenu.trim())
       return res.status(400).json({ error: 'Message vide.' });
     if (BLOCK_REGEX.test(contenu))
       return res.status(400).json({ error: 'Gleam bloque les coordonnées avant paiement.', blocked: true });
+
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
 
     const { data, error } = await supabase.from('messages').insert({
       demande_id: demande_id,
@@ -244,6 +326,62 @@ app.get('/api/messages/:demande_id', auth, async (req, res) => {
   const { data } = await supabase.from('messages').select('*').eq('demande_id', req.params.demande_id).order('created_at', { ascending: true });
   res.json(data || []);
 });
+
+// Liste des conversations actives pour l'utilisateur connecté (client ou pro)
+app.get('/api/conversations', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    let demandeIds = [];
+
+    if (isProType(user?.type)) {
+      const { data: devis } = await supabase.from('devis').select('demande_id').eq('societe_id', req.user.id);
+      demandeIds = [...new Set((devis || []).map(d => d.demande_id))];
+    } else {
+      const { data: demandes } = await supabase.from('demandes').select('id').eq('client_id', req.user.id);
+      demandeIds = (demandes || []).map(d => d.id);
+    }
+
+    if (!demandeIds.length) return res.json([]);
+
+    const { data: demandes } = await supabase.from('demandes').select('*').in('id', demandeIds);
+    const conversations = [];
+
+    for (const d of (demandes || [])) {
+      const { data: msgs } = await supabase.from('messages').select('*').eq('demande_id', d.id).order('created_at', { ascending: false }).limit(1);
+      const lastMsg = msgs && msgs[0] ? msgs[0] : null;
+
+      let autrePartie = null;
+      if (isProType(user?.type)) {
+        const { data: client } = await supabase.from('users').select('prenom, nom').eq('id', d.client_id).single();
+        autrePartie = client;
+      } else {
+        const { data: devisAcceptes } = await supabase.from('devis').select('societe_id').eq('demande_id', d.id).eq('statut', 'accepte').maybeSingle();
+        if (devisAcceptes) {
+          const { data: pro } = await supabase.from('users').select('prenom, nom').eq('id', devisAcceptes.societe_id).single();
+          autrePartie = pro;
+        }
+      }
+
+      conversations.push({
+        demande_id: d.id,
+        prestation: d.prestation,
+        statut: d.statut,
+        numero_anonyme: d.numero_anonyme,
+        dernier_message: lastMsg ? lastMsg.contenu : null,
+        dernier_message_date: lastMsg ? lastMsg.created_at : d.created_at,
+        autre_partie: autrePartie
+      });
+    }
+
+    conversations.sort((a, b) => new Date(b.dernier_message_date) - new Date(a.dernier_message_date));
+    res.json(conversations);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ══════════════ PAIEMENTS ══════════════
 
 app.post('/api/paiements/intent', auth, async (req, res) => {
   try {
@@ -296,6 +434,8 @@ app.post('/api/paiements/liberer', auth, async (req, res) => {
   }
 });
 
+// ══════════════ ÉVALUATIONS ══════════════
+
 app.post('/api/evaluations', auth, async (req, res) => {
   try {
     const { demande_id, evalue_id, note, commentaire } = req.body;
@@ -320,8 +460,10 @@ app.post('/api/evaluations', auth, async (req, res) => {
   }
 });
 
+// ══════════════ PROS / SOCIÉTÉS ══════════════
+
 app.get('/api/societes', auth, async (req, res) => {
-  const { data } = await supabase.from('users').select('id, prenom, nom, note_moyenne, disponible').eq('type', 'societe').eq('disponible', true);
+  const { data } = await supabase.from('users').select('id, prenom, nom, note_moyenne, disponible').eq('type', 'pro').eq('disponible', true);
   res.json(data || []);
 });
 
