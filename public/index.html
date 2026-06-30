@@ -894,7 +894,7 @@ async function sendDemand(type){
   if(!addr){toast('⚠️ Veuillez indiquer une adresse.');return}
   const flex=document.querySelector('.flex-opt.sel')?.textContent||'Heure exacte';
   const details={};
-  document.querySelectorAll('.opt-btn.sel').forEach(b=>{const g=b.getAttribute('onclick').match(/'([^']+)'\\)/)?.[1];if(g)details[g]=b.textContent.trim()});
+  document.querySelectorAll('.opt-btn.sel').forEach(b=>{const g=b.getAttribute('onclick').match(/'([^']+)'\)/);if(g&&g[1])details[g[1]]=b.textContent.trim()});
   if(type==='autre'){const t=document.getElementById('f-autre-type')?.value.trim();if(t)details['type-prestation']=t}
   const btn=document.getElementById('send-demand-btn');
   if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>'}
