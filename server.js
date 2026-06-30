@@ -129,7 +129,18 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
-app.get('/api/auth/me', auth, async (req, res) => {
+app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email requis.' });
+    await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
+      redirectTo: 'https://niakate1.github.io/Gleam/public/'
+    });
+    res.json({ message: 'Email de réinitialisation envoyé !' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
   const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
   if (!data) return res.status(404).json({ error: 'Utilisateur introuvable.' });
   res.json({ ...data, firstName: data.prenom, lastName: data.nom });
