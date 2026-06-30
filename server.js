@@ -236,29 +236,16 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
 });
 
 // Demandes disponibles pour les pros (en attente, pas encore acceptées)
-app.get('/api/demandes/all', auth, async (req, res) => {
+app.get('/api/demandes/all', async (req, res) => {
   try {
-    const { data: user, error: userErr } = await supabase.from('users').select('type').eq('id', req.user.id).single();
-    if (userErr) return res.status(500).json({ error: 'Erreur utilisateur: ' + userErr.message });
-    if (!user || !isProType(user.type))
-      return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
-
     const { data: demandes, error: demErr } = await supabase
       .from('demandes')
       .select('*')
-      .or('statut.eq.en_attente,statut.eq.devis_recus')
       .order('created_at', { ascending: false });
-
-    if (demErr) return res.status(500).json({ error: 'Erreur demandes: ' + demErr.message });
-
-    const { data: mesDevis } = await supabase.from('devis').select('demande_id, statut').eq('societe_id', req.user.id);
-    const idsRepondues = new Set((mesDevis || []).filter(d => d.statut === 'envoye' || d.statut === 'accepte').map(d => d.demande_id));
-    const filtered = (demandes || []).filter(d => !idsRepondues.has(d.id));
-
-    res.json(filtered);
+    if (demErr) return res.status(500).json({ error: demErr.message });
+    res.json(demandes || []);
   } catch (e) {
-    console.error('Erreur /api/demandes/all:', e);
-    res.status(500).json({ error: 'Erreur serveur: ' + e.message });
+    res.status(500).json({ error: e.message });
   }
 });
 
