@@ -416,19 +416,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     await supabase.from('devis').update({ statut: 'annule_pro' }).eq('id', req.params.id);
     await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', devis.demande_id);
 
-    // Recalcule le taux de fiabilité du pro : (acceptés non annulés / acceptés total) * 100
-    const { data: tousDevisAcceptes } = await supabase.from('devis').select('statut').eq('societe_id', req.user.id).in('statut', ['accepte', 'annule_pro', 'termine']);
-    const totalAcceptes = (tousDevisAcceptes || []).length;
-    const totalAnnules = (tousDevisAcceptes || []).filter(d => d.statut === 'annule_pro').length;
-    const tauxFiabilite = totalAcceptes > 0 ? Math.round(((totalAcceptes - totalAnnules) / totalAcceptes) * 100) : 100;
-
-    await supabase.from('users').update({ taux_fiabilite: tauxFiabilite }).eq('id', req.user.id);
-
-    let message = 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.';
-    if (tauxFiabilite < 80) message += ' ⚠️ Votre taux de fiabilité est sous 80% : vos devis seront moins visibles par les clients.';
-    else if (tauxFiabilite < 85) message += ' ⚠️ Attention : votre taux de fiabilité a baissé sous 85%.';
-
-    res.json({ message, taux_fiabilite: tauxFiabilite });
+    res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.' });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
