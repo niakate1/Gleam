@@ -141,6 +141,8 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
+
+app.get('/api/auth/me', auth, async (req, res) => {
   const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
   if (!data) return res.status(404).json({ error: 'Utilisateur introuvable.' });
   res.json({ ...data, firstName: data.prenom, lastName: data.nom });
