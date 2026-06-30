@@ -244,9 +244,9 @@ app.get('/api/demandes/all', auth, async (req, res) => {
 
     const { data: demandes } = await supabase.from('demandes').select('*').in('statut', ['en_attente', 'devis_recus']).order('created_at', { ascending: false });
 
-    // Exclut les demandes auxquelles ce pro a déjà répondu
-    const { data: mesDevis } = await supabase.from('devis').select('demande_id').eq('societe_id', req.user.id);
-    const idsRepondues = new Set((mesDevis || []).map(d => d.demande_id));
+    // Exclut les demandes où ce pro a déjà un devis ACTIF (envoyé ou accepté) — pas les devis refusés/annulés
+    const { data: mesDevis } = await supabase.from('devis').select('demande_id, statut').eq('societe_id', req.user.id);
+    const idsRepondues = new Set((mesDevis || []).filter(d => d.statut === 'envoye' || d.statut === 'accepte').map(d => d.demande_id));
     const filtered = (demandes || []).filter(d => !idsRepondues.has(d.id));
 
     res.json(filtered);
@@ -296,11 +296,20 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
   if (!devis || !devis.length) return res.json([]);
 
   const proIds = [...new Set(devis.map(d => d.societe_id))];
-  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne').in('id', proIds);
+  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite').in('id', proIds);
   const proMap = {};
   (pros || []).forEach(p => proMap[p.id] = p);
 
   const enriched = devis.map(d => ({ ...d, pro: proMap[d.societe_id] || null }));
+  // Trie : les pros avec un taux de fiabilité < 80% passent en dernier
+  enriched.sort((a, b) => {
+    const tauxA = a.pro?.taux_fiabilite ?? 100;
+    const tauxB = b.pro?.taux_fiabilite ?? 100;
+    const lowA = tauxA < 80 ? 1 : 0;
+    const lowB = tauxB < 80 ? 1 : 0;
+    if (lowA !== lowB) return lowA - lowB;
+    return a.prix_ttc - b.prix_ttc;
+  });
   res.json(enriched);
 });
 
@@ -388,12 +397,19 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     await supabase.from('devis').update({ statut: 'annule_pro' }).eq('id', req.params.id);
     await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', devis.demande_id);
 
-    // Pénalité légère sur la note du pro pour décourager les annulations
-    const { data: proUser } = await supabase.from('users').select('note_moyenne, annulations').eq('id', req.user.id).single();
-    const nouvellesAnnulations = (proUser?.annulations || 0) + 1;
-    await supabase.from('users').update({ annulations: nouvellesAnnulations }).eq('id', req.user.id);
+    // Recalcule le taux de fiabilité du pro : (acceptés non annulés / acceptés total) * 100
+    const { data: tousDevisAcceptes } = await supabase.from('devis').select('statut').eq('societe_id', req.user.id).in('statut', ['accepte', 'annule_pro', 'termine']);
+    const totalAcceptes = (tousDevisAcceptes || []).length;
+    const totalAnnules = (tousDevisAcceptes || []).filter(d => d.statut === 'annule_pro').length;
+    const tauxFiabilite = totalAcceptes > 0 ? Math.round(((totalAcceptes - totalAnnules) / totalAcceptes) * 100) : 100;
 
-    res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.' });
+    await supabase.from('users').update({ taux_fiabilite: tauxFiabilite }).eq('id', req.user.id);
+
+    let message = 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.';
+    if (tauxFiabilite < 80) message += ' ⚠️ Votre taux de fiabilité est sous 80% : vos devis seront moins visibles par les clients.';
+    else if (tauxFiabilite < 85) message += ' ⚠️ Attention : votre taux de fiabilité a baissé sous 85%.';
+
+    res.json({ message, taux_fiabilite: tauxFiabilite });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
