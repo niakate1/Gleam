@@ -139,7 +139,7 @@ app.get('/api/auth/me', auth, async (req, res) => {
 
 app.post('/api/demandes', auth, async (req, res) => {
   try {
-    const { type, prestations, address, date, time, flexibility, description, details } = req.body;
+    const { type, prestations, address, date, time, flexibility, description, details, photos } = req.body;
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
 
     const numero = 'Client #' + Math.floor(1000 + Math.random() * 9000);
@@ -151,7 +151,7 @@ app.post('/api/demandes', auth, async (req, res) => {
       : [{ type: type || 'autre', description: description || '', details: details || {} }];
 
     const prestationLabel = listePrestations.map(p => p.type).join(' + ');
-    const notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations });
+    const notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations, photos: photos || [] });
 
     const { data, error } = await supabase.from('demandes').insert({
       client_id: req.user.id,
