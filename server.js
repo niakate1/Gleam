@@ -520,12 +520,11 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
     if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
 
     const montant = Math.round(devis.prix_ttc * 100);
-    const commission = Math.round(montant * 0.25);
+    const commission = Math.round(montant * 0.15); // 15% commission Gleam
 
     const intent = await stripe.paymentIntents.create({
       amount: montant,
       currency: 'eur',
-      application_fee_amount: commission,
       metadata: { devis_id: devis_id, gleam: 'true' }
     });
 
@@ -535,13 +534,30 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
       client_id: req.user.id,
       societe_id: devis.societe_id,
       montant_ttc: devis.prix_ttc,
-      commission: devis.prix_ttc * 0.25,
-      montant_societe: devis.prix_ttc * 0.75,
+      commission: devis.prix_ttc * 0.15,
+      montant_societe: devis.prix_ttc * 0.85,
       stripe_payment_intent_id: intent.id,
       statut: 'en_attente'
     });
 
-    res.json({ client_secret: intent.client_secret });
+    res.json({ client_secret: intent.client_secret, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/paiements/confirmer', auth, async (req, res) => {
+  try {
+    const { payment_intent_id } = req.body;
+    const intent = await stripe.paymentIntents.retrieve(payment_intent_id);
+    if (intent.status !== 'succeeded')
+      return res.status(400).json({ error: 'Paiement non confirmé par Stripe.' });
+
+    await supabase.from('paiements').update({ statut: 'paye' }).eq('stripe_payment_intent_id', payment_intent_id);
+    const { data: paiement } = await supabase.from('paiements').select('demande_id').eq('stripe_payment_intent_id', payment_intent_id).single();
+    if (paiement) await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
+
+    res.json({ message: 'Paiement confirmé ✨' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -549,12 +565,21 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
 
 app.post('/api/paiements/liberer', auth, async (req, res) => {
   try {
-    const { paiement_id } = req.body;
-    const { data: paiement } = await supabase.from('paiements').select('*').eq('id', paiement_id).single();
+    const { paiement_id, demande_id } = req.body;
+    let paiement;
+
+    if(paiement_id){
+      const { data } = await supabase.from('paiements').select('*').eq('id', paiement_id).single();
+      paiement = data;
+    } else if(demande_id){
+      const { data } = await supabase.from('paiements').select('*').eq('demande_id', demande_id).eq('statut', 'paye').single();
+      paiement = data;
+    }
+
     if (!paiement) return res.status(404).json({ error: 'Paiement introuvable.' });
     if (paiement.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
 
-    await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement_id);
+    await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id);
     await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
     res.json({ message: 'Paiement Gleam libéré ✨' });
   } catch (e) {
