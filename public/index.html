@@ -542,6 +542,22 @@ function tryParseNotes(notes){
     return n.description||'';
   }catch(e){return notes||''}
 }
+function renderPhotoPreviews(photos, containerId){
+  const c=document.getElementById(containerId);
+  if(!c)return;
+  c.innerHTML='';
+  photos.forEach((p,i)=>{
+    const div=document.createElement('div');
+    div.className='photo-preview';
+    div.style.cursor='pointer';
+    div.onclick=()=>window.open(p,'_blank');
+    const img=document.createElement('img');
+    img.src=p;
+    div.appendChild(img);
+    c.appendChild(div);
+  });
+}
+
 function getPhotosFromNotes(notes){
   try{const n=JSON.parse(notes);return (n.photos&&Array.isArray(n.photos))?n.photos:[]}catch(e){return[]}
 }
@@ -703,7 +719,7 @@ function renderDetail(d){
     }).join(''):`<div class="detail-presta"><span class="detail-presta-icon">${ICONS[d.prestation]||'✨'}</span><div class="detail-presta-name">${d.prestation}</div></div>`}
   </div>
 
-  ${getPhotosFromNotes(d.notes).length?`<div class="detail-card"><label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews">${getPhotosFromNotes(d.notes).map(p=>`<div class="photo-preview" style="width:80px;height:80px;cursor:pointer" onclick="window.open('${p}','_blank')"><img src="${p}"></div>`).join('')}</div></div>`:''}
+  ${getPhotosFromNotes(d.notes).length?`<div class="detail-card"><label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>`:''}
 
   <div class="detail-card">
     <div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">${d.adresse}</div></div>
@@ -717,6 +733,8 @@ function renderDetail(d){
   ${d.statut==='devis_recus'||d.statut==='acceptee'?`<button class="modal-send-btn" style="margin-top:14px" onclick="goTab('devis')">📋 Voir les devis reçus</button>`:''}`;
 
   c.innerHTML=html;
+  const photos=getPhotosFromNotes(d.notes);
+  if(photos.length)renderPhotoPreviews(photos,'photos-detail');
 }
 
 async function deleteDemande(){
@@ -780,7 +798,7 @@ async function loadProDemandes(){
         <div class="dc-info"><span>📍</span>${d.adresse}</div>
         ${d.creneau?`<div class="dc-info"><span>📅</span>${formatCreneau(d.creneau)}</div>`:''}
         ${d.notes?`<div style="font-size:12px;color:var(--gray);margin-top:6px;background:#F9FAFB;padding:8px;border-radius:8px">${tryParseNotes(d.notes)}</div>`:''}
-        ${getPhotosFromNotes(d.notes).length?`<div class="photo-previews" style="margin-top:8px">${getPhotosFromNotes(d.notes).map(p=>`<div class="photo-preview" style="cursor:pointer" onclick="window.open('${p}','_blank')"><img src="${p}"></div>`).join('')}</div>`:''}
+        ${getPhotosFromNotes(d.notes).length?`<div class="photo-previews" style="margin-top:8px" id="photos-pro-${d.id}"></div>`:''}
         <div class="devis-form">
           <label>💰 Votre prix (€ TTC)</label>
           <input type="number" id="prix-${d.id}" placeholder="Ex: 150" min="1">
@@ -789,6 +807,11 @@ async function loadProDemandes(){
           <button class="btn-devis" id="btn-devis-${d.id}" onclick="envoyerDevis('${d.id}')">✨ Envoyer mon devis</button>
         </div>
       </div>`).join('');
+    // Rendu des photos après insertion DOM
+    data.forEach(d=>{
+      const photos=getPhotosFromNotes(d.notes);
+      if(photos.length)renderPhotoPreviews(photos,'photos-pro-'+d.id);
+    });
   }catch(e){
     document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement.</p></div>';
   }
