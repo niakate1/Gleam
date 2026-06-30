@@ -11,53 +11,61 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#F9FAFB;color:#11182
 .screen{display:none;min-height:100vh;flex-direction:column}
 .screen.active{display:flex}
 
-/* AUTH */
 .auth-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#7C3AED,#4F46E5)}
 .auth-box{background:#fff;border-radius:20px;padding:36px 32px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
 .logo{text-align:center;margin-bottom:28px}
 .logo h1{font-size:32px;font-weight:800;color:var(--p)}
 .logo p{color:var(--gray);font-size:14px;margin-top:4px}
 .tabs{display:flex;background:#F3F4F6;border-radius:10px;padding:4px;margin-bottom:24px;gap:4px}
-.tab{flex:1;padding:9px;border:none;background:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;color:var(--gray);transition:.2s}
+.tab{flex:1;padding:9px;border:none;background:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;color:var(--gray)}
 .tab.active{background:#fff;color:var(--p);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px;margin-top:14px}
 input,select,textarea{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;transition:.2s;background:#fff;font-family:inherit}
 input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .role-select{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-.role-btn{padding:12px;border:2px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:#374151;transition:.2s}
+.role-btn{padding:12px;border:2px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:#374151}
 .role-btn.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .role-btn span{display:block;font-size:22px;margin-bottom:4px}
-.btn{width:100%;padding:13px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;transition:.2s}
+.btn{width:100%;padding:13px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px}
 .btn:hover{background:var(--p2)}
 .err{background:#FEF2F2;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none}
 .err.show{display:block}
 
-/* NAVBAR */
 .navbar{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
-.navbar .logo-sm{font-size:22px;font-weight:800;color:var(--p)}
+.navbar .logo-sm{font-size:22px;font-weight:800;color:var(--p);cursor:pointer}
 .user-badge{background:var(--light);color:var(--p);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
 .pro-badge{background:#D1FAE5;color:var(--green);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
+.back-btn{background:none;border:none;font-size:20px;cursor:pointer;color:#374151}
 
-/* BOTTOM NAV */
 .bottom-nav{background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:sticky;bottom:0}
-.bnav-item{display:flex;flex-direction:column;align-items:center;padding:10px 0;cursor:pointer;border:none;background:none;color:var(--gray);font-size:11px;font-weight:600;gap:3px;transition:.2s}
+.bnav-item{display:flex;flex-direction:column;align-items:center;padding:10px 0;cursor:pointer;border:none;background:none;color:var(--gray);font-size:11px;font-weight:600;gap:3px}
 .bnav-item.active{color:var(--p)}
 .bnav-item span:first-child{font-size:22px}
 
-/* HOME CLIENT */
-.home-content{flex:1;overflow-y:auto;padding:16px}
+.home-content,.pro-content,.profile-content{flex:1;overflow-y:auto;padding:16px}
 .greeting h2{font-size:22px;font-weight:800;margin-bottom:4px}
 .greeting p{color:var(--gray);font-size:14px;margin-bottom:18px}
 .section-title{font-size:16px;font-weight:700;margin-bottom:12px;color:#111827}
 .services-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
-.svc-card{background:#fff;border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;border:2px solid var(--border);transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.svc-card:hover{border-color:var(--p);transform:translateY(-2px)}
+.svc-card{background:#fff;border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;border:2px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.svc-card:hover{border-color:var(--p)}
 .svc-card span:first-child{font-size:28px;display:block;margin-bottom:6px}
 .svc-card .svc-name{font-size:11px;font-weight:700;color:#374151}
 
-/* HOME PRO */
-.pro-content{flex:1;overflow-y:auto;padding:16px}
+.demand-row{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.05);cursor:pointer}
+.demand-row:hover{border-color:var(--p)}
+.demand-icon{font-size:28px}
+.demand-info{flex:1;min-width:0}
+.demand-type{font-weight:700;font-size:14px;text-transform:capitalize}
+.demand-addr{font-size:12px;color:var(--gray);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.demand-status{font-size:11px;font-weight:600;margin-top:4px}
+.s-attente{color:#D97706}
+.s-devis{color:var(--p)}
+.s-acceptee{color:var(--green)}
+.s-terminee{color:var(--gray)}
+.demand-date{font-size:11px;color:var(--gray);flex-shrink:0}
+
 .pro-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
 .stat-card{background:#fff;border-radius:14px;padding:16px;border:1px solid var(--border);text-align:center}
 .stat-card .stat-num{font-size:28px;font-weight:800;color:var(--p)}
@@ -65,23 +73,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .dispo-toggle{background:#fff;border-radius:14px;padding:16px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .dispo-toggle .dispo-text{font-size:14px;font-weight:700}
 .dispo-toggle .dispo-sub{font-size:12px;color:var(--gray);margin-top:2px}
-.toggle-switch{width:48px;height:26px;background:#E5E7EB;border-radius:13px;cursor:pointer;position:relative;transition:.3s;border:none}
+.toggle-switch{width:48px;height:26px;background:#E5E7EB;border-radius:13px;cursor:pointer;position:relative;border:none}
 .toggle-switch.on{background:var(--green)}
-.toggle-switch::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-switch::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .toggle-switch.on::after{left:25px}
+
 .demande-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.demande-card .dc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
-.demande-card .dc-type{font-size:16px;font-weight:800;text-transform:capitalize;display:flex;align-items:center;gap:8px}
-.demande-card .dc-num{font-size:11px;color:var(--gray);background:#F3F4F6;padding:3px 8px;border-radius:10px}
-.demande-card .dc-info{font-size:13px;color:#374151;margin-bottom:4px;display:flex;align-items:center;gap:6px}
-.demande-card .dc-info span{font-size:15px}
+.dc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.dc-type{font-size:16px;font-weight:800;text-transform:capitalize;display:flex;align-items:center;gap:8px}
+.dc-num{font-size:11px;color:var(--gray);background:#F3F4F6;padding:3px 8px;border-radius:10px}
+.dc-info{font-size:13px;color:#374151;margin-bottom:4px;display:flex;align-items:center;gap:6px}
 .devis-form{background:#F9FAFB;border-radius:10px;padding:14px;margin-top:12px;border:1px solid var(--border)}
 .devis-form label{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;margin-top:10px;display:block}
 .devis-form label:first-child{margin-top:0}
 .btn-devis{width:100%;padding:11px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px}
-.btn-voir{padding:8px 14px;background:var(--light);color:var(--p);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+.btn-devis:disabled{background:var(--gray);cursor:not-allowed}
 
-/* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .modal-overlay.open{display:flex}
 .modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px 20px 32px}
@@ -89,48 +96,61 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .modal-title{font-size:18px;font-weight:800;margin-bottom:6px}
 .modal-sub{font-size:13px;color:var(--gray);margin-bottom:20px}
 .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.opt-btn{padding:12px 10px;border:2px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:#374151;transition:.2s}
+.opt-btn{padding:12px 10px;border:2px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:#374151}
 .opt-btn.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .opt-btn span{display:block;font-size:20px;margin-bottom:4px}
 .opt-btn.full{grid-column:1/-1}
 .field-group{margin-bottom:14px}
 .field-group label{font-size:13px;font-weight:600;color:#374151;margin-bottom:5px;display:block}
 .optional{font-weight:400;color:var(--gray);font-size:11px}
-.photo-zone{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:.2s}
+.photo-zone{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer}
 .photo-zone:hover{border-color:var(--p);background:var(--light)}
 .photo-previews{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .photo-preview{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden}
 .photo-preview img{width:100%;height:100%;object-fit:cover}
-.photo-preview .del-photo{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.photo-preview .del-photo{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer}
 .datetime-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .flex-opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.flex-opt{padding:6px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#374151;transition:.2s}
+.flex-opt{padding:6px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#374151}
 .flex-opt.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .divider{height:1px;background:var(--border);margin:16px 0}
 .modal-send-btn{width:100%;padding:14px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
 
-/* DEVIS CLIENT */
 .devis-list{flex:1;overflow-y:auto;padding:16px}
 .devis-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .devis-badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700}
 .badge-pending{background:#FEF3C7;color:#D97706}
 .badge-accepted{background:#D1FAE5;color:var(--green)}
+.badge-refused{background:#FEE2E2;color:var(--red)}
 .btn-accept{flex:1;padding:10px;background:var(--p);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
 .btn-refuse{flex:1;padding:10px;background:#fff;color:var(--red);border:2px solid var(--red);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
 
-/* MESSAGES */
-.messages-list{flex:1;overflow-y:auto;padding:16px}
+.conv-row{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;cursor:pointer}
+.conv-row:hover{border-color:var(--p)}
+.conv-avatar{width:44px;height:44px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.conv-body{flex:1;min-width:0}
+.conv-name{font-weight:700;font-size:14px}
+.conv-preview{color:var(--gray);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.conv-time{font-size:11px;color:var(--gray);flex-shrink:0}
+
+.chat-screen{flex:1;display:flex;flex-direction:column;min-height:0}
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.chat-bubble{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.4}
+.chat-bubble.mine{align-self:flex-end;background:var(--p);color:#fff;border-bottom-right-radius:4px}
+.chat-bubble.theirs{align-self:flex-start;background:#fff;border:1px solid var(--border);border-bottom-left-radius:4px}
+.chat-input-bar{background:#fff;border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:center}
+.chat-input-bar input{flex:1;padding:10px 14px;border-radius:20px}
+.chat-send-btn{background:var(--p);color:#fff;border:none;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0}
+
 .empty-state{text-align:center;padding:60px 20px;color:var(--gray)}
 .empty-state span{font-size:48px;display:block;margin-bottom:12px}
 .empty-state p{font-size:15px}
 
-/* PROFIL */
-.profile-content{flex:1;overflow-y:auto;padding:16px}
 .profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;text-align:center}
 .profile-hero .avatar{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px}
 .profile-hero h3{font-size:20px;font-weight:800}
 .profile-menu{background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
-.profile-item{display:flex;align-items:center;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);gap:12px;transition:.2s}
+.profile-item{display:flex;align-items:center;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);gap:12px}
 .profile-item:last-child{border-bottom:none}
 .profile-item:hover{background:#F9FAFB}
 .profile-item .pi-icon{font-size:20px;width:32px;text-align:center}
@@ -138,13 +158,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .profile-item .pi-arrow{color:var(--gray)}
 .logout-btn{width:100%;margin-top:12px;padding:13px;background:#FEF2F2;color:var(--red);border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
 
-/* SUCCESS */
 .success-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
 .success-icon{width:80px;height:80px;background:var(--light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 20px}
 
-/* TOAST */
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1F2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:500;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1F2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:500;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -163,7 +183,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div id="form-login">
         <label>Email</label><input type="email" id="le" placeholder="votre@email.com">
         <label>Mot de passe</label><input type="password" id="lp" placeholder="••••••••">
-        <button class="btn" onclick="doLogin()">Se connecter</button>
+        <button class="btn" id="login-btn" onclick="doLogin()">Se connecter</button>
         <div class="err" id="lerr"></div>
       </div>
       <div id="form-register" style="display:none">
@@ -179,7 +199,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
           <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
           <button class="role-btn" id="role-pro" onclick="setRole('pro')"><span>🏢</span>Professionnel</button>
         </div>
-        <button class="btn" onclick="doRegister()">Créer mon compte Gleam</button>
+        <button class="btn" id="register-btn" onclick="doRegister()">Créer mon compte Gleam</button>
         <div class="err" id="rerr"></div>
       </div>
     </div>
@@ -188,15 +208,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- HOME CLIENT -->
 <div class="screen" id="s-home">
-  <div class="navbar">
-    <span class="logo-sm">✨ Gleam</span>
-    <span class="user-badge" id="user-name-badge">Bonjour</span>
-  </div>
+  <div class="navbar"><span class="logo-sm">✨ Gleam</span><span class="user-badge" id="user-name-badge">Bonjour</span></div>
   <div class="home-content">
-    <div class="greeting">
-      <h2 id="greeting-name">Bonjour 👋</h2>
-      <p>Que souhaitez-vous faire briller aujourd'hui ?</p>
-    </div>
+    <div class="greeting"><h2 id="greeting-name">Bonjour 👋</h2><p>Que souhaitez-vous faire briller aujourd'hui ?</p></div>
     <div class="section-title">Choisissez une prestation</div>
     <div class="services-grid">
       <div class="svc-card" onclick="openService('voiture')"><span>🚗</span><div class="svc-name">Voiture</div></div>
@@ -221,28 +235,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- HOME PRO -->
 <div class="screen" id="s-pro-home">
-  <div class="navbar">
-    <span class="logo-sm">✨ Gleam Pro</span>
-    <span class="pro-badge" id="pro-name-badge">Pro</span>
-  </div>
+  <div class="navbar"><span class="logo-sm">✨ Gleam Pro</span><span class="pro-badge" id="pro-name-badge">Pro</span></div>
   <div class="pro-content">
-    <div class="greeting">
-      <h2 id="pro-greeting">Bonjour 👋</h2>
-      <p>Voici les demandes disponibles</p>
-    </div>
+    <div class="greeting"><h2 id="pro-greeting">Bonjour 👋</h2><p>Voici les demandes disponibles</p></div>
     <div class="pro-stats">
       <div class="stat-card"><div class="stat-num" id="stat-demandes">0</div><div class="stat-label">Demandes disponibles</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-devis">0</div><div class="stat-label">Devis envoyés</div></div>
     </div>
     <div class="dispo-toggle">
-      <div>
-        <div class="dispo-text">Disponibilité</div>
-        <div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div>
-      </div>
+      <div><div class="dispo-text">Disponibilité</div><div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div></div>
       <button class="toggle-switch on" id="dispo-toggle" onclick="toggleDispo()"></button>
     </div>
     <div class="section-title">📋 Demandes clients</div>
-    <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Aucune demande pour l'instant.</p></div></div>
+    <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Chargement...</p></div></div>
   </div>
   <div class="bottom-nav">
     <button class="bnav-item active" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
@@ -252,10 +257,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- PRO MESSAGES -->
+<!-- PRO MESSAGES (liste) -->
 <div class="screen" id="s-pro-messages">
   <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
-  <div class="messages-list"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
+  <div class="messages-list" id="pro-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
     <button class="bnav-item active" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
@@ -267,7 +272,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <!-- PRO DEVIS ENVOYES -->
 <div class="screen" id="s-pro-devis">
   <div class="navbar"><span class="logo-sm">💰 Mes devis envoyés</span></div>
-  <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l'instant.</p></div></div>
+  <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
     <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
@@ -280,11 +285,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-pro-profile">
   <div class="navbar"><span class="logo-sm">👤 Mon Profil Pro</span></div>
   <div class="profile-content">
-    <div class="profile-hero">
-      <div class="avatar">🏢</div>
-      <h3 id="pro-profile-name">Professionnel</h3>
-      <p id="pro-profile-email">email@exemple.com</p>
-    </div>
+    <div class="profile-hero"><div class="avatar">🏢</div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p></div>
     <div class="profile-menu">
       <div class="profile-item"><span class="pi-icon">💰</span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon">⭐</span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
@@ -301,15 +302,31 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- MESSAGES CLIENT -->
+<!-- MESSAGES CLIENT (liste conversations) -->
 <div class="screen" id="s-messages">
   <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
-  <div class="messages-list"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
+  <div id="client-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
     <button class="bnav-item active" onclick="goTab('messages')"><span>💬</span>Messages</button>
     <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
+  </div>
+</div>
+
+<!-- CHAT (commun client/pro) -->
+<div class="screen" id="s-chat">
+  <div class="navbar">
+    <button class="back-btn" onclick="backFromChat()">←</button>
+    <span class="logo-sm" id="chat-title" style="font-size:16px">Conversation</span>
+    <span style="width:24px"></span>
+  </div>
+  <div class="chat-screen">
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-bar">
+      <input type="text" id="chat-input" placeholder="Écrivez votre message..." onkeypress="if(event.key==='Enter')sendChatMsg()">
+      <button class="chat-send-btn" onclick="sendChatMsg()">➤</button>
+    </div>
   </div>
 </div>
 
@@ -329,11 +346,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-profile">
   <div class="navbar"><span class="logo-sm">👤 Mon Profil</span></div>
   <div class="profile-content">
-    <div class="profile-hero">
-      <div class="avatar">👤</div>
-      <h3 id="profile-name">Utilisateur</h3>
-      <p id="profile-email">email@exemple.com</p>
-    </div>
+    <div class="profile-hero"><div class="avatar">👤</div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p></div>
     <div class="profile-menu">
       <div class="profile-item"><span class="pi-icon">📋</span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon">⭐</span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
@@ -363,7 +376,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- MODAL SERVICE -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
   <div class="modal"><div class="modal-handle"></div><div id="modal-body"></div></div>
 </div>
@@ -372,9 +384,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <script>
 const API='https://gleam-production-9b95.up.railway.app';
-let currentUser=null,userRole='client',photos=[],disponible=true;
+let currentUser=null,userRole='client',photos=[],disponible=true,currentChatDemandeId=null,chatPollInterval=null;
 
-// ── UTILS ──
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 function toast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur)}
 function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.add('show')}
@@ -385,34 +396,36 @@ function switchTab(t){
   document.getElementById('form-login').style.display=t==='login'?'block':'none';
   document.getElementById('form-register').style.display=t==='register'?'block':'none';
 }
-function isPro(){
-  const t=(currentUser?.type||'').toLowerCase().trim();
-  console.log('Type utilisateur:', t);
-  return t==='pro'||t==='societe'||t==='professionnel';
-}
+function isPro(){const t=(currentUser?.type||'').toLowerCase().trim();return t==='pro'||t==='societe'||t==='professionnel'}
+function authHeaders(){const t=localStorage.getItem('gleam_token');return {'Content-Type':'application/json','Authorization':'Bearer '+t}}
 
 function goTab(tab){
+  stopChatPoll();
   const map={home:'s-home',messages:'s-messages',devis:'s-devis',profile:'s-profile'};
   show(map[tab]);
-  document.querySelectorAll('#s-home .bnav-item,#s-messages .bnav-item,#s-devis .bnav-item,#s-profile .bnav-item').forEach(b=>b.classList.remove('active'));
   const idx={home:0,messages:1,devis:2,profile:3}[tab];
-  document.querySelectorAll(`#${map[tab]} .bnav-item`)[idx]?.classList.add('active');
+  document.querySelectorAll(`#${map[tab]} .bnav-item`).forEach((b,i)=>b.classList.toggle('active',i===idx));
   if(tab==='home')loadDemandes();
   if(tab==='devis')loadDevis();
+  if(tab==='messages')loadConversationsClient();
 }
-
 function goProTab(tab){
+  stopChatPoll();
   const map={'pro-home':'s-pro-home','pro-messages':'s-pro-messages','pro-devis':'s-pro-devis','pro-profile':'s-pro-profile'};
   show(map[tab]);
+  const idx={'pro-home':0,'pro-messages':1,'pro-devis':2,'pro-profile':3}[tab];
+  document.querySelectorAll(`#${map[tab]} .bnav-item`).forEach((b,i)=>b.classList.toggle('active',i===idx));
   if(tab==='pro-home')loadProDemandes();
   if(tab==='pro-devis')loadProDevis();
+  if(tab==='pro-messages')loadConversationsPro();
 }
 
-// ── AUTH ──
+// ══════════════ AUTH ══════════════
 async function doLogin(){
   hideErr('lerr');
   const email=document.getElementById('le').value.trim(),pw=document.getElementById('lp').value;
-  if(!email||!pw){showErr('lerr','Remplissez tous les champs.');return}
+  if(!email||!pw)return showErr('lerr','Remplissez tous les champs.');
+  const btn=document.getElementById('login-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
     const d=await r.json();
@@ -420,6 +433,7 @@ async function doLogin(){
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
     enterApp();
   }catch(e){showErr('lerr','Erreur réseau.')}
+  finally{btn.disabled=false;btn.textContent='Se connecter'}
 }
 
 async function doRegister(){
@@ -431,14 +445,16 @@ async function doRegister(){
   if(!email)return showErr('rerr','Email requis.');
   if(!phone)return showErr('rerr','Téléphone requis.');
   if(!pw||pw.length<8)return showErr('rerr','Mot de passe min 8 caractères.');
+  const btn=document.getElementById('register-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({firstName:fn,lastName:ln,prenom:fn,nom:ln,email,phone,telephone:phone,password:pw,role:userRole,type:userRole})});
     const d=await r.json();
-    if(!r.ok)return showErr('rerr',d.error||'Erreur inscription.');
+    if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
     enterApp();
   }catch(e){showErr('rerr','Erreur réseau.')}
+  finally{btn.disabled=false;btn.textContent='Créer mon compte Gleam'}
 }
 
 function enterApp(){
@@ -448,6 +464,9 @@ function enterApp(){
     document.getElementById('pro-name-badge').textContent=name;
     document.getElementById('pro-profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
     document.getElementById('pro-profile-email').textContent=currentUser?.email||'';
+    disponible=currentUser?.disponible!==false;
+    document.getElementById('dispo-toggle').classList.toggle('on',disponible);
+    document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
     show('s-pro-home');
     loadProDemandes();
   }else{
@@ -460,84 +479,110 @@ function enterApp(){
   }
   toast('Bienvenue sur Gleam ✨');
 }
+function doLogout(){stopChatPoll();localStorage.removeItem('gleam_token');currentUser=null;show('s-auth');toast('À bientôt !')}
 
-function doLogout(){localStorage.removeItem('gleam_token');currentUser=null;show('s-auth');toast('À bientôt !')}
+// ══════════════ HELPERS AFFICHAGE ══════════════
+const ICONS={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
+const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],terminee:['🏁 Terminée','s-terminee']};
+function tryParseNotes(notes){try{const n=JSON.parse(notes);return n.description||''}catch(e){return notes||''}}
 
-// ── CLIENT : DEMANDES ──
+// ══════════════ CLIENT : DEMANDES ══════════════
 async function loadDemandes(){
-  const token=localStorage.getItem('gleam_token');if(!token)return;
   try{
-    const r=await fetch(API+'/api/demandes',{headers:{'Authorization':'Bearer '+token}});
+    const r=await fetch(API+'/api/demandes',{headers:authHeaders()});
     if(!r.ok)return;
     const data=await r.json();
     const c=document.getElementById('recent-demands');
-    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\'instant.</p></div>';return}
-    const icons={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
-    const statuts={en_attente:'⏳ En attente',devis_recus:'📋 Devis reçus',terminee:'✅ Terminée'};
-    c.innerHTML=data.map(d=>`
-      <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.05)">
-        <span style="font-size:28px">${icons[d.prestation]||'✨'}</span>
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:14px;text-transform:capitalize">${d.prestation}</div>
-          <div style="font-size:12px;color:var(--gray);margin-top:2px">${d.adresse}</div>
-          <div style="font-size:11px;color:var(--p);font-weight:600;margin-top:4px">${statuts[d.statut]||d.statut}</div>
+    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\\'instant.</p></div>';return}
+    c.innerHTML=data.map(d=>{
+      const st=STATUTS[d.statut]||['',''];
+      return `<div class="demand-row" onclick="goTab('devis')">
+        <span class="demand-icon">${ICONS[d.prestation]||'✨'}</span>
+        <div class="demand-info">
+          <div class="demand-type">${d.prestation}</div>
+          <div class="demand-addr">${d.adresse}</div>
+          <div class="demand-status ${st[1]}">${st[0]}</div>
         </div>
-        <div style="font-size:11px;color:var(--gray)">${new Date(d.created_at).toLocaleDateString('fr-FR')}</div>
-      </div>`).join('');
+        <div class="demand-date">${new Date(d.created_at).toLocaleDateString('fr-FR')}</div>
+      </div>`;
+    }).join('');
   }catch(e){}
 }
 
 async function loadDevis(){
-  const token=localStorage.getItem('gleam_token');if(!token)return;
   try{
-    const rd=await fetch(API+'/api/demandes',{headers:{'Authorization':'Bearer '+token}});
+    const rd=await fetch(API+'/api/demandes',{headers:authHeaders()});
     if(!rd.ok)return;
     const demandes=await rd.json();
     const c=document.getElementById('devis-list');
     if(!demandes||!demandes.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div>';return}
     let all=[];
     for(const d of demandes){
-      const r=await fetch(API+'/api/devis/demande/'+d.id,{headers:{'Authorization':'Bearer '+token}});
-      if(r.ok){const dv=await r.json();all=[...all,...dv.map(v=>({...v,prestation:d.prestation}))]}
+      const r=await fetch(API+'/api/devis/demande/'+d.id,{headers:authHeaders()});
+      if(r.ok){const dv=await r.json();all=[...all,...dv.map(v=>({...v,prestation:d.prestation,demande_statut:d.statut}))]}
     }
-    if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\'instant.</p></div>';return}
-    c.innerHTML=all.map(v=>`
-      <div class="devis-card">
+    if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\\'instant.</p></div>';return}
+    all.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    c.innerHTML=all.map(v=>{
+      const proName=v.pro?(v.pro.prenom+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
+      let badge='<span class="devis-badge badge-pending">En attente</span>',actions='';
+      if(v.statut==='accepte'){
+        badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';
+        actions=`<div style="margin-top:12px"><button class="btn-accept" onclick="goToChat('${v.demande_id}','${proName.replace(/'/g,"\\'")}')">💬 Discuter avec le prestataire</button></div>`;
+      }else if(v.statut==='refuse'){
+        badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
+      }else{
+        actions=`<div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn-accept" onclick="accepterDevis('${v.id}')">✅ Accepter</button>
+          <button class="btn-refuse" onclick="refuserDevis('${v.id}')">❌ Refuser</button>
+        </div>`;
+      }
+      return `<div class="devis-card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-          <div style="font-weight:700;font-size:15px">Prestataire Gleam</div>
-          <span class="devis-badge badge-pending">En attente</span>
+          <div style="font-weight:700;font-size:15px">${proName}</div>${badge}
         </div>
         <div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 ${v.prestation}</div>
         <div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">${v.prix_ttc} €</div>
         ${v.description?`<div style="font-size:13px;color:#374151">${v.description}</div>`:''}
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="btn-accept" onclick="toast('✅ Devis accepté !')">✅ Accepter</button>
-          <button class="btn-refuse" onclick="toast('❌ Devis refusé.')">❌ Refuser</button>
-        </div>
-      </div>`).join('');
+        ${actions}
+      </div>`;
+    }).join('');
   }catch(e){}
 }
 
-// ── PRO : DEMANDES ──
-async function loadProDemandes(){
-  const token=localStorage.getItem('gleam_token');if(!token)return;
+async function accepterDevis(devisId){
+  if(!confirm('Accepter ce devis ? Les autres devis pour cette demande seront automatiquement refusés.'))return;
   try{
-    const r=await fetch(API+'/api/demandes/all',{headers:{'Authorization':'Bearer '+token}});
+    const r=await fetch(API+'/api/devis/'+devisId+'/accepter',{method:'POST',headers:authHeaders()});
+    const d=await r.json();
+    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
+    toast('✅ Devis accepté ! Vous pouvez maintenant discuter.');
+    loadDevis();
+    loadDemandes();
+  }catch(e){toast('❌ Erreur réseau.')}
+}
+async function refuserDevis(devisId){
+  try{
+    const r=await fetch(API+'/api/devis/'+devisId+'/refuser',{method:'POST',headers:authHeaders()});
+    if(!r.ok){toast('❌ Erreur.');return}
+    toast('❌ Devis refusé.');
+    loadDevis();
+  }catch(e){toast('❌ Erreur réseau.')}
+}
+
+// ══════════════ PRO : DEMANDES ══════════════
+async function loadProDemandes(){
+  try{
+    const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
     const c=document.getElementById('pro-demandes-list');
-    if(!r.ok){
-      // Fallback — affiche message si route pas encore créée
-      c.innerHTML='<div class="empty-state"><span>📋</span><p>Les demandes clients apparaîtront ici.</p></div>';
-      document.getElementById('stat-demandes').textContent='0';
-      return;
-    }
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande disponible.</p></div>';document.getElementById('stat-demandes').textContent='0';return}
     const data=await r.json();
     document.getElementById('stat-demandes').textContent=data.length||0;
-    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\'instant.<br>Revenez bientôt !</p></div>';return}
-    const icons={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
+    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\\'instant.<br>Revenez bientôt !</p></div>';return}
     c.innerHTML=data.map(d=>`
       <div class="demande-card">
         <div class="dc-header">
-          <div class="dc-type">${icons[d.prestation]||'✨'} ${d.prestation}</div>
+          <div class="dc-type">${ICONS[d.prestation]||'✨'} ${d.prestation}</div>
           <span class="dc-num">${d.numero_anonyme||'#???'}</span>
         </div>
         <div class="dc-info"><span>📍</span>${d.adresse}</div>
@@ -548,50 +593,146 @@ async function loadProDemandes(){
           <input type="number" id="prix-${d.id}" placeholder="Ex: 150" min="1">
           <label>📝 Message pour le client</label>
           <textarea id="msg-${d.id}" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>
-          <button class="btn-devis" onclick="envoyerDevis('${d.id}')">✨ Envoyer mon devis</button>
+          <button class="btn-devis" id="btn-devis-${d.id}" onclick="envoyerDevis('${d.id}')">✨ Envoyer mon devis</button>
         </div>
       </div>`).join('');
   }catch(e){
-    document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Les demandes clients apparaîtront ici.</p></div>';
+    document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement.</p></div>';
   }
 }
 
-function tryParseNotes(notes){
-  try{const n=JSON.parse(notes);return n.description||''}catch(e){return notes||''}
-}
-
 async function loadProDevis(){
-  document.getElementById('pro-devis-list').innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\'instant.</p></div>';
+  try{
+    const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
+    const c=document.getElementById('pro-devis-list');
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div>';return}
+    const data=await r.json();
+    document.getElementById('stat-devis').textContent=data.length||0;
+    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\\'instant.</p></div>';return}
+    c.innerHTML=data.map(v=>{
+      let badge='<span class="devis-badge badge-pending">⏳ En attente</span>',extra='';
+      if(v.statut==='accepte'){badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';extra=`<div style="margin-top:10px"><button class="btn-accept" onclick="goToChat('${v.demande_id}','Client')">💬 Discuter</button></div>`}
+      else if(v.statut==='refuse')badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
+      return `<div class="devis-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="font-weight:700;font-size:15px;text-transform:capitalize">${ICONS[v.demande?.prestation]||'✨'} ${v.demande?.prestation||''}</div>
+          ${badge}
+        </div>
+        <div style="font-size:12px;color:var(--gray)">📍 ${v.demande?.adresse||''}</div>
+        <div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">${v.prix_ttc} €</div>
+        ${v.description?`<div style="font-size:13px;color:#374151">${v.description}</div>`:''}
+        ${extra}
+      </div>`;
+    }).join('');
+  }catch(e){}
 }
 
 async function envoyerDevis(demandeId){
-  const token=localStorage.getItem('gleam_token');
   const prix=document.getElementById('prix-'+demandeId)?.value;
   const msg=document.getElementById('msg-'+demandeId)?.value||'';
   if(!prix||parseFloat(prix)<=0){toast('⚠️ Entrez un prix valide.');return}
+  const btn=document.getElementById('btn-devis-'+demandeId);
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
-    const r=await fetch(API+'/api/devis',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({demande_id:demandeId,prix_ttc:parseFloat(prix),description:msg})});
+    const r=await fetch(API+'/api/devis',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,prix_ttc:parseFloat(prix),description:msg})});
     const d=await r.json();
-    if(!r.ok){toast('❌ '+( d.error||'Erreur'));return}
+    if(!r.ok){toast('❌ '+(d.error||'Erreur'));btn.disabled=false;btn.textContent='✨ Envoyer mon devis';return}
     toast('✅ Devis envoyé au client !');
-    document.getElementById('stat-devis').textContent=parseInt(document.getElementById('stat-devis').textContent)+1;
-    document.getElementById('prix-'+demandeId).value='';
-    document.getElementById('msg-'+demandeId).value='';
-  }catch(e){toast('❌ Erreur réseau.')}
+    loadProDemandes();
+  }catch(e){toast('❌ Erreur réseau.');btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}
 }
 
 async function toggleDispo(){
   disponible=!disponible;
-  const btn=document.getElementById('dispo-toggle');
-  btn.classList.toggle('on',disponible);
+  document.getElementById('dispo-toggle').classList.toggle('on',disponible);
   document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
-  const token=localStorage.getItem('gleam_token');
-  try{await fetch(API+'/api/societes/disponibilite',{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({disponible})})}catch(e){}
+  try{await fetch(API+'/api/societes/disponibilite',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({disponible})})}catch(e){}
   toast(disponible?'✅ Vous êtes disponible':'❌ Vous êtes indisponible');
 }
 
-// ── SERVICES CLIENT ──
+// ══════════════ CONVERSATIONS ══════════════
+async function loadConversationsClient(){
+  try{
+    const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
+    const c=document.getElementById('client-conv-list');
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\\'instant.</p></div>';return}
+    const data=await r.json();
+    renderConvList(c,data,false);
+  }catch(e){}
+}
+async function loadConversationsPro(){
+  try{
+    const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
+    const c=document.getElementById('pro-conv-list');
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\\'instant.</p></div>';return}
+    const data=await r.json();
+    renderConvList(c,data,true);
+  }catch(e){}
+}
+function renderConvList(container,data,fromPro){
+  const active=(data||[]).filter(c=>c.statut==='acceptee'||c.statut==='terminee');
+  if(!active.length){container.innerHTML='<div class="empty-state"><span>💬</span><p>Aucune conversation active.<br>Acceptez un devis pour démarrer une discussion !</p></div>';return}
+  container.innerHTML=active.map(c=>{
+    const name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
+    const preview=c.dernier_message||'Démarrez la conversation...';
+    const time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
+    return `<div class="conv-row" onclick="goToChat('${c.demande_id}','${name.replace(/'/g,"\\'")}')">
+      <div class="conv-avatar">${ICONS[c.prestation]||'✨'}</div>
+      <div class="conv-body">
+        <div class="conv-name">${name}</div>
+        <div class="conv-preview">${preview}</div>
+      </div>
+      <div class="conv-time">${time}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════ CHAT ══════════════
+function goToChat(demandeId,otherName){
+  currentChatDemandeId=demandeId;
+  document.getElementById('chat-title').textContent=otherName||'Conversation';
+  document.getElementById('chat-messages').innerHTML='';
+  show('s-chat');
+  loadChatMessages();
+  chatPollInterval=setInterval(loadChatMessages,4000);
+}
+function backFromChat(){
+  stopChatPoll();
+  if(isPro())goProTab('pro-messages');else goTab('messages');
+}
+function stopChatPoll(){if(chatPollInterval){clearInterval(chatPollInterval);chatPollInterval=null}}
+
+async function loadChatMessages(){
+  if(!currentChatDemandeId)return;
+  try{
+    const r=await fetch(API+'/api/messages/'+currentChatDemandeId,{headers:authHeaders()});
+    if(!r.ok)return;
+    const data=await r.json();
+    const c=document.getElementById('chat-messages');
+    const wasAtBottom=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
+    c.innerHTML=data.map(m=>{
+      const mine=m.expediteur_id===currentUser.id;
+      return `<div class="chat-bubble ${mine?'mine':'theirs'}">${escapeHtml(m.contenu)}</div>`;
+    }).join('')||'<div class="empty-state" style="padding:30px"><span>💬</span><p>Démarrez la conversation !</p></div>';
+    if(wasAtBottom||data.length<=1)c.scrollTop=c.scrollHeight;
+  }catch(e){}
+}
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+async function sendChatMsg(){
+  const input=document.getElementById('chat-input');
+  const msg=input.value.trim();
+  if(!msg||!currentChatDemandeId)return;
+  input.value='';
+  try{
+    const r=await fetch(API+'/api/messages',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:currentChatDemandeId,contenu:msg})});
+    const d=await r.json();
+    if(!r.ok){toast('⚠️ '+(d.error||'Message bloqué.'));return}
+    loadChatMessages();
+  }catch(e){toast('❌ Erreur réseau.')}
+}
+
+// ══════════════ SERVICES (formulaires de demande) ══════════════
 function openService(type){
   photos=[];
   const bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,autre:autreForm};
@@ -616,7 +757,7 @@ function dateTimeBlock(){
   <div class="photo-previews" id="photo-previews"></div></div>`
 }
 function descBlock(ph){return`<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="${ph}" style="resize:none"></textarea></div>`}
-function sendBtn(type){return`<button class="modal-send-btn" onclick="sendDemand('${type}')">✨ Envoyer ma demande</button>`}
+function sendBtn(type){return`<button class="modal-send-btn" id="send-demand-btn" onclick="sendDemand('${type}')">✨ Envoyer ma demande</button>`}
 
 function voitureForm(){return`<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>
   <div class="field-group"><label>Type de nettoyage</label><div class="options-grid">
@@ -661,10 +802,10 @@ function canapeForm(){return`<div class="modal-title">🛋️ Nettoyage canapé<
 
 function matelasForm(){return`<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Indiquez les dimensions</div>
   <div class="field-group"><label>Taille</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'mat-t')">90×190 cm<br><small style="color:var(--gray);font-size:10px">1 personne</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-t')">140×190 cm<br><small style="color:var(--gray);font-size:10px">2 personnes</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-t')">160×200 cm<br><small style="color:var(--gray);font-size:10px">Queen size</small></button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-t')">180×200 cm<br><small style="color:var(--gray);font-size:10px">King size</small></button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-t')">90×190 cm</button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-t')">140×190 cm</button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-t')">160×200 cm</button>
+    <button class="opt-btn" onclick="selOpt(this,'mat-t')">180×200 cm</button>
   </div></div>
   <div class="field-group"><label>Nombre</label><div class="options-grid">
     <button class="opt-btn" onclick="selOpt(this,'mat-nb')">1 matelas</button>
@@ -732,12 +873,6 @@ function vitresForm(){return`<div class="modal-title">🪟 Nettoyage vitres</div
     <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">10 à 20</button>
     <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">Plus de 20</button>
   </div></div>
-  <div class="field-group"><label>Hauteur <span class="optional">(optionnel)</span></label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitr-h')">Rez-de-chaussée</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-h')">1er étage</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-h')">2e étage</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-h')">3e+ étage</button>
-  </div></div>
   ${descBlock("Ex: Velux, double vitrage, accès difficile...")}${dateTimeBlock()}${sendBtn('vitres')}`}
 
 function autreForm(){return`<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez librement votre besoin</div>
@@ -759,19 +894,21 @@ async function sendDemand(type){
   if(!addr){toast('⚠️ Veuillez indiquer une adresse.');return}
   const flex=document.querySelector('.flex-opt.sel')?.textContent||'Heure exacte';
   const details={};
-  document.querySelectorAll('.opt-btn.sel').forEach(b=>{const g=b.getAttribute('onclick').match(/'([^']+)'\)/)?.[1];if(g)details[g]=b.textContent.trim()});
+  document.querySelectorAll('.opt-btn.sel').forEach(b=>{const g=b.getAttribute('onclick').match(/'([^']+)'\\)/)?.[1];if(g)details[g]=b.textContent.trim()});
   if(type==='autre'){const t=document.getElementById('f-autre-type')?.value.trim();if(t)details['type-prestation']=t}
-  const token=localStorage.getItem('gleam_token');
+  const btn=document.getElementById('send-demand-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>'}
   try{
-    if(token)await fetch(API+'/api/demandes',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({type,address:addr,date,time,flexibility:flex,description:desc,details,photos:photos.slice(0,5)})});
+    const r=await fetch(API+'/api/demandes',{method:'POST',headers:authHeaders(),body:JSON.stringify({type,address:addr,date,time,flexibility:flex,description:desc,details,photos:photos.slice(0,5)})});
+    if(!r.ok){const d=await r.json();toast('❌ '+(d.error||'Erreur'));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
     photos=[];
     show('s-success');
     loadDemandes();
-  }catch(e){document.getElementById('modal-overlay').classList.remove('open');photos=[];show('s-success')}
+  }catch(e){toast('❌ Erreur réseau.');if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}}
 }
 
-// Init
+// ══════════════ INIT ══════════════
 const tok=localStorage.getItem('gleam_token');
 if(tok){
   fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
