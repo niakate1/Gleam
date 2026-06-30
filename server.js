@@ -54,7 +54,7 @@ const isProType = (t) => t === 'pro' || t === 'societe' || t === 'professionnel'
 const BLOCK_REGEX = /(\b0[67]\d{8}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Gleam API', version: '2.1.0', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', app: 'Gleam API', version: '2.2.0', timestamp: new Date().toISOString() });
 });
 
 // ══════════════ AUTH ══════════════
@@ -175,6 +175,33 @@ app.get('/api/demandes', auth, async (req, res) => {
   res.json(data || []);
 });
 
+// Demandes disponibles pour les pros (en attente, pas encore acceptées) — DOIT être déclarée avant /api/demandes/:id
+app.get('/api/demandes/all', auth, async (req, res) => {
+  try {
+    const { data: user, error: userErr } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (userErr) return res.status(500).json({ error: 'Erreur utilisateur: ' + userErr.message });
+    if (!user || !isProType(user.type))
+      return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
+
+    const { data: demandes, error: demErr } = await supabase
+      .from('demandes')
+      .select('*')
+      .or('statut.eq.en_attente,statut.eq.devis_recus')
+      .order('created_at', { ascending: false });
+
+    if (demErr) return res.status(500).json({ error: 'Erreur demandes: ' + demErr.message });
+
+    const { data: mesDevis } = await supabase.from('devis').select('demande_id, statut').eq('societe_id', req.user.id);
+    const idsRepondues = new Set((mesDevis || []).filter(d => d.statut === 'envoye' || d.statut === 'accepte').map(d => d.demande_id));
+    const filtered = (demandes || []).filter(d => !idsRepondues.has(d.id));
+
+    res.json(filtered);
+  } catch (e) {
+    console.error('Erreur /api/demandes/all:', e);
+    res.status(500).json({ error: 'Erreur serveur: ' + e.message });
+  }
+});
+
 app.get('/api/demandes/:id', auth, async (req, res) => {
   const { data } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
   if (!data) return res.status(404).json({ error: 'Demande introuvable.' });
@@ -205,7 +232,6 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
     const { data, error } = await supabase.from('demandes').update(updateData).eq('id', req.params.id).select().single();
     if (error) return res.status(400).json({ error: error.message });
 
-    // Si la demande avait des devis en attente, on les marque comme "demande modifiée" pour notifier les pros
     await supabase.from('devis').update({ demande_modifiee: true }).eq('demande_id', req.params.id).eq('statut', 'envoye');
 
     res.json(data);
@@ -232,24 +258,6 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
     res.json({ message: 'Demande supprimée.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
-  }
-});
-
-app.get('/api/test-sans-auth', (req, res) => {
-  res.json({ ok: true, message: 'Cette route ne demande aucune authentification.' });
-});
-
-// Demandes disponibles pour les pros (en attente, pas encore acceptées)
-app.get('/api/demandes/all', async (req, res) => {
-  try {
-    const { data: demandes, error: demErr } = await supabase
-      .from('demandes')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (demErr) return res.status(500).json({ error: demErr.message });
-    res.json(demandes || []);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
   }
 });
 
