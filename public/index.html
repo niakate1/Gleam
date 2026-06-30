@@ -616,7 +616,6 @@ async function loadDevis(){
     }).join('');
   }catch(e){console.error('Erreur loadDevis',e)}
 }
-}
 
 async function accepterDevis(devisId){
   if(!confirm('Accepter ce devis ? Les autres devis pour cette demande seront automatiquement refusés.'))return;
