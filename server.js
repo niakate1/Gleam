@@ -139,16 +139,23 @@ app.get('/api/auth/me', auth, async (req, res) => {
 
 app.post('/api/demandes', auth, async (req, res) => {
   try {
-    const { type, address, date, time, flexibility, description, details } = req.body;
+    const { type, prestations, address, date, time, flexibility, description, details } = req.body;
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
 
     const numero = 'Client #' + Math.floor(1000 + Math.random() * 9000);
     const creneau = date && time ? date + ' à ' + time : null;
-    const notes = JSON.stringify({ description: description || '', details: details || {}, flexibility: flexibility || '' });
+
+    // Supporte soit une liste de prestations (nouveau format groupé), soit une seule (ancien format)
+    const listePrestations = prestations && Array.isArray(prestations) && prestations.length
+      ? prestations
+      : [{ type: type || 'autre', description: description || '', details: details || {} }];
+
+    const prestationLabel = listePrestations.map(p => p.type).join(' + ');
+    const notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations });
 
     const { data, error } = await supabase.from('demandes').insert({
       client_id: req.user.id,
-      prestation: type || 'autre',
+      prestation: prestationLabel,
       adresse: address,
       creneau: creneau,
       notes: notes,
@@ -477,3 +484,4 @@ app.listen(PORT, function() {
   console.log('✨ Gleam API démarrée sur le port ' + PORT);
   console.log('   Environnement : ' + (process.env.NODE_ENV || 'development'));
 });
+// END
