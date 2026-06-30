@@ -54,7 +54,7 @@ const isProType = (t) => t === 'pro' || t === 'societe' || t === 'professionnel'
 const BLOCK_REGEX = /(\b0[67]\d{8}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Gleam API', version: '3.0.0-TEST', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', app: 'Gleam API', version: '2.1.0', timestamp: new Date().toISOString() });
 });
 
 // ══════════════ AUTH ══════════════
