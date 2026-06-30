@@ -740,6 +740,7 @@ async function loadProDemandes(){
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande disponible.</p></div>';document.getElementById('stat-demandes').textContent='0';return}
     const data=await r.json();
     document.getElementById('stat-demandes').textContent=data.length||0;
+    loadProDevisCount();
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
     c.innerHTML=data.map(d=>`
       <div class="demande-card">
@@ -762,6 +763,15 @@ async function loadProDemandes(){
   }catch(e){
     document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement.</p></div>';
   }
+}
+
+async function loadProDevisCount(){
+  try{
+    const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
+    if(!r.ok)return;
+    const data=await r.json();
+    document.getElementById('stat-devis').textContent=data.length||0;
+  }catch(e){}
 }
 
 async function loadProDevis(){
@@ -821,6 +831,7 @@ async function envoyerDevis(demandeId){
     if(!r.ok){toast('❌ '+(d.error||'Erreur'));btn.disabled=false;btn.textContent='✨ Envoyer mon devis';return}
     toast('✅ Devis envoyé au client !');
     loadProDemandes();
+    loadProDevisCount();
   }catch(e){toast('❌ Erreur réseau.');btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}
 }
 
