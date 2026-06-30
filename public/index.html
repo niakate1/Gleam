@@ -576,10 +576,17 @@ async function loadDevis(){
     const demandes=await rd.json();
     const c=document.getElementById('devis-list');
     if(!demandes||!demandes.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div>';return}
+
+    // On filtre seulement les demandes avec des devis potentiels (statut devis_recus ou acceptee)
+    const demandesAvecDevis=demandes.filter(d=>d.statut==='devis_recus'||d.statut==='acceptee');
+    if(!demandesAvecDevis.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
+
     let all=[];
-    for(const d of demandes){
-      const r=await fetch(API+'/api/devis/demande/'+d.id,{headers:authHeaders()});
-      if(r.ok){const dv=await r.json();all=[...all,...dv.map(v=>({...v,prestation:d.prestation,demande_statut:d.statut}))]}
+    for(const d of demandesAvecDevis){
+      try{
+        const r=await fetch(API+'/api/devis/demande/'+d.id,{headers:authHeaders()});
+        if(r.ok){const dv=await r.json();all=[...all,...dv.map(v=>({...v,prestation:d.prestation,demande_statut:d.statut}))]}
+      }catch(e){console.error('Erreur devis pour demande',d.id,e)}
     }
     if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
     all.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
@@ -607,7 +614,8 @@ async function loadDevis(){
         ${actions}
       </div>`;
     }).join('');
-  }catch(e){}
+  }catch(e){console.error('Erreur loadDevis',e)}
+}
 }
 
 async function accepterDevis(devisId){
