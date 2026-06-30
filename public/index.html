@@ -493,7 +493,7 @@ async function loadDemandes(){
     if(!r.ok)return;
     const data=await r.json();
     const c=document.getElementById('recent-demands');
-    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\\'instant.</p></div>';return}
+    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
     c.innerHTML=data.map(d=>{
       const st=STATUTS[d.statut]||['',''];
       return `<div class="demand-row" onclick="goTab('devis')">
@@ -521,14 +521,14 @@ async function loadDevis(){
       const r=await fetch(API+'/api/devis/demande/'+d.id,{headers:authHeaders()});
       if(r.ok){const dv=await r.json();all=[...all,...dv.map(v=>({...v,prestation:d.prestation,demande_statut:d.statut}))]}
     }
-    if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\\'instant.</p></div>';return}
+    if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
     all.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
     c.innerHTML=all.map(v=>{
       const proName=v.pro?(v.pro.prenom+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
       let badge='<span class="devis-badge badge-pending">En attente</span>',actions='';
       if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';
-        actions=`<div style="margin-top:12px"><button class="btn-accept" onclick="goToChat('${v.demande_id}','${proName.replace(/'/g,"\\'")}')">💬 Discuter avec le prestataire</button></div>`;
+        actions=`<div style="margin-top:12px"><button class="btn-accept" onclick="goToChat('${v.demande_id}','${proName.replace(/'/g,"")}')">💬 Discuter avec le prestataire</button></div>`;
       }else if(v.statut==='refuse'){
         badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
       }else{
@@ -578,7 +578,7 @@ async function loadProDemandes(){
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande disponible.</p></div>';document.getElementById('stat-demandes').textContent='0';return}
     const data=await r.json();
     document.getElementById('stat-demandes').textContent=data.length||0;
-    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\\'instant.<br>Revenez bientôt !</p></div>';return}
+    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
     c.innerHTML=data.map(d=>`
       <div class="demande-card">
         <div class="dc-header">
@@ -608,7 +608,7 @@ async function loadProDevis(){
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div>';return}
     const data=await r.json();
     document.getElementById('stat-devis').textContent=data.length||0;
-    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\\'instant.</p></div>';return}
+    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\u2019instant.</p></div>';return}
     c.innerHTML=data.map(v=>{
       let badge='<span class="devis-badge badge-pending">⏳ En attente</span>',extra='';
       if(v.statut==='accepte'){badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';extra=`<div style="margin-top:10px"><button class="btn-accept" onclick="goToChat('${v.demande_id}','Client')">💬 Discuter</button></div>`}
@@ -655,7 +655,7 @@ async function loadConversationsClient(){
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('client-conv-list');
-    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\\'instant.</p></div>';return}
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await r.json();
     renderConvList(c,data,false);
   }catch(e){}
@@ -664,7 +664,7 @@ async function loadConversationsPro(){
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('pro-conv-list');
-    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\\'instant.</p></div>';return}
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await r.json();
     renderConvList(c,data,true);
   }catch(e){}
@@ -676,7 +676,7 @@ function renderConvList(container,data,fromPro){
     const name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
     const preview=c.dernier_message||'Démarrez la conversation...';
     const time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
-    return `<div class="conv-row" onclick="goToChat('${c.demande_id}','${name.replace(/'/g,"\\'")}')">
+    return `<div class="conv-row" onclick="goToChat('${c.demande_id}','${name.replace(/'/g,"")}')">
       <div class="conv-avatar">${ICONS[c.prestation]||'✨'}</div>
       <div class="conv-body">
         <div class="conv-name">${name}</div>
@@ -919,5 +919,3 @@ if(tok){
 </script>
 </body>
 </html>
-
-
