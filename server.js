@@ -235,6 +235,10 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
   }
 });
 
+app.get('/api/test-sans-auth', (req, res) => {
+  res.json({ ok: true, message: 'Cette route ne demande aucune authentification.' });
+});
+
 // Demandes disponibles pour les pros (en attente, pas encore acceptées)
 app.get('/api/demandes/all', async (req, res) => {
   try {
