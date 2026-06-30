@@ -479,7 +479,7 @@ function enterApp(){
   }
   toast('Bienvenue sur Gleam ✨');
 }
-function doLogout(){stopChatPoll();localStorage.removeItem('gleam_token');currentUser=null;show('s-auth');toast('À bientôt !')}
+function doLogout(){stopChatPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
 
 // ══════════════ HELPERS AFFICHAGE ══════════════
 const ICONS={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
@@ -711,7 +711,7 @@ async function loadChatMessages(){
     const c=document.getElementById('chat-messages');
     const wasAtBottom=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
     c.innerHTML=data.map(m=>{
-      const mine=m.expediteur_id===currentUser.id;
+      const mine=String(m.expediteur_id)===String(currentUser.id);
       return `<div class="chat-bubble ${mine?'mine':'theirs'}">${escapeHtml(m.contenu)}</div>`;
     }).join('')||'<div class="empty-state" style="padding:30px"><span>💬</span><p>Démarrez la conversation !</p></div>';
     if(wasAtBottom||data.length<=1)c.scrollTop=c.scrollHeight;
