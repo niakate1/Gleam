@@ -400,13 +400,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
+<!-- MODAL PAIEMENT -->
+<div class="modal-overlay" id="payment-overlay">
+  <div class="modal" style="max-height:80vh">
+    <div class="modal-handle"></div>
+    <div class="modal-title">💳 Paiement sécurisé</div>
+    <div class="modal-sub" id="payment-sub">Montant : --</div>
+    <div id="payment-error" class="err"></div>
+    <div id="card-element" style="border:1.5px solid var(--border);border-radius:10px;padding:14px;margin:16px 0;background:#fff"></div>
+    <button class="modal-send-btn" id="payment-btn" onclick="confirmPayment()">🔒 Payer maintenant</button>
+    <button onclick="closePayment()" style="width:100%;padding:12px;background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;margin-top:8px">Annuler</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
   <div class="modal"><div class="modal-handle"></div><div id="modal-body"></div></div>
 </div>
 
 <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
-
-<script>
 const API='https://gleam-production-9b95.up.railway.app';
 let currentUser=null,userRole='client',photos=[],disponible=true,currentChatDemandeId=null,chatPollInterval=null;
 
@@ -595,7 +606,18 @@ async function loadDevis(){
       let badge='<span class="devis-badge badge-pending">En attente</span>',actions='';
       if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';
-        actions=`<div style="margin-top:12px"><button class="btn-accept" onclick="goToChat('${v.demande_id}','${proName.replace(/'/g,"")}')">💬 Discuter avec le prestataire</button></div>`;
+        const dejaPaye=v.demande_statut==='en_cours'||v.demande_statut==='terminee';
+        if(dejaPaye){
+          actions=`<div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn-accept" onclick="goToChat('${v.demande_id}','${proName.replace(/'/g,"")}')">💬 Discuter</button>
+            ${v.demande_statut==='en_cours'?`<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement('${v.demande_id}')">✅ Confirmer la prestation</button>`:''}
+          </div>`;
+        }else{
+          actions=`<div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn-accept" onclick="goToChat('${v.demande_id}','${proName.replace(/'/g,"")}')">💬 Discuter</button>
+            <button class="btn-accept" style="background:#059669" onclick="openPayment('${v.id}',${v.prix_ttc})">💳 Payer ${v.prix_ttc}€</button>
+          </div>`;
+        }
       }else if(v.statut==='refuse'){
         badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
       }else{
@@ -932,7 +954,79 @@ async function sendChatMsg(){
   }catch(e){toast('❌ Erreur réseau.')}
 }
 
-// ══════════════ SERVICES (formulaires de demande) ══════════════
+// ══════════════ PAIEMENT STRIPE ══════════════
+let stripeInstance=null, cardElement=null, currentPaymentIntent=null, currentDevisId=null;
+
+async function openPayment(devisId, montant){
+  currentDevisId=devisId;
+  document.getElementById('payment-sub').textContent=`Montant : ${montant} € TTC (commission Gleam 15% incluse)`;
+  document.getElementById('payment-error').classList.remove('show');
+  document.getElementById('payment-overlay').classList.add('open');
+  document.getElementById('payment-btn').disabled=false;
+  document.getElementById('payment-btn').textContent='🔒 Payer maintenant';
+
+  try{
+    const r=await fetch(API+'/api/paiements/intent',{method:'POST',headers:authHeaders(),body:JSON.stringify({devis_id:devisId})});
+    const d=await r.json();
+    if(!r.ok){document.getElementById('payment-error').textContent=d.error||'Erreur';document.getElementById('payment-error').classList.add('show');return}
+
+    currentPaymentIntent=d.client_secret;
+    if(!stripeInstance) stripeInstance=Stripe(d.publishable_key);
+    const elements=stripeInstance.elements();
+    if(cardElement)cardElement.destroy();
+    cardElement=elements.create('card',{style:{base:{fontSize:'16px',color:'#111827',fontFamily:'Segoe UI, system-ui, sans-serif'}}});
+    cardElement.mount('#card-element');
+  }catch(e){
+    document.getElementById('payment-error').textContent='Erreur réseau.';
+    document.getElementById('payment-error').classList.add('show');
+  }
+}
+
+function closePayment(){
+  document.getElementById('payment-overlay').classList.remove('open');
+  if(cardElement){cardElement.destroy();cardElement=null}
+  currentPaymentIntent=null;
+  currentDevisId=null;
+}
+
+async function confirmPayment(){
+  if(!stripeInstance||!cardElement||!currentPaymentIntent)return;
+  const btn=document.getElementById('payment-btn');
+  btn.disabled=true;btn.textContent='⏳ Traitement...';
+  document.getElementById('payment-error').classList.remove('show');
+
+  const {paymentIntent, error}=await stripeInstance.confirmCardPayment(currentPaymentIntent,{
+    payment_method:{card:cardElement}
+  });
+
+  if(error){
+    document.getElementById('payment-error').textContent=error.message;
+    document.getElementById('payment-error').classList.add('show');
+    btn.disabled=false;btn.textContent='🔒 Payer maintenant';
+    return;
+  }
+
+  if(paymentIntent.status==='succeeded'){
+    try{
+      await fetch(API+'/api/paiements/confirmer',{method:'POST',headers:authHeaders(),body:JSON.stringify({payment_intent_id:paymentIntent.id})});
+    }catch(e){}
+    closePayment();
+    toast('✅ Paiement réussi ! La prestation est confirmée.',5000);
+    loadDevis();
+  }
+}
+
+async function libererPaiement(demandeId){
+  if(!confirm('Confirmez-vous que la prestation a bien été réalisée ? Le paiement sera libéré au prestataire.'))return;
+  try{
+    const r=await fetch(API+'/api/paiements/liberer',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId})});
+    const d=await r.json();
+    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
+    toast('✅ Prestation confirmée ! Le prestataire a été payé.',5000);
+    loadDevis();
+    loadDemandes();
+  }catch(e){toast('❌ Erreur réseau.')}
+}
 let selectedServices=[];
 let multiFlow={active:false,queue:[],current:0,results:[]};
 
