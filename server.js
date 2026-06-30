@@ -242,7 +242,7 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     if (!user || !isProType(user.type))
       return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
 
-    const { data: demandes } = await supabase.from('demandes').select('*').eq('statut', 'en_attente').order('created_at', { ascending: false });
+    const { data: demandes } = await supabase.from('demandes').select('*').in('statut', ['en_attente', 'devis_recus']).order('created_at', { ascending: false });
 
     // Exclut les demandes auxquelles ce pro a déjà répondu
     const { data: mesDevis } = await supabase.from('devis').select('demande_id').eq('societe_id', req.user.id);
@@ -352,6 +352,50 @@ app.post('/api/devis/:id/refuser', auth, async (req, res) => {
     await supabase.from('devis').update({ statut: 'refuse' }).eq('id', req.params.id);
     res.json({ message: 'Devis refusé.' });
   } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Le pro annule un devis qu'il avait fait accepter par le client
+app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
+  try {
+    const { data: devis } = await supabase.from('devis').select('*').eq('id', req.params.id).single();
+    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+    if (devis.societe_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (devis.statut !== 'accepte') return res.status(400).json({ error: 'Ce devis n\'est pas accepté.' });
+
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+
+    // Vérifie le délai de 24h avant le créneau
+    let penalite = false;
+    if (demande.creneau) {
+      // creneau format "YYYY-MM-DD à HhMM" -> on extrait juste la date pour estimer le délai
+      const dateMatch = demande.creneau.match(/(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch) {
+        const creneauDate = new Date(dateMatch[1]);
+        const maintenant = new Date();
+        const heuresRestantes = (creneauDate - maintenant) / (1000 * 60 * 60);
+        if (heuresRestantes < 24) penalite = true;
+      }
+    }
+
+    if (penalite) {
+      return res.status(400).json({ error: 'Annulation impossible : le créneau est dans moins de 24h. Contactez le support si vous avez un empêchement majeur.' });
+    }
+
+    // Annule le devis et remet la demande disponible pour d'autres pros
+    await supabase.from('devis').update({ statut: 'annule_pro' }).eq('id', req.params.id);
+    await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', devis.demande_id);
+
+    // Pénalité légère sur la note du pro pour décourager les annulations
+    const { data: proUser } = await supabase.from('users').select('note_moyenne, annulations').eq('id', req.user.id).single();
+    const nouvellesAnnulations = (proUser?.annulations || 0) + 1;
+    await supabase.from('users').update({ annulations: nouvellesAnnulations }).eq('id', req.user.id);
+
+    res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.' });
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
