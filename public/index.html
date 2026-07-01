@@ -10,7 +10,6 @@
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#F9FAFB;color:#111827;min-height:100vh}
 .screen{display:none;min-height:100vh;flex-direction:column}
 .screen.active{display:flex}
-
 .auth-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#7C3AED,#4F46E5)}
 .auth-box{background:#fff;border-radius:20px;padding:36px 32px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
 .logo{text-align:center;margin-bottom:28px}
@@ -31,18 +30,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .btn:hover{background:var(--p2)}
 .err{background:#FEF2F2;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none}
 .err.show{display:block}
-
 .navbar{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
 .navbar .logo-sm{font-size:22px;font-weight:800;color:var(--p);cursor:pointer}
 .user-badge{background:var(--light);color:var(--p);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
 .pro-badge{background:#D1FAE5;color:var(--green);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
 .back-btn{background:none;border:none;font-size:20px;cursor:pointer;color:#374151}
-
 .bottom-nav{background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:sticky;bottom:0}
 .bnav-item{display:flex;flex-direction:column;align-items:center;padding:10px 0;cursor:pointer;border:none;background:none;color:var(--gray);font-size:11px;font-weight:600;gap:3px}
 .bnav-item.active{color:var(--p)}
 .bnav-item span:first-child{font-size:22px}
-
 .home-content,.pro-content,.profile-content{flex:1;overflow-y:auto;padding:16px}
 .greeting h2{font-size:22px;font-weight:800;margin-bottom:4px}
 .greeting p{color:var(--gray);font-size:14px;margin-bottom:18px}
@@ -54,7 +50,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .svc-card.selected::after{content:'✓';position:absolute;top:6px;right:6px;width:18px;height:18px;background:var(--p);color:#fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700}
 .svc-card span:first-child{font-size:28px;display:block;margin-bottom:6px}
 .svc-card .svc-name{font-size:11px;font-weight:700;color:#374151}
-
 .demand-row{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.05);cursor:pointer}
 .demand-row:hover{border-color:var(--p)}
 .demand-icon{font-size:28px}
@@ -62,12 +57,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .demand-type{font-weight:700;font-size:14px;text-transform:capitalize}
 .demand-addr{font-size:12px;color:var(--gray);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .demand-status{font-size:11px;font-weight:600;margin-top:4px}
-.s-attente{color:#D97706}
-.s-devis{color:var(--p)}
-.s-acceptee{color:var(--green)}
-.s-terminee{color:var(--gray)}
+.s-attente{color:#D97706}.s-devis{color:var(--p)}.s-acceptee{color:var(--green)}.s-terminee{color:var(--gray)}
 .demand-date{font-size:11px;color:var(--gray);flex-shrink:0}
-
 .pro-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
 .stat-card{background:#fff;border-radius:14px;padding:16px;border:1px solid var(--border);text-align:center}
 .stat-card .stat-num{font-size:28px;font-weight:800;color:var(--p)}
@@ -79,7 +70,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .toggle-switch.on{background:var(--green)}
 .toggle-switch::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .toggle-switch.on::after{left:25px}
-
 .demande-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .dc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
 .dc-type{font-size:16px;font-weight:800;text-transform:capitalize;display:flex;align-items:center;gap:8px}
@@ -90,7 +80,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .devis-form label:first-child{margin-top:0}
 .btn-devis{width:100%;padding:11px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px}
 .btn-devis:disabled{background:var(--gray);cursor:not-allowed}
-
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .modal-overlay.open{display:flex}
 .modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px 20px 32px}
@@ -108,7 +97,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .photo-zone{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer}
 .photo-zone:hover{border-color:var(--p);background:var(--light)}
 .photo-previews{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.photo-preview{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden}
+.photo-preview{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;cursor:pointer}
 .photo-preview img{width:100%;height:100%;object-fit:cover}
 .photo-preview .del-photo{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer}
 .datetime-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -117,7 +106,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .flex-opt.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .divider{height:1px;background:var(--border);margin:16px 0}
 .modal-send-btn{width:100%;padding:14px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
-
 .devis-list{flex:1;overflow-y:auto;padding:16px}
 .devis-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .devis-badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700}
@@ -126,7 +114,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .badge-refused{background:#FEE2E2;color:var(--red)}
 .btn-accept{flex:1;padding:10px;background:var(--p);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
 .btn-refuse{flex:1;padding:10px;background:#fff;color:var(--red);border:2px solid var(--red);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
-
 .conv-row{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;cursor:pointer}
 .conv-row:hover{border-color:var(--p)}
 .conv-avatar{width:44px;height:44px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
@@ -134,7 +121,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .conv-name{font-weight:700;font-size:14px}
 .conv-preview{color:var(--gray);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .conv-time{font-size:11px;color:var(--gray);flex-shrink:0}
-
 .chat-screen{flex:1;display:flex;flex-direction:column;min-height:0}
 .chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
 .chat-bubble{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.4}
@@ -143,11 +129,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .chat-input-bar{background:#fff;border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:center}
 .chat-input-bar input{flex:1;padding:10px 14px;border-radius:20px}
 .chat-send-btn{background:var(--p);color:#fff;border:none;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0}
-
 .empty-state{text-align:center;padding:60px 20px;color:var(--gray)}
 .empty-state span{font-size:48px;display:block;margin-bottom:12px}
 .empty-state p{font-size:15px}
-
 .profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;text-align:center}
 .profile-hero .avatar{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px}
 .profile-hero h3{font-size:20px;font-weight:800}
@@ -159,10 +143,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .profile-item .pi-text{flex:1;font-size:14px;font-weight:600}
 .profile-item .pi-arrow{color:var(--gray)}
 .logout-btn{width:100%;margin-top:12px;padding:13px;background:#FEF2F2;color:var(--red);border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
-
 .success-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
 .success-icon{width:80px;height:80px;background:var(--light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 20px}
-
 .detail-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;border:1px solid var(--border)}
 .detail-presta{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)}
 .detail-presta:last-child{border-bottom:none}
@@ -180,7 +162,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 </style>
 </head>
 <body>
-
 <div class="toast" id="toast"></div>
 
 <!-- AUTH -->
@@ -271,10 +252,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- PRO MESSAGES (liste) -->
+<!-- PRO MESSAGES -->
 <div class="screen" id="s-pro-messages">
   <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
-  <div class="messages-list" id="pro-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
+  <div id="pro-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
     <button class="bnav-item active" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
@@ -283,7 +264,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- PRO DEVIS ENVOYES -->
+<!-- PRO DEVIS -->
 <div class="screen" id="s-pro-devis">
   <div class="navbar"><span class="logo-sm">💰 Mes devis envoyés</span></div>
   <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div></div>
@@ -304,7 +285,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="profile-item"><span class="pi-icon">💰</span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon">⭐</span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon">🔔</span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">❓</span><span class="pi-text">Aide & Support</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon">❓</span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
     </div>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
@@ -316,7 +297,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- MESSAGES CLIENT (liste conversations) -->
+<!-- MESSAGES CLIENT -->
 <div class="screen" id="s-messages">
   <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
   <div id="client-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
@@ -328,7 +309,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- CHAT (commun client/pro) -->
+<!-- CHAT -->
 <div class="screen" id="s-chat">
   <div class="navbar">
     <button class="back-btn" onclick="backFromChat()">←</button>
@@ -378,7 +359,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<!-- DETAIL DEMANDE CLIENT -->
+<!-- DETAIL DEMANDE -->
 <div class="screen" id="s-detail">
   <div class="navbar">
     <button class="back-btn" onclick="goTab('home')">←</button>
@@ -400,6 +381,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
+<!-- MODAL SERVICE -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal"><div class="modal-handle"></div><div id="modal-body"></div></div>
+</div>
+
 <!-- MODAL PAIEMENT -->
 <div class="modal-overlay" id="payment-overlay">
   <div class="modal" style="max-height:80vh">
@@ -413,13 +399,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
-  <div class="modal"><div class="modal-handle"></div><div id="modal-body"></div></div>
-</div>
-
 <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
 const API='https://gleam-production-9b95.up.railway.app';
 let currentUser=null,userRole='client',photos=[],disponible=true,currentChatDemandeId=null,chatPollInterval=null;
+let selectedServices=[],multiFlow={active:false,queue:[],current:0,results:[]};
+let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisId=null;
 
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 function toast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur)}
@@ -432,14 +419,14 @@ function switchTab(t){
   document.getElementById('form-register').style.display=t==='register'?'block':'none';
 }
 function isPro(){const t=(currentUser?.type||'').toLowerCase().trim();return t==='pro'||t==='societe'||t==='professionnel'}
-function authHeaders(){const t=localStorage.getItem('gleam_token');return {'Content-Type':'application/json','Authorization':'Bearer '+t}}
+function authHeaders(){const t=localStorage.getItem('gleam_token');return{'Content-Type':'application/json','Authorization':'Bearer '+t}}
 
 function goTab(tab){
   stopChatPoll();
   const map={home:'s-home',messages:'s-messages',devis:'s-devis',profile:'s-profile'};
   show(map[tab]);
   const idx={home:0,messages:1,devis:2,profile:3}[tab];
-  document.querySelectorAll(`#${map[tab]} .bnav-item`).forEach((b,i)=>b.classList.toggle('active',i===idx));
+  document.querySelectorAll('#'+map[tab]+' .bnav-item').forEach((b,i)=>b.classList.toggle('active',i===idx));
   if(tab==='home')loadDemandes();
   if(tab==='devis')loadDevis();
   if(tab==='messages')loadConversationsClient();
@@ -449,22 +436,22 @@ function goProTab(tab){
   const map={'pro-home':'s-pro-home','pro-messages':'s-pro-messages','pro-devis':'s-pro-devis','pro-profile':'s-pro-profile'};
   show(map[tab]);
   const idx={'pro-home':0,'pro-messages':1,'pro-devis':2,'pro-profile':3}[tab];
-  document.querySelectorAll(`#${map[tab]} .bnav-item`).forEach((b,i)=>b.classList.toggle('active',i===idx));
+  document.querySelectorAll('#'+map[tab]+' .bnav-item').forEach((b,i)=>b.classList.toggle('active',i===idx));
   if(tab==='pro-home')loadProDemandes();
   if(tab==='pro-devis')loadProDevis();
   if(tab==='pro-messages')loadConversationsPro();
 }
 
-// ══════════════ AUTH ══════════════
+// ── AUTH ──
 async function forgotPassword(){
   const email=document.getElementById('le').value.trim();
-  if(!email){toast('⚠️ Entrez votre email d\'abord.');return}
+  if(!email){toast('Entrez votre email d\'abord.');return}
   try{
     const r=await fetch(API+'/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
     const d=await r.json();
-    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast('📧 Email de réinitialisation envoyé !',5000);
-  }catch(e){toast('❌ Erreur réseau.')}
+  }catch(e){toast('Erreur réseau.')}
 }
 
 async function doLogin(){
@@ -506,7 +493,7 @@ async function doRegister(){
 function enterApp(){
   const name=currentUser?.firstName||currentUser?.prenom||currentUser?.email||'';
   if(isPro()){
-    document.getElementById('pro-greeting').textContent=`Bonjour ${name} 👋`;
+    document.getElementById('pro-greeting').textContent='Bonjour '+name+' 👋';
     document.getElementById('pro-name-badge').textContent=name;
     document.getElementById('pro-profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
     document.getElementById('pro-profile-email').textContent=currentUser?.email||'';
@@ -516,7 +503,7 @@ function enterApp(){
     show('s-pro-home');
     loadProDemandes();
   }else{
-    document.getElementById('greeting-name').textContent=`Bonjour ${name} 👋`;
+    document.getElementById('greeting-name').textContent='Bonjour '+name+' 👋';
     document.getElementById('user-name-badge').textContent=name;
     document.getElementById('profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
     document.getElementById('profile-email').textContent=currentUser?.email||'';
@@ -527,53 +514,54 @@ function enterApp(){
 }
 function doLogout(){stopChatPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
 
-// ══════════════ HELPERS AFFICHAGE ══════════════
+// ── HELPERS ──
 const ICONS={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
-const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],terminee:['🏁 Terminée','s-terminee']};
+const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],en_cours:['🔧 En cours','s-acceptee'],terminee:['🏁 Terminée','s-terminee']};
+
 function tryParseNotes(notes){
   try{
     const n=JSON.parse(notes);
     if(n.prestations&&Array.isArray(n.prestations)){
-      return n.prestations.map(p=>{
-        const detailsTxt=p.details&&Object.keys(p.details).length?Object.values(p.details).join(', '):'';
-        return `<div style="margin-bottom:6px"><strong style="text-transform:capitalize">${ICONS[p.type]||'✨'} ${p.type}</strong>${detailsTxt?' — '+detailsTxt:''}${p.description?'<br>'+p.description:''}</div>`;
+      return n.prestations.map(function(p){
+        var det=p.details&&Object.keys(p.details).length?Object.values(p.details).join(' • '):'';
+        return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+(ICONS[p.type]||'✨')+' '+p.type+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+p.description:'')+'</div>';
       }).join('');
     }
     return n.description||'';
   }catch(e){return notes||''}
 }
-function renderPhotoPreviews(photos, containerId){
-  const c=document.getElementById(containerId);
+
+function getPhotosFromNotes(notes){
+  try{const n=JSON.parse(notes);return(n.photos&&Array.isArray(n.photos))?n.photos:[]}catch(e){return[]}
+}
+
+function renderPhotoPreviews(photosList,containerId){
+  var c=document.getElementById(containerId);
   if(!c)return;
   c.innerHTML='';
-  photos.forEach((p,i)=>{
-    const div=document.createElement('div');
+  photosList.forEach(function(src){
+    var div=document.createElement('div');
     div.className='photo-preview';
-    div.style.cursor='pointer';
-    div.onclick=()=>window.open(p,'_blank');
-    const img=document.createElement('img');
-    img.src=p;
+    div.onclick=function(){window.open(src,'_blank')};
+    var img=document.createElement('img');
+    img.src=src;
     div.appendChild(img);
     c.appendChild(div);
   });
 }
 
-function getPhotosFromNotes(notes){
-  try{const n=JSON.parse(notes);return (n.photos&&Array.isArray(n.photos))?n.photos:[]}catch(e){return[]}
-}
 function formatCreneau(creneau){
   if(!creneau)return'';
-  const match=creneau.match(/(\d{4})-(\d{2})-(\d{2})\s*à\s*(.+)/);
+  var match=creneau.match(/(\d{4})-(\d{2})-(\d{2})\s*à\s*(.+)/);
   if(!match)return creneau;
-  const [,y,m,d]=match;
-  const time=match[4];
-  const date=new Date(y,m-1,d);
-  const jours=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
-  const mois=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-  return `${jours[date.getDay()]} ${parseInt(d)} ${mois[parseInt(m)-1]} ${y} à ${time}`;
+  var y=match[1],m=match[2],d=match[3],time=match[4];
+  var date=new Date(y,m-1,d);
+  var jours=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  var mois=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  return jours[date.getDay()]+' '+parseInt(d)+' '+mois[parseInt(m)-1]+' '+y+' à '+time;
 }
 
-// ══════════════ CLIENT : DEMANDES ══════════════
+// ── CLIENT DEMANDES ──
 async function loadDemandes(){
   try{
     const r=await fetch(API+'/api/demandes',{headers:authHeaders()});
@@ -581,18 +569,21 @@ async function loadDemandes(){
     const data=await r.json();
     const c=document.getElementById('recent-demands');
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
-    c.innerHTML=data.map(d=>{
-      const st=STATUTS[d.statut]||['',''];
-      return `<div class="demand-row" onclick="openDetail('${d.id}')">
-        <span class="demand-icon">${ICONS[d.prestation.split(' + ')[0]]||'✨'}</span>
-        <div class="demand-info">
-          <div class="demand-type">${d.prestation}</div>
-          <div class="demand-addr">${d.adresse}</div>
-          <div class="demand-status ${st[1]}">${st[0]}</div>
-        </div>
-        <div class="demand-date">${new Date(d.created_at).toLocaleDateString('fr-FR')}</div>
-      </div>`;
-    }).join('');
+    var html='';
+    data.forEach(function(d){
+      var st=STATUTS[d.statut]||['',''];
+      var icon=ICONS[d.prestation.split(' + ')[0]]||'✨';
+      html+='<div class="demand-row" onclick="openDetail(\''+d.id+'\')">'+
+        '<span class="demand-icon">'+icon+'</span>'+
+        '<div class="demand-info">'+
+          '<div class="demand-type">'+d.prestation+'</div>'+
+          '<div class="demand-addr">'+d.adresse+'</div>'+
+          '<div class="demand-status '+st[1]+'">'+st[0]+'</div>'+
+        '</div>'+
+        '<div class="demand-date">'+new Date(d.created_at).toLocaleDateString('fr-FR')+'</div>'+
+      '</div>';
+    });
+    c.innerHTML=html;
   }catch(e){}
 }
 
@@ -602,184 +593,164 @@ async function loadDevis(){
     if(!rd.ok)return;
     const demandes=await rd.json();
     const c=document.getElementById('devis-list');
-    if(!demandes||!demandes.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div>';return}
-
-    // On filtre seulement les demandes avec des devis potentiels (statut devis_recus ou acceptee)
-    const demandesAvecDevis=demandes.filter(d=>d.statut==='devis_recus'||d.statut==='acceptee');
-    if(!demandesAvecDevis.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
-
-    let all=[];
-    for(const d of demandesAvecDevis){
+    const avecDevis=demandes.filter(function(d){return d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee'});
+    if(!avecDevis.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
+    var all=[];
+    for(var i=0;i<avecDevis.length;i++){
       try{
-        const r=await fetch(API+'/api/devis/demande/'+d.id,{headers:authHeaders()});
-        if(r.ok){const dv=await r.json();all=[...all,...dv.map(v=>({...v,prestation:d.prestation,demande_statut:d.statut}))]}
-      }catch(e){console.error('Erreur devis pour demande',d.id,e)}
+        const r=await fetch(API+'/api/devis/demande/'+avecDevis[i].id,{headers:authHeaders()});
+        if(r.ok){const dv=await r.json();dv.forEach(function(v){all.push(Object.assign({},v,{prestation:avecDevis[i].prestation,demande_statut:avecDevis[i].statut}))})}
+      }catch(e){}
     }
     if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
-    all.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-    c.innerHTML=all.map(v=>{
-      const proName=v.pro?(v.pro.prenom+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
-      let badge='<span class="devis-badge badge-pending">En attente</span>',actions='';
+    all.sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at)});
+    var html='';
+    all.forEach(function(v){
+      var proName=v.pro?(v.pro.prenom+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
+      var badge,actions='';
       if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';
-        const dejaPaye=v.demande_statut==='en_cours'||v.demande_statut==='terminee';
+        var dejaPaye=v.demande_statut==='en_cours'||v.demande_statut==='terminee';
         if(dejaPaye){
-          actions=`<div style="margin-top:12px;display:flex;gap:8px">
-            <button class="btn-accept" onclick="goToChat('${v.demande_id}','${proName.replace(/'/g,"")}')">💬 Discuter</button>
-            ${v.demande_statut==='en_cours'?`<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement('${v.demande_id}')">✅ Confirmer la prestation</button>`:''}
-          </div>`;
+          actions='<div style="margin-top:12px;display:flex;gap:8px">'+
+            '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\''+proName.replace(/'/g,'')+'\')">💬 Discuter</button>'+
+            (v.demande_statut==='en_cours'?'<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement(\''+v.demande_id+'\')">✅ Confirmer la prestation</button>':'')+
+          '</div>';
         }else{
-          actions=`<div style="margin-top:12px;display:flex;gap:8px">
-            <button class="btn-accept" onclick="goToChat('${v.demande_id}','${proName.replace(/'/g,"")}')">💬 Discuter</button>
-            <button class="btn-accept" style="background:#059669" onclick="openPayment('${v.id}',${v.prix_ttc})">💳 Payer ${v.prix_ttc}€</button>
-          </div>`;
+          actions='<div style="margin-top:12px;display:flex;gap:8px">'+
+            '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\''+proName.replace(/'/g,'')+'\')">💬 Discuter</button>'+
+            '<button class="btn-accept" style="background:#059669" onclick="openPayment(\''+v.id+'\','+v.prix_ttc+')">💳 Payer '+v.prix_ttc+'€</button>'+
+          '</div>';
         }
       }else if(v.statut==='refuse'){
         badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
+      }else if(v.statut==='annule_pro'){
+        badge='<span class="devis-badge badge-refused">🚫 Annulé</span>';
       }else{
-        actions=`<div style="display:flex;gap:8px;margin-top:12px">
-          <button class="btn-accept" onclick="accepterDevis('${v.id}')">✅ Accepter</button>
-          <button class="btn-refuse" onclick="refuserDevis('${v.id}')">❌ Refuser</button>
-        </div>`;
+        badge='<span class="devis-badge badge-pending">En attente</span>';
+        actions='<div style="display:flex;gap:8px;margin-top:12px">'+
+          '<button class="btn-accept" onclick="accepterDevis(\''+v.id+'\')">✅ Accepter</button>'+
+          '<button class="btn-refuse" onclick="refuserDevis(\''+v.id+'\')">❌ Refuser</button>'+
+        '</div>';
       }
-      return `<div class="devis-card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-          <div style="font-weight:700;font-size:15px">${proName}</div>${badge}
-        </div>
-        <div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 ${v.prestation}</div>
-        <div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">${v.prix_ttc} €</div>
-        ${v.description?`<div style="font-size:13px;color:#374151">${v.description}</div>`:''}
-        ${actions}
-      </div>`;
-    }).join('');
-  }catch(e){console.error('Erreur loadDevis',e)}
+      html+='<div class="devis-card">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'+
+          '<div style="font-weight:700;font-size:15px">'+proName+'</div>'+badge+
+        '</div>'+
+        '<div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 '+v.prestation+'</div>'+
+        '<div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">'+v.prix_ttc+' €</div>'+
+        (v.description?'<div style="font-size:13px;color:#374151">'+v.description+'</div>':'')+
+        actions+
+      '</div>';
+    });
+    c.innerHTML=html;
+  }catch(e){console.error(e)}
 }
 
 async function accepterDevis(devisId){
-  if(!confirm('Accepter ce devis ? Les autres devis pour cette demande seront automatiquement refusés.'))return;
+  if(!confirm('Accepter ce devis ? Les autres devis seront automatiquement refusés.'))return;
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/accepter',{method:'POST',headers:authHeaders()});
     const d=await r.json();
-    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
-    toast('✅ Devis accepté ! Vous pouvez maintenant discuter.');
-    loadDevis();
-    loadDemandes();
-  }catch(e){toast('❌ Erreur réseau.')}
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    toast('✅ Devis accepté !');loadDevis();loadDemandes();
+  }catch(e){toast('Erreur réseau.')}
 }
 async function refuserDevis(devisId){
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/refuser',{method:'POST',headers:authHeaders()});
-    if(!r.ok){toast('❌ Erreur.');return}
-    toast('❌ Devis refusé.');
-    loadDevis();
-  }catch(e){toast('❌ Erreur réseau.')}
+    if(!r.ok){toast('Erreur.');return}
+    toast('❌ Devis refusé.');loadDevis();
+  }catch(e){toast('Erreur réseau.')}
 }
 
-// ══════════════ DETAIL / MODIFICATION / SUPPRESSION DEMANDE ══════════════
-let currentDetailDemande=null;
-
+// ── DETAIL DEMANDE ──
+var currentDetailDemande=null;
 async function openDetail(demandeId){
   try{
     const r=await fetch(API+'/api/demandes/'+demandeId,{headers:authHeaders()});
-    if(!r.ok){toast('❌ Demande introuvable.');return}
+    if(!r.ok){toast('Demande introuvable.');return}
     const d=await r.json();
     currentDetailDemande=d;
     renderDetail(d);
     show('s-detail');
-  }catch(e){toast('❌ Erreur réseau.')}
+  }catch(e){toast('Erreur réseau.')}
 }
-
 function renderDetail(d){
-  const c=document.getElementById('detail-content');
-  let prestations=[];
-  try{const n=JSON.parse(d.notes);if(n.prestations)prestations=n.prestations}catch(e){}
-  const st=STATUTS[d.statut]||['',''];
-  const locked=d.statut==='acceptee'||d.statut==='terminee';
-
-  let html='';
-  if(locked){
-    html+=`<div class="locked-banner"><span>🔒</span><div>Cette demande a été acceptée${d.statut==='acceptee'?' et est en cours':''}. Elle ne peut plus être modifiée ou annulée. Une annulation à ce stade peut entraîner des pénalités.</div></div>`;
-  }
-
-  html+=`<div class="detail-card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <span style="font-weight:700;font-size:13px;color:var(--gray)">${d.numero_anonyme||''}</span>
-      <span class="demand-status ${st[1]}" style="font-size:13px">${st[0]}</span>
-    </div>
-    ${prestations.length?prestations.map(p=>{
-      const detailsTxt=p.details&&Object.keys(p.details).length?Object.values(p.details).join(' • '):'';
-      return `<div class="detail-presta">
-        <span class="detail-presta-icon">${ICONS[p.type]||'✨'}</span>
-        <div>
-          <div class="detail-presta-name">${p.type}</div>
-          ${detailsTxt?`<div class="detail-presta-info">${detailsTxt}</div>`:''}
-          ${p.description?`<div class="detail-presta-info">${p.description}</div>`:''}
-        </div>
-      </div>`;
-    }).join(''):`<div class="detail-presta"><span class="detail-presta-icon">${ICONS[d.prestation]||'✨'}</span><div class="detail-presta-name">${d.prestation}</div></div>`}
-  </div>
-
-  ${getPhotosFromNotes(d.notes).length?`<div class="detail-card"><label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>`:''}
-
-  <div class="detail-card">
-    <div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">${d.adresse}</div></div>
-    ${d.creneau?`<div class="field-group" style="margin-bottom:0"><label>📅 Créneau</label><div style="font-size:14px">${formatCreneau(d.creneau)}</div></div>`:''}
-  </div>
-
-  ${!locked?`<div class="detail-actions">
-    <button class="btn-modify" onclick="openModifyDemande()">✏️ Modifier</button>
-    <button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>
-  </div>`:''}
-  ${d.statut==='devis_recus'||d.statut==='acceptee'?`<button class="modal-send-btn" style="margin-top:14px" onclick="goTab('devis')">📋 Voir les devis reçus</button>`:''}`;
-
+  var c=document.getElementById('detail-content');
+  var prestations=[];
+  try{var n=JSON.parse(d.notes);if(n.prestations)prestations=n.prestations}catch(e){}
+  var st=STATUTS[d.statut]||['',''];
+  var locked=d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee';
+  var hasPhotos=getPhotosFromNotes(d.notes).length>0;
+  var html='';
+  if(locked)html+='<div class="locked-banner"><span>🔒</span><div>Cette demande a été acceptée'+
+    (d.statut==='en_cours'?' et est en cours':'')+(d.statut==='terminee'?' et est terminée':'')+
+    '. Elle ne peut plus être modifiée ou annulée. Une annulation à ce stade peut entraîner des pénalités.</div></div>';
+  html+='<div class="detail-card">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+      '<span style="font-weight:700;font-size:13px;color:var(--gray)">'+(d.numero_anonyme||'')+'</span>'+
+      '<span class="demand-status '+st[1]+'" style="font-size:13px">'+st[0]+'</span>'+
+    '</div>'+
+    (prestations.length?prestations.map(function(p){
+      var det=p.details&&Object.keys(p.details).length?Object.values(p.details).join(' • '):'';
+      return '<div class="detail-presta"><span class="detail-presta-icon">'+(ICONS[p.type]||'✨')+'</span>'+
+        '<div><div class="detail-presta-name">'+p.type+'</div>'+
+        (det?'<div class="detail-presta-info">'+det+'</div>':'')+
+        (p.description?'<div class="detail-presta-info">'+p.description+'</div>':'')+
+        '</div></div>';
+    }).join(''):
+    '<div class="detail-presta"><span class="detail-presta-icon">'+(ICONS[d.prestation]||'✨')+'</span><div class="detail-presta-name">'+d.prestation+'</div></div>')+
+  '</div>';
+  if(hasPhotos)html+='<div class="detail-card"><label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>';
+  html+='<div class="detail-card">'+
+    '<div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">'+d.adresse+'</div></div>'+
+    (d.creneau?'<div class="field-group" style="margin-bottom:0"><label>📅 Créneau</label><div style="font-size:14px">'+formatCreneau(d.creneau)+'</div></div>':'')+
+  '</div>';
+  if(!locked)html+='<div class="detail-actions">'+
+    '<button class="btn-modify" onclick="openModifyDemande()">✏️ Modifier</button>'+
+    '<button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>'+
+  '</div>';
+  if(d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours')
+    html+='<button class="modal-send-btn" style="margin-top:14px" onclick="goTab(\'devis\')">📋 Voir les devis reçus</button>';
   c.innerHTML=html;
-  const photos=getPhotosFromNotes(d.notes);
-  if(photos.length)renderPhotoPreviews(photos,'photos-detail');
+  if(hasPhotos)renderPhotoPreviews(getPhotosFromNotes(d.notes),'photos-detail');
 }
-
 async function deleteDemande(){
   if(!currentDetailDemande)return;
-  if(!confirm('Supprimer définitivement cette demande ? Cette action est irréversible.'))return;
+  if(!confirm('Supprimer définitivement cette demande ?'))return;
   try{
     const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id,{method:'DELETE',headers:authHeaders()});
     const d=await r.json();
-    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
-    toast('🗑️ Demande supprimée.');
-    goTab('home');
-  }catch(e){toast('❌ Erreur réseau.')}
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    toast('🗑️ Demande supprimée.');goTab('home');
+  }catch(e){toast('Erreur réseau.')}
 }
-
 function openModifyDemande(){
   if(!currentDetailDemande)return;
-  let prestations=[];
-  try{const n=JSON.parse(currentDetailDemande.notes);if(n.prestations)prestations=n.prestations}catch(e){}
+  var prestations=[];
+  try{var n=JSON.parse(currentDetailDemande.notes);if(n.prestations)prestations=n.prestations}catch(e){}
   if(!prestations.length)prestations=[{type:currentDetailDemande.prestation,description:'',details:{}}];
-
-  multiFlow={active:true,queue:prestations.map(p=>p.type),current:0,results:[],editMode:true,editId:currentDetailDemande.id,editData:prestations};
+  multiFlow={active:true,queue:prestations.map(function(p){return p.type}),current:0,results:[],editMode:true,editId:currentDetailDemande.id,editData:prestations};
   photos=[];
   openServiceForm(multiFlow.queue[0]);
-  // Pré-remplit les champs après affichage
-  setTimeout(()=>prefillModifyForm(prestations[0]),50);
+  setTimeout(function(){prefillModifyForm(prestations[0])},50);
 }
-
 function prefillModifyForm(p){
   if(!p)return;
-  if(p.description){const desc=document.getElementById('f-desc');if(desc)desc.value=p.description}
+  if(p.description){var desc=document.getElementById('f-desc');if(desc)desc.value=p.description}
   if(p.details){
-    Object.entries(p.details).forEach(([group,value])=>{
-      document.querySelectorAll(`[onclick*="selOpt(this,'${group}')"]`).forEach(b=>{
-        if(b.textContent.trim()===value){b.classList.add('sel')}
+    Object.entries(p.details).forEach(function(entry){
+      var group=entry[0],value=entry[1];
+      document.querySelectorAll('[onclick*="selOpt(this,\''+group+'\')"]').forEach(function(b){
+        if(b.textContent.trim()===value)b.classList.add('sel');
       });
     });
   }
-  // Adresse / créneau pré-remplis seulement à la dernière étape
-  if(isLastInFlow()&&currentDetailDemande){
-    const addrEl=document.getElementById('f-addr');
-    if(addrEl)addrEl.value=currentDetailDemande.adresse||'';
-  }
+  if(isLastInFlow()&&currentDetailDemande){var a=document.getElementById('f-addr');if(a)a.value=currentDetailDemande.adresse||''}
 }
 
-// ══════════════ PRO : DEMANDES ══════════════
+// ── PRO DEMANDES ──
 async function loadProDemandes(){
   try{
     const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
@@ -789,32 +760,30 @@ async function loadProDemandes(){
     document.getElementById('stat-demandes').textContent=data.length||0;
     loadProDevisCount();
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
-    c.innerHTML=data.map(d=>`
-      <div class="demande-card">
-        <div class="dc-header">
-          <div class="dc-type">${ICONS[d.prestation]||'✨'} ${d.prestation}</div>
-          <span class="dc-num">${d.numero_anonyme||'#???'}</span>
-        </div>
-        <div class="dc-info"><span>📍</span>${d.adresse}</div>
-        ${d.creneau?`<div class="dc-info"><span>📅</span>${formatCreneau(d.creneau)}</div>`:''}
-        ${d.notes?`<div style="font-size:12px;color:var(--gray);margin-top:6px;background:#F9FAFB;padding:8px;border-radius:8px">${tryParseNotes(d.notes)}</div>`:''}
-        ${getPhotosFromNotes(d.notes).length?`<div class="photo-previews" style="margin-top:8px" id="photos-pro-${d.id}"></div>`:''}
-        <div class="devis-form">
-          <label>💰 Votre prix (€ TTC)</label>
-          <input type="number" id="prix-${d.id}" placeholder="Ex: 150" min="1">
-          <label>📝 Message pour le client</label>
-          <textarea id="msg-${d.id}" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>
-          <button class="btn-devis" id="btn-devis-${d.id}" onclick="envoyerDevis('${d.id}')">✨ Envoyer mon devis</button>
-        </div>
-      </div>`).join('');
-    // Rendu des photos après insertion DOM
-    data.forEach(d=>{
-      const photos=getPhotosFromNotes(d.notes);
+    var html='';
+    data.forEach(function(d){
+      var hasPhotos=getPhotosFromNotes(d.notes).length>0;
+      html+='<div class="demande-card">'+
+        '<div class="dc-header"><div class="dc-type">'+(ICONS[d.prestation]||'✨')+' '+d.prestation+'</div>'+
+        '<span class="dc-num">'+(d.numero_anonyme||'#???')+'</span></div>'+
+        '<div class="dc-info"><span>📍</span>'+d.adresse+'</div>'+
+        (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
+        (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:#F9FAFB;padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
+        (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+d.id+'"></div>':'')+
+        '<div class="devis-form">'+
+          '<label>💰 Votre prix (€ TTC)</label>'+
+          '<input type="number" id="prix-'+d.id+'" placeholder="Ex: 150" min="1">'+
+          '<label>📝 Message pour le client</label>'+
+          '<textarea id="msg-'+d.id+'" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>'+
+          '<button class="btn-devis" id="btn-devis-'+d.id+'" onclick="envoyerDevis(\''+d.id+'\')">✨ Envoyer mon devis</button>'+
+        '</div></div>';
+    });
+    c.innerHTML=html;
+    data.forEach(function(d){
+      var photos=getPhotosFromNotes(d.notes);
       if(photos.length)renderPhotoPreviews(photos,'photos-pro-'+d.id);
     });
-  }catch(e){
-    document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement.</p></div>';
-  }
+  }catch(e){document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement.</p></div>'}
 }
 
 async function loadProDevisCount(){
@@ -834,57 +803,44 @@ async function loadProDevis(){
     const data=await r.json();
     document.getElementById('stat-devis').textContent=data.length||0;
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\u2019instant.</p></div>';return}
-    c.innerHTML=data.map(v=>{
-      let badge='<span class="devis-badge badge-pending">⏳ En attente</span>',extra='';
+    var html='';
+    data.forEach(function(v){
+      var badge,extra='';
       if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';
-        extra=`<div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn-accept" onclick="goToChat('${v.demande_id}','Client')">💬 Discuter</button>
-          <button class="btn-refuse" onclick="annulerProDevis('${v.id}')">🚫 Annuler</button>
-        </div>`;
-      }
-      else if(v.statut==='refuse')badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
-      else if(v.statut==='annule_pro')badge='<span class="devis-badge badge-refused">🚫 Annulé par vous</span>';
-      return `<div class="devis-card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-          <div style="font-weight:700;font-size:15px;text-transform:capitalize">${ICONS[v.demande?.prestation]||'✨'} ${v.demande?.prestation||''}</div>
-          ${badge}
-        </div>
-        <div style="font-size:12px;color:var(--gray)">📍 ${v.demande?.adresse||''}</div>
-        <div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">${v.prix_ttc} €</div>
-        ${v.description?`<div style="font-size:13px;color:#374151">${v.description}</div>`:''}
-        ${extra}
-      </div>`;
-    }).join('');
+        extra='<div style="display:flex;gap:8px;margin-top:10px">'+
+          '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\'Client\')">💬 Discuter</button>'+
+          '<button class="btn-refuse" onclick="annulerProDevis(\''+v.id+'\')">🚫 Annuler</button>'+
+        '</div>';
+      }else if(v.statut==='refuse'){badge='<span class="devis-badge badge-refused">❌ Refusé</span>'}
+      else if(v.statut==='annule_pro'){badge='<span class="devis-badge badge-refused">🚫 Annulé par vous</span>'}
+      else{badge='<span class="devis-badge badge-pending">⏳ En attente</span>'}
+      html+='<div class="devis-card">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
+          '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+(ICONS[v.demande&&v.demande.prestation]||'✨')+' '+(v.demande&&v.demande.prestation||'')+'</div>'+badge+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--gray)">📍 '+(v.demande&&v.demande.adresse||'')+'</div>'+
+        '<div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">'+v.prix_ttc+' €</div>'+
+        (v.description?'<div style="font-size:13px;color:#374151">'+v.description+'</div>':'')+
+        extra+'</div>';
+    });
+    c.innerHTML=html;
   }catch(e){}
 }
 
-async function annulerProDevis(devisId){
-  if(!confirm('Annuler ce devis accepté ? Cela peut affecter votre taux de fiabilité si le créneau est proche. Le client sera notifié et pourra recevoir d\'autres devis.'))return;
-  try{
-    const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
-    const d=await r.json();
-    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
-    toast(d.message||'🚫 Devis annulé.',5000);
-    if(currentUser&&d.taux_fiabilite!==undefined)currentUser.taux_fiabilite=d.taux_fiabilite;
-    loadProDevis();
-  }catch(e){toast('❌ Erreur réseau.')}
-}
-
 async function envoyerDevis(demandeId){
-  const prix=document.getElementById('prix-'+demandeId)?.value;
-  const msg=document.getElementById('msg-'+demandeId)?.value||'';
-  if(!prix||parseFloat(prix)<=0){toast('⚠️ Entrez un prix valide.');return}
-  const btn=document.getElementById('btn-devis-'+demandeId);
+  var prix=document.getElementById('prix-'+demandeId)&&document.getElementById('prix-'+demandeId).value;
+  var msg=document.getElementById('msg-'+demandeId)&&document.getElementById('msg-'+demandeId).value||'';
+  if(!prix||parseFloat(prix)<=0){toast('Entrez un prix valide.');return}
+  var btn=document.getElementById('btn-devis-'+demandeId);
   btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     const r=await fetch(API+'/api/devis',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,prix_ttc:parseFloat(prix),description:msg})});
     const d=await r.json();
-    if(!r.ok){toast('❌ '+(d.error||'Erreur'));btn.disabled=false;btn.textContent='✨ Envoyer mon devis';return}
+    if(!r.ok){toast('Erreur : '+(d.error||''));btn.disabled=false;btn.textContent='✨ Envoyer mon devis';return}
     toast('✅ Devis envoyé au client !');
-    loadProDemandes();
-    loadProDevisCount();
-  }catch(e){toast('❌ Erreur réseau.');btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}
+    loadProDemandes();loadProDevisCount();
+  }catch(e){toast('Erreur réseau.');btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}
 }
 
 async function toggleDispo(){
@@ -892,17 +848,27 @@ async function toggleDispo(){
   document.getElementById('dispo-toggle').classList.toggle('on',disponible);
   document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
   try{await fetch(API+'/api/societes/disponibilite',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({disponible})})}catch(e){}
-  toast(disponible?'✅ Vous êtes disponible':'❌ Vous êtes indisponible');
+  toast(disponible?'✅ Disponible':'❌ Indisponible');
 }
 
-// ══════════════ CONVERSATIONS ══════════════
+async function annulerProDevis(devisId){
+  if(!confirm('Annuler ce devis accepté ? Le client sera notifié.'))return;
+  try{
+    const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
+    const d=await r.json();
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    toast('🚫 Devis annulé.');loadProDevis();
+  }catch(e){toast('Erreur réseau.')}
+}
+
+// ── CONVERSATIONS ──
 async function loadConversationsClient(){
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('client-conv-list');
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await r.json();
-    renderConvList(c,data,false);
+    renderConvList(c,data);
   }catch(e){}
 }
 async function loadConversationsPro(){
@@ -911,28 +877,26 @@ async function loadConversationsPro(){
     const c=document.getElementById('pro-conv-list');
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await r.json();
-    renderConvList(c,data,true);
+    renderConvList(c,data);
   }catch(e){}
 }
-function renderConvList(container,data,fromPro){
-  const active=(data||[]).filter(c=>c.statut==='acceptee'||c.statut==='terminee');
-  if(!active.length){container.innerHTML='<div class="empty-state"><span>💬</span><p>Aucune conversation active.<br>Acceptez un devis pour démarrer une discussion !</p></div>';return}
-  container.innerHTML=active.map(c=>{
-    const name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
-    const preview=c.dernier_message||'Démarrez la conversation...';
-    const time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
-    return `<div class="conv-row" onclick="goToChat('${c.demande_id}','${name.replace(/'/g,"")}')">
-      <div class="conv-avatar">${ICONS[c.prestation]||'✨'}</div>
-      <div class="conv-body">
-        <div class="conv-name">${name}</div>
-        <div class="conv-preview">${preview}</div>
-      </div>
-      <div class="conv-time">${time}</div>
-    </div>`;
-  }).join('');
+function renderConvList(container,data){
+  var active=(data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'||c.statut==='terminee'});
+  if(!active.length){container.innerHTML='<div class="empty-state"><span>💬</span><p>Aucune conversation active.<br>Acceptez un devis pour démarrer !</p></div>';return}
+  var html='';
+  active.forEach(function(c){
+    var name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
+    var preview=c.dernier_message||'Démarrez la conversation...';
+    var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
+    html+='<div class="conv-row" onclick="goToChat(\''+c.demande_id+'\',\''+name.replace(/'/g,'')+'\')">'+
+      '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
+      '<div class="conv-body"><div class="conv-name">'+name+'</div><div class="conv-preview">'+preview+'</div></div>'+
+      '<div class="conv-time">'+time+'</div></div>';
+  });
+  container.innerHTML=html;
 }
 
-// ══════════════ CHAT ══════════════
+// ── CHAT ──
 function goToChat(demandeId,otherName){
   currentChatDemandeId=demandeId;
   document.getElementById('chat-title').textContent=otherName||'Conversation';
@@ -946,7 +910,6 @@ function backFromChat(){
   if(isPro())goProTab('pro-messages');else goTab('messages');
 }
 function stopChatPoll(){if(chatPollInterval){clearInterval(chatPollInterval);chatPollInterval=null}}
-
 async function loadChatMessages(){
   if(!currentChatDemandeId)return;
   try{
@@ -954,356 +917,296 @@ async function loadChatMessages(){
     if(!r.ok)return;
     const data=await r.json();
     const c=document.getElementById('chat-messages');
-    const wasAtBottom=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
-    c.innerHTML=data.map(m=>{
-      const mine=String(m.expediteur_id)===String(currentUser.id);
-      return `<div class="chat-bubble ${mine?'mine':'theirs'}">${escapeHtml(m.contenu)}</div>`;
-    }).join('')||'<div class="empty-state" style="padding:30px"><span>💬</span><p>Démarrez la conversation !</p></div>';
-    if(wasAtBottom||data.length<=1)c.scrollTop=c.scrollHeight;
+    var atBottom=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
+    var html='';
+    if(!data||!data.length){html='<div class="empty-state" style="padding:30px"><span>💬</span><p>Démarrez la conversation !</p></div>'}
+    else{data.forEach(function(m){var mine=String(m.expediteur_id)===String(currentUser.id);html+='<div class="chat-bubble '+(mine?'mine':'theirs')+'">'+escapeHtml(m.contenu)+'</div>'})}
+    c.innerHTML=html;
+    if(atBottom||!data||data.length<=1)c.scrollTop=c.scrollHeight;
   }catch(e){}
 }
-function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
-
+function escapeHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
 async function sendChatMsg(){
-  const input=document.getElementById('chat-input');
-  const msg=input.value.trim();
+  var input=document.getElementById('chat-input');
+  var msg=input.value.trim();
   if(!msg||!currentChatDemandeId)return;
   input.value='';
   try{
     const r=await fetch(API+'/api/messages',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:currentChatDemandeId,contenu:msg})});
     const d=await r.json();
-    if(!r.ok){toast('⚠️ '+(d.error||'Message bloqué.'));return}
+    if(!r.ok){toast(d.error||'Message bloqué.');return}
     loadChatMessages();
-  }catch(e){toast('❌ Erreur réseau.')}
+  }catch(e){toast('Erreur réseau.')}
 }
 
-// ══════════════ PAIEMENT STRIPE ══════════════
-let stripeInstance=null, cardElement=null, currentPaymentIntent=null, currentDevisId=null;
-
-async function openPayment(devisId, montant){
+// ── PAIEMENT ──
+async function openPayment(devisId,montant){
   currentDevisId=devisId;
-  document.getElementById('payment-sub').textContent=`Montant : ${montant} € TTC (commission Gleam 15% incluse)`;
+  document.getElementById('payment-sub').textContent='Montant : '+montant+' € TTC (commission Gleam 15% incluse)';
   document.getElementById('payment-error').classList.remove('show');
   document.getElementById('payment-overlay').classList.add('open');
   document.getElementById('payment-btn').disabled=false;
   document.getElementById('payment-btn').textContent='🔒 Payer maintenant';
-
   try{
     const r=await fetch(API+'/api/paiements/intent',{method:'POST',headers:authHeaders(),body:JSON.stringify({devis_id:devisId})});
     const d=await r.json();
     if(!r.ok){document.getElementById('payment-error').textContent=d.error||'Erreur';document.getElementById('payment-error').classList.add('show');return}
-
     currentPaymentIntent=d.client_secret;
-    if(!stripeInstance) stripeInstance=Stripe(d.publishable_key);
-    const elements=stripeInstance.elements();
+    if(!stripeInstance)stripeInstance=Stripe(d.publishable_key);
+    var elements=stripeInstance.elements();
     if(cardElement)cardElement.destroy();
-    cardElement=elements.create('card',{style:{base:{fontSize:'16px',color:'#111827',fontFamily:'Segoe UI, system-ui, sans-serif'}}});
+    cardElement=elements.create('card',{style:{base:{fontSize:'16px',color:'#111827'}}});
     cardElement.mount('#card-element');
-  }catch(e){
-    document.getElementById('payment-error').textContent='Erreur réseau.';
-    document.getElementById('payment-error').classList.add('show');
-  }
+  }catch(e){document.getElementById('payment-error').textContent='Erreur réseau.';document.getElementById('payment-error').classList.add('show')}
 }
-
 function closePayment(){
   document.getElementById('payment-overlay').classList.remove('open');
   if(cardElement){cardElement.destroy();cardElement=null}
-  currentPaymentIntent=null;
-  currentDevisId=null;
+  currentPaymentIntent=null;currentDevisId=null;
 }
-
 async function confirmPayment(){
   if(!stripeInstance||!cardElement||!currentPaymentIntent)return;
-  const btn=document.getElementById('payment-btn');
+  var btn=document.getElementById('payment-btn');
   btn.disabled=true;btn.textContent='⏳ Traitement...';
   document.getElementById('payment-error').classList.remove('show');
-
-  const {paymentIntent, error}=await stripeInstance.confirmCardPayment(currentPaymentIntent,{
-    payment_method:{card:cardElement}
-  });
-
-  if(error){
-    document.getElementById('payment-error').textContent=error.message;
+  var result=await stripeInstance.confirmCardPayment(currentPaymentIntent,{payment_method:{card:cardElement}});
+  if(result.error){
+    document.getElementById('payment-error').textContent=result.error.message;
     document.getElementById('payment-error').classList.add('show');
     btn.disabled=false;btn.textContent='🔒 Payer maintenant';
     return;
   }
-
-  if(paymentIntent.status==='succeeded'){
-    try{
-      await fetch(API+'/api/paiements/confirmer',{method:'POST',headers:authHeaders(),body:JSON.stringify({payment_intent_id:paymentIntent.id})});
-    }catch(e){}
+  if(result.paymentIntent&&result.paymentIntent.status==='succeeded'){
+    try{await fetch(API+'/api/paiements/confirmer',{method:'POST',headers:authHeaders(),body:JSON.stringify({payment_intent_id:result.paymentIntent.id})})}catch(e){}
     closePayment();
     toast('✅ Paiement réussi ! La prestation est confirmée.',5000);
     loadDevis();
   }
 }
-
 async function libererPaiement(demandeId){
   if(!confirm('Confirmez-vous que la prestation a bien été réalisée ? Le paiement sera libéré au prestataire.'))return;
   try{
     const r=await fetch(API+'/api/paiements/liberer',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId})});
     const d=await r.json();
-    if(!r.ok){toast('❌ '+(d.error||'Erreur'));return}
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast('✅ Prestation confirmée ! Le prestataire a été payé.',5000);
-    loadDevis();
-    loadDemandes();
-  }catch(e){toast('❌ Erreur réseau.')}
+    loadDevis();loadDemandes();
+  }catch(e){toast('Erreur réseau.')}
 }
-let selectedServices=[];
-let multiFlow={active:false,queue:[],current:0,results:[]};
 
+// ── SERVICES ──
 function toggleSvc(card,svc){
-  const idx=selectedServices.indexOf(svc);
+  var idx=selectedServices.indexOf(svc);
   if(idx>=0){selectedServices.splice(idx,1);card.classList.remove('selected')}
   else{selectedServices.push(svc);card.classList.add('selected')}
-  const btn=document.getElementById('continue-svc-btn');
+  var btn=document.getElementById('continue-svc-btn');
   document.getElementById('svc-count').textContent=selectedServices.length;
   btn.style.display=selectedServices.length>0?'block':'none';
 }
-
 function startMultiServiceFlow(){
   if(!selectedServices.length)return;
-  multiFlow={active:true,queue:[...selectedServices],current:0,results:[]};
+  multiFlow={active:true,queue:selectedServices.slice(),current:0,results:[]};
   photos=[];
   openServiceForm(multiFlow.queue[0]);
 }
-
 function openService(type){
   photos=[];
   multiFlow={active:false,queue:[],current:0,results:[]};
   openServiceForm(type);
 }
-
 function openServiceForm(type){
-  const bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,autre:autreForm};
-  let html=bodies[type]();
+  var bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,autre:autreForm};
+  var html=(bodies[type]||autreForm)();
   if(multiFlow.active&&multiFlow.queue.length>1){
-    const progress=`<div style="background:var(--light);color:var(--p);padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;display:inline-block;margin-bottom:12px">Prestation ${multiFlow.current+1}/${multiFlow.queue.length}</div><br>`;
-    html=progress+html;
+    html='<div style="background:var(--light);color:var(--p);padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;display:inline-block;margin-bottom:12px">Prestation '+(multiFlow.current+1)+'/'+multiFlow.queue.length+'</div><br>'+html;
   }
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal(e){if(e.target===document.getElementById('modal-overlay')){document.getElementById('modal-overlay').classList.remove('open');multiFlow={active:false,queue:[],current:0,results:[]}}}
+function isLastInFlow(){return!multiFlow.active||multiFlow.current===multiFlow.queue.length-1}
 
 function dateTimeBlock(isLast){
-  const today=new Date().toISOString().split('T')[0];
-  if(multiFlow.active&&!isLast){
-    return `<div class="divider"></div><div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">📅 La date, l'heure et l'adresse seront demandées à la dernière étape.</div>`;
-  }
-  return`<div class="divider"></div>
-  <div class="field-group"><label>📅 Date et heure souhaitées</label>
-  <div class="datetime-row">
-    <input type="date" id="f-date" min="${today}" value="${today}">
-    <select id="f-time">${[...Array(27)].map((_,i)=>{const h=Math.floor(i/2)+7,m=i%2?'30':'00';return`<option>${h}h${m}</option>`}).join('')}</select>
-  </div>
-  <label style="margin-top:12px">Flexibilité <span class="optional">(optionnel)</span></label>
-  <div class="flex-opts">${['Heure exacte','± 30 min','± 1 heure','Matinée','Après-midi','Toute la journée'].map((l,i)=>`<button class="flex-opt${i===0?' sel':''}" onclick="selFlex(this)">${l}</button>`).join('')}</div></div>
-  <div class="field-group"><label>📍 Adresse d'intervention</label><input type="text" id="f-addr" placeholder="12 rue de la Paix, 75001 Paris"></div>
-  <div class="field-group"><label>📸 Photos <span class="optional">(optionnel)</span></label>
-  <div class="photo-zone" onclick="document.getElementById('photo-input').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>
-  <div class="photo-previews" id="photo-previews"></div></div>`
+  var today=new Date().toISOString().split('T')[0];
+  if(multiFlow.active&&!isLast)return '<div class="divider"></div><div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">📅 La date, l\'heure et l\'adresse seront demandées à la dernière étape.</div>';
+  var opts='';
+  for(var i=0;i<27;i++){var h=Math.floor(i/2)+7,m=i%2?'30':'00';opts+='<option>'+h+'h'+m+'</option>'}
+  var flexBtns=['Heure exacte','± 30 min','± 1 heure','Matinée','Après-midi','Toute la journée'].map(function(l,i){return'<button class="flex-opt'+(i===0?' sel':'')+'" onclick="selFlex(this)">'+l+'</button>'}).join('');
+  return '<div class="divider"></div>'+
+    '<div class="field-group"><label>📅 Date et heure souhaitées</label>'+
+    '<div class="datetime-row"><input type="date" id="f-date" min="'+today+'" value="'+today+'"><select id="f-time">'+opts+'</select></div>'+
+    '<label style="margin-top:12px">Flexibilité <span class="optional">(optionnel)</span></label>'+
+    '<div class="flex-opts">'+flexBtns+'</div></div>'+
+    '<div class="field-group"><label>📍 Adresse d\'intervention</label><input type="text" id="f-addr" placeholder="12 rue de la Paix, 75001 Paris"></div>'+
+    '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel)</span></label>'+
+    '<div class="photo-zone" onclick="document.getElementById(\'photo-input\').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>'+
+    '<div class="photo-previews" id="photo-previews"></div></div>';
 }
-function descBlock(ph){return`<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="${ph}" style="resize:none"></textarea></div>`}
-function sendBtn(type){
-  const isLast=!multiFlow.active||multiFlow.current===multiFlow.queue.length-1;
-  const label=multiFlow.active&&!isLast?'Suivant →':'✨ Envoyer ma demande';
-  return`<button class="modal-send-btn" id="send-demand-btn" onclick="sendDemand('${type}')">${label}</button>`;
-}
+function descBlock(ph){return'<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
+function sendBtn(type){var isLast=isLastInFlow();var label=multiFlow.active&&!isLast?'Suivant →':'✨ Envoyer ma demande';return'<button class="modal-send-btn" id="send-demand-btn" onclick="sendDemand(\''+type+'\')">'+label+'</button>'}
 
-function isLastInFlow(){return !multiFlow.active||multiFlow.current===multiFlow.queue.length-1}
+function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
+  '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'net-type\')"><span>🪑</span>Intérieur</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'net-type\')"><span>✨</span>Extérieur</button>'+
+  '<button class="opt-btn full" onclick="selOpt(this,\'net-type\')"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
+  '<div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'veh\')"><span>🚗</span>Citadine</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'veh\')"><span>🚙</span>SUV/4x4</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'veh\')"><span>🚐</span>Monospace</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'veh\')"><span>🚌</span>Utilitaire</button></div></div>'+
+  '<div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'seats\')">2 places</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'seats\')">5 places</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'seats\')">7 places</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'seats\')">9+ places</button></div></div>'+
+  descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
-function voitureForm(){return`<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>
-  <div class="field-group"><label>Type de nettoyage</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'net-type')"><span>🪑</span>Intérieur</button>
-    <button class="opt-btn" onclick="selOpt(this,'net-type')"><span>✨</span>Extérieur</button>
-    <button class="opt-btn full" onclick="selOpt(this,'net-type')"><span>🔄</span>Intérieur + Extérieur</button>
-  </div></div>
-  <div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'veh')"><span>🚗</span>Citadine</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh')"><span>🚙</span>SUV/4×4</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh')"><span>🚐</span>Monospace</button>
-    <button class="opt-btn" onclick="selOpt(this,'veh')"><span>🚌</span>Utilitaire</button>
-  </div></div>
-  <div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'seats')">2 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'seats')">5 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'seats')">7 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'seats')">9+ places</button>
-  </div></div>
-  ${descBlock("Ex: Sièges tachés, odeur de cigarette...")}${dateTimeBlock(isLastInFlow())}${sendBtn('voiture')}`}
+function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
+  '<div class="field-group"><label>Type</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-type\')"><span>➡️</span>Droit</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-type\')"><span>📐</span>Angle</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-type\')"><span>🪑</span>Canapé lit</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-type\')"><span>🪑</span>Chauffeuses</button></div></div>'+
+  '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-pl\')">2 places</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-pl\')">3 places</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-pl\')">4 places</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-pl\')">5+ places</button></div></div>'+
+  '<div class="field-group"><label>Matière <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-mat\')">Tissu</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-mat\')">Cuir</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-mat\')">Velours</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'can-mat\')">Microfibre</button></div></div>'+
+  descBlock('Ex: Taches de café...')+dateTimeBlock(isLastInFlow())+sendBtn('canape')}
 
-function canapeForm(){return`<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Indiquez le type de canapé</div>
-  <div class="field-group"><label>Type</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'can-type')"><span>➡️</span>Droit</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-type')"><span>📐</span>Angle</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-type')"><span>🪑</span>Canapé lit</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-type')"><span>🪑</span>Chauffeuses</button>
-  </div></div>
-  <div class="field-group"><label>Nombre de places</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'can-pl')">2 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-pl')">3 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-pl')">4 places</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-pl')">5+ places</button>
-  </div></div>
-  <div class="field-group"><label>Matière <span class="optional">(optionnel)</span></label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'can-mat')">Tissu</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-mat')">Cuir</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-mat')">Velours</button>
-    <button class="opt-btn" onclick="selOpt(this,'can-mat')">Microfibre</button>
-  </div></div>
-  ${descBlock("Ex: Taches de café, poils d'animaux...")}${dateTimeBlock(isLastInFlow())}${sendBtn('canape')}`}
+function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
+  '<div class="field-group"><label>Taille</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'mat-t\')">90x190 cm</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'mat-t\')">140x190 cm</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'mat-t\')">160x200 cm</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'mat-t\')">180x200 cm</button></div></div>'+
+  '<div class="field-group"><label>Nombre</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'mat-nb\')">1 matelas</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'mat-nb\')">2 matelas</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'mat-nb\')">3 matelas</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'mat-nb\')">4+ matelas</button></div></div>'+
+  descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
 
-function matelasForm(){return`<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Indiquez les dimensions</div>
-  <div class="field-group"><label>Taille</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'mat-t')">90×190 cm</button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-t')">140×190 cm</button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-t')">160×200 cm</button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-t')">180×200 cm</button>
-  </div></div>
-  <div class="field-group"><label>Nombre</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'mat-nb')">1 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-nb')">2 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-nb')">3 matelas</button>
-    <button class="opt-btn" onclick="selOpt(this,'mat-nb')">4+ matelas</button>
-  </div></div>
-  ${descBlock("Ex: Taches, acariens, odeurs...")}${dateTimeBlock(isLastInFlow())}${sendBtn('matelas')}`}
+function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
+  '<div class="field-group"><label>Surface</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'ter-s\')">Moins de 20 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'ter-s\')">20 à 50 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'ter-s\')">50 à 100 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'ter-s\')">Plus de 100 m²</button></div></div>'+
+  '<div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'ter-sol\')">Carrelage</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'ter-sol\')">Bois/composite</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'ter-sol\')">Béton</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'ter-sol\')">Pierre naturelle</button></div></div>'+
+  descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
 
-function terrasseForm(){return`<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et type de sol</div>
-  <div class="field-group"><label>Surface</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'ter-s')">Moins de 20 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'ter-s')">20 à 50 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'ter-s')">50 à 100 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'ter-s')">Plus de 100 m²</button>
-  </div></div>
-  <div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'ter-sol')">Carrelage</button>
-    <button class="opt-btn" onclick="selOpt(this,'ter-sol')">Bois/composite</button>
-    <button class="opt-btn" onclick="selOpt(this,'ter-sol')">Béton</button>
-    <button class="opt-btn" onclick="selOpt(this,'ter-sol')">Pierre naturelle</button>
-  </div></div>
-  ${descBlock("Ex: Mousse verte, joints noircis...")}${dateTimeBlock(isLastInFlow())}${sendBtn('terrasse')}`}
+function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Caractéristiques</div>'+
+  '<div class="field-group"><label>Type</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'pisc-t\')"><span>🏊</span>Enterrée</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'pisc-t\')"><span>🏖️</span>Hors-sol</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'pisc-t\')"><span>🌊</span>Semi-enterrée</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'pisc-t\')"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
+  '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'pisc-s\')">Moins de 25 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'pisc-s\')">25 à 50 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'pisc-s\')">50 à 80 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'pisc-s\')">Plus de 80 m²</button></div></div>'+
+  descBlock('Ex: Eau verte...')+dateTimeBlock(isLastInFlow())+sendBtn('piscine')}
 
-function piscineForm(){return`<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Caractéristiques de votre piscine</div>
-  <div class="field-group"><label>Type</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'pisc-t')"><span>🏊</span>Enterrée</button>
-    <button class="opt-btn" onclick="selOpt(this,'pisc-t')"><span>🏖️</span>Hors-sol</button>
-    <button class="opt-btn" onclick="selOpt(this,'pisc-t')"><span>🌊</span>Semi-enterrée</button>
-    <button class="opt-btn" onclick="selOpt(this,'pisc-t')"><span>🛁</span>Spa/Jacuzzi</button>
-  </div></div>
-  <div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'pisc-s')">Moins de 25 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'pisc-s')">25 à 50 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'pisc-s')">50 à 80 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'pisc-s')">Plus de 80 m²</button>
-  </div></div>
-  ${descBlock("Ex: Eau verte, nettoyage de printemps...")}${dateTimeBlock(isLastInFlow())}${sendBtn('piscine')}`}
+function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
+  '<div class="field-group"><label>Type de toiture</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'toit-t\')">Tuiles</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'toit-t\')">Ardoises</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'toit-t\')">Fibrociment</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'toit-t\')">Zinc/Métal</button></div></div>'+
+  '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'toit-s\')">Moins de 50 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'toit-s\')">50 à 100 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'toit-s\')">100 à 200 m²</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'toit-s\')">Plus de 200 m²</button></div></div>'+
+  descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
 
-function toitureForm(){return`<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>
-  <div class="field-group"><label>Type de toiture</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'toit-t')">Tuiles</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-t')">Ardoises</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-t')">Fibrociment</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-t')">Zinc/Métal</button>
-  </div></div>
-  <div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'toit-s')">Moins de 50 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-s')">50 à 100 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-s')">100 à 200 m²</button>
-    <button class="opt-btn" onclick="selOpt(this,'toit-s')">Plus de 200 m²</button>
-  </div></div>
-  ${descBlock("Ex: Mousse importante, gouttières...")}${dateTimeBlock(isLastInFlow())}${sendBtn('toiture')}`}
+function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
+  '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'vitr-b\')">🏠 Maison</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'vitr-b\')">🏢 Appartement</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'vitr-b\')">🏪 Commerce</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'vitr-b\')">🏭 Bureaux</button></div></div>'+
+  '<div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" onclick="selOpt(this,\'vitr-nb\')">Moins de 5</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'vitr-nb\')">5 à 10</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'vitr-nb\')">10 à 20</button>'+
+  '<button class="opt-btn" onclick="selOpt(this,\'vitr-nb\')">Plus de 20</button></div></div>'+
+  descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
-function vitresForm(){return`<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien et nombre de vitres</div>
-  <div class="field-group"><label>Type de bien</label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitr-b')">🏠 Maison</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-b')">🏢 Appartement</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-b')">🏪 Commerce</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-b')">🏭 Bureaux</button>
-  </div></div>
-  <div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel)</span></label><div class="options-grid">
-    <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">Moins de 5</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">5 à 10</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">10 à 20</button>
-    <button class="opt-btn" onclick="selOpt(this,'vitr-nb')">Plus de 20</button>
-  </div></div>
-  ${descBlock("Ex: Velux, double vitrage, accès difficile...")}${dateTimeBlock(isLastInFlow())}${sendBtn('vitres')}`}
+function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
+  '<div class="field-group"><label>De quoi s\'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: Bateau, jacuzzi..."></div>'+
+  '<div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel..." style="resize:none"></textarea></div>'+
+  dateTimeBlock(isLastInFlow())+sendBtn('autre')}
 
-function autreForm(){return`<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez librement votre besoin</div>
-  <div class="field-group"><label>De quoi s'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: Bateau, jacuzzi, salle de sport..."></div>
-  <div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel, vos attentes..." style="resize:none"></textarea></div>
-  ${dateTimeBlock(isLastInFlow())}${sendBtn('autre')}`}
-
-function selOpt(btn,group){document.querySelectorAll(`[onclick*="selOpt(this,'${group}')"]`).forEach(b=>b.classList.remove('sel'));btn.classList.add('sel')}
-function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel')}
-function handlePhotos(input){Array.from(input.files).forEach(f=>{if(photos.length>=5)return;const r=new FileReader();r.onload=e=>{photos.push(e.target.result);renderPhotos()};r.readAsDataURL(f)});input.value=''}
-function renderPhotos(){const c=document.getElementById('photo-previews');if(!c)return;c.innerHTML=photos.map((p,i)=>`<div class="photo-preview"><img src="${p}"><button class="del-photo" onclick="removePhoto(${i})">×</button></div>`).join('')}
-function removePhoto(i){photos.splice(i,1);renderPhotos()}
+function selOpt(btn,group){document.querySelectorAll('[onclick*="selOpt(this,\''+group+'\')"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
+function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
+function handlePhotos(input){Array.from(input.files).forEach(function(f){if(photos.length>=5)return;var r=new FileReader();r.onload=function(e){photos.push(e.target.result);renderPhotoInput()};r.readAsDataURL(f)});input.value=''}
+function renderPhotoInput(){var c=document.getElementById('photo-previews');if(!c)return;c.innerHTML='';photos.forEach(function(src,i){var div=document.createElement('div');div.className='photo-preview';var img=document.createElement('img');img.src=src;var btn=document.createElement('button');btn.className='del-photo';btn.textContent='×';btn.onclick=function(){photos.splice(i,1);renderPhotoInput()};div.appendChild(img);div.appendChild(btn);c.appendChild(div)})}
+function removePhoto(i){photos.splice(i,1);renderPhotoInput()}
 
 async function sendDemand(type){
-  const desc=document.getElementById('f-desc')?.value.trim()||'';
-  const details={};
-  document.querySelectorAll('.opt-btn.sel').forEach(b=>{const g=b.getAttribute('onclick').match(/'([^']+)'\)/);if(g&&g[1])details[g[1]]=b.textContent.trim()});
-  if(type==='autre'){const t=document.getElementById('f-autre-type')?.value.trim();if(t)details['type-prestation']=t}
+  var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
+  var details={};
+  document.querySelectorAll('.opt-btn.sel').forEach(function(b){var m=b.getAttribute('onclick').match(/selOpt\(this,'([^']+)'\)/);if(m&&m[1])details[m[1]]=b.textContent.trim()});
+  if(type==='autre'){var t=document.getElementById('f-autre-type')&&document.getElementById('f-autre-type').value.trim();if(t)details['type-prestation']=t}
 
-  // Étape intermédiaire du flux multi-services : on stocke et on passe au suivant
   if(multiFlow.active&&multiFlow.current<multiFlow.queue.length-1){
-    multiFlow.results.push({type,description:desc,details});
+    multiFlow.results.push({type:type,description:desc,details:details});
     multiFlow.current++;
     openServiceForm(multiFlow.queue[multiFlow.current]);
-    if(multiFlow.editMode&&multiFlow.editData[multiFlow.current])setTimeout(()=>prefillModifyForm(multiFlow.editData[multiFlow.current]),50);
+    if(multiFlow.editMode&&multiFlow.editData&&multiFlow.editData[multiFlow.current])setTimeout(function(){prefillModifyForm(multiFlow.editData[multiFlow.current])},50);
     return;
   }
 
-  // Dernière étape (ou demande simple) : on récupère adresse/date/heure et on envoie tout
-  const addr=document.getElementById('f-addr')?.value.trim()||'';
-  const date=document.getElementById('f-date')?.value||'';
-  const time=document.getElementById('f-time')?.value||'';
-  if(!addr){toast('⚠️ Veuillez indiquer une adresse.');return}
-  const flex=document.querySelector('.flex-opt.sel')?.textContent||'Heure exacte';
+  var addr=document.getElementById('f-addr')&&document.getElementById('f-addr').value.trim()||'';
+  var date=document.getElementById('f-date')&&document.getElementById('f-date').value||'';
+  var time=document.getElementById('f-time')&&document.getElementById('f-time').value||'';
+  if(!addr){toast('Veuillez indiquer une adresse.');return}
+  var flex=document.querySelector('.flex-opt.sel')&&document.querySelector('.flex-opt.sel').textContent||'Heure exacte';
 
-  let prestations;
-  if(multiFlow.active){
-    multiFlow.results.push({type,description:desc,details});
-    prestations=multiFlow.results;
-  }else{
-    prestations=[{type,description:desc,details}];
-  }
+  var prestations;
+  if(multiFlow.active){multiFlow.results.push({type:type,description:desc,details:details});prestations=multiFlow.results}
+  else{prestations=[{type:type,description:desc,details:details}]}
 
-  const btn=document.getElementById('send-demand-btn');
+  var btn=document.getElementById('send-demand-btn');
   if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>'}
   try{
-    const isEdit=multiFlow.editMode&&multiFlow.editId;
-    const url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
-    const method=isEdit?'PATCH':'POST';
-    const r=await fetch(url,{method,headers:authHeaders(),body:JSON.stringify({prestations,address:addr,date,time,flexibility:flex,photos:photos.slice(0,5)})});
-    if(!r.ok){const d=await r.json();toast('❌ '+(d.error||'Erreur'));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
+    var isEdit=multiFlow.editMode&&multiFlow.editId;
+    var url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
+    var method=isEdit?'PATCH':'POST';
+    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:addr,date:date,time:time,flexibility:flex,photos:photos.slice(0,5)})});
+    if(!r.ok){const d=await r.json();toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
-    photos=[];
-    selectedServices=[];
-    const wasEdit=isEdit;
-    const editedId=multiFlow.editId;
+    photos=[];selectedServices=[];
+    var wasEdit=isEdit,editedId=multiFlow.editId;
     multiFlow={active:false,queue:[],current:0,results:[]};
-    document.querySelectorAll('.svc-card').forEach(c=>c.classList.remove('selected'));
-    const cbtn=document.getElementById('continue-svc-btn');if(cbtn)cbtn.style.display='none';
-    if(wasEdit){
-      toast('✅ Demande modifiée !');
-      openDetail(editedId);
-    }else{
-      show('s-success');
-    }
+    document.querySelectorAll('.svc-card').forEach(function(c){c.classList.remove('selected')});
+    var cbtn=document.getElementById('continue-svc-btn');if(cbtn)cbtn.style.display='none';
+    if(wasEdit){toast('✅ Demande modifiée !');openDetail(editedId)}
+    else{show('s-success')}
     loadDemandes();
-  }catch(e){toast('❌ Erreur réseau.');if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}}
+  }catch(e){toast('Erreur réseau.');if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}}
 }
 
-// ══════════════ INIT ══════════════
-const tok=localStorage.getItem('gleam_token');
+// ── INIT ──
+var tok=localStorage.getItem('gleam_token');
 if(tok){
   fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
-    .then(r=>r.ok?r.json():null)
-    .then(u=>{if(u){currentUser=u;enterApp()}else localStorage.removeItem('gleam_token')})
-    .catch(()=>{});
+    .then(function(r){return r.ok?r.json():null})
+    .then(function(u){if(u){currentUser=u;enterApp()}else localStorage.removeItem('gleam_token')})
+    .catch(function(){});
 }
 </script>
 </body>
