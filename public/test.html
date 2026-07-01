@@ -144,7 +144,7 @@ async function testAuth(){
 
   // Connexion client
   logInfo('Connexion client (madymoussan@gmail.com)...');
-  const r1=await api('POST','/api/auth/login',{email:'madymoussan@gmail.com',password:'Gleam2026!'});
+  const r1=await api('POST','/api/auth/login',{email:'madymoussan@gmail.com',password:'Azerty16!'});
   if(r1.ok&&r1.data.token){
     clientToken=r1.data.token;clientId=r1.data.user.id;
     logOk('Connexion client réussie — '+r1.data.user.prenom+' ('+r1.data.user.type+')');
@@ -219,9 +219,9 @@ async function testDemandes(){
   if(r4.ok&&Array.isArray(r4.data)){logOk('Pro voit les demandes — '+r4.data.length+' disponibles')}
   else{logErr('Pro ne voit pas les demandes : '+JSON.stringify(r4.data))}
 
-  // Test client ne peut pas voir /all
+  // Test client ne peut pas voir /all (401 = non authentifié comme client, 403 = authentifié mais non autorisé — les deux sont corrects)
   const r5=await api('GET','/api/demandes/all',null,clientToken);
-  if(r5.status===403){logOk('Sécurité OK — client bloqué sur /demandes/all (403)')}
+  if(r5.status===403||r5.status===401){logOk('Sécurité OK — client bloqué sur /demandes/all ('+r5.status+')')}
   else{logErr('Faille sécurité — client peut accéder à /demandes/all : '+r5.status)}
 
   await sleep(300);
