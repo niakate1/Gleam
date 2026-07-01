@@ -569,14 +569,21 @@ async function loadDemandes(){
     const data=await r.json();
     const c=document.getElementById('recent-demands');
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
+
+    // Tri logique : en_cours > acceptee > devis_recus > en_attente > terminee
+    var order={en_cours:0,acceptee:1,devis_recus:2,en_attente:3,terminee:4};
+    data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9)});
+
     var html='';
     data.forEach(function(d){
       var st=STATUTS[d.statut]||['',''];
       var icon=ICONS[d.prestation.split(' + ')[0]]||'✨';
-      html+='<div class="demand-row" onclick="openDetail(\''+d.id+'\')">'+
+      var urgentStyle=d.statut==='en_cours'?'border-color:var(--green);background:#F0FDF4;':'';
+      var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px;margin-left:6px">ACTION REQUISE</span>':'';
+      html+='<div class="demand-row" style="'+urgentStyle+'" onclick="openDetail(\''+d.id+'\')">'+
         '<span class="demand-icon">'+icon+'</span>'+
         '<div class="demand-info">'+
-          '<div class="demand-type">'+d.prestation+'</div>'+
+          '<div class="demand-type">'+d.prestation+urgentBadge+'</div>'+
           '<div class="demand-addr">'+d.adresse+'</div>'+
           '<div class="demand-status '+st[1]+'">'+st[0]+'</div>'+
         '</div>'+
@@ -603,42 +610,68 @@ async function loadDevis(){
       }catch(e){}
     }
     if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
-    all.sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at)});
+
+    // Tri logique : en cours > accepté à payer > en attente > refusé > annulé
+    var devisOrder={accepte:0,envoye:1,refuse:2,annule_pro:3};
+    // Prioriser ceux dont la demande est en_cours (paiement fait)
+    all.sort(function(a,b){
+      var aScore=(a.demande_statut==='en_cours'?-1:0)+(devisOrder[a.statut]||9);
+      var bScore=(b.demande_statut==='en_cours'?-1:0)+(devisOrder[b.statut]||9);
+      return aScore-bScore;
+    });
+
     var html='';
     all.forEach(function(v){
       var proName=v.pro?(v.pro.prenom+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
+      var proNote=v.pro&&v.pro.note_moyenne?'⭐ '+v.pro.note_moyenne:'';
       var badge,actions='';
-      if(v.statut==='accepte'){
-        badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';
-        var dejaPaye=v.demande_statut==='en_cours'||v.demande_statut==='terminee';
-        if(dejaPaye){
-          actions='<div style="margin-top:12px;display:flex;gap:8px">'+
-            '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\''+proName.replace(/'/g,'')+'\')">💬 Discuter</button>'+
-            (v.demande_statut==='en_cours'?'<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement(\''+v.demande_id+'\')">✅ Confirmer la prestation</button>':'')+
-          '</div>';
-        }else{
-          actions='<div style="margin-top:12px;display:flex;gap:8px">'+
-            '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\''+proName.replace(/'/g,'')+'\')">💬 Discuter</button>'+
-            '<button class="btn-accept" style="background:#059669" onclick="openPayment(\''+v.id+'\','+v.prix_ttc+')">💳 Payer '+v.prix_ttc+'€</button>'+
-          '</div>';
-        }
+      var cardStyle='';
+
+      if(v.statut==='accepte'&&v.demande_statut==='en_cours'){
+        // Payé — prestation en cours
+        badge='<span class="devis-badge badge-accepted">🔧 En cours</span>';
+        cardStyle='border-color:var(--green);background:#F0FDF4;';
+        actions='<div style="margin-top:12px;display:flex;gap:8px">'+
+          '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\''+proName.replace(/'/g,'')+'\')">💬 Discuter</button>'+
+          '<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement(\''+v.demande_id+'\')">✅ Confirmer la prestation</button>'+
+        '</div>';
+      }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
+        // Terminé
+        badge='<span class="devis-badge badge-accepted">🏁 Terminé</span>';
+        cardStyle='opacity:0.7;';
+        actions='<div style="margin-top:12px">'+
+          '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+v.demande_id+'\',\''+v.societe_id+'\',\''+proName.replace(/'/g,'')+'\')">⭐ Noter le prestataire</button>'+
+        '</div>';
+      }else if(v.statut==='accepte'){
+        // Accepté — en attente de paiement
+        badge='<span class="devis-badge badge-accepted">✅ Accepté — Paiement requis</span>';
+        cardStyle='border-color:#D97706;background:#FFFBEB;';
+        actions='<div style="margin-top:12px;display:flex;gap:8px">'+
+          '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\''+proName.replace(/'/g,'')+'\')">💬 Discuter</button>'+
+          '<button class="btn-accept" style="background:#059669" onclick="openPayment(\''+v.id+'\','+v.prix_ttc+')">💳 Payer '+v.prix_ttc+'\u20ac</button>'+
+        '</div>';
       }else if(v.statut==='refuse'){
         badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
+        cardStyle='opacity:0.6;';
       }else if(v.statut==='annule_pro'){
-        badge='<span class="devis-badge badge-refused">🚫 Annulé</span>';
+        badge='<span class="devis-badge badge-refused">🚫 Annulé par le pro</span>';
+        cardStyle='opacity:0.6;';
       }else{
-        badge='<span class="devis-badge badge-pending">En attente</span>';
+        badge='<span class="devis-badge badge-pending">⏳ En attente</span>';
         actions='<div style="display:flex;gap:8px;margin-top:12px">'+
           '<button class="btn-accept" onclick="accepterDevis(\''+v.id+'\')">✅ Accepter</button>'+
           '<button class="btn-refuse" onclick="refuserDevis(\''+v.id+'\')">❌ Refuser</button>'+
         '</div>';
       }
-      html+='<div class="devis-card">'+
+
+      html+='<div class="devis-card" style="'+cardStyle+'">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'+
-          '<div style="font-weight:700;font-size:15px">'+proName+'</div>'+badge+
+          '<div><div style="font-weight:700;font-size:15px">'+proName+'</div>'+
+          (proNote?'<div style="font-size:12px;color:#D97706;margin-top:2px">'+proNote+'</div>':'')+
+          '</div>'+badge+
         '</div>'+
         '<div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 '+v.prestation+'</div>'+
-        '<div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">'+v.prix_ttc+' €</div>'+
+        '<div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">'+v.prix_ttc+' \u20ac</div>'+
         (v.description?'<div style="font-size:13px;color:#374151">'+v.description+'</div>':'')+
         actions+
       '</div>';
@@ -750,7 +783,47 @@ function prefillModifyForm(p){
   if(isLastInFlow()&&currentDetailDemande){var a=document.getElementById('f-addr');if(a)a.value=currentDetailDemande.adresse||''}
 }
 
-// ── PRO DEMANDES ──
+// ── NOTATION ──
+var noteDemandeId=null,noteSocieteId=null;
+function ouvrirNote(demandeId,societeId,proName){
+  noteDemandeId=demandeId;noteSocieteId=societeId;
+  var html='<div class="modal-title">⭐ Noter '+proName+'</div>'+
+    '<div class="modal-sub">Comment s\'est passée votre prestation ?</div>'+
+    '<div id="star-rating" style="display:flex;gap:12px;justify-content:center;margin:20px 0;font-size:36px">'+
+    '<span class="star" data-note="1" onclick="selectNote(1)" style="cursor:pointer;opacity:0.3">⭐</span>'+
+    '<span class="star" data-note="2" onclick="selectNote(2)" style="cursor:pointer;opacity:0.3">⭐</span>'+
+    '<span class="star" data-note="3" onclick="selectNote(3)" style="cursor:pointer;opacity:0.3">⭐</span>'+
+    '<span class="star" data-note="4" onclick="selectNote(4)" style="cursor:pointer;opacity:0.3">⭐</span>'+
+    '<span class="star" data-note="5" onclick="selectNote(5)" style="cursor:pointer;opacity:0.3">⭐</span>'+
+    '</div>'+
+    '<div id="note-label" style="text-align:center;font-weight:700;font-size:16px;margin-bottom:16px;color:var(--gray)">Sélectionnez une note</div>'+
+    '<div class="field-group"><label>Commentaire <span class="optional">(optionnel)</span></label>'+
+    '<textarea id="note-comment" rows="3" placeholder="Décrivez votre expérience..." style="resize:none"></textarea></div>'+
+    '<button class="modal-send-btn" onclick="envoyerNote()">✅ Envoyer mon avis</button>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+var noteSelectionnee=0;
+var noteLabels={1:'😞 Très insatisfait',2:'😐 Insatisfait',3:'🙂 Correct',4:'😊 Satisfait',5:'🤩 Excellent !'};
+function selectNote(n){
+  noteSelectionnee=n;
+  document.querySelectorAll('.star').forEach(function(s,i){s.style.opacity=i<n?'1':'0.3'});
+  document.getElementById('note-label').textContent=noteLabels[n]||'';
+  document.getElementById('note-label').style.color=n>=4?'var(--green)':(n>=3?'#D97706':'var(--red)');
+}
+async function envoyerNote(){
+  if(!noteSelectionnee){toast('Sélectionnez une note.');return}
+  var comment=document.getElementById('note-comment')&&document.getElementById('note-comment').value.trim()||'';
+  try{
+    const r=await fetch(API+'/api/evaluations',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:noteDemandeId,evalue_id:noteSocieteId,note:noteSelectionnee,commentaire:comment})});
+    if(!r.ok){const d=await r.json();toast('Erreur : '+(d.error||''));return}
+    document.getElementById('modal-overlay').classList.remove('open');
+    toast('⭐ Merci pour votre avis !',4000);
+    loadDevis();
+  }catch(e){toast('Erreur réseau.')}
+}
+
+// ── PRO DEMANDES (avec tri logique) ──
 async function loadProDemandes(){
   try{
     const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
@@ -881,19 +954,35 @@ async function loadConversationsPro(){
   }catch(e){}
 }
 function renderConvList(container,data){
-  var active=(data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'||c.statut==='terminee'});
-  if(!active.length){container.innerHTML='<div class="empty-state"><span>💬</span><p>Aucune conversation active.<br>Acceptez un devis pour démarrer !</p></div>';return}
+  var active=(data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'});
+  var termine=(data||[]).filter(function(c){return c.statut==='terminee'});
+  if(!active.length&&!termine.length){container.innerHTML='<div class="empty-state"><span>💬</span><p>Aucune conversation active.<br>Acceptez un devis pour démarrer !</p></div>';return}
   var html='';
-  active.forEach(function(c){
-    var name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
-    var preview=c.dernier_message||'Démarrez la conversation...';
-    var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
-    html+='<div class="conv-row" onclick="goToChat(\''+c.demande_id+'\',\''+name.replace(/'/g,'')+'\')">'+
-      '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
-      '<div class="conv-body"><div class="conv-name">'+name+'</div><div class="conv-preview">'+preview+'</div></div>'+
-      '<div class="conv-time">'+time+'</div></div>';
-  });
+  if(active.length){
+    html+='<div class="section-title" style="padding:0 0 8px">💬 En cours</div>';
+    active.forEach(function(c){html+=convRowHtml(c)});
+  }
+  if(termine.length){
+    html+='<div class="section-title" style="padding:16px 0 8px;color:var(--gray)">🏁 Terminées</div>';
+    termine.forEach(function(c){
+      var name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
+      html+='<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);opacity:0.6;display:flex;gap:12px;align-items:center">'+
+        '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
+        '<div class="conv-body"><div class="conv-name">'+name+'</div>'+
+        '<div class="conv-preview">Prestation terminée</div></div>'+
+        '<div class="conv-time">🏁</div></div>';
+    });
+  }
   container.innerHTML=html;
+}
+function convRowHtml(c){
+  var name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
+  var preview=c.dernier_message||'Démarrez la conversation...';
+  var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
+  return'<div class="conv-row" onclick="goToChat(\''+c.demande_id+'\',\''+name.replace(/'/g,'')+'\')">'+
+    '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
+    '<div class="conv-body"><div class="conv-name">'+name+'</div><div class="conv-preview">'+preview+'</div></div>'+
+    '<div class="conv-time">'+time+'</div></div>';
 }
 
 // ── CHAT ──
@@ -904,6 +993,15 @@ function goToChat(demandeId,otherName){
   show('s-chat');
   loadChatMessages();
   chatPollInterval=setInterval(loadChatMessages,4000);
+  // Vérifie si la prestation est terminée pour bloquer le chat
+  fetch(API+'/api/demandes/'+demandeId,{headers:authHeaders()})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var bar=document.querySelector('.chat-input-bar');
+      if(d.statut==='terminee'){
+        if(bar)bar.innerHTML='<div style="text-align:center;padding:12px;color:var(--gray);font-size:13px;width:100%">🏁 Cette prestation est terminée. La messagerie est fermée.</div>';
+      }
+    }).catch(function(){});
 }
 function backFromChat(){
   stopChatPoll();
@@ -942,7 +1040,7 @@ async function sendChatMsg(){
 // ── PAIEMENT ──
 async function openPayment(devisId,montant){
   currentDevisId=devisId;
-  document.getElementById('payment-sub').textContent='Montant : '+montant+' € TTC (commission Gleam 15% incluse)';
+  document.getElementById('payment-sub').textContent='Montant : '+montant+' € TTC';
   document.getElementById('payment-error').classList.remove('show');
   document.getElementById('payment-overlay').classList.add('open');
   document.getElementById('payment-btn').disabled=false;
