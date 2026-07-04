@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const jwt = require('jsonwebtoken');
+const { sendEmail } = require('./email');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -177,6 +178,20 @@ app.post('/api/demandes', auth, async (req, res) => {
     }).select().single();
 
     if (error) return res.status(400).json({ error: error.message });
+
+    // 📧 Email "nouvelle demande" désactivé pour l'instant (risque de spam pour les pros).
+    // Pour le réactiver, décommentez le bloc ci-dessous :
+    // supabase.from('users').select('email, prenom').eq('type', 'pro').eq('disponible', true)
+    //   .then(({ data: pros }) => {
+    //     (pros || []).forEach((pro) => {
+    //       sendEmail('nouvelle_demande', pro.email, {
+    //         prenom: pro.prenom,
+    //         prestation: prestationLabel,
+    //         ville: address
+    //       });
+    //     });
+    //   });
+
     res.status(201).json(data);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -303,6 +318,18 @@ app.post('/api/devis', auth, async (req, res) => {
 
     if (error) return res.status(400).json({ error: error.message });
     await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', demande_id);
+
+    // 📧 Email 2/8 : nouveau devis reçu → client
+    const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
+    if (client) {
+      sendEmail('nouveau_devis', client.email, {
+        prenom: client.prenom,
+        prestation: demande.prestation,
+        prix: parseFloat(prix_ttc),
+        demandeId: demande_id
+      });
+    }
+
     res.status(201).json(data);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -363,6 +390,28 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
     await supabase.from('demandes').update({ statut: 'acceptee' }).eq('id', devis.demande_id);
     await supabase.from('devis').update({ statut: 'refuse' }).eq('demande_id', devis.demande_id).neq('id', req.params.id);
 
+    // 📧 Email 3/8 : devis accepté → pro gagnant
+    const { data: proAccepte } = await supabase.from('users').select('email, prenom').eq('id', devis.societe_id).single();
+    if (proAccepte) {
+      sendEmail('devis_accepte', proAccepte.email, {
+        prenom: proAccepte.prenom,
+        prestation: demande.prestation,
+        creneau: devis.creneau_propose || demande.creneau,
+        demandeId: devis.demande_id
+      });
+    }
+
+    // 📧 Email "devis refusé" désactivé pour l'instant (peu actionnable, peut être mal vécu par les pros).
+    // Pour le réactiver, décommentez le bloc ci-dessous :
+    // const { data: devisRefuses } = await supabase.from('devis').select('societe_id').eq('demande_id', devis.demande_id).eq('statut', 'refuse');
+    // if (devisRefuses && devisRefuses.length) {
+    //   const idsRefuses = [...new Set(devisRefuses.map(d => d.societe_id))];
+    //   const { data: prosRefuses } = await supabase.from('users').select('email, prenom').in('id', idsRefuses);
+    //   (prosRefuses || []).forEach((pro) => {
+    //     sendEmail('devis_refuse', pro.email, { prenom: pro.prenom, prestation: demande.prestation });
+    //   });
+    // }
+
     res.json({ message: 'Devis accepté !', demande_id: devis.demande_id, societe_id: devis.societe_id });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -378,6 +427,14 @@ app.post('/api/devis/:id/refuser', auth, async (req, res) => {
     if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
 
     await supabase.from('devis').update({ statut: 'refuse' }).eq('id', req.params.id);
+
+    // 📧 Email "devis refusé" désactivé pour l'instant (peu actionnable, peut être mal vécu par les pros).
+    // Pour le réactiver, décommentez le bloc ci-dessous :
+    // const { data: proRefuse } = await supabase.from('users').select('email, prenom').eq('id', devis.societe_id).single();
+    // if (proRefuse) {
+    //   sendEmail('devis_refuse', proRefuse.email, { prenom: proRefuse.prenom, prestation: demande.prestation });
+    // }
+
     res.json({ message: 'Devis refusé.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -416,6 +473,17 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     await supabase.from('devis').update({ statut: 'annule_pro' }).eq('id', req.params.id);
     await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', devis.demande_id);
 
+    // 📧 Email 7/8 : annulation pro → client
+    const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
+    if (client) {
+      sendEmail('annulation_pro', client.email, {
+        prenom: client.prenom,
+        prestation: demande.prestation,
+        creneau: demande.creneau,
+        demandeId: devis.demande_id
+      });
+    }
+
     res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.' });
   } catch (e) {
     console.error(e);
@@ -444,6 +512,31 @@ app.post('/api/messages', auth, async (req, res) => {
     }).select().single();
 
     if (error) return res.status(400).json({ error: error.message });
+
+    // 📧 Email 8/8 : nouveau message → destinataire (client ou pro selon l'expéditeur)
+    const { data: expediteur } = await supabase.from('users').select('prenom, type').eq('id', req.user.id).single();
+    let destinataireId = null;
+
+    if (expediteur && isProType(expediteur.type)) {
+      destinataireId = demande.client_id;
+    } else {
+      const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande_id).eq('statut', 'accepte').maybeSingle();
+      destinataireId = devisAccepte ? devisAccepte.societe_id : null;
+    }
+
+    if (destinataireId) {
+      const { data: destinataire } = await supabase.from('users').select('email, prenom').eq('id', destinataireId).single();
+      if (destinataire) {
+        sendEmail('nouveau_message', destinataire.email, {
+          prenom: destinataire.prenom,
+          expediteurNom: (expediteur && expediteur.prenom) || 'Un utilisateur',
+          prestation: demande.prestation,
+          apercu: contenu.trim().slice(0, 100),
+          demandeId: demande_id
+        });
+      }
+    }
+
     res.status(201).json(data);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -554,8 +647,25 @@ app.post('/api/paiements/confirmer', auth, async (req, res) => {
       return res.status(400).json({ error: 'Paiement non confirmé par Stripe.' });
 
     await supabase.from('paiements').update({ statut: 'paye' }).eq('stripe_payment_intent_id', payment_intent_id);
-    const { data: paiement } = await supabase.from('paiements').select('demande_id').eq('stripe_payment_intent_id', payment_intent_id).single();
-    if (paiement) await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
+    const { data: paiement } = await supabase.from('paiements').select('*').eq('stripe_payment_intent_id', payment_intent_id).single();
+
+    if (paiement) {
+      await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
+
+      // 📧 Email 5/8 : paiement confirmé → pro
+      const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', paiement.societe_id).single();
+      const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
+      if (pro) {
+        sendEmail('paiement_confirme', pro.email, {
+          prenom: pro.prenom,
+          prestation: demandeInfo ? demandeInfo.prestation : '',
+          montantTotal: paiement.montant_ttc,
+          commission: paiement.commission,
+          montantPro: paiement.montant_societe,
+          demandeId: paiement.demande_id
+        });
+      }
+    }
 
     res.json({ message: 'Paiement confirmé ✨' });
   } catch (e) {
@@ -581,6 +691,23 @@ app.post('/api/paiements/liberer', auth, async (req, res) => {
 
     await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id);
     await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
+
+    // 📧 Email "prestation confirmée" désactivé pour l'instant (redondant avec l'app).
+    // Pour le réactiver, décommentez le bloc ci-dessous :
+    // const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
+    // const { data: client } = await supabase.from('users').select('email, prenom').eq('id', paiement.client_id).single();
+    // const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', paiement.societe_id).single();
+    // if (client) {
+    //   sendEmail('prestation_confirmee', client.email, {
+    //     prenom: client.prenom, role: 'client', prestation: demandeInfo ? demandeInfo.prestation : '', demandeId: paiement.demande_id
+    //   });
+    // }
+    // if (pro) {
+    //   sendEmail('prestation_confirmee', pro.email, {
+    //     prenom: pro.prenom, role: 'pro', prestation: demandeInfo ? demandeInfo.prestation : '', montantPro: paiement.montant_societe, demandeId: paiement.demande_id
+    //   });
+    // }
+
     res.json({ message: 'Paiement Gleam libéré ✨' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
