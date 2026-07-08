@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gleam ✨</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -19,7 +19,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#F9FAFB;color:#11182
 .tab{flex:1;padding:9px;border:none;background:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;color:var(--gray)}
 .tab.active{background:#fff;color:var(--p);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:5px;margin-top:14px}
-input,select,textarea{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;transition:.2s;background:#fff;font-family:inherit}
+input,select,textarea{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;outline:none;transition:.2s;background:#fff;font-family:inherit}
 input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .role-select{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
@@ -28,6 +28,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .role-btn span{display:block;font-size:22px;margin-bottom:4px}
 .btn{width:100%;padding:13px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px}
 .btn:hover{background:var(--p2)}
+.btn:disabled{opacity:.6;cursor:not-allowed}
 .err{background:#FEF2F2;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none}
 .err.show{display:block}
 .navbar{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
@@ -35,11 +36,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .user-badge{background:var(--light);color:var(--p);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
 .pro-badge{background:#D1FAE5;color:var(--green);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
 .back-btn{background:none;border:none;font-size:20px;cursor:pointer;color:#374151}
-.bottom-nav{background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:sticky;bottom:0}
+.bottom-nav{background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:sticky;bottom:0;padding-bottom:env(safe-area-inset-bottom)}
 .bnav-item{display:flex;flex-direction:column;align-items:center;padding:10px 0;cursor:pointer;border:none;background:none;color:var(--gray);font-size:11px;font-weight:600;gap:3px}
 .bnav-item.active{color:var(--p)}
 .bnav-item span:first-child{font-size:22px}
-.home-content,.pro-content,.profile-content{flex:1;overflow-y:auto;padding:16px}
+.home-content,.pro-content,.profile-content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .greeting h2{font-size:22px;font-weight:800;margin-bottom:4px}
 .greeting p{color:var(--gray);font-size:14px;margin-bottom:18px}
 .section-title{font-size:16px;font-weight:700;margin-bottom:12px;color:#111827}
@@ -82,7 +83,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .btn-devis:disabled{background:var(--gray);cursor:not-allowed}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .modal-overlay.open{display:flex}
-.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px 20px 32px}
+.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px 20px calc(32px + env(safe-area-inset-bottom))}
 .modal-handle{width:40px;height:4px;background:#E5E7EB;border-radius:2px;margin:0 auto 20px}
 .modal-title{font-size:18px;font-weight:800;margin-bottom:6px}
 .modal-sub{font-size:13px;color:var(--gray);margin-bottom:20px}
@@ -106,14 +107,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .flex-opt.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .divider{height:1px;background:var(--border);margin:16px 0}
 .modal-send-btn{width:100%;padding:14px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
-.devis-list{flex:1;overflow-y:auto;padding:16px}
+.modal-send-btn:disabled{opacity:.6;cursor:not-allowed}
+.devis-list{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .devis-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .devis-badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700}
 .badge-pending{background:#FEF3C7;color:#D97706}
 .badge-accepted{background:#D1FAE5;color:var(--green)}
 .badge-refused{background:#FEE2E2;color:var(--red)}
 .btn-accept{flex:1;padding:10px;background:var(--p);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-accept:disabled{opacity:.6;cursor:not-allowed}
 .btn-refuse{flex:1;padding:10px;background:#fff;color:var(--red);border:2px solid var(--red);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-refuse:disabled{opacity:.6;cursor:not-allowed}
 .conv-row{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;cursor:pointer}
 .conv-row:hover{border-color:var(--p)}
 .conv-avatar{width:44px;height:44px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
@@ -122,13 +126,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .conv-preview{color:var(--gray);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .conv-time{font-size:11px;color:var(--gray);flex-shrink:0}
 .chat-screen{flex:1;display:flex;flex-direction:column;min-height:0}
-.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
-.chat-bubble{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.4}
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
+.chat-bubble{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word}
 .chat-bubble.mine{align-self:flex-end;background:var(--p);color:#fff;border-bottom-right-radius:4px}
 .chat-bubble.theirs{align-self:flex-start;background:#fff;border:1px solid var(--border);border-bottom-left-radius:4px}
-.chat-input-bar{background:#fff;border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:center}
-.chat-input-bar input{flex:1;padding:10px 14px;border-radius:20px}
+.chat-input-bar{background:#fff;border-top:1px solid var(--border);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center}
+.chat-input-bar input{flex:1;padding:10px 14px;border-radius:20px;font-size:16px}
 .chat-send-btn{background:var(--p);color:#fff;border:none;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0}
+.chat-send-btn:disabled{opacity:.6;cursor:not-allowed}
 .empty-state{text-align:center;padding:60px 20px;color:var(--gray)}
 .empty-state span{font-size:48px;display:block;margin-bottom:12px}
 .empty-state p{font-size:15px}
@@ -155,10 +160,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .btn-modify{flex:1;padding:12px;background:var(--light);color:var(--p);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
 .btn-delete{flex:1;padding:12px;background:#FEF2F2;color:var(--red);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
 .locked-banner{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:10px;padding:12px;font-size:13px;margin-bottom:14px;display:flex;gap:8px;align-items:flex-start}
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1F2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:500;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;max-width:90%;text-align:center}
+.toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:#1F2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:500;opacity:0;transition:.3s;pointer-events:none;max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.upload-progress{font-size:12px;color:var(--gray);margin-top:6px;display:none}
+.upload-progress.show{display:block}
 </style>
 </head>
 <body>
@@ -174,20 +181,20 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
         <button class="tab" onclick="switchTab('register')">Inscription</button>
       </div>
       <div id="form-login">
-        <label>Email</label><input type="email" id="le" placeholder="votre@email.com">
-        <label>Mot de passe</label><input type="password" id="lp" placeholder="••••••••">
+        <label>Email</label><input type="email" id="le" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false">
+        <label>Mot de passe</label><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password">
         <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600" onclick="forgotPassword()">Mot de passe oublié ?</button></div>
         <button class="btn" id="login-btn" onclick="doLogin()">Se connecter</button>
         <div class="err" id="lerr"></div>
       </div>
       <div id="form-register" style="display:none">
         <div class="row2">
-          <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean"></div>
-          <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont"></div>
+          <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean" autocomplete="given-name"></div>
+          <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont" autocomplete="family-name"></div>
         </div>
-        <label>Email</label><input type="email" id="re" placeholder="votre@email.com">
-        <label>Téléphone</label><input type="tel" id="rp" placeholder="06 00 00 00 00">
-        <label>Mot de passe</label><input type="password" id="rpw" placeholder="Minimum 8 caractères">
+        <label>Email</label><input type="email" id="re" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false">
+        <label>Téléphone</label><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel">
+        <label>Mot de passe</label><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password">
         <label>Vous êtes</label>
         <div class="role-select">
           <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
@@ -320,7 +327,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="chat-messages" id="chat-messages"></div>
     <div class="chat-input-bar">
       <input type="text" id="chat-input" placeholder="Écrivez votre message..." onkeypress="if(event.key==='Enter')sendChatMsg()">
-      <button class="chat-send-btn" onclick="sendChatMsg()">➤</button>
+      <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMsg()">➤</button>
     </div>
   </div>
 </div>
@@ -407,9 +414,10 @@ const API='https://gleam-production-9b95.up.railway.app';
 let currentUser=null,userRole='client',photos=[],disponible=true,currentChatDemandeId=null,chatPollInterval=null;
 let selectedServices=[],multiFlow={active:false,queue:[],current:0,results:[]};
 let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisId=null;
+let isSubmittingPhotos=false;
 
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
-function toast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur)}
+function toast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._hideTimer);t._hideTimer=setTimeout(()=>t.classList.remove('show'),dur)}
 function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.add('show')}
 function hideErr(id){document.getElementById(id).classList.remove('show')}
 function setRole(r){userRole=r;document.getElementById('role-client').classList.toggle('sel',r==='client');document.getElementById('role-pro').classList.toggle('sel',r==='pro')}
@@ -418,8 +426,25 @@ function switchTab(t){
   document.getElementById('form-login').style.display=t==='login'?'block':'none';
   document.getElementById('form-register').style.display=t==='register'?'block':'none';
 }
-function isPro(){const t=(currentUser?.type||'').toLowerCase().trim();return t==='pro'||t==='societe'||t==='professionnel'}
+function isPro(){const t=(currentUser&&currentUser.type||'').toLowerCase().trim();return t==='pro'||t==='societe'||t==='professionnel'}
 function authHeaders(){const t=localStorage.getItem('gleam_token');return{'Content-Type':'application/json','Authorization':'Bearer '+t}}
+function escapeHtml(s){if(s===null||s===undefined)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML}
+function escAttr(s){var str=String(s===null||s===undefined?'':s);return str.split('\\').join('\\\\').split("'").join("\\'");}
+
+// Lecture sûre d'une réponse fetch : gère les cas où le corps n'est pas du JSON valide
+// (ex: erreur 413 "payload too large", erreur 502 Railway, page HTML d'erreur, etc.)
+async function safeJson(r){
+  try{return await r.json()}
+  catch(e){
+    if(r.status===413)return{error:'Le fichier envoyé est trop volumineux. Réessayez avec moins de photos ou des photos plus légères.'};
+    if(r.status===0)return{error:'Impossible de contacter le serveur. Vérifiez votre connexion internet.'};
+    return{error:'Erreur serveur (code '+r.status+'). Réessayez dans un instant.'};
+  }
+}
+function friendlyNetworkError(e){
+  if(e&&e.name==='TypeError')return'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
+  return'Erreur réseau. Réessayez dans un instant.';
+}
 
 function goTab(tab){
   stopChatPoll();
@@ -448,10 +473,10 @@ async function forgotPassword(){
   if(!email){toast('Entrez votre email d\'abord.');return}
   try{
     const r=await fetch(API+'/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
-    const d=await r.json();
+    const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast('📧 Email de réinitialisation envoyé !',5000);
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e))}
 }
 
 async function doLogin(){
@@ -461,11 +486,11 @@ async function doLogin(){
   const btn=document.getElementById('login-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     const r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
-    const d=await r.json();
+    const d=await safeJson(r);
     if(!r.ok){showErr('lerr',d.error||'Identifiants incorrects.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
     enterApp();
-  }catch(e){showErr('lerr','Erreur réseau.')}
+  }catch(e){showErr('lerr',friendlyNetworkError(e))}
   finally{btn.disabled=false;btn.textContent='Se connecter'}
 }
 
@@ -476,28 +501,29 @@ async function doRegister(){
   if(!fn)return showErr('rerr','Prénom requis.');
   if(!ln)return showErr('rerr','Nom requis.');
   if(!email)return showErr('rerr','Email requis.');
+  if(!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email))return showErr('rerr','Format d\'email invalide.');
   if(!phone)return showErr('rerr','Téléphone requis.');
   if(!pw||pw.length<8)return showErr('rerr','Mot de passe min 8 caractères.');
   const btn=document.getElementById('register-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({firstName:fn,lastName:ln,prenom:fn,nom:ln,email,phone,telephone:phone,password:pw,role:userRole,type:userRole})});
-    const d=await r.json();
+    const d=await safeJson(r);
     if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
     enterApp();
-  }catch(e){showErr('rerr','Erreur réseau.')}
+  }catch(e){showErr('rerr',friendlyNetworkError(e))}
   finally{btn.disabled=false;btn.textContent='Créer mon compte Gleam'}
 }
 
 function enterApp(){
-  const name=currentUser?.firstName||currentUser?.prenom||currentUser?.email||'';
+  const name=(currentUser&&(currentUser.firstName||currentUser.prenom||currentUser.email))||'';
   if(isPro()){
     document.getElementById('pro-greeting').textContent='Bonjour '+name+' 👋';
     document.getElementById('pro-name-badge').textContent=name;
-    document.getElementById('pro-profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
-    document.getElementById('pro-profile-email').textContent=currentUser?.email||'';
-    disponible=currentUser?.disponible!==false;
+    document.getElementById('pro-profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
+    document.getElementById('pro-profile-email').textContent=(currentUser&&currentUser.email)||'';
+    disponible=!currentUser||currentUser.disponible!==false;
     document.getElementById('dispo-toggle').classList.toggle('on',disponible);
     document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
     show('s-pro-home');
@@ -505,8 +531,8 @@ function enterApp(){
   }else{
     document.getElementById('greeting-name').textContent='Bonjour '+name+' 👋';
     document.getElementById('user-name-badge').textContent=name;
-    document.getElementById('profile-name').textContent=(currentUser?.firstName||currentUser?.prenom||'')+' '+(currentUser?.lastName||currentUser?.nom||'');
-    document.getElementById('profile-email').textContent=currentUser?.email||'';
+    document.getElementById('profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
+    document.getElementById('profile-email').textContent=(currentUser&&currentUser.email)||'';
     show('s-home');
     loadDemandes();
   }
@@ -523,12 +549,12 @@ function tryParseNotes(notes){
     const n=JSON.parse(notes);
     if(n.prestations&&Array.isArray(n.prestations)){
       return n.prestations.map(function(p){
-        var det=p.details&&Object.keys(p.details).length?Object.values(p.details).join(' • '):'';
-        return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+(ICONS[p.type]||'✨')+' '+p.type+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+p.description:'')+'</div>';
+        var det=p.details&&Object.keys(p.details).length?Object.values(p.details).map(escapeHtml).join(' • '):'';
+        return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+(ICONS[p.type]||'✨')+' '+escapeHtml(p.type)+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+escapeHtml(p.description):'')+'</div>';
       }).join('');
     }
-    return n.description||'';
-  }catch(e){return notes||''}
+    return escapeHtml(n.description||'');
+  }catch(e){return escapeHtml(notes||'')}
 }
 
 function getPhotosFromNotes(notes){
@@ -550,55 +576,88 @@ function renderPhotoPreviews(photosList,containerId){
   });
 }
 
+// Redimensionne et compresse une image côté client avant envoi (évite les erreurs
+// "payload too large" quand un client envoie une photo prise directement au téléphone,
+// qui peut peser plusieurs Mo — surtout critique sur mobile).
+function compressImage(file,maxDim,quality){
+  return new Promise(function(resolve,reject){
+    var reader=new FileReader();
+    reader.onerror=function(){reject(new Error('Lecture du fichier impossible.'))};
+    reader.onload=function(e){
+      var img=new Image();
+      img.onerror=function(){reject(new Error('Image invalide.'))};
+      img.onload=function(){
+        var w=img.width,h=img.height;
+        if(w>h&&w>maxDim){h=Math.round(h*(maxDim/w));w=maxDim}
+        else if(h>=w&&h>maxDim){w=Math.round(w*(maxDim/h));h=maxDim}
+        var canvas=document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        var ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        try{resolve(canvas.toDataURL('image/jpeg',quality))}
+        catch(err){reject(err)}
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function formatCreneau(creneau){
   if(!creneau)return'';
   var match=creneau.match(/(\d{4})-(\d{2})-(\d{2})\s*à\s*(.+)/);
-  if(!match)return creneau;
+  if(!match)return escapeHtml(creneau);
   var y=match[1],m=match[2],d=match[3],time=match[4];
-  var date=new Date(y,m-1,d);
+  var date=new Date(parseInt(y),parseInt(m)-1,parseInt(d));
   var jours=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
   var mois=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-  return jours[date.getDay()]+' '+parseInt(d)+' '+mois[parseInt(m)-1]+' '+y+' à '+time;
+  return jours[date.getDay()]+' '+parseInt(d)+' '+mois[parseInt(m)-1]+' '+y+' à '+escapeHtml(time);
+}
+
+function localDateISO(d){
+  var yr=d.getFullYear(),mo=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');
+  return yr+'-'+mo+'-'+da;
 }
 
 // ── CLIENT DEMANDES ──
 async function loadDemandes(){
   try{
     const r=await fetch(API+'/api/demandes',{headers:authHeaders()});
+    if(r.status===401){return doLogout()}
     if(!r.ok)return;
-    const data=await r.json();
+    const data=await safeJson(r);
     const c=document.getElementById('recent-demands');
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
 
-    // Tri logique : en_cours > acceptee > devis_recus > en_attente > terminee
     var order={en_cours:0,acceptee:1,devis_recus:2,en_attente:3,terminee:4};
     data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9)});
 
     var html='';
     data.forEach(function(d){
       var st=STATUTS[d.statut]||['',''];
-      var icon=ICONS[d.prestation.split(' + ')[0]]||'✨';
+      var icon=ICONS[(d.prestation||'').split(' + ')[0]]||'✨';
       var urgentStyle=d.statut==='en_cours'?'border-color:var(--green);background:#F0FDF4;':'';
       var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px;margin-left:6px">ACTION REQUISE</span>':'';
-      html+='<div class="demand-row" style="'+urgentStyle+'" onclick="openDetail(\''+d.id+'\')">'+
+      html+='<div class="demand-row" style="'+urgentStyle+'" onclick="openDetail(\''+escAttr(d.id)+'\')">'+
         '<span class="demand-icon">'+icon+'</span>'+
         '<div class="demand-info">'+
-          '<div class="demand-type">'+d.prestation+urgentBadge+'</div>'+
-          '<div class="demand-addr">'+d.adresse+'</div>'+
+          '<div class="demand-type">'+escapeHtml(d.prestation)+urgentBadge+'</div>'+
+          '<div class="demand-addr">'+escapeHtml(d.adresse)+'</div>'+
           '<div class="demand-status '+st[1]+'">'+st[0]+'</div>'+
         '</div>'+
         '<div class="demand-date">'+new Date(d.created_at).toLocaleDateString('fr-FR')+'</div>'+
       '</div>';
     });
     c.innerHTML=html;
-  }catch(e){}
+  }catch(e){console.error('loadDemandes',e)}
 }
 
 async function loadDevis(){
   try{
     const rd=await fetch(API+'/api/demandes',{headers:authHeaders()});
+    if(rd.status===401){return doLogout()}
     if(!rd.ok)return;
-    const demandes=await rd.json();
+    const demandes=await safeJson(rd);
     const c=document.getElementById('devis-list');
     const avecDevis=demandes.filter(function(d){return d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee'});
     if(!avecDevis.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
@@ -606,14 +665,12 @@ async function loadDevis(){
     for(var i=0;i<avecDevis.length;i++){
       try{
         const r=await fetch(API+'/api/devis/demande/'+avecDevis[i].id,{headers:authHeaders()});
-        if(r.ok){const dv=await r.json();dv.forEach(function(v){all.push(Object.assign({},v,{prestation:avecDevis[i].prestation,demande_statut:avecDevis[i].statut}))})}
+        if(r.ok){const dv=await safeJson(r);dv.forEach(function(v){all.push(Object.assign({},v,{prestation:avecDevis[i].prestation,demande_statut:avecDevis[i].statut}))})}
       }catch(e){}
     }
     if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
 
-    // Tri logique : en cours > accepté à payer > en attente > refusé > annulé
     var devisOrder={accepte:0,envoye:1,refuse:2,annule_pro:3};
-    // Prioriser ceux dont la demande est en_cours (paiement fait)
     all.sort(function(a,b){
       var aScore=(a.demande_statut==='en_cours'?-1:0)+(devisOrder[a.statut]||9);
       var bScore=(b.demande_statut==='en_cours'?-1:0)+(devisOrder[b.statut]||9);
@@ -622,33 +679,32 @@ async function loadDevis(){
 
     var html='';
     all.forEach(function(v){
-      var proName=v.pro?(v.pro.prenom+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
-      var proNote=v.pro&&v.pro.note_moyenne?'⭐ '+v.pro.note_moyenne:'';
+      var proNameRaw=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
+      var proName=escapeHtml(proNameRaw);
+      var proNote=v.pro&&v.pro.note_moyenne?'⭐ '+escapeHtml(v.pro.note_moyenne):'';
       var badge,actions='';
       var cardStyle='';
+      var safeDemandeId=escAttr(v.demande_id),safeVId=escAttr(v.id),safeSocieteId=escAttr(v.societe_id),safeProName=escAttr(proNameRaw);
 
       if(v.statut==='accepte'&&v.demande_statut==='en_cours'){
-        // Payé — prestation en cours
         badge='<span class="devis-badge badge-accepted">🔧 En cours</span>';
         cardStyle='border-color:var(--green);background:#F0FDF4;';
         actions='<div style="margin-top:12px;display:flex;gap:8px">'+
-          '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\''+proName.replace(/'/g,'')+'\')">💬 Discuter</button>'+
-          '<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement(\''+v.demande_id+'\')">✅ Confirmer la prestation</button>'+
+          '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
+          '<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement(\''+safeDemandeId+'\')">✅ Confirmer la prestation</button>'+
         '</div>';
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
-        // Terminé
         badge='<span class="devis-badge badge-accepted">🏁 Terminé</span>';
         cardStyle='opacity:0.7;';
         actions='<div style="margin-top:12px">'+
-          '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+v.demande_id+'\',\''+v.societe_id+'\',\''+proName.replace(/'/g,'')+'\')">⭐ Noter le prestataire</button>'+
+          '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeSocieteId+'\',\''+safeProName+'\')">⭐ Noter le prestataire</button>'+
         '</div>';
       }else if(v.statut==='accepte'){
-        // Accepté — en attente de paiement
         badge='<span class="devis-badge badge-accepted">✅ Accepté — Paiement requis</span>';
         cardStyle='border-color:#D97706;background:#FFFBEB;';
         actions='<div style="margin-top:12px;display:flex;gap:8px">'+
-          '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\''+proName.replace(/'/g,'')+'\')">💬 Discuter</button>'+
-          '<button class="btn-accept" style="background:#059669" onclick="openPayment(\''+v.id+'\','+v.prix_ttc+')">💳 Payer '+v.prix_ttc+'\u20ac</button>'+
+          '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
+          '<button class="btn-accept" style="background:#059669" onclick="openPayment(\''+safeVId+'\','+Number(v.prix_ttc)+')">💳 Payer '+escapeHtml(v.prix_ttc)+'\u20ac</button>'+
         '</div>';
       }else if(v.statut==='refuse'){
         badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
@@ -659,8 +715,8 @@ async function loadDevis(){
       }else{
         badge='<span class="devis-badge badge-pending">⏳ En attente</span>';
         actions='<div style="display:flex;gap:8px;margin-top:12px">'+
-          '<button class="btn-accept" onclick="accepterDevis(\''+v.id+'\')">✅ Accepter</button>'+
-          '<button class="btn-refuse" onclick="refuserDevis(\''+v.id+'\')">❌ Refuser</button>'+
+          '<button class="btn-accept" onclick="accepterDevis(\''+safeVId+'\',this)">✅ Accepter</button>'+
+          '<button class="btn-refuse" onclick="refuserDevis(\''+safeVId+'\',this)">❌ Refuser</button>'+
         '</div>';
       }
 
@@ -670,31 +726,33 @@ async function loadDevis(){
           (proNote?'<div style="font-size:12px;color:#D97706;margin-top:2px">'+proNote+'</div>':'')+
           '</div>'+badge+
         '</div>'+
-        '<div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 '+v.prestation+'</div>'+
-        '<div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">'+v.prix_ttc+' \u20ac</div>'+
-        (v.description?'<div style="font-size:13px;color:#374151">'+v.description+'</div>':'')+
+        '<div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 '+escapeHtml(v.prestation)+'</div>'+
+        '<div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' \u20ac</div>'+
+        (v.description?'<div style="font-size:13px;color:#374151">'+escapeHtml(v.description)+'</div>':'')+
         actions+
       '</div>';
     });
     c.innerHTML=html;
-  }catch(e){console.error(e)}
+  }catch(e){console.error('loadDevis',e)}
 }
 
-async function accepterDevis(devisId){
+async function accepterDevis(devisId,btn){
   if(!confirm('Accepter ce devis ? Les autres devis seront automatiquement refusés.'))return;
+  if(btn){btn.disabled=true;var sib=btn.parentElement&&btn.parentElement.querySelector('.btn-refuse');if(sib)sib.disabled=true}
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/accepter',{method:'POST',headers:authHeaders()});
-    const d=await r.json();
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;var sib2=btn.parentElement&&btn.parentElement.querySelector('.btn-refuse');if(sib2)sib2.disabled=false}return}
     toast('✅ Devis accepté !');loadDevis();loadDemandes();
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
-async function refuserDevis(devisId){
+async function refuserDevis(devisId,btn){
+  if(btn){btn.disabled=true;var sib=btn.parentElement&&btn.parentElement.querySelector('.btn-accept');if(sib)sib.disabled=true}
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/refuser',{method:'POST',headers:authHeaders()});
-    if(!r.ok){toast('Erreur.');return}
+    if(!r.ok){const d=await safeJson(r);toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;var sib2=btn.parentElement&&btn.parentElement.querySelector('.btn-accept');if(sib2)sib2.disabled=false}return}
     toast('❌ Devis refusé.');loadDevis();
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
 // ── DETAIL DEMANDE ──
@@ -703,11 +761,11 @@ async function openDetail(demandeId){
   try{
     const r=await fetch(API+'/api/demandes/'+demandeId,{headers:authHeaders()});
     if(!r.ok){toast('Demande introuvable.');return}
-    const d=await r.json();
+    const d=await safeJson(r);
     currentDetailDemande=d;
     renderDetail(d);
     show('s-detail');
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e))}
 }
 function renderDetail(d){
   var c=document.getElementById('detail-content');
@@ -722,22 +780,22 @@ function renderDetail(d){
     '. Elle ne peut plus être modifiée ou annulée. Une annulation à ce stade peut entraîner des pénalités.</div></div>';
   html+='<div class="detail-card">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
-      '<span style="font-weight:700;font-size:13px;color:var(--gray)">'+(d.numero_anonyme||'')+'</span>'+
+      '<span style="font-weight:700;font-size:13px;color:var(--gray)">'+escapeHtml(d.numero_anonyme||'')+'</span>'+
       '<span class="demand-status '+st[1]+'" style="font-size:13px">'+st[0]+'</span>'+
     '</div>'+
     (prestations.length?prestations.map(function(p){
-      var det=p.details&&Object.keys(p.details).length?Object.values(p.details).join(' • '):'';
+      var det=p.details&&Object.keys(p.details).length?Object.values(p.details).map(escapeHtml).join(' • '):'';
       return '<div class="detail-presta"><span class="detail-presta-icon">'+(ICONS[p.type]||'✨')+'</span>'+
-        '<div><div class="detail-presta-name">'+p.type+'</div>'+
+        '<div><div class="detail-presta-name">'+escapeHtml(p.type)+'</div>'+
         (det?'<div class="detail-presta-info">'+det+'</div>':'')+
-        (p.description?'<div class="detail-presta-info">'+p.description+'</div>':'')+
+        (p.description?'<div class="detail-presta-info">'+escapeHtml(p.description)+'</div>':'')+
         '</div></div>';
     }).join(''):
-    '<div class="detail-presta"><span class="detail-presta-icon">'+(ICONS[d.prestation]||'✨')+'</span><div class="detail-presta-name">'+d.prestation+'</div></div>')+
+    '<div class="detail-presta"><span class="detail-presta-icon">'+(ICONS[d.prestation]||'✨')+'</span><div class="detail-presta-name">'+escapeHtml(d.prestation)+'</div></div>')+
   '</div>';
   if(hasPhotos)html+='<div class="detail-card"><label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>';
   html+='<div class="detail-card">'+
-    '<div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">'+d.adresse+'</div></div>'+
+    '<div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">'+escapeHtml(d.adresse)+'</div></div>'+
     (d.creneau?'<div class="field-group" style="margin-bottom:0"><label>📅 Créneau</label><div style="font-size:14px">'+formatCreneau(d.creneau)+'</div></div>':'')+
   '</div>';
   if(!locked)html+='<div class="detail-actions">'+
@@ -754,10 +812,10 @@ async function deleteDemande(){
   if(!confirm('Supprimer définitivement cette demande ?'))return;
   try{
     const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id,{method:'DELETE',headers:authHeaders()});
-    const d=await r.json();
+    const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast('🗑️ Demande supprimée.');goTab('home');
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e))}
 }
 function openModifyDemande(){
   if(!currentDetailDemande)return;
@@ -775,7 +833,7 @@ function prefillModifyForm(p){
   if(p.details){
     Object.entries(p.details).forEach(function(entry){
       var group=entry[0],value=entry[1];
-      document.querySelectorAll('[onclick*="selOpt(this,\''+group+'\')"]').forEach(function(b){
+      document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){
         if(b.textContent.trim()===value)b.classList.add('sel');
       });
     });
@@ -787,7 +845,7 @@ function prefillModifyForm(p){
 var noteDemandeId=null,noteSocieteId=null;
 function ouvrirNote(demandeId,societeId,proName){
   noteDemandeId=demandeId;noteSocieteId=societeId;
-  var html='<div class="modal-title">⭐ Noter '+proName+'</div>'+
+  var html='<div class="modal-title">⭐ Noter '+escapeHtml(proName)+'</div>'+
     '<div class="modal-sub">Comment s\'est passée votre prestation ?</div>'+
     '<div id="star-rating" style="display:flex;gap:12px;justify-content:center;margin:20px 0;font-size:36px">'+
     '<span class="star" data-note="1" onclick="selectNote(1)" style="cursor:pointer;opacity:0.3">⭐</span>'+
@@ -799,7 +857,7 @@ function ouvrirNote(demandeId,societeId,proName){
     '<div id="note-label" style="text-align:center;font-weight:700;font-size:16px;margin-bottom:16px;color:var(--gray)">Sélectionnez une note</div>'+
     '<div class="field-group"><label>Commentaire <span class="optional">(optionnel)</span></label>'+
     '<textarea id="note-comment" rows="3" placeholder="Décrivez votre expérience..." style="resize:none"></textarea></div>'+
-    '<button class="modal-send-btn" onclick="envoyerNote()">✅ Envoyer mon avis</button>';
+    '<button class="modal-send-btn" onclick="envoyerNote(this)">✅ Envoyer mon avis</button>';
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -811,59 +869,62 @@ function selectNote(n){
   document.getElementById('note-label').textContent=noteLabels[n]||'';
   document.getElementById('note-label').style.color=n>=4?'var(--green)':(n>=3?'#D97706':'var(--red)');
 }
-async function envoyerNote(){
+async function envoyerNote(btn){
   if(!noteSelectionnee){toast('Sélectionnez une note.');return}
   var comment=document.getElementById('note-comment')&&document.getElementById('note-comment').value.trim()||'';
+  if(btn)btn.disabled=true;
   try{
     const r=await fetch(API+'/api/evaluations',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:noteDemandeId,evalue_id:noteSocieteId,note:noteSelectionnee,commentaire:comment})});
-    if(!r.ok){const d=await r.json();toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){const d=await safeJson(r);toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
     document.getElementById('modal-overlay').classList.remove('open');
     toast('⭐ Merci pour votre avis !',4000);
     loadDevis();
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
-// ── PRO DEMANDES (avec tri logique) ──
+// ── PRO DEMANDES ──
 async function loadProDemandes(){
   try{
     const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
     const c=document.getElementById('pro-demandes-list');
+    if(r.status===401){return doLogout()}
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande disponible.</p></div>';document.getElementById('stat-demandes').textContent='0';return}
-    const data=await r.json();
+    const data=await safeJson(r);
     document.getElementById('stat-demandes').textContent=data.length||0;
     loadProDevisCount();
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
     var html='';
     data.forEach(function(d){
       var hasPhotos=getPhotosFromNotes(d.notes).length>0;
+      var safeId=escAttr(d.id);
       html+='<div class="demande-card">'+
-        '<div class="dc-header"><div class="dc-type">'+(ICONS[d.prestation]||'✨')+' '+d.prestation+'</div>'+
-        '<span class="dc-num">'+(d.numero_anonyme||'#???')+'</span></div>'+
-        '<div class="dc-info"><span>📍</span>'+d.adresse+'</div>'+
+        '<div class="dc-header"><div class="dc-type">'+(ICONS[d.prestation]||'✨')+' '+escapeHtml(d.prestation)+'</div>'+
+        '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
+        '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+'</div>'+
         (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
         (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:#F9FAFB;padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
-        (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+d.id+'"></div>':'')+
+        (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
         '<div class="devis-form">'+
           '<label>💰 Votre prix (€ TTC)</label>'+
-          '<input type="number" id="prix-'+d.id+'" placeholder="Ex: 150" min="1">'+
+          '<input type="number" inputmode="decimal" id="prix-'+safeId+'" placeholder="Ex: 150" min="1">'+
           '<label>📝 Message pour le client</label>'+
-          '<textarea id="msg-'+d.id+'" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>'+
-          '<button class="btn-devis" id="btn-devis-'+d.id+'" onclick="envoyerDevis(\''+d.id+'\')">✨ Envoyer mon devis</button>'+
+          '<textarea id="msg-'+safeId+'" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>'+
+          '<button class="btn-devis" id="btn-devis-'+safeId+'" onclick="envoyerDevis(\''+safeId+'\')">✨ Envoyer mon devis</button>'+
         '</div></div>';
     });
     c.innerHTML=html;
     data.forEach(function(d){
-      var photos=getPhotosFromNotes(d.notes);
-      if(photos.length)renderPhotoPreviews(photos,'photos-pro-'+d.id);
+      var ph=getPhotosFromNotes(d.notes);
+      if(ph.length)renderPhotoPreviews(ph,'photos-pro-'+d.id);
     });
-  }catch(e){document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement.</p></div>'}
+  }catch(e){document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement. Tirez vers le bas pour réessayer.</p></div>'}
 }
 
 async function loadProDevisCount(){
   try{
     const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
     if(!r.ok)return;
-    const data=await r.json();
+    const data=await safeJson(r);
     document.getElementById('stat-devis').textContent=data.length||0;
   }catch(e){}
 }
@@ -872,66 +933,107 @@ async function loadProDevis(){
   try{
     const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
     const c=document.getElementById('pro-devis-list');
+    if(r.status===401){return doLogout()}
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div>';return}
-    const data=await r.json();
+    const data=await safeJson(r);
     document.getElementById('stat-devis').textContent=data.length||0;
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\u2019instant.</p></div>';return}
+
+    // Tri logique : terminé > en cours > accepté (paiement en attente) > en attente > refusé/annulé
+    function proDevisScore(v){
+      var demandeStatut=v.demande&&v.demande.statut;
+      if(v.statut==='accepte'&&demandeStatut==='terminee')return 0;
+      if(v.statut==='accepte'&&demandeStatut==='en_cours')return 1;
+      if(v.statut==='accepte')return 2;
+      if(v.statut==='envoye')return 3;
+      return 4; // refuse, annule_pro
+    }
+    data.sort(function(a,b){
+      var diff=proDevisScore(a)-proDevisScore(b);
+      if(diff!==0)return diff;
+      return new Date(b.created_at||0)-new Date(a.created_at||0);
+    });
+
     var html='';
     data.forEach(function(v){
       var badge,extra='';
-      if(v.statut==='accepte'){
-        badge='<span class="devis-badge badge-accepted">✅ Accepté</span>';
+      var safeVId=escAttr(v.id),safeDemandeId=escAttr(v.demande_id);
+      var demandeStatut=v.demande&&v.demande.statut;
+      if(v.statut==='accepte'&&demandeStatut==='terminee'){
+        badge='<span class="devis-badge badge-accepted">🏁 Terminé</span>';
+      }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
+        badge='<span class="devis-badge badge-accepted">🔧 En cours</span>';
         extra='<div style="display:flex;gap:8px;margin-top:10px">'+
-          '<button class="btn-accept" onclick="goToChat(\''+v.demande_id+'\',\'Client\')">💬 Discuter</button>'+
-          '<button class="btn-refuse" onclick="annulerProDevis(\''+v.id+'\')">🚫 Annuler</button>'+
+          '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
+        '</div>';
+      }else if(v.statut==='accepte'){
+        badge='<span class="devis-badge badge-accepted">✅ Accepté — Paiement en attente</span>';
+        extra='<div style="display:flex;gap:8px;margin-top:10px">'+
+          '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
+          '<button class="btn-refuse" onclick="annulerProDevis(\''+safeVId+'\',this)">🚫 Annuler</button>'+
         '</div>';
       }else if(v.statut==='refuse'){badge='<span class="devis-badge badge-refused">❌ Refusé</span>'}
       else if(v.statut==='annule_pro'){badge='<span class="devis-badge badge-refused">🚫 Annulé par vous</span>'}
       else{badge='<span class="devis-badge badge-pending">⏳ En attente</span>'}
       html+='<div class="devis-card">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
-          '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+(ICONS[v.demande&&v.demande.prestation]||'✨')+' '+(v.demande&&v.demande.prestation||'')+'</div>'+badge+
+          '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+(ICONS[v.demande&&v.demande.prestation]||'✨')+' '+escapeHtml(v.demande&&v.demande.prestation||'')+'</div>'+badge+
         '</div>'+
-        '<div style="font-size:12px;color:var(--gray)">📍 '+(v.demande&&v.demande.adresse||'')+'</div>'+
-        '<div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">'+v.prix_ttc+' €</div>'+
-        (v.description?'<div style="font-size:13px;color:#374151">'+v.description+'</div>':'')+
+        '<div style="font-size:12px;color:var(--gray)">📍 '+escapeHtml(v.demande&&v.demande.adresse||'')+'</div>'+
+        '<div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' €</div>'+
+        (v.description?'<div style="font-size:13px;color:#374151">'+escapeHtml(v.description)+'</div>':'')+
         extra+'</div>';
     });
     c.innerHTML=html;
-  }catch(e){}
+  }catch(e){console.error('loadProDevis',e)}
 }
 
 async function envoyerDevis(demandeId){
-  var prix=document.getElementById('prix-'+demandeId)&&document.getElementById('prix-'+demandeId).value;
+  var prixEl=document.getElementById('prix-'+demandeId);
+  var prix=prixEl&&prixEl.value;
   var msg=document.getElementById('msg-'+demandeId)&&document.getElementById('msg-'+demandeId).value||'';
-  if(!prix||parseFloat(prix)<=0){toast('Entrez un prix valide.');return}
+  if(!prix||isNaN(parseFloat(prix))||parseFloat(prix)<=0){toast('Entrez un prix valide.');return}
   var btn=document.getElementById('btn-devis-'+demandeId);
-  btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>'}
   try{
     const r=await fetch(API+'/api/devis',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,prix_ttc:parseFloat(prix),description:msg})});
-    const d=await r.json();
-    if(!r.ok){toast('Erreur : '+(d.error||''));btn.disabled=false;btn.textContent='✨ Envoyer mon devis';return}
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}return}
     toast('✅ Devis envoyé au client !');
     loadProDemandes();loadProDevisCount();
-  }catch(e){toast('Erreur réseau.');btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}
+  }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}}
 }
 
 async function toggleDispo(){
   disponible=!disponible;
   document.getElementById('dispo-toggle').classList.toggle('on',disponible);
   document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
-  try{await fetch(API+'/api/societes/disponibilite',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({disponible})})}catch(e){}
+  try{
+    const r=await fetch(API+'/api/societes/disponibilite',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({disponible})});
+    if(!r.ok){
+      disponible=!disponible;
+      document.getElementById('dispo-toggle').classList.toggle('on',disponible);
+      document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
+      toast('Erreur, réessayez.');return;
+    }
+  }catch(e){
+    disponible=!disponible;
+    document.getElementById('dispo-toggle').classList.toggle('on',disponible);
+    document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
+    toast(friendlyNetworkError(e));return;
+  }
   toast(disponible?'✅ Disponible':'❌ Indisponible');
 }
 
-async function annulerProDevis(devisId){
+async function annulerProDevis(devisId,btn){
   if(!confirm('Annuler ce devis accepté ? Le client sera notifié.'))return;
+  if(btn)btn.disabled=true;
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
-    const d=await r.json();
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
     toast('🚫 Devis annulé.');loadProDevis();
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
 // ── CONVERSATIONS ──
@@ -940,7 +1042,7 @@ async function loadConversationsClient(){
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('client-conv-list');
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
-    const data=await r.json();
+    const data=await safeJson(r);
     renderConvList(c,data);
   }catch(e){}
 }
@@ -949,7 +1051,7 @@ async function loadConversationsPro(){
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('pro-conv-list');
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
-    const data=await r.json();
+    const data=await safeJson(r);
     renderConvList(c,data);
   }catch(e){}
 }
@@ -965,10 +1067,10 @@ function renderConvList(container,data){
   if(termine.length){
     html+='<div class="section-title" style="padding:16px 0 8px;color:var(--gray)">🏁 Terminées</div>';
     termine.forEach(function(c){
-      var name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
+      var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
       html+='<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);opacity:0.6;display:flex;gap:12px;align-items:center">'+
         '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
-        '<div class="conv-body"><div class="conv-name">'+name+'</div>'+
+        '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
         '<div class="conv-preview">Prestation terminée</div></div>'+
         '<div class="conv-time">🏁</div></div>';
     });
@@ -976,12 +1078,12 @@ function renderConvList(container,data){
   container.innerHTML=html;
 }
 function convRowHtml(c){
-  var name=c.autre_partie?(c.autre_partie.prenom+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
+  var nameRaw=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
   var preview=c.dernier_message||'Démarrez la conversation...';
   var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
-  return'<div class="conv-row" onclick="goToChat(\''+c.demande_id+'\',\''+name.replace(/'/g,'')+'\')">'+
+  return'<div class="conv-row" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(nameRaw)+'\')">'+
     '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
-    '<div class="conv-body"><div class="conv-name">'+name+'</div><div class="conv-preview">'+preview+'</div></div>'+
+    '<div class="conv-body"><div class="conv-name">'+escapeHtml(nameRaw)+'</div><div class="conv-preview">'+escapeHtml(preview)+'</div></div>'+
     '<div class="conv-time">'+time+'</div></div>';
 }
 
@@ -992,13 +1094,13 @@ function goToChat(demandeId,otherName){
   document.getElementById('chat-messages').innerHTML='';
   show('s-chat');
   loadChatMessages();
+  stopChatPoll();
   chatPollInterval=setInterval(loadChatMessages,4000);
-  // Vérifie si la prestation est terminée pour bloquer le chat
   fetch(API+'/api/demandes/'+demandeId,{headers:authHeaders()})
-    .then(function(r){return r.json()})
+    .then(function(r){return safeJson(r)})
     .then(function(d){
       var bar=document.querySelector('.chat-input-bar');
-      if(d.statut==='terminee'){
+      if(d&&d.statut==='terminee'){
         if(bar)bar.innerHTML='<div style="text-align:center;padding:12px;color:var(--gray);font-size:13px;width:100%">🏁 Cette prestation est terminée. La messagerie est fermée.</div>';
       }
     }).catch(function(){});
@@ -1013,28 +1115,30 @@ async function loadChatMessages(){
   try{
     const r=await fetch(API+'/api/messages/'+currentChatDemandeId,{headers:authHeaders()});
     if(!r.ok)return;
-    const data=await r.json();
+    const data=await safeJson(r);
     const c=document.getElementById('chat-messages');
     var atBottom=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
     var html='';
     if(!data||!data.length){html='<div class="empty-state" style="padding:30px"><span>💬</span><p>Démarrez la conversation !</p></div>'}
-    else{data.forEach(function(m){var mine=String(m.expediteur_id)===String(currentUser.id);html+='<div class="chat-bubble '+(mine?'mine':'theirs')+'">'+escapeHtml(m.contenu)+'</div>'})}
+    else{data.forEach(function(m){var mine=currentUser&&String(m.expediteur_id)===String(currentUser.id);html+='<div class="chat-bubble '+(mine?'mine':'theirs')+'">'+escapeHtml(m.contenu)+'</div>'})}
     c.innerHTML=html;
     if(atBottom||!data||data.length<=1)c.scrollTop=c.scrollHeight;
   }catch(e){}
 }
-function escapeHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
 async function sendChatMsg(){
   var input=document.getElementById('chat-input');
   var msg=input.value.trim();
   if(!msg||!currentChatDemandeId)return;
+  var sendBtn=document.getElementById('chat-send-btn');
   input.value='';
+  if(sendBtn)sendBtn.disabled=true;
   try{
     const r=await fetch(API+'/api/messages',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:currentChatDemandeId,contenu:msg})});
-    const d=await r.json();
-    if(!r.ok){toast(d.error||'Message bloqué.');return}
+    const d=await safeJson(r);
+    if(!r.ok){toast(d.error||'Message bloqué.');input.value=msg;return}
     loadChatMessages();
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e));input.value=msg}
+  finally{if(sendBtn)sendBtn.disabled=false}
 }
 
 // ── PAIEMENT ──
@@ -1047,15 +1151,16 @@ async function openPayment(devisId,montant){
   document.getElementById('payment-btn').textContent='🔒 Payer maintenant';
   try{
     const r=await fetch(API+'/api/paiements/intent',{method:'POST',headers:authHeaders(),body:JSON.stringify({devis_id:devisId})});
-    const d=await r.json();
+    const d=await safeJson(r);
     if(!r.ok){document.getElementById('payment-error').textContent=d.error||'Erreur';document.getElementById('payment-error').classList.add('show');return}
+    if(!d.client_secret||!d.publishable_key){document.getElementById('payment-error').textContent='Réponse de paiement invalide.';document.getElementById('payment-error').classList.add('show');return}
     currentPaymentIntent=d.client_secret;
     if(!stripeInstance)stripeInstance=Stripe(d.publishable_key);
     var elements=stripeInstance.elements();
     if(cardElement)cardElement.destroy();
     cardElement=elements.create('card',{style:{base:{fontSize:'16px',color:'#111827'}}});
     cardElement.mount('#card-element');
-  }catch(e){document.getElementById('payment-error').textContent='Erreur réseau.';document.getElementById('payment-error').classList.add('show')}
+  }catch(e){document.getElementById('payment-error').textContent=friendlyNetworkError(e);document.getElementById('payment-error').classList.add('show')}
 }
 function closePayment(){
   document.getElementById('payment-overlay').classList.remove('open');
@@ -1067,7 +1172,15 @@ async function confirmPayment(){
   var btn=document.getElementById('payment-btn');
   btn.disabled=true;btn.textContent='⏳ Traitement...';
   document.getElementById('payment-error').classList.remove('show');
-  var result=await stripeInstance.confirmCardPayment(currentPaymentIntent,{payment_method:{card:cardElement}});
+  var result;
+  try{
+    result=await stripeInstance.confirmCardPayment(currentPaymentIntent,{payment_method:{card:cardElement}});
+  }catch(e){
+    document.getElementById('payment-error').textContent=friendlyNetworkError(e);
+    document.getElementById('payment-error').classList.add('show');
+    btn.disabled=false;btn.textContent='🔒 Payer maintenant';
+    return;
+  }
   if(result.error){
     document.getElementById('payment-error').textContent=result.error.message;
     document.getElementById('payment-error').classList.add('show');
@@ -1075,7 +1188,20 @@ async function confirmPayment(){
     return;
   }
   if(result.paymentIntent&&result.paymentIntent.status==='succeeded'){
-    try{await fetch(API+'/api/paiements/confirmer',{method:'POST',headers:authHeaders(),body:JSON.stringify({payment_intent_id:result.paymentIntent.id})})}catch(e){}
+    try{
+      const cr=await fetch(API+'/api/paiements/confirmer',{method:'POST',headers:authHeaders(),body:JSON.stringify({payment_intent_id:result.paymentIntent.id})});
+      if(!cr.ok){
+        document.getElementById('payment-error').textContent='Paiement effectué mais la confirmation a échoué. Contactez le support.';
+        document.getElementById('payment-error').classList.add('show');
+        btn.disabled=false;btn.textContent='🔒 Payer maintenant';
+        return;
+      }
+    }catch(e){
+      document.getElementById('payment-error').textContent='Paiement effectué mais la confirmation a échoué. Contactez le support.';
+      document.getElementById('payment-error').classList.add('show');
+      btn.disabled=false;btn.textContent='🔒 Payer maintenant';
+      return;
+    }
     closePayment();
     toast('✅ Paiement réussi ! La prestation est confirmée.',5000);
     loadDevis();
@@ -1085,11 +1211,11 @@ async function libererPaiement(demandeId){
   if(!confirm('Confirmez-vous que la prestation a bien été réalisée ? Le paiement sera libéré au prestataire.'))return;
   try{
     const r=await fetch(API+'/api/paiements/liberer',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId})});
-    const d=await r.json();
+    const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast('✅ Prestation confirmée ! Le prestataire a été payé.',5000);
     loadDevis();loadDemandes();
-  }catch(e){toast('Erreur réseau.')}
+  }catch(e){toast(friendlyNetworkError(e))}
 }
 
 // ── SERVICES ──
@@ -1120,12 +1246,13 @@ function openServiceForm(type){
   }
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
+  renderPhotoInput();
 }
 function closeModal(e){if(e.target===document.getElementById('modal-overlay')){document.getElementById('modal-overlay').classList.remove('open');multiFlow={active:false,queue:[],current:0,results:[]}}}
 function isLastInFlow(){return!multiFlow.active||multiFlow.current===multiFlow.queue.length-1}
 
 function dateTimeBlock(isLast){
-  var today=new Date().toISOString().split('T')[0];
+  var today=localDateISO(new Date());
   if(multiFlow.active&&!isLast)return '<div class="divider"></div><div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">📅 La date, l\'heure et l\'adresse seront demandées à la dernière étape.</div>';
   var opts='';
   for(var i=0;i<27;i++){var h=Math.floor(i/2)+7,m=i%2?'30':'00';opts+='<option>'+h+'h'+m+'</option>'}
@@ -1135,9 +1262,10 @@ function dateTimeBlock(isLast){
     '<div class="datetime-row"><input type="date" id="f-date" min="'+today+'" value="'+today+'"><select id="f-time">'+opts+'</select></div>'+
     '<label style="margin-top:12px">Flexibilité <span class="optional">(optionnel)</span></label>'+
     '<div class="flex-opts">'+flexBtns+'</div></div>'+
-    '<div class="field-group"><label>📍 Adresse d\'intervention</label><input type="text" id="f-addr" placeholder="12 rue de la Paix, 75001 Paris"></div>'+
-    '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel)</span></label>'+
+    '<div class="field-group"><label>📍 Adresse d\'intervention</label><input type="text" id="f-addr" placeholder="12 rue de la Paix, 75001 Paris" autocomplete="street-address"></div>'+
+    '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel, max 5)</span></label>'+
     '<div class="photo-zone" onclick="document.getElementById(\'photo-input\').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>'+
+    '<div class="upload-progress" id="upload-progress">Compression des photos...</div>'+
     '<div class="photo-previews" id="photo-previews"></div></div>';
 }
 function descBlock(ph){return'<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
@@ -1145,102 +1273,102 @@ function sendBtn(type){var isLast=isLastInFlow();var label=multiFlow.active&&!is
 
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'net-type\')"><span>🪑</span>Intérieur</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'net-type\')"><span>✨</span>Extérieur</button>'+
-  '<button class="opt-btn full" onclick="selOpt(this,\'net-type\')"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
+  '<button class="opt-btn" data-group="net-type" onclick="selOpt(this)"><span>🪑</span>Intérieur</button>'+
+  '<button class="opt-btn" data-group="net-type" onclick="selOpt(this)"><span>✨</span>Extérieur</button>'+
+  '<button class="opt-btn full" data-group="net-type" onclick="selOpt(this)"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
   '<div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'veh\')"><span>🚗</span>Citadine</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'veh\')"><span>🚙</span>SUV/4x4</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'veh\')"><span>🚐</span>Monospace</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'veh\')"><span>🚌</span>Utilitaire</button></div></div>'+
+  '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
+  '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
+  '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
+  '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚌</span>Utilitaire</button></div></div>'+
   '<div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'seats\')">2 places</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'seats\')">5 places</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'seats\')">7 places</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'seats\')">9+ places</button></div></div>'+
+  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">2 places</button>'+
+  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">5 places</button>'+
+  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">7 places</button>'+
+  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">9+ places</button></div></div>'+
   descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-type\')"><span>➡️</span>Droit</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-type\')"><span>📐</span>Angle</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-type\')"><span>🪑</span>Canapé lit</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-type\')"><span>🪑</span>Chauffeuses</button></div></div>'+
+  '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>➡️</span>Droit</button>'+
+  '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>📐</span>Angle</button>'+
+  '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>🪑</span>Canapé lit</button>'+
+  '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>🪑</span>Chauffeuses</button></div></div>'+
   '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-pl\')">2 places</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-pl\')">3 places</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-pl\')">4 places</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-pl\')">5+ places</button></div></div>'+
+  '<button class="opt-btn" data-group="can-pl" onclick="selOpt(this)">2 places</button>'+
+  '<button class="opt-btn" data-group="can-pl" onclick="selOpt(this)">3 places</button>'+
+  '<button class="opt-btn" data-group="can-pl" onclick="selOpt(this)">4 places</button>'+
+  '<button class="opt-btn" data-group="can-pl" onclick="selOpt(this)">5+ places</button></div></div>'+
   '<div class="field-group"><label>Matière <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-mat\')">Tissu</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-mat\')">Cuir</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-mat\')">Velours</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'can-mat\')">Microfibre</button></div></div>'+
+  '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Tissu</button>'+
+  '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Cuir</button>'+
+  '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Velours</button>'+
+  '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Microfibre</button></div></div>'+
   descBlock('Ex: Taches de café...')+dateTimeBlock(isLastInFlow())+sendBtn('canape')}
 
 function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
   '<div class="field-group"><label>Taille</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'mat-t\')">90x190 cm</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'mat-t\')">140x190 cm</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'mat-t\')">160x200 cm</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'mat-t\')">180x200 cm</button></div></div>'+
+  '<button class="opt-btn" data-group="mat-t" onclick="selOpt(this)">90x190 cm</button>'+
+  '<button class="opt-btn" data-group="mat-t" onclick="selOpt(this)">140x190 cm</button>'+
+  '<button class="opt-btn" data-group="mat-t" onclick="selOpt(this)">160x200 cm</button>'+
+  '<button class="opt-btn" data-group="mat-t" onclick="selOpt(this)">180x200 cm</button></div></div>'+
   '<div class="field-group"><label>Nombre</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'mat-nb\')">1 matelas</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'mat-nb\')">2 matelas</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'mat-nb\')">3 matelas</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'mat-nb\')">4+ matelas</button></div></div>'+
+  '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">1 matelas</button>'+
+  '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">2 matelas</button>'+
+  '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">3 matelas</button>'+
+  '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">4+ matelas</button></div></div>'+
   descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
 
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
   '<div class="field-group"><label>Surface</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'ter-s\')">Moins de 20 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'ter-s\')">20 à 50 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'ter-s\')">50 à 100 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'ter-s\')">Plus de 100 m²</button></div></div>'+
+  '<button class="opt-btn" data-group="ter-s" onclick="selOpt(this)">Moins de 20 m²</button>'+
+  '<button class="opt-btn" data-group="ter-s" onclick="selOpt(this)">20 à 50 m²</button>'+
+  '<button class="opt-btn" data-group="ter-s" onclick="selOpt(this)">50 à 100 m²</button>'+
+  '<button class="opt-btn" data-group="ter-s" onclick="selOpt(this)">Plus de 100 m²</button></div></div>'+
   '<div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'ter-sol\')">Carrelage</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'ter-sol\')">Bois/composite</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'ter-sol\')">Béton</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'ter-sol\')">Pierre naturelle</button></div></div>'+
+  '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Carrelage</button>'+
+  '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Bois/composite</button>'+
+  '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Béton</button>'+
+  '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Pierre naturelle</button></div></div>'+
   descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
 
 function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Caractéristiques</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'pisc-t\')"><span>🏊</span>Enterrée</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'pisc-t\')"><span>🏖️</span>Hors-sol</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'pisc-t\')"><span>🌊</span>Semi-enterrée</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'pisc-t\')"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
+  '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🏊</span>Enterrée</button>'+
+  '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🏖️</span>Hors-sol</button>'+
+  '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🌊</span>Semi-enterrée</button>'+
+  '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
   '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'pisc-s\')">Moins de 25 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'pisc-s\')">25 à 50 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'pisc-s\')">50 à 80 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'pisc-s\')">Plus de 80 m²</button></div></div>'+
+  '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">Moins de 25 m²</button>'+
+  '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">25 à 50 m²</button>'+
+  '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">50 à 80 m²</button>'+
+  '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">Plus de 80 m²</button></div></div>'+
   descBlock('Ex: Eau verte...')+dateTimeBlock(isLastInFlow())+sendBtn('piscine')}
 
 function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
   '<div class="field-group"><label>Type de toiture</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'toit-t\')">Tuiles</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'toit-t\')">Ardoises</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'toit-t\')">Fibrociment</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'toit-t\')">Zinc/Métal</button></div></div>'+
+  '<button class="opt-btn" data-group="toit-t" onclick="selOpt(this)">Tuiles</button>'+
+  '<button class="opt-btn" data-group="toit-t" onclick="selOpt(this)">Ardoises</button>'+
+  '<button class="opt-btn" data-group="toit-t" onclick="selOpt(this)">Fibrociment</button>'+
+  '<button class="opt-btn" data-group="toit-t" onclick="selOpt(this)">Zinc/Métal</button></div></div>'+
   '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'toit-s\')">Moins de 50 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'toit-s\')">50 à 100 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'toit-s\')">100 à 200 m²</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'toit-s\')">Plus de 200 m²</button></div></div>'+
+  '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">Moins de 50 m²</button>'+
+  '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">50 à 100 m²</button>'+
+  '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">100 à 200 m²</button>'+
+  '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">Plus de 200 m²</button></div></div>'+
   descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
 
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
   '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'vitr-b\')">🏠 Maison</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'vitr-b\')">🏢 Appartement</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'vitr-b\')">🏪 Commerce</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'vitr-b\')">🏭 Bureaux</button></div></div>'+
+  '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏠 Maison</button>'+
+  '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏢 Appartement</button>'+
+  '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏪 Commerce</button>'+
+  '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏭 Bureaux</button></div></div>'+
   '<div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" onclick="selOpt(this,\'vitr-nb\')">Moins de 5</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'vitr-nb\')">5 à 10</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'vitr-nb\')">10 à 20</button>'+
-  '<button class="opt-btn" onclick="selOpt(this,\'vitr-nb\')">Plus de 20</button></div></div>'+
+  '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">Moins de 5</button>'+
+  '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">5 à 10</button>'+
+  '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">10 à 20</button>'+
+  '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">Plus de 20</button></div></div>'+
   descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
 function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
@@ -1248,16 +1376,38 @@ function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><
   '<div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel..." style="resize:none"></textarea></div>'+
   dateTimeBlock(isLastInFlow())+sendBtn('autre')}
 
-function selOpt(btn,group){document.querySelectorAll('[onclick*="selOpt(this,\''+group+'\')"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
+function selOpt(btn){var group=btn.getAttribute('data-group');document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
 function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
-function handlePhotos(input){Array.from(input.files).forEach(function(f){if(photos.length>=5)return;var r=new FileReader();r.onload=function(e){photos.push(e.target.result);renderPhotoInput()};r.readAsDataURL(f)});input.value=''}
-function renderPhotoInput(){var c=document.getElementById('photo-previews');if(!c)return;c.innerHTML='';photos.forEach(function(src,i){var div=document.createElement('div');div.className='photo-preview';var img=document.createElement('img');img.src=src;var btn=document.createElement('button');btn.className='del-photo';btn.textContent='×';btn.onclick=function(){photos.splice(i,1);renderPhotoInput()};div.appendChild(img);div.appendChild(btn);c.appendChild(div)})}
-function removePhoto(i){photos.splice(i,1);renderPhotoInput()}
+
+async function handlePhotos(input){
+  var files=Array.from(input.files||[]);
+  input.value='';
+  if(!files.length)return;
+  var remaining=5-photos.length;
+  if(remaining<=0){toast('Maximum 5 photos par demande.');return}
+  var toProcess=files.slice(0,remaining);
+  if(files.length>remaining)toast('Seules les '+remaining+' premières photos ont été ajoutées (max 5 au total).');
+  var progressEl=document.getElementById('upload-progress');
+  if(progressEl)progressEl.classList.add('show');
+  for(var i=0;i<toProcess.length;i++){
+    var f=toProcess[i];
+    if(!f.type||f.type.indexOf('image/')!==0){toast('"'+f.name+'" n\'est pas une image valide, ignorée.');continue}
+    try{
+      var dataUrl=await compressImage(f,1280,0.72);
+      photos.push(dataUrl);
+      renderPhotoInput();
+    }catch(e){
+      toast('Impossible de traiter la photo "'+f.name+'".');
+    }
+  }
+  if(progressEl)progressEl.classList.remove('show');
+}
+function renderPhotoInput(){var c=document.getElementById('photo-previews');if(!c)return;c.innerHTML='';photos.forEach(function(src,i){var div=document.createElement('div');div.className='photo-preview';var img=document.createElement('img');img.src=src;var btn=document.createElement('button');btn.className='del-photo';btn.type='button';btn.textContent='×';btn.onclick=function(){photos.splice(i,1);renderPhotoInput()};div.appendChild(img);div.appendChild(btn);c.appendChild(div)})}
 
 async function sendDemand(type){
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
-  document.querySelectorAll('.opt-btn.sel').forEach(function(b){var m=b.getAttribute('onclick').match(/selOpt\(this,'([^']+)'\)/);if(m&&m[1])details[m[1]]=b.textContent.trim()});
+  document.querySelectorAll('.opt-btn.sel').forEach(function(b){var group=b.getAttribute('data-group');if(group)details[group]=b.textContent.trim()});
   if(type==='autre'){var t=document.getElementById('f-autre-type')&&document.getElementById('f-autre-type').value.trim();if(t)details['type-prestation']=t}
 
   if(multiFlow.active&&multiFlow.current<multiFlow.queue.length-1){
@@ -1285,7 +1435,8 @@ async function sendDemand(type){
     var url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
     var method=isEdit?'PATCH':'POST';
     const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:addr,date:date,time:time,flexibility:flex,photos:photos.slice(0,5)})});
-    if(!r.ok){const d=await r.json();toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
     photos=[];selectedServices=[];
     var wasEdit=isEdit,editedId=multiFlow.editId;
@@ -1295,15 +1446,15 @@ async function sendDemand(type){
     if(wasEdit){toast('✅ Demande modifiée !');openDetail(editedId)}
     else{show('s-success')}
     loadDemandes();
-  }catch(e){toast('Erreur réseau.');if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}}
+  }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}}
 }
 
 // ── INIT ──
 var tok=localStorage.getItem('gleam_token');
 if(tok){
   fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
-    .then(function(r){return r.ok?r.json():null})
-    .then(function(u){if(u){currentUser=u;enterApp()}else localStorage.removeItem('gleam_token')})
+    .then(function(r){return r.ok?safeJson(r):null})
+    .then(function(u){if(u&&u.id){currentUser=u;enterApp()}else localStorage.removeItem('gleam_token')})
     .catch(function(){});
 }
 </script>
