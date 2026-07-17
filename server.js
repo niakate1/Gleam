@@ -580,7 +580,7 @@ app.get('/api/conversations', auth, async (req, res) => {
     let demandeIds = [];
 
     if (isProType(user?.type)) {
-      const { data: devis } = await supabase.from('devis').select('demande_id').eq('societe_id', req.user.id);
+      const { data: devis } = await supabase.from('devis').select('demande_id').eq('societe_id', req.user.id).eq('statut', 'accepte');
       demandeIds = [...new Set((devis || []).map(d => d.demande_id))];
     } else {
       const { data: demandes } = await supabase.from('demandes').select('id').eq('client_id', req.user.id);
