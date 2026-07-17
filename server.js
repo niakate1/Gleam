@@ -36,6 +36,23 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
 
 app.use(express.json({ limit: '10mb' }));
 
+// Gestion propre des erreurs de parsing du body (JSON malformé, payload trop volumineux).
+// Sans ce middleware, Express renvoie une page d'erreur HTML par défaut que le frontend
+// ne peut pas parser en JSON, ce qui provoquait des messages "Erreur réseau" trompeurs
+// (notamment sur mobile, où les photos prises directement au téléphone peuvent dépasser 10MB).
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Le fichier envoyé est trop volumineux (photos trop lourdes). Réessayez avec moins de photos.' });
+  }
+  if (err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Requête invalide.' });
+  }
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Requête invalide.' });
+  }
+  next(err);
+});
+
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 app.use('/api/', globalLimiter);
@@ -155,6 +172,14 @@ app.post('/api/demandes', auth, async (req, res) => {
   try {
     const { type, prestations, address, date, time, flexibility, description, details, photos } = req.body;
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
+    if (photos && Array.isArray(photos)) {
+      if (photos.length > 5) return res.status(400).json({ error: 'Maximum 5 photos par demande.' });
+      for (const p of photos) {
+        if (typeof p === 'string' && p.length > 3 * 1024 * 1024) {
+          return res.status(400).json({ error: 'Une photo est trop volumineuse. Réessayez avec une photo plus légère.' });
+        }
+      }
+    }
 
     const numero = 'Client #' + Math.floor(1000 + Math.random() * 9000);
     const creneau = date && time ? date + ' à ' + time : null;
@@ -590,6 +615,7 @@ app.get('/api/conversations', auth, async (req, res) => {
         numero_anonyme: d.numero_anonyme,
         dernier_message: lastMsg ? lastMsg.contenu : null,
         dernier_message_date: lastMsg ? lastMsg.created_at : d.created_at,
+        dernier_message_expediteur_id: lastMsg ? lastMsg.expediteur_id : null,
         autre_partie: autrePartie
       });
     }
@@ -750,6 +776,19 @@ app.get('/api/societes', auth, async (req, res) => {
 app.patch('/api/societes/disponibilite', auth, async (req, res) => {
   await supabase.from('users').update({ disponible: Boolean(req.body.disponible) }).eq('id', req.user.id);
   res.json({ message: 'Disponibilité mise à jour.' });
+});
+
+// Filet de sécurité : toute erreur non interceptée par un try/catch de route
+// renvoie une réponse JSON propre plutôt qu'une page d'erreur HTML illisible par le frontend.
+app.use((err, req, res, next) => {
+  console.error('Erreur non interceptée :', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Erreur serveur inattendue.' });
+});
+
+// Route 404 générique pour les chemins inconnus (renvoie du JSON, pas du HTML)
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route introuvable.' });
 });
 
 const PORT = process.env.PORT || 3000;
