@@ -166,6 +166,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 @keyframes spin{to{transform:rotate(360deg)}}
 .upload-progress{font-size:12px;color:var(--gray);margin-top:6px;display:none}
 .upload-progress.show{display:block}
+.nav-badge{position:absolute;top:-3px;right:-6px;width:9px;height:9px;background:var(--red);border-radius:50%;border:2px solid #fff}
+.conv-dot{width:8px;height:8px;background:var(--red);border-radius:50%;flex-shrink:0;margin-left:6px}
 </style>
 </head>
 <body>
@@ -229,7 +231,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
   <div class="bottom-nav">
     <button class="bnav-item active" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goTab('messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-client" style="display:none"></span></span>Messages</button>
     <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
   </div>
@@ -253,7 +255,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
   <div class="bottom-nav">
     <button class="bnav-item active" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-pro" style="display:none"></span></span>Messages</button>
     <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
   </div>
@@ -265,7 +267,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div id="pro-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item active" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item active" onclick="goProTab('pro-messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-pro" style="display:none"></span></span>Messages</button>
     <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
   </div>
@@ -277,7 +279,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-pro" style="display:none"></span></span>Messages</button>
     <button class="bnav-item active" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
   </div>
@@ -298,7 +300,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-pro" style="display:none"></span></span>Messages</button>
     <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item active" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
   </div>
@@ -310,7 +312,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div id="client-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item active" onclick="goTab('messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item active" onclick="goTab('messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-client" style="display:none"></span></span>Messages</button>
     <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
   </div>
@@ -338,7 +340,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="devis-list" id="devis-list"><div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goTab('messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-client" style="display:none"></span></span>Messages</button>
     <button class="bnav-item active" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
   </div>
@@ -360,7 +362,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages</button>
+    <button class="bnav-item" onclick="goTab('messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-client" style="display:none"></span></span>Messages</button>
     <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item active" onclick="goTab('profile')"><span>👤</span>Profil</button>
   </div>
@@ -537,8 +539,9 @@ function enterApp(){
     loadDemandes();
   }
   toast('Bienvenue sur Gleam ✨');
+  startUnreadPoll();
 }
-function doLogout(){stopChatPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
+function doLogout(){stopChatPoll();stopUnreadPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
 
 // ── HELPERS ──
 const ICONS={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
@@ -1045,6 +1048,45 @@ async function annulerProDevis(devisId,btn){
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
+// ── NOTIFICATIONS MESSAGES NON LUS ──
+function getLastReadMap(){
+  try{return JSON.parse(localStorage.getItem('gleam_last_read')||'{}')}catch(e){return{}}
+}
+function setLastRead(demandeId){
+  if(!demandeId)return;
+  var m=getLastReadMap();
+  m[demandeId]=new Date().toISOString();
+  try{localStorage.setItem('gleam_last_read',JSON.stringify(m))}catch(e){}
+}
+function isConvUnread(c){
+  if(!c||!c.dernier_message_date)return false;
+  if(c.dernier_message_expediteur_id&&currentUser&&String(c.dernier_message_expediteur_id)===String(currentUser.id))return false;
+  var lastRead=getLastReadMap()[c.demande_id];
+  if(!lastRead)return true;
+  return new Date(c.dernier_message_date)>new Date(lastRead);
+}
+function updateNavBadge(hasUnread){
+  var cls=isPro()?'nav-badge-pro':'nav-badge-client';
+  document.querySelectorAll('.'+cls).forEach(function(el){el.style.display=hasUnread?'block':'none'});
+}
+async function refreshUnreadBadge(){
+  if(!currentUser)return;
+  try{
+    const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
+    if(!r.ok)return;
+    const data=await safeJson(r);
+    var hasUnread=(data||[]).some(isConvUnread);
+    updateNavBadge(hasUnread);
+  }catch(e){}
+}
+let unreadPollInterval=null;
+function startUnreadPoll(){
+  stopUnreadPoll();
+  refreshUnreadBadge();
+  unreadPollInterval=setInterval(refreshUnreadBadge,20000);
+}
+function stopUnreadPoll(){if(unreadPollInterval){clearInterval(unreadPollInterval);unreadPollInterval=null}}
+
 // ── CONVERSATIONS ──
 async function loadConversationsClient(){
   try{
@@ -1053,6 +1095,7 @@ async function loadConversationsClient(){
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await safeJson(r);
     renderConvList(c,data);
+    updateNavBadge((data||[]).some(isConvUnread));
   }catch(e){}
 }
 async function loadConversationsPro(){
@@ -1062,6 +1105,7 @@ async function loadConversationsPro(){
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await safeJson(r);
     renderConvList(c,data);
+    updateNavBadge((data||[]).some(isConvUnread));
   }catch(e){}
 }
 function renderConvList(container,data){
@@ -1090,9 +1134,10 @@ function convRowHtml(c){
   var nameRaw=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
   var preview=c.dernier_message||'Démarrez la conversation...';
   var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
+  var unread=isConvUnread(c);
   return'<div class="conv-row" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(nameRaw)+'\')">'+
     '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
-    '<div class="conv-body"><div class="conv-name">'+escapeHtml(nameRaw)+'</div><div class="conv-preview">'+escapeHtml(preview)+'</div></div>'+
+    '<div class="conv-body"><div class="conv-name">'+escapeHtml(nameRaw)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div><div class="conv-preview">'+escapeHtml(preview)+'</div></div>'+
     '<div class="conv-time">'+time+'</div></div>';
 }
 
@@ -1105,6 +1150,8 @@ function goToChat(demandeId,otherName){
   loadChatMessages();
   stopChatPoll();
   chatPollInterval=setInterval(loadChatMessages,4000);
+  setLastRead(demandeId);
+  refreshUnreadBadge();
   fetch(API+'/api/demandes/'+demandeId,{headers:authHeaders()})
     .then(function(r){return safeJson(r)})
     .then(function(d){
@@ -1132,6 +1179,7 @@ async function loadChatMessages(){
     else{data.forEach(function(m){var mine=currentUser&&String(m.expediteur_id)===String(currentUser.id);html+='<div class="chat-bubble '+(mine?'mine':'theirs')+'">'+escapeHtml(m.contenu)+'</div>'})}
     c.innerHTML=html;
     if(atBottom||!data||data.length<=1)c.scrollTop=c.scrollHeight;
+    setLastRead(currentChatDemandeId);
   }catch(e){}
 }
 async function sendChatMsg(){
