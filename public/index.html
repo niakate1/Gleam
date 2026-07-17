@@ -1050,13 +1050,14 @@ async function annulerProDevis(devisId,btn){
 
 // ── NOTIFICATIONS MESSAGES NON LUS ──
 function getLastReadMap(){
-  try{return JSON.parse(localStorage.getItem('gleam_last_read')||'{}')}catch(e){return{}}
+  if(!currentUser||!currentUser.id)return{};
+  try{return JSON.parse(localStorage.getItem('gleam_last_read_'+currentUser.id)||'{}')}catch(e){return{}}
 }
 function setLastRead(demandeId){
-  if(!demandeId)return;
+  if(!demandeId||!currentUser||!currentUser.id)return;
   var m=getLastReadMap();
   m[demandeId]=new Date().toISOString();
-  try{localStorage.setItem('gleam_last_read',JSON.stringify(m))}catch(e){}
+  try{localStorage.setItem('gleam_last_read_'+currentUser.id,JSON.stringify(m))}catch(e){}
 }
 function isConvUnread(c){
   if(!c||!c.dernier_message_date)return false;
