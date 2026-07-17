@@ -37,9 +37,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .pro-badge{background:#D1FAE5;color:var(--green);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600}
 .back-btn{background:none;border:none;font-size:20px;cursor:pointer;color:#374151}
 .bottom-nav{background:#fff;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:sticky;bottom:0;padding-bottom:env(safe-area-inset-bottom)}
-.bnav-item{display:flex;flex-direction:column;align-items:center;padding:10px 0;cursor:pointer;border:none;background:none;color:var(--gray);font-size:11px;font-weight:600;gap:3px}
+.bnav-item{display:flex;flex-direction:column;align-items:center;padding:10px 0;cursor:pointer;border:none;background:none;color:var(--gray);font-size:11px;font-weight:600;gap:3px;position:relative}
 .bnav-item.active{color:var(--p)}
 .bnav-item span:first-child{font-size:22px}
+.nav-badge{position:absolute;top:4px;left:50%;margin-left:6px;width:9px;height:9px;background:var(--red);border-radius:50%;border:2px solid #fff}
 .home-content,.pro-content,.profile-content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .greeting h2{font-size:22px;font-weight:800;margin-bottom:4px}
 .greeting p{color:var(--gray);font-size:14px;margin-bottom:18px}
@@ -166,7 +167,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 @keyframes spin{to{transform:rotate(360deg)}}
 .upload-progress{font-size:12px;color:var(--gray);margin-top:6px;display:none}
 .upload-progress.show{display:block}
-.nav-badge{position:absolute;top:-3px;right:-6px;width:9px;height:9px;background:var(--red);border-radius:50%;border:2px solid #fff}
 .conv-dot{width:8px;height:8px;background:var(--red);border-radius:50%;flex-shrink:0;margin-left:6px}
 </style>
 </head>
@@ -231,7 +231,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
   <div class="bottom-nav">
     <button class="bnav-item active" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-client" style="display:none"></span></span>Messages</button>
+    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
     <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
   </div>
@@ -255,7 +255,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
   <div class="bottom-nav">
     <button class="bnav-item active" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-pro" style="display:none"></span></span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
     <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
   </div>
@@ -267,7 +267,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div id="pro-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item active" onclick="goProTab('pro-messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-pro" style="display:none"></span></span>Messages</button>
+    <button class="bnav-item active" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
     <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
   </div>
@@ -279,7 +279,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-pro" style="display:none"></span></span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
     <button class="bnav-item active" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
   </div>
@@ -300,7 +300,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-pro" style="display:none"></span></span>Messages</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
     <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item active" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
   </div>
@@ -312,7 +312,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div id="client-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item active" onclick="goTab('messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-client" style="display:none"></span></span>Messages</button>
+    <button class="bnav-item active" onclick="goTab('messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
     <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
   </div>
@@ -340,7 +340,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="devis-list" id="devis-list"><div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-client" style="display:none"></span></span>Messages</button>
+    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
     <button class="bnav-item active" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
   </div>
@@ -362,7 +362,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   </div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span style="position:relative">💬<span class="nav-badge nav-badge-client" style="display:none"></span></span>Messages</button>
+    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
     <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
     <button class="bnav-item active" onclick="goTab('profile')"><span>👤</span>Profil</button>
   </div>
@@ -1075,8 +1075,7 @@ async function refreshUnreadBadge(){
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     if(!r.ok)return;
     const data=await safeJson(r);
-    var hasUnread=(data||[]).some(isConvUnread);
-    updateNavBadge(hasUnread);
+    updateNavBadge(hasAnyUnreadVisible(data));
   }catch(e){}
 }
 let unreadPollInterval=null;
@@ -1095,7 +1094,7 @@ async function loadConversationsClient(){
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await safeJson(r);
     renderConvList(c,data);
-    updateNavBadge((data||[]).some(isConvUnread));
+    updateNavBadge(hasAnyUnreadVisible(data));
   }catch(e){}
 }
 async function loadConversationsPro(){
@@ -1105,8 +1104,13 @@ async function loadConversationsPro(){
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await safeJson(r);
     renderConvList(c,data);
-    updateNavBadge((data||[]).some(isConvUnread));
+    updateNavBadge(hasAnyUnreadVisible(data));
   }catch(e){}
+}
+// Ne considère que les conversations réellement affichées et cliquables dans la liste
+// (acceptee/en_cours/terminee), pour garantir que le badge peut toujours être effacé par l'utilisateur.
+function hasAnyUnreadVisible(data){
+  return (data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'||c.statut==='terminee'}).some(isConvUnread);
 }
 function renderConvList(container,data){
   var active=(data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'});
@@ -1121,10 +1125,11 @@ function renderConvList(container,data){
     html+='<div class="section-title" style="padding:16px 0 8px;color:var(--gray)">🏁 Terminées</div>';
     termine.forEach(function(c){
       var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
-      html+='<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);opacity:0.6;display:flex;gap:12px;align-items:center">'+
+      var unread=isConvUnread(c);
+      html+='<div class="conv-row" style="opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
         '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
-        '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
-        '<div class="conv-preview">Prestation terminée</div></div>'+
+        '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div>'+
+        '<div class="conv-preview">Prestation terminée — consulter l\'historique</div></div>'+
         '<div class="conv-time">🏁</div></div>';
     });
   }
