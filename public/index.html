@@ -501,7 +501,7 @@ async function doRegister(){
   if(!fn)return showErr('rerr','Prénom requis.');
   if(!ln)return showErr('rerr','Nom requis.');
   if(!email)return showErr('rerr','Email requis.');
-  if(!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email))return showErr('rerr','Format d\'email invalide.');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return showErr('rerr','Format d\'email invalide.');
   if(!phone)return showErr('rerr','Téléphone requis.');
   if(!pw||pw.length<8)return showErr('rerr','Mot de passe min 8 caractères.');
   const btn=document.getElementById('register-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
@@ -670,11 +670,20 @@ async function loadDevis(){
     }
     if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
 
-    var devisOrder={accepte:0,envoye:1,refuse:2,annule_pro:3};
+    // Tri logique explicite (indépendant du statut de la demande associée à d'autres devis) :
+    // En cours > Terminé (à noter) > Accepté-paiement requis > En attente > Refusé > Annulé par le pro
+    function clientDevisScore(v){
+      if(v.statut==='accepte'&&v.demande_statut==='en_cours')return 0;
+      if(v.statut==='accepte'&&v.demande_statut==='terminee')return 1;
+      if(v.statut==='accepte')return 2;
+      if(v.statut==='envoye')return 3;
+      if(v.statut==='refuse')return 4;
+      return 5; // annule_pro
+    }
     all.sort(function(a,b){
-      var aScore=(a.demande_statut==='en_cours'?-1:0)+(devisOrder[a.statut]||9);
-      var bScore=(b.demande_statut==='en_cours'?-1:0)+(devisOrder[b.statut]||9);
-      return aScore-bScore;
+      var diff=clientDevisScore(a)-clientDevisScore(b);
+      if(diff!==0)return diff;
+      return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
 
     var html='';
