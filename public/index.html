@@ -304,6 +304,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-hero"><div class="avatar">🏢</div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p></div>
     <div class="profile-menu">
       <div class="profile-item"><span class="pi-icon">💰</span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon">💶</span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon">⭐</span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon">🔔</span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon">❓</span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
@@ -316,6 +317,23 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
     <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
     <button class="bnav-item active" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+  </div>
+</div>
+
+<!-- PRO TARIFS (Vague 2) -->
+<div class="screen" id="s-pro-tarifs">
+  <div class="navbar">
+    <button class="back-btn" onclick="goProTab('pro-profile')">←</button>
+    <span class="logo-sm" style="font-size:16px">💶 Mes tarifs</span>
+    <span style="width:24px"></span>
+  </div>
+  <div class="home-content">
+    <div class="locked-banner" style="background:var(--light);border-color:#DDD6FE;color:#5B21B6">
+      <span>💡</span>
+      <div>Fixez un tarif de base par prestation. Les clients verront une estimation de prix calculée à partir de ces tarifs (et de ceux des autres pros) avant même de recevoir un devis. Laissez un champ vide si vous ne proposez pas cette prestation — un tarif par défaut sera utilisé pour l'estimation en attendant.</div>
+    </div>
+    <div id="pro-tarifs-form"></div>
+    <button class="modal-send-btn" id="save-tarifs-btn" onclick="saveTarifs()" style="margin-top:8px">💾 Enregistrer mes tarifs</button>
   </div>
 </div>
 
@@ -475,13 +493,14 @@ function goTab(tab){
 }
 function goProTab(tab){
   stopChatPoll();
-  const map={'pro-home':'s-pro-home','pro-messages':'s-pro-messages','pro-devis':'s-pro-devis','pro-profile':'s-pro-profile'};
+  const map={'pro-home':'s-pro-home','pro-messages':'s-pro-messages','pro-devis':'s-pro-devis','pro-profile':'s-pro-profile','pro-tarifs':'s-pro-tarifs'};
   show(map[tab]);
   const idx={'pro-home':0,'pro-messages':1,'pro-devis':2,'pro-profile':3}[tab];
-  document.querySelectorAll('#'+map[tab]+' .bnav-item').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  if(idx!==undefined)document.querySelectorAll('#'+map[tab]+' .bnav-item').forEach((b,i)=>b.classList.toggle('active',i===idx));
   if(tab==='pro-home')loadProDemandes();
   if(tab==='pro-devis')loadProDevis();
   if(tab==='pro-messages')loadConversationsPro();
+  if(tab==='pro-tarifs')loadProTarifs();
 }
 
 // ── AUTH ──
@@ -1043,6 +1062,69 @@ async function envoyerDevis(demandeId){
   }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}}
 }
 
+// ── TARIFICATION (Vague 2) ──
+const TARIF_CATEGORIES=[
+  {key:'voiture',label:'🚗 Voiture'},{key:'canape',label:'🛋️ Canapé'},{key:'matelas',label:'🛏️ Matelas'},
+  {key:'terrasse',label:'☀️ Terrasse'},{key:'piscine',label:'💧 Piscine'},{key:'toiture',label:'🏠 Toiture'},
+  {key:'vitres',label:'🪟 Vitres'},{key:'autre',label:'➕ Autre'}
+];
+async function loadProTarifs(){
+  var c=document.getElementById('pro-tarifs-form');
+  var html='';
+  TARIF_CATEGORIES.forEach(function(cat){
+    html+='<div class="field-group" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px">'+
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:0">'+
+        '<input type="checkbox" id="propose-'+cat.key+'" style="width:auto" onchange="toggleTarifInput(\''+cat.key+'\')">'+
+        '<span>'+cat.label+' — je propose cette prestation</span>'+
+      '</label>'+
+      '<input type="number" inputmode="decimal" min="1" id="tarif-'+cat.key+'" placeholder="Prix de base, ex: 60" style="margin-top:8px" disabled></div>';
+  });
+  c.innerHTML=html;
+  try{
+    const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
+    if(!r.ok)return;
+    const d=await safeJson(r);
+    var tarifs=d.tarifs||{};
+    var prestations=d.prestations||[];
+    TARIF_CATEGORIES.forEach(function(cat){
+      var checkbox=document.getElementById('propose-'+cat.key);
+      var input=document.getElementById('tarif-'+cat.key);
+      var propose=prestations.indexOf(cat.key)>=0;
+      if(checkbox)checkbox.checked=propose;
+      if(input){
+        if(tarifs[cat.key])input.value=tarifs[cat.key];
+        input.disabled=!propose;
+      }
+    });
+  }catch(e){}
+}
+function toggleTarifInput(key){
+  var checkbox=document.getElementById('propose-'+key);
+  var input=document.getElementById('tarif-'+key);
+  if(input)input.disabled=!checkbox.checked;
+}
+async function saveTarifs(){
+  var tarifs={},prestations=[];
+  TARIF_CATEGORIES.forEach(function(cat){
+    var checkbox=document.getElementById('propose-'+cat.key);
+    var input=document.getElementById('tarif-'+cat.key);
+    if(checkbox&&checkbox.checked){
+      prestations.push(cat.key);
+      if(input&&input.value.trim())tarifs[cat.key]=parseFloat(input.value);
+    }
+  });
+  if(!prestations.length){toast('Cochez au moins une prestation que vous proposez.');return}
+  var btn=document.getElementById('save-tarifs-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
+  try{
+    const r=await fetch(API+'/api/societes/tarifs',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({tarifs,prestations})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    toast('💾 Tarifs enregistrés !');
+  }catch(e){toast(friendlyNetworkError(e))}
+  finally{btn.disabled=false;btn.textContent='💾 Enregistrer mes tarifs'}
+}
+
 async function toggleDispo(){
   disponible=!disponible;
   document.getElementById('dispo-toggle').classList.toggle('on',disponible);
@@ -1329,6 +1411,7 @@ function openService(type){
   openServiceForm(type);
 }
 function openServiceForm(type){
+  currentFormType=type;
   var bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,autre:autreForm};
   var html=(bodies[type]||autreForm)();
   if(multiFlow.active&&multiFlow.queue.length>1){
@@ -1337,6 +1420,7 @@ function openServiceForm(type){
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
   renderPhotoInput();
+  if(document.getElementById('prix-estime-box'))updateEstimation();
 }
 function closeModal(e){if(e.target===document.getElementById('modal-overlay')){document.getElementById('modal-overlay').classList.remove('open');multiFlow={active:false,queue:[],current:0,results:[]}}}
 function isLastInFlow(){return!multiFlow.active||multiFlow.current===multiFlow.queue.length-1}
@@ -1361,6 +1445,33 @@ function dateTimeBlock(isLast){
 function descBlock(ph){return'<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
 function sendBtn(type){var isLast=isLastInFlow();var label=multiFlow.active&&!isLast?'Suivant →':'✨ Envoyer ma demande';return'<button class="modal-send-btn" id="send-demand-btn" onclick="sendDemand(\''+type+'\')">'+label+'</button>'}
 
+function etatBlock(){
+  return '<div class="field-group"><label>🧽 État actuel</label><div class="options-grid">'+
+    '<button class="opt-btn sel" data-group="etat" data-etat-val="propre" onclick="selOpt(this)">Propre</button>'+
+    '<button class="opt-btn" data-group="etat" data-etat-val="moyen" onclick="selOpt(this)">Moyennement sale</button>'+
+    '<button class="opt-btn" data-group="etat" data-etat-val="sale" onclick="selOpt(this)">Sale</button>'+
+    '<button class="opt-btn" data-group="etat" data-etat-val="tres_sale" onclick="selOpt(this)">Très sale</button>'+
+    '</div><div id="prix-estime-box" style="margin-top:10px"></div></div>';
+}
+
+var currentFormType=null;
+
+async function updateEstimation(){
+  if(!currentFormType)return;
+  var box=document.getElementById('prix-estime-box');
+  if(!box)return;
+  var etatBtn=document.querySelector('[data-group="etat"].sel');
+  var etat=etatBtn?etatBtn.getAttribute('data-etat-val'):'propre';
+  box.innerHTML='<div style="font-size:12px;color:var(--gray)">Calcul de l\'estimation...</div>';
+  try{
+    const r=await fetch(API+'/api/tarifs/estimation?prestation='+encodeURIComponent(currentFormType)+'&etat='+encodeURIComponent(etat),{headers:authHeaders()});
+    const d=await safeJson(r);
+    if(!r.ok){box.innerHTML='';return}
+    box.innerHTML='<div style="background:var(--light);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--p);font-weight:600">💡 Prix estimé : '+d.prix_min+'€ – '+d.prix_max+'€'+
+      (d.base_sur_donnees_reelles?'':' <span style="font-weight:400;color:var(--gray)">(estimation indicative)</span>')+'</div>';
+  }catch(e){box.innerHTML=''}
+}
+
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="net-type" onclick="selOpt(this)"><span>🪑</span>Intérieur</button>'+
@@ -1376,7 +1487,7 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">5 places</button>'+
   '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">7 places</button>'+
   '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">9+ places</button></div></div>'+
-  descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
+  etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
@@ -1394,7 +1505,7 @@ function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé<
   '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Cuir</button>'+
   '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Velours</button>'+
   '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Microfibre</button></div></div>'+
-  descBlock('Ex: Taches de café...')+dateTimeBlock(isLastInFlow())+sendBtn('canape')}
+  etatBlock()+descBlock('Ex: Taches de café...')+dateTimeBlock(isLastInFlow())+sendBtn('canape')}
 
 function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
   '<div class="field-group"><label>Taille</label><div class="options-grid">'+
@@ -1407,7 +1518,7 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
   '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">2 matelas</button>'+
   '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">3 matelas</button>'+
   '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">4+ matelas</button></div></div>'+
-  descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
+  etatBlock()+descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
 
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
   '<div class="field-group"><label>Surface</label><div class="options-grid">'+
@@ -1420,7 +1531,7 @@ function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrass
   '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Bois/composite</button>'+
   '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Béton</button>'+
   '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Pierre naturelle</button></div></div>'+
-  descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
+  etatBlock()+descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
 
 function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Caractéristiques</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
@@ -1433,7 +1544,7 @@ function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</d
   '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">25 à 50 m²</button>'+
   '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">50 à 80 m²</button>'+
   '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">Plus de 80 m²</button></div></div>'+
-  descBlock('Ex: Eau verte...')+dateTimeBlock(isLastInFlow())+sendBtn('piscine')}
+  etatBlock()+descBlock('Ex: Eau verte...')+dateTimeBlock(isLastInFlow())+sendBtn('piscine')}
 
 function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
   '<div class="field-group"><label>Type de toiture</label><div class="options-grid">'+
@@ -1446,7 +1557,7 @@ function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</d
   '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">50 à 100 m²</button>'+
   '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">100 à 200 m²</button>'+
   '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">Plus de 200 m²</button></div></div>'+
-  descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
+  etatBlock()+descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
 
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
   '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
@@ -1459,14 +1570,14 @@ function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div
   '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">5 à 10</button>'+
   '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">10 à 20</button>'+
   '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">Plus de 20</button></div></div>'+
-  descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
+  etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
 function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
   '<div class="field-group"><label>De quoi s\'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: Bateau, jacuzzi..."></div>'+
   '<div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel..." style="resize:none"></textarea></div>'+
   dateTimeBlock(isLastInFlow())+sendBtn('autre')}
 
-function selOpt(btn){var group=btn.getAttribute('data-group');document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
+function selOpt(btn){var group=btn.getAttribute('data-group');document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel');if(group==='etat')updateEstimation()}
 function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
 
 async function handlePhotos(input){
