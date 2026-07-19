@@ -69,6 +69,24 @@ const auth = async (req, res, next) => {
 };
 
 const isProType = (t) => t === 'pro' || t === 'societe' || t === 'professionnel';
+
+// ══════════════ TARIFICATION (Vague 2) ══════════════
+// Coefficients multiplicateurs selon l'état du bien déclaré par le client
+const ETAT_COEF = { propre: 1.0, moyen: 1.15, sale: 1.3, tres_sale: 1.5 };
+// Tarifs de base par défaut (utilisés tant qu'aucun pro n'a renseigné son propre tarif pour la catégorie)
+const DEFAULT_TARIFS = { voiture: 60, canape: 70, matelas: 40, terrasse: 90, piscine: 120, toiture: 150, vitres: 50, autre: 60 };
+
+// Extrait la liste des types de prestation demandés (ex: ['voiture','canape'] pour une demande groupée)
+// à partir du champ notes (JSON) d'une demande, avec repli sur le champ prestation si besoin.
+function extractPrestationTypes(demande) {
+  try {
+    const n = JSON.parse(demande.notes);
+    if (n && Array.isArray(n.prestations) && n.prestations.length) {
+      return n.prestations.map(p => p.type).filter(Boolean);
+    }
+  } catch (e) { /* notes non-JSON ou absent, on utilise le repli ci-dessous */ }
+  return (demande.prestation || '').split(' + ').map(s => s.trim()).filter(Boolean);
+}
 const BLOCK_REGEX = /(\b0[67]\d{8}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
 
 app.get('/health', (req, res) => {
@@ -239,7 +257,7 @@ app.get('/api/demandes', auth, async (req, res) => {
 // Demandes disponibles pour les pros (en attente, pas encore acceptées) — DOIT être déclarée avant /api/demandes/:id
 app.get('/api/demandes/all', auth, async (req, res) => {
   try {
-    const { data: user, error: userErr } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    const { data: user, error: userErr } = await supabase.from('users').select('type, prestations_proposees').eq('id', req.user.id).single();
     if (userErr) return res.status(500).json({ error: 'Erreur utilisateur: ' + userErr.message });
     if (!user || !isProType(user.type))
       return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
@@ -254,7 +272,19 @@ app.get('/api/demandes/all', auth, async (req, res) => {
 
     const { data: mesDevis } = await supabase.from('devis').select('demande_id, statut').eq('societe_id', req.user.id);
     const idsRepondues = new Set((mesDevis || []).filter(d => d.statut === 'envoye' || d.statut === 'accepte').map(d => d.demande_id));
-    const filtered = (demandes || []).filter(d => !idsRepondues.has(d.id));
+    let filtered = (demandes || []).filter(d => !idsRepondues.has(d.id));
+
+    // Ne montrer que les demandes correspondant aux prestations que le pro a déclaré savoir faire
+    // (si le pro n'a configuré aucune préférence dans "Mes tarifs", on continue à tout lui montrer
+    // pour ne pas casser l'expérience des pros n'ayant pas encore configuré cet écran).
+    const prestationsPro = user.prestations_proposees;
+    if (Array.isArray(prestationsPro) && prestationsPro.length > 0) {
+      const prestationsProSet = new Set(prestationsPro);
+      filtered = filtered.filter(d => {
+        const typesDemande = extractPrestationTypes(d);
+        return typesDemande.some(t => prestationsProSet.has(t));
+      });
+    }
 
     res.json(filtered);
   } catch (e) {
@@ -784,6 +814,82 @@ app.get('/api/societes', auth, async (req, res) => {
 app.patch('/api/societes/disponibilite', auth, async (req, res) => {
   await supabase.from('users').update({ disponible: Boolean(req.body.disponible) }).eq('id', req.user.id);
   res.json({ message: 'Disponibilité mise à jour.' });
+});
+
+// ══════════════ TARIFICATION (Vague 2) ══════════════
+
+// Le pro consulte ses propres tarifs de base et prestations proposées
+app.get('/api/societes/tarifs', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type, tarifs_base, prestations_proposees').eq('id', req.user.id).single();
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
+    res.json({ tarifs: user.tarifs_base || {}, prestations: user.prestations_proposees || [] });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Le pro met à jour ses tarifs de base et les prestations qu'il propose réellement
+app.patch('/api/societes/tarifs', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
+
+    const categoriesValides = Object.keys(DEFAULT_TARIFS);
+    const prestationsRecues = Array.isArray(req.body.prestations) ? req.body.prestations : [];
+    const prestationsPropres = prestationsRecues.filter(p => categoriesValides.includes(p));
+
+    const tarifsRecus = req.body.tarifs || {};
+    const tarifsPropres = {};
+    for (const cat of categoriesValides) {
+      const val = tarifsRecus[cat];
+      if (val === undefined || val === null || val === '') continue;
+      const num = parseFloat(val);
+      if (isNaN(num) || num <= 0) return res.status(400).json({ error: 'Le tarif pour "' + cat + '" doit être un nombre positif.' });
+      tarifsPropres[cat] = num;
+    }
+
+    const { error } = await supabase.from('users').update({ tarifs_base: tarifsPropres, prestations_proposees: prestationsPropres }).eq('id', req.user.id);
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: 'Tarifs mis à jour.', tarifs: tarifsPropres, prestations: prestationsPropres });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Le client obtient une estimation de prix avant/après avoir envoyé sa demande
+app.get('/api/tarifs/estimation', auth, async (req, res) => {
+  try {
+    const prestation = req.query.prestation;
+    const etat = req.query.etat || 'propre';
+    if (!prestation || !DEFAULT_TARIFS.hasOwnProperty(prestation))
+      return res.status(400).json({ error: 'Prestation inconnue.' });
+    const coef = ETAT_COEF[etat] || 1.0;
+
+    const { data: pros } = await supabase.from('users').select('tarifs_base').eq('type', 'pro').eq('disponible', true);
+    const prixDeclares = (pros || [])
+      .map(p => p.tarifs_base && p.tarifs_base[prestation])
+      .filter(v => typeof v === 'number' && v > 0);
+
+    let base;
+    if (prixDeclares.length) {
+      base = prixDeclares.reduce((a, b) => a + b, 0) / prixDeclares.length;
+    } else {
+      base = DEFAULT_TARIFS[prestation];
+    }
+
+    const prixMoyen = Math.round(base * coef);
+    const prixMin = Math.round(prixMoyen * 0.85);
+    const prixMax = Math.round(prixMoyen * 1.15);
+
+    res.json({
+      prestation, etat, prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
+      base_sur_donnees_reelles: prixDeclares.length > 0,
+      nombre_pros_reference: prixDeclares.length
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
 });
 
 // Filet de sécurité : toute erreur non interceptée par un try/catch de route
