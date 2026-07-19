@@ -202,6 +202,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
           <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
           <button class="role-btn" id="role-pro" onclick="setRole('pro')"><span>🏢</span>Professionnel</button>
         </div>
+        <div id="pro-rcpro-block" style="display:none;background:#F9FAFB;border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
+          <label style="margin-top:0">Assurance RC Pro <span class="optional">(requis pour les professionnels)</span></label>
+          <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Une assurance responsabilité civile professionnelle en cours de validité est nécessaire pour intervenir chez les clients Gleam.</div>
+          <label style="font-size:12px;margin-top:0">Compagnie d'assurance <span class="optional">(optionnel)</span></label>
+          <input type="text" id="r-assurance-compagnie" placeholder="Ex: MAIF, AXA...">
+          <label style="font-size:12px">Numéro de police <span class="optional">(optionnel)</span></label>
+          <input type="text" id="r-assurance-police" placeholder="Ex: 123456789">
+          <label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;cursor:pointer;font-weight:400;font-size:13px">
+            <input type="checkbox" id="r-assurance-atteste" style="width:auto;margin-top:2px">
+            <span>J'atteste disposer d'une assurance responsabilité civile professionnelle en cours de validité, couvrant les dommages pouvant survenir dans le cadre de mes prestations.</span>
+          </label>
+        </div>
         <button class="btn" id="register-btn" onclick="doRegister()">Créer mon compte Gleam</button>
         <div class="err" id="rerr"></div>
       </div>
@@ -422,7 +434,7 @@ function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.re
 function toast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._hideTimer);t._hideTimer=setTimeout(()=>t.classList.remove('show'),dur)}
 function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.add('show')}
 function hideErr(id){document.getElementById(id).classList.remove('show')}
-function setRole(r){userRole=r;document.getElementById('role-client').classList.toggle('sel',r==='client');document.getElementById('role-pro').classList.toggle('sel',r==='pro')}
+function setRole(r){userRole=r;document.getElementById('role-client').classList.toggle('sel',r==='client');document.getElementById('role-pro').classList.toggle('sel',r==='pro');var b=document.getElementById('pro-rcpro-block');if(b)b.style.display=(r==='pro')?'block':'none'}
 function switchTab(t){
   document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(t==='login'&&i===0)||(t==='register'&&i===1)));
   document.getElementById('form-login').style.display=t==='login'?'block':'none';
@@ -506,10 +518,18 @@ async function doRegister(){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return showErr('rerr','Format d\'email invalide.');
   if(!phone)return showErr('rerr','Téléphone requis.');
   if(!pw||pw.length<8)return showErr('rerr','Mot de passe min 8 caractères.');
+  var assuranceCompagnie='',assurancePolice='',assuranceAtteste=false;
+  if(userRole==='pro'){
+    assuranceAtteste=document.getElementById('r-assurance-atteste').checked;
+    if(!assuranceAtteste)return showErr('rerr','L\'attestation d\'assurance RC Pro est requise pour créer un compte professionnel.');
+    assuranceCompagnie=document.getElementById('r-assurance-compagnie').value.trim();
+    assurancePolice=document.getElementById('r-assurance-police').value.trim();
+  }
   const btn=document.getElementById('register-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({firstName:fn,lastName:ln,prenom:fn,nom:ln,email,phone,telephone:phone,password:pw,role:userRole,type:userRole})});
+      body:JSON.stringify({firstName:fn,lastName:ln,prenom:fn,nom:ln,email,phone,telephone:phone,password:pw,role:userRole,type:userRole,
+        assurance_rc_pro:assuranceAtteste,assurance_compagnie:assuranceCompagnie,assurance_police:assurancePolice})});
     const d=await safeJson(r);
     if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
@@ -973,6 +993,10 @@ async function loadProDevis(){
       var demandeStatut=v.demande&&v.demande.statut;
       if(v.statut==='accepte'&&demandeStatut==='terminee'){
         badge='<span class="devis-badge badge-accepted">🏁 Terminé</span>';
+        var safeClientId=escAttr(v.demande&&v.demande.client_id);
+        extra='<div style="margin-top:10px">'+
+          '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeClientId+'\',\'le client\')">⭐ Noter le client</button>'+
+        '</div>';
       }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
         badge='<span class="devis-badge badge-accepted">🔧 En cours</span>';
         extra='<div style="display:flex;gap:8px;margin-top:10px">'+
