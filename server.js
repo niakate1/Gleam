@@ -85,11 +85,16 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const nom = req.body.lastName || req.body.nom;
     const telephone = req.body.phone || req.body.telephone;
     const type = req.body.role || req.body.type || 'client';
+    const assuranceRcPro = Boolean(req.body.assurance_rc_pro);
+    const assuranceCompagnie = req.body.assurance_compagnie || null;
+    const assurancePolice = req.body.assurance_police || null;
 
     if (!email || !password || !prenom || !nom)
       return res.status(400).json({ error: 'Tous les champs sont requis.' });
     if (password.length < 8)
       return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
+    if (isProType(type) && !assuranceRcPro)
+      return res.status(400).json({ error: 'L\'attestation d\'assurance RC Pro est requise pour créer un compte professionnel.' });
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: email.toLowerCase().trim(),
@@ -105,7 +110,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       nom: nom.trim(),
       telephone: telephone || null,
       type: type,
-      disponible: true
+      disponible: true,
+      assurance_rc_pro: isProType(type) ? assuranceRcPro : null,
+      assurance_compagnie: isProType(type) ? assuranceCompagnie : null,
+      assurance_police: isProType(type) ? assurancePolice : null
     }).select().single();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -391,7 +399,7 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
     if (!devis || !devis.length) return res.json([]);
 
     const demandeIds = [...new Set(devis.map(d => d.demande_id))];
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme').in('id', demandeIds);
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme, client_id').in('id', demandeIds);
     const demandeMap = {};
     (demandes || []).forEach(d => demandeMap[d.id] = d);
 
