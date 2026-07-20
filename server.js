@@ -70,55 +70,85 @@ const auth = async (req, res, next) => {
 
 const isProType = (t) => t === 'pro' || t === 'societe' || t === 'professionnel';
 
-// ══════════════ TARIFICATION (Vague 2) — calibrée sur des prix de marché réels ══════════════
+// ══════════════ TARIFICATION (Vague 2/3) — calibrée sur des prix de marché réels ══════════════
 // Coefficient d'état, universel à toutes les prestations
 const ETAT_COEF = { propre: 1.0, moyen: 1.15, sale: 1.3, tres_sale: 1.5 };
 
-// Configuration complète par prestation : prix de référence, et coefficients spécifiques
-// (taille, matière, portée, intervention selon ce qui est pertinent pour chaque métier).
+// Configuration complète par prestation. Chaque catégorie a une "dimension principale" (tierKey)
+// pour laquelle le PRO SAISIT DIRECTEMENT UN PRIX PAR CAS CONCRET (ex: un prix pour "Citadine",
+// un autre pour "SUV/4x4"...), plutôt qu'un coefficient invisible appliqué à un prix unique.
+// Une dimension secondaire (matière, portée...) reste un coefficient multiplicatif simple.
 // Chiffres calibrés à partir d'une recherche de prix pratiqués par des professionnels en France
 // (voir tableau-reference-prix-marche.md pour le détail des sources et du raisonnement).
 const PRESTATION_CONFIG = {
   voiture: {
-    prixReferenceDefaut: 85, // citadine, intérieur + extérieur, état propre
-    coefTaille: { A: 0.85, B: 1.0, C: 1.25, D: 1.55 }, // citadine, berline, SUV/monospace, utilitaire/van
+    tierKey: 'taille', // le pro saisit un prix par type de véhicule
+    tiers: ['citadine', 'suv_4x4', 'monospace', 'utilitaire'],
+    tierLabels: { citadine: 'Citadine', suv_4x4: 'SUV / 4x4', monospace: 'Monospace', utilitaire: 'Utilitaire / Van' },
+    tierDefaults: { citadine: 85, suv_4x4: 128, monospace: 132, utilitaire: 153 }, // intérieur+extérieur, propre
     coefPortee: { interieur: 0.70, exterieur: 0.55, complet: 1.0 }
   },
   canape: {
-    prixReferenceDefaut: 80, // 2 places, tissu, état propre
-    coefTaille: { A: 1.0, B: 1.15, C: 1.35, D: 1.6 }, // 2, 3, 4, 5+ places
+    tierKey: 'taille', // le pro saisit un prix par nombre de places
+    tiers: ['A', 'B', 'C', 'D'],
+    tierLabels: { A: '2 places', B: '3 places', C: '4 places', D: '5+ places / angle' },
+    tierDefaults: { A: 80, B: 92, C: 108, D: 128 }, // tissu, propre
     coefMatiere: { tissu: 1.0, cuir: 1.15, velours: 1.05, microfibre: 1.0 }
   },
   matelas: {
     unite: true,
-    prixUnitaireDefaut: 60, // taille 140x190 (référence), état propre
-    coefTaille: { A: 0.75, B: 1.0, C: 1.2, D: 1.5 } // 90x190, 140x190, 160x200, 180x200+
+    tierKey: 'taille', // le pro saisit un prix unitaire par taille de matelas
+    tiers: ['A', 'B', 'C', 'D'],
+    tierLabels: { A: '90x190 cm', B: '140x190 cm', C: '160x200 cm', D: '180x200 cm+' },
+    tierDefaults: { A: 45, B: 60, C: 72, D: 90 } // propre
   },
   terrasse: {
-    prixReferenceDefaut: 140, // 20 à 50 m², carrelage, état propre
-    coefTaille: { A: 0.5, B: 1.0, C: 1.8, D: 3.0 }, // <20, 20-50, 50-100, >100 m²
+    tierKey: 'taille', // le pro saisit un prix par surface
+    tiers: ['A', 'B', 'C', 'D'],
+    tierLabels: { A: 'Moins de 20 m²', B: '20 à 50 m²', C: '50 à 100 m²', D: 'Plus de 100 m²' },
+    tierDefaults: { A: 70, B: 140, C: 252, D: 420 }, // carrelage, propre
     coefMatiere: { carrelage: 1.0, beton: 1.05, pierre_naturelle: 1.1, bois_composite: 2.2 }
   },
   piscine: {
-    prixReferenceDefaut: 130, // nettoyage complet, bassin moyen, état propre
-    coefTaille: { A: 0.7, B: 1.0, C: 1.4, D: 1.9 }, // <25, 25-50, 50-80, >80 m²
-    coefIntervention: { entretien: 0.5, complet: 1.0, eau_verte: 4.5 }
+    tierKey: 'intervention', // le pro saisit un prix par type d'intervention (le vrai driver de prix du métier)
+    tiers: ['entretien', 'complet', 'eau_verte'],
+    tierLabels: { entretien: 'Entretien simple', complet: 'Nettoyage complet', eau_verte: 'Eau verte / remise en état' },
+    tierDefaults: { entretien: 65, complet: 130, eau_verte: 585 }, // bassin moyen, propre
+    coefTaille: { A: 0.7, B: 1.0, C: 1.4, D: 1.9 }
   },
   toiture: {
-    prixReferenceDefaut: 1500, // 50 à 100 m², tuiles, démoussage + hydrofuge, propre
-    coefTaille: { A: 0.45, B: 1.0, C: 1.9, D: 3.3 }, // <50, 50-100, 100-200, >200 m²
+    tierKey: 'taille', // le pro saisit un prix par surface
+    tiers: ['A', 'B', 'C', 'D'],
+    tierLabels: { A: 'Moins de 50 m²', B: '50 à 100 m²', C: '100 à 200 m²', D: 'Plus de 200 m²' },
+    tierDefaults: { A: 675, B: 1500, C: 2850, D: 4950 }, // tuiles, démoussage+hydrofuge, propre
     coefMatiere: { tuiles: 1.0, ardoises: 0.75, fibrociment: 0.9, zinc_metal: 1.1 }
   },
   vitres: {
     unite: true,
-    prixUnitaireDefaut: 6 // par vitre, état propre
+    tierKey: 'type_bien', // le pro saisit un prix unitaire par type de bien
+    tiers: ['maison', 'appartement', 'commerce', 'bureaux'],
+    tierLabels: { maison: 'Maison', appartement: 'Appartement', commerce: 'Commerce', bureaux: 'Bureaux' },
+    tierDefaults: { maison: 6, appartement: 6, commerce: 7.2, bureaux: 7.8 } // propre
   },
   autre: {
+    tierKey: null, // pas de dimension structurée, un seul prix indicatif
     prixReferenceDefaut: 60
   }
 };
 
 const UNIT_CATEGORIES = Object.keys(PRESTATION_CONFIG).filter(k => PRESTATION_CONFIG[k].unite);
+
+// Calcule le prix pour un palier donné d'une prestation, en utilisant la moyenne des prix
+// déclarés par les pros disponibles pour CE palier précis, ou le prix par défaut sinon.
+function prixPourPalier(config, prestation, tierValue, prosTarifs) {
+  const key = tierValue && config.tiers && config.tiers.includes(tierValue) ? tierValue : (config.tiers ? config.tiers[0] : null);
+  if (!key) return { prix: config.prixReferenceDefaut, reel: false, nbPros: 0 };
+  const declares = (prosTarifs || [])
+    .map(t => t && t[key])
+    .filter(v => typeof v === 'number' && v > 0);
+  const prix = declares.length ? declares.reduce((a, b) => a + b, 0) / declares.length : config.tierDefaults[key];
+  return { prix, reel: declares.length > 0, nbPros: declares.length };
+}
 
 // Extrait la liste des types de prestation demandés (ex: ['voiture','canape'] pour une demande groupée)
 // à partir du champ notes (JSON) d'une demande, avec repli sur le champ prestation si besoin.
@@ -873,7 +903,8 @@ app.get('/api/societes/tarifs', auth, async (req, res) => {
   }
 });
 
-// Le pro met à jour ses tarifs (de base ou unitaires selon la catégorie) et les prestations qu'il propose réellement
+// Le pro met à jour ses tarifs — pour les catégories structurées, un prix distinct par palier
+// (ex: {citadine: 70, suv_4x4: 130, ...}) ; pour "autre", un prix unique.
 app.patch('/api/societes/tarifs', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
@@ -884,24 +915,35 @@ app.patch('/api/societes/tarifs', auth, async (req, res) => {
     const prestationsPropres = prestationsRecues.filter(p => categoriesValides.includes(p));
 
     const tarifsRecus = req.body.tarifs || {};
-    const tarifsPropres = {};
-    for (const cat of categoriesValides) {
-      if (UNIT_CATEGORIES.includes(cat)) continue; // ces catégories utilisent tarifs_unitaires, pas tarifs_base
-      const val = tarifsRecus[cat];
-      if (val === undefined || val === null || val === '') continue;
-      const num = parseFloat(val);
-      if (isNaN(num) || num <= 0) return res.status(400).json({ error: 'Le tarif pour "' + cat + '" doit être un nombre positif.' });
-      tarifsPropres[cat] = num;
-    }
-
     const tarifsUnitairesRecus = req.body.tarifs_unitaires || {};
+    const tarifsPropres = {};
     const tarifsUnitairesPropres = {};
-    for (const cat of UNIT_CATEGORIES) {
-      const val = tarifsUnitairesRecus[cat];
-      if (val === undefined || val === null || val === '') continue;
-      const num = parseFloat(val);
-      if (isNaN(num) || num <= 0) return res.status(400).json({ error: 'Le prix unitaire pour "' + cat + '" doit être un nombre positif.' });
-      tarifsUnitairesPropres[cat] = num;
+
+    for (const cat of categoriesValides) {
+      const config = PRESTATION_CONFIG[cat];
+      const cible = config.unite ? tarifsUnitairesRecus : tarifsRecus;
+      const destination = config.unite ? tarifsUnitairesPropres : tarifsPropres;
+      const valBrute = cible[cat];
+
+      if (config.tiers) {
+        // Catégorie structurée : on attend un objet { palier: prix, ... }
+        if (valBrute === undefined || valBrute === null || typeof valBrute !== 'object') continue;
+        const parPalier = {};
+        for (const tier of config.tiers) {
+          const val = valBrute[tier];
+          if (val === undefined || val === null || val === '') continue;
+          const num = parseFloat(val);
+          if (isNaN(num) || num <= 0) return res.status(400).json({ error: 'Le tarif "' + (config.tierLabels[tier] || tier) + '" pour "' + cat + '" doit être un nombre positif.' });
+          parPalier[tier] = num;
+        }
+        if (Object.keys(parPalier).length) destination[cat] = parPalier;
+      } else {
+        // Catégorie non structurée (ex: "autre") : un seul prix
+        if (valBrute === undefined || valBrute === null || valBrute === '') continue;
+        const num = parseFloat(valBrute);
+        if (isNaN(num) || num <= 0) return res.status(400).json({ error: 'Le tarif pour "' + cat + '" doit être un nombre positif.' });
+        destination[cat] = num;
+      }
     }
 
     const { error } = await supabase.from('users').update({
@@ -921,18 +963,21 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
   try {
     const prestation = req.query.prestation;
     const etat = req.query.etat || 'propre';
-    const taille = req.query.taille;             // 'A'|'B'|'C'|'D', selon la catégorie
-    const portee = req.query.portee;             // 'interieur'|'exterieur'|'complet' (voiture)
-    const matiere = req.query.matiere;            // catégorie-dépendant (canape, terrasse, toiture)
-    const intervention = req.query.intervention;  // 'entretien'|'complet'|'eau_verte' (piscine)
-    const quantite = req.query.quantite ? parseInt(req.query.quantite, 10) : null; // catégories à l'unité
+    const taille = req.query.taille;
+    const portee = req.query.portee;
+    const matiere = req.query.matiere;
+    const intervention = req.query.intervention;
+    const typeBien = req.query.type_bien;
+    const quantite = req.query.quantite ? parseInt(req.query.quantite, 10) : null;
 
     const config = PRESTATION_CONFIG[prestation];
     if (!config) return res.status(400).json({ error: 'Prestation inconnue.' });
 
     const coefEtat = ETAT_COEF[etat] || 1.0;
+    // La valeur de palier envoyée dépend de la dimension principale de cette catégorie
+    const tierParams = { taille, portee, matiere, intervention, type_bien: typeBien };
+    const tierValue = config.tierKey ? tierParams[config.tierKey] : null;
 
-    // Catégories facturées à l'unité (ex: par vitre, par matelas) : prix = prix_unitaire × quantité × coefficients
     if (config.unite) {
       if (!quantite || quantite <= 0) {
         return res.json({
@@ -941,44 +986,40 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
           message: 'Indiquez une quantité pour obtenir une estimation.'
         });
       }
-      const coefTailleUnite = (config.coefTaille && taille && config.coefTaille.hasOwnProperty(taille)) ? config.coefTaille[taille] : 1.0;
-
       const { data: prosUnit } = await supabase.from('users').select('tarifs_unitaires').eq('type', 'pro').eq('disponible', true);
-      const prixUnitDeclares = (prosUnit || [])
-        .map(p => p.tarifs_unitaires && p.tarifs_unitaires[prestation])
-        .filter(v => typeof v === 'number' && v > 0);
+      const { prix: prixUnitaire, reel, nbPros } = prixPourPalier(config, prestation, tierValue, (prosUnit || []).map(p => p.tarifs_unitaires && p.tarifs_unitaires[prestation]));
 
-      const prixUnitaire = prixUnitDeclares.length
-        ? prixUnitDeclares.reduce((a, b) => a + b, 0) / prixUnitDeclares.length
-        : config.prixUnitaireDefaut;
-
-      const prixMoyen = Math.round(prixUnitaire * quantite * coefEtat * coefTailleUnite);
+      const prixMoyen = Math.round(prixUnitaire * quantite * coefEtat);
       const prixMin = Math.round(prixMoyen * 0.85);
       const prixMax = Math.round(prixMoyen * 1.15);
 
       return res.json({
-        prestation, etat, quantite, taille: taille || null, prix_unitaire: Math.round(prixUnitaire * 100) / 100,
+        prestation, etat, quantite, taille: taille || null, type_bien: typeBien || null,
+        prix_unitaire: Math.round(prixUnitaire * 100) / 100,
         prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
-        base_sur_donnees_reelles: prixUnitDeclares.length > 0,
-        nombre_pros_reference: prixUnitDeclares.length
+        base_sur_donnees_reelles: reel, nombre_pros_reference: nbPros
       });
     }
 
-    // Catégories facturées avec un prix de référence + coefficients (taille, matière, portée, intervention, état)
-    const coefTaille = (config.coefTaille && taille && config.coefTaille.hasOwnProperty(taille)) ? config.coefTaille[taille] : 1.0;
-    const coefMatiere = (config.coefMatiere && matiere && config.coefMatiere.hasOwnProperty(matiere)) ? config.coefMatiere[matiere] : 1.0;
-    const coefPortee = (config.coefPortee && portee && config.coefPortee.hasOwnProperty(portee)) ? config.coefPortee[portee] : 1.0;
-    const coefIntervention = (config.coefIntervention && intervention && config.coefIntervention.hasOwnProperty(intervention)) ? config.coefIntervention[intervention] : 1.0;
+    // Catégories à prix de référence par palier + coefficients secondaires (matière, portée, taille, état)
+    let base, reel, nbPros;
+    if (config.tierKey) {
+      const { data: pros } = await supabase.from('users').select('tarifs_base').eq('type', 'pro').eq('disponible', true);
+      const resultat = prixPourPalier(config, prestation, tierValue, (pros || []).map(p => p.tarifs_base && p.tarifs_base[prestation]));
+      base = resultat.prix; reel = resultat.reel; nbPros = resultat.nbPros;
+    } else {
+      const { data: pros } = await supabase.from('users').select('tarifs_base').eq('type', 'pro').eq('disponible', true);
+      const prixDeclares = (pros || []).map(p => p.tarifs_base && p.tarifs_base[prestation]).filter(v => typeof v === 'number' && v > 0);
+      base = prixDeclares.length ? prixDeclares.reduce((a, b) => a + b, 0) / prixDeclares.length : config.prixReferenceDefaut;
+      reel = prixDeclares.length > 0; nbPros = prixDeclares.length;
+    }
+
+    // Coefficients secondaires : appliqués seulement s'ils ne sont pas déjà la dimension principale de cette catégorie
+    const coefTaille = (config.tierKey !== 'taille' && config.coefTaille && taille && config.coefTaille.hasOwnProperty(taille)) ? config.coefTaille[taille] : 1.0;
+    const coefMatiere = (config.tierKey !== 'matiere' && config.coefMatiere && matiere && config.coefMatiere.hasOwnProperty(matiere)) ? config.coefMatiere[matiere] : 1.0;
+    const coefPortee = (config.tierKey !== 'portee' && config.coefPortee && portee && config.coefPortee.hasOwnProperty(portee)) ? config.coefPortee[portee] : 1.0;
+    const coefIntervention = (config.tierKey !== 'intervention' && config.coefIntervention && intervention && config.coefIntervention.hasOwnProperty(intervention)) ? config.coefIntervention[intervention] : 1.0;
     const coef = coefEtat * coefTaille * coefMatiere * coefPortee * coefIntervention;
-
-    const { data: pros } = await supabase.from('users').select('tarifs_base').eq('type', 'pro').eq('disponible', true);
-    const prixDeclares = (pros || [])
-      .map(p => p.tarifs_base && p.tarifs_base[prestation])
-      .filter(v => typeof v === 'number' && v > 0);
-
-    const base = prixDeclares.length
-      ? prixDeclares.reduce((a, b) => a + b, 0) / prixDeclares.length
-      : config.prixReferenceDefaut;
 
     const prixMoyen = Math.round(base * coef);
     const prixMin = Math.round(prixMoyen * 0.85);
@@ -987,8 +1028,8 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
     res.json({
       prestation, etat, taille: taille || null, matiere: matiere || null, portee: portee || null, intervention: intervention || null,
       prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
-      base_sur_donnees_reelles: prixDeclares.length > 0,
-      nombre_pros_reference: prixDeclares.length
+      base_sur_donnees_reelles: reel,
+      nombre_pros_reference: nbPros
     });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
