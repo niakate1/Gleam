@@ -1566,7 +1566,7 @@ function quantiteBlock(label,placeholder){
 var currentFormType=null;
 
 const UNIT_CATEGORIES_CLIENT=['vitres','matelas'];
-const COEF_KEYS=['taille','matiere','portee','intervention','type_bien'];
+const COEF_KEYS=['taille','matiere','portee','intervention','type_bien','places','forme','type_bassin'];
 
 async function updateEstimation(){
   if(!currentFormType)return;
@@ -1608,18 +1608,18 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="monospace" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚌</span>Utilitaire</button></div></div>'+
   '<div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">2 places</button>'+
-  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">5 places</button>'+
-  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">7 places</button>'+
-  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">9+ places</button></div></div>'+
+  '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
+  '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
+  '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="C" onclick="selOpt(this)">7 places</button>'+
+  '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="D" onclick="selOpt(this)">9+ places</button></div></div>'+
   etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>➡️</span>Droit</button>'+
-  '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>📐</span>Angle</button>'+
-  '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>🪑</span>Canapé lit</button>'+
-  '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>🪑</span>Chauffeuses</button></div></div>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span>➡️</span>Droit</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="angle" onclick="selOpt(this)"><span>📐</span>Angle</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="canape_lit" onclick="selOpt(this)"><span>🪑</span>Canapé lit</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="chauffeuses" onclick="selOpt(this)"><span>🪑</span>Chauffeuses</button></div></div>'+
   '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">3 places</button>'+
@@ -1660,10 +1660,10 @@ function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</d
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="complet" onclick="selOpt(this)">Nettoyage complet<br><span style="font-weight:400;font-size:11px">(parois, fond, filtre)</span></button>'+
   '<button class="opt-btn full" data-group="pisc-int" data-coef-key="intervention" data-coef-val="eau_verte" onclick="selOpt(this)">Eau verte / remise en état</button></div></div>'+
   '<div class="field-group"><label>Type de bassin <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🏊</span>Enterrée</button>'+
-  '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🏖️</span>Hors-sol</button>'+
-  '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🌊</span>Semi-enterrée</button>'+
-  '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="enterree" onclick="selOpt(this)"><span>🏊</span>Enterrée</button>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="hors_sol" onclick="selOpt(this)"><span>🏖️</span>Hors-sol</button>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="semi_enterree" onclick="selOpt(this)"><span>🌊</span>Semi-enterrée</button>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="spa_jacuzzi" onclick="selOpt(this)"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
   '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">Moins de 25 m²</button>'+
   '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">25 à 50 m²</button>'+
