@@ -70,11 +70,55 @@ const auth = async (req, res, next) => {
 
 const isProType = (t) => t === 'pro' || t === 'societe' || t === 'professionnel';
 
-// ══════════════ TARIFICATION (Vague 2) ══════════════
-// Coefficients multiplicateurs selon l'état du bien déclaré par le client
+// ══════════════ TARIFICATION (Vague 2) — calibrée sur des prix de marché réels ══════════════
+// Coefficient d'état, universel à toutes les prestations
 const ETAT_COEF = { propre: 1.0, moyen: 1.15, sale: 1.3, tres_sale: 1.5 };
-// Tarifs de base par défaut (utilisés tant qu'aucun pro n'a renseigné son propre tarif pour la catégorie)
-const DEFAULT_TARIFS = { voiture: 60, canape: 70, matelas: 40, terrasse: 90, piscine: 120, toiture: 150, vitres: 50, autre: 60 };
+
+// Configuration complète par prestation : prix de référence, et coefficients spécifiques
+// (taille, matière, portée, intervention selon ce qui est pertinent pour chaque métier).
+// Chiffres calibrés à partir d'une recherche de prix pratiqués par des professionnels en France
+// (voir tableau-reference-prix-marche.md pour le détail des sources et du raisonnement).
+const PRESTATION_CONFIG = {
+  voiture: {
+    prixReferenceDefaut: 85, // citadine, intérieur + extérieur, état propre
+    coefTaille: { A: 0.85, B: 1.0, C: 1.25, D: 1.55 }, // citadine, berline, SUV/monospace, utilitaire/van
+    coefPortee: { interieur: 0.70, exterieur: 0.55, complet: 1.0 }
+  },
+  canape: {
+    prixReferenceDefaut: 80, // 2 places, tissu, état propre
+    coefTaille: { A: 1.0, B: 1.15, C: 1.35, D: 1.6 }, // 2, 3, 4, 5+ places
+    coefMatiere: { tissu: 1.0, cuir: 1.15, velours: 1.05, microfibre: 1.0 }
+  },
+  matelas: {
+    unite: true,
+    prixUnitaireDefaut: 60, // taille 140x190 (référence), état propre
+    coefTaille: { A: 0.75, B: 1.0, C: 1.2, D: 1.5 } // 90x190, 140x190, 160x200, 180x200+
+  },
+  terrasse: {
+    prixReferenceDefaut: 140, // 20 à 50 m², carrelage, état propre
+    coefTaille: { A: 0.5, B: 1.0, C: 1.8, D: 3.0 }, // <20, 20-50, 50-100, >100 m²
+    coefMatiere: { carrelage: 1.0, beton: 1.05, pierre_naturelle: 1.1, bois_composite: 2.2 }
+  },
+  piscine: {
+    prixReferenceDefaut: 130, // nettoyage complet, bassin moyen, état propre
+    coefTaille: { A: 0.7, B: 1.0, C: 1.4, D: 1.9 }, // <25, 25-50, 50-80, >80 m²
+    coefIntervention: { entretien: 0.5, complet: 1.0, eau_verte: 4.5 }
+  },
+  toiture: {
+    prixReferenceDefaut: 1500, // 50 à 100 m², tuiles, démoussage + hydrofuge, propre
+    coefTaille: { A: 0.45, B: 1.0, C: 1.9, D: 3.3 }, // <50, 50-100, 100-200, >200 m²
+    coefMatiere: { tuiles: 1.0, ardoises: 0.75, fibrociment: 0.9, zinc_metal: 1.1 }
+  },
+  vitres: {
+    unite: true,
+    prixUnitaireDefaut: 6 // par vitre, état propre
+  },
+  autre: {
+    prixReferenceDefaut: 60
+  }
+};
+
+const UNIT_CATEGORIES = Object.keys(PRESTATION_CONFIG).filter(k => PRESTATION_CONFIG[k].unite);
 
 // Extrait la liste des types de prestation demandés (ex: ['voiture','canape'] pour une demande groupée)
 // à partir du champ notes (JSON) d'une demande, avec repli sur le champ prestation si besoin.
@@ -821,27 +865,28 @@ app.patch('/api/societes/disponibilite', auth, async (req, res) => {
 // Le pro consulte ses propres tarifs de base et prestations proposées
 app.get('/api/societes/tarifs', auth, async (req, res) => {
   try {
-    const { data: user } = await supabase.from('users').select('type, tarifs_base, prestations_proposees').eq('id', req.user.id).single();
+    const { data: user } = await supabase.from('users').select('type, tarifs_base, tarifs_unitaires, prestations_proposees').eq('id', req.user.id).single();
     if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
-    res.json({ tarifs: user.tarifs_base || {}, prestations: user.prestations_proposees || [] });
+    res.json({ tarifs: user.tarifs_base || {}, tarifs_unitaires: user.tarifs_unitaires || {}, prestations: user.prestations_proposees || [] });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
 
-// Le pro met à jour ses tarifs de base et les prestations qu'il propose réellement
+// Le pro met à jour ses tarifs (de base ou unitaires selon la catégorie) et les prestations qu'il propose réellement
 app.patch('/api/societes/tarifs', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
     if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
 
-    const categoriesValides = Object.keys(DEFAULT_TARIFS);
+    const categoriesValides = Object.keys(PRESTATION_CONFIG);
     const prestationsRecues = Array.isArray(req.body.prestations) ? req.body.prestations : [];
     const prestationsPropres = prestationsRecues.filter(p => categoriesValides.includes(p));
 
     const tarifsRecus = req.body.tarifs || {};
     const tarifsPropres = {};
     for (const cat of categoriesValides) {
+      if (UNIT_CATEGORIES.includes(cat)) continue; // ces catégories utilisent tarifs_unitaires, pas tarifs_base
       const val = tarifsRecus[cat];
       if (val === undefined || val === null || val === '') continue;
       const num = parseFloat(val);
@@ -849,9 +894,23 @@ app.patch('/api/societes/tarifs', auth, async (req, res) => {
       tarifsPropres[cat] = num;
     }
 
-    const { error } = await supabase.from('users').update({ tarifs_base: tarifsPropres, prestations_proposees: prestationsPropres }).eq('id', req.user.id);
+    const tarifsUnitairesRecus = req.body.tarifs_unitaires || {};
+    const tarifsUnitairesPropres = {};
+    for (const cat of UNIT_CATEGORIES) {
+      const val = tarifsUnitairesRecus[cat];
+      if (val === undefined || val === null || val === '') continue;
+      const num = parseFloat(val);
+      if (isNaN(num) || num <= 0) return res.status(400).json({ error: 'Le prix unitaire pour "' + cat + '" doit être un nombre positif.' });
+      tarifsUnitairesPropres[cat] = num;
+    }
+
+    const { error } = await supabase.from('users').update({
+      tarifs_base: tarifsPropres,
+      tarifs_unitaires: tarifsUnitairesPropres,
+      prestations_proposees: prestationsPropres
+    }).eq('id', req.user.id);
     if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: 'Tarifs mis à jour.', tarifs: tarifsPropres, prestations: prestationsPropres });
+    res.json({ message: 'Tarifs mis à jour.', tarifs: tarifsPropres, tarifs_unitaires: tarifsUnitairesPropres, prestations: prestationsPropres });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
@@ -862,28 +921,72 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
   try {
     const prestation = req.query.prestation;
     const etat = req.query.etat || 'propre';
-    if (!prestation || !DEFAULT_TARIFS.hasOwnProperty(prestation))
-      return res.status(400).json({ error: 'Prestation inconnue.' });
-    const coef = ETAT_COEF[etat] || 1.0;
+    const taille = req.query.taille;             // 'A'|'B'|'C'|'D', selon la catégorie
+    const portee = req.query.portee;             // 'interieur'|'exterieur'|'complet' (voiture)
+    const matiere = req.query.matiere;            // catégorie-dépendant (canape, terrasse, toiture)
+    const intervention = req.query.intervention;  // 'entretien'|'complet'|'eau_verte' (piscine)
+    const quantite = req.query.quantite ? parseInt(req.query.quantite, 10) : null; // catégories à l'unité
+
+    const config = PRESTATION_CONFIG[prestation];
+    if (!config) return res.status(400).json({ error: 'Prestation inconnue.' });
+
+    const coefEtat = ETAT_COEF[etat] || 1.0;
+
+    // Catégories facturées à l'unité (ex: par vitre, par matelas) : prix = prix_unitaire × quantité × coefficients
+    if (config.unite) {
+      if (!quantite || quantite <= 0) {
+        return res.json({
+          prestation, etat, quantite: null, prix_min: null, prix_max: null, prix_moyen: null,
+          base_sur_donnees_reelles: false, nombre_pros_reference: 0,
+          message: 'Indiquez une quantité pour obtenir une estimation.'
+        });
+      }
+      const coefTailleUnite = (config.coefTaille && taille && config.coefTaille.hasOwnProperty(taille)) ? config.coefTaille[taille] : 1.0;
+
+      const { data: prosUnit } = await supabase.from('users').select('tarifs_unitaires').eq('type', 'pro').eq('disponible', true);
+      const prixUnitDeclares = (prosUnit || [])
+        .map(p => p.tarifs_unitaires && p.tarifs_unitaires[prestation])
+        .filter(v => typeof v === 'number' && v > 0);
+
+      const prixUnitaire = prixUnitDeclares.length
+        ? prixUnitDeclares.reduce((a, b) => a + b, 0) / prixUnitDeclares.length
+        : config.prixUnitaireDefaut;
+
+      const prixMoyen = Math.round(prixUnitaire * quantite * coefEtat * coefTailleUnite);
+      const prixMin = Math.round(prixMoyen * 0.85);
+      const prixMax = Math.round(prixMoyen * 1.15);
+
+      return res.json({
+        prestation, etat, quantite, taille: taille || null, prix_unitaire: Math.round(prixUnitaire * 100) / 100,
+        prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
+        base_sur_donnees_reelles: prixUnitDeclares.length > 0,
+        nombre_pros_reference: prixUnitDeclares.length
+      });
+    }
+
+    // Catégories facturées avec un prix de référence + coefficients (taille, matière, portée, intervention, état)
+    const coefTaille = (config.coefTaille && taille && config.coefTaille.hasOwnProperty(taille)) ? config.coefTaille[taille] : 1.0;
+    const coefMatiere = (config.coefMatiere && matiere && config.coefMatiere.hasOwnProperty(matiere)) ? config.coefMatiere[matiere] : 1.0;
+    const coefPortee = (config.coefPortee && portee && config.coefPortee.hasOwnProperty(portee)) ? config.coefPortee[portee] : 1.0;
+    const coefIntervention = (config.coefIntervention && intervention && config.coefIntervention.hasOwnProperty(intervention)) ? config.coefIntervention[intervention] : 1.0;
+    const coef = coefEtat * coefTaille * coefMatiere * coefPortee * coefIntervention;
 
     const { data: pros } = await supabase.from('users').select('tarifs_base').eq('type', 'pro').eq('disponible', true);
     const prixDeclares = (pros || [])
       .map(p => p.tarifs_base && p.tarifs_base[prestation])
       .filter(v => typeof v === 'number' && v > 0);
 
-    let base;
-    if (prixDeclares.length) {
-      base = prixDeclares.reduce((a, b) => a + b, 0) / prixDeclares.length;
-    } else {
-      base = DEFAULT_TARIFS[prestation];
-    }
+    const base = prixDeclares.length
+      ? prixDeclares.reduce((a, b) => a + b, 0) / prixDeclares.length
+      : config.prixReferenceDefaut;
 
     const prixMoyen = Math.round(base * coef);
     const prixMin = Math.round(prixMoyen * 0.85);
     const prixMax = Math.round(prixMoyen * 1.15);
 
     res.json({
-      prestation, etat, prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
+      prestation, etat, taille: taille || null, matiere: matiere || null, portee: portee || null, intervention: intervention || null,
+      prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
       base_sur_donnees_reelles: prixDeclares.length > 0,
       nombre_pros_reference: prixDeclares.length
     });
