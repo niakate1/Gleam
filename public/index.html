@@ -425,7 +425,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- MODAL SERVICE -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
-  <div class="modal"><div class="modal-handle"></div><div id="modal-body"></div></div>
+  <div class="modal"><div style="display:flex;justify-content:center;position:relative"><div class="modal-handle"></div><button onclick="closeModalForce()" style="position:absolute;right:0;top:-4px;background:none;border:none;font-size:22px;color:var(--gray);cursor:pointer;padding:4px 8px;line-height:1">✕</button></div><div id="modal-body"></div></div>
 </div>
 
 <!-- MODAL PAIEMENT -->
@@ -890,9 +890,11 @@ function prefillModifyForm(p){
       document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){
         if(b.textContent.trim()===value)b.classList.add('sel');
       });
+      if(group==='quantite'){var qEl=document.getElementById('f-quantite');if(qEl)qEl.value=value}
     });
   }
   if(isLastInFlow()&&currentDetailDemande){var a=document.getElementById('f-addr');if(a)a.value=currentDetailDemande.adresse||''}
+  if(document.getElementById('prix-estime-box'))updateEstimation();
 }
 
 // ── NOTATION ──
@@ -1064,27 +1066,59 @@ async function envoyerDevis(demandeId){
 
 // ── TARIFICATION (Vague 2) ──
 const TARIF_CATEGORIES=[
-  {key:'voiture',label:'🚗 Voiture',placeholder:85,reference:'Prix pour : citadine, intérieur + extérieur, état propre'},
-  {key:'canape',label:'🛋️ Canapé',placeholder:80,reference:'Prix pour : 2 places, tissu, état propre'},
-  {key:'matelas',label:'🛏️ Matelas',unite:true,uniteLabel:'matelas',placeholder:60,reference:'Prix pour : 1 matelas taille 140x190, état propre'},
-  {key:'terrasse',label:'☀️ Terrasse',placeholder:140,reference:'Prix pour : 20 à 50 m², carrelage, état propre'},
-  {key:'piscine',label:'💧 Piscine',placeholder:130,reference:'Prix pour : nettoyage complet, bassin moyen, état propre'},
-  {key:'toiture',label:'🏠 Toiture',placeholder:1500,reference:'Prix pour : 50 à 100 m², tuiles, démoussage + hydrofuge, état propre'},
-  {key:'vitres',label:'🪟 Vitres',unite:true,uniteLabel:'vitre',placeholder:6,reference:'Prix pour : 1 vitre, état propre'},
-  {key:'autre',label:'➕ Autre',placeholder:60,reference:'Prix de base indicatif'}
+  {key:'voiture',label:'🚗 Voiture',tiers:['citadine','suv_4x4','monospace','utilitaire'],
+    tierLabels:{citadine:'Citadine',suv_4x4:'SUV / 4x4',monospace:'Monospace',utilitaire:'Utilitaire / Van'},
+    tierPlaceholders:{citadine:85,suv_4x4:128,monospace:132,utilitaire:153},
+    note:'Prix pour un nettoyage intérieur + extérieur complet, état propre. Le type de nettoyage (intérieur seul/extérieur seul) ajuste ensuite automatiquement.'},
+  {key:'canape',label:'🛋️ Canapé',tiers:['A','B','C','D'],
+    tierLabels:{A:'2 places',B:'3 places',C:'4 places',D:'5+ places / angle'},
+    tierPlaceholders:{A:80,B:92,C:108,D:128},
+    note:'Prix pour un canapé en tissu, état propre. Cuir/velours ajustent ensuite automatiquement le prix.'},
+  {key:'matelas',label:'🛏️ Matelas',unite:true,uniteLabel:'matelas',tiers:['A','B','C','D'],
+    tierLabels:{A:'90x190 cm',B:'140x190 cm',C:'160x200 cm',D:'180x200 cm+'},
+    tierPlaceholders:{A:45,B:60,C:72,D:90},
+    note:'Prix par matelas, état propre. Le nombre de matelas est fourni par le client.'},
+  {key:'terrasse',label:'☀️ Terrasse',tiers:['A','B','C','D'],
+    tierLabels:{A:'Moins de 20 m²',B:'20 à 50 m²',C:'50 à 100 m²',D:'Plus de 100 m²'},
+    tierPlaceholders:{A:70,B:140,C:252,D:420},
+    note:'Prix pour une terrasse en carrelage, état propre. Bois/béton/pierre ajustent ensuite automatiquement le prix.'},
+  {key:'piscine',label:'💧 Piscine',tiers:['entretien','complet','eau_verte'],
+    tierLabels:{entretien:'Entretien simple',complet:'Nettoyage complet',eau_verte:'Eau verte / remise en état'},
+    tierPlaceholders:{entretien:65,complet:130,eau_verte:585},
+    note:'Prix pour un bassin de taille moyenne, état propre. La surface exacte ajuste ensuite automatiquement le prix.'},
+  {key:'toiture',label:'🏠 Toiture',tiers:['A','B','C','D'],
+    tierLabels:{A:'Moins de 50 m²',B:'50 à 100 m²',C:'100 à 200 m²',D:'Plus de 200 m²'},
+    tierPlaceholders:{A:675,B:1500,C:2850,D:4950},
+    note:'Prix pour une toiture en tuiles, démoussage + hydrofuge, état propre. Ardoises/fibrociment/zinc ajustent ensuite automatiquement le prix.'},
+  {key:'vitres',label:'🪟 Vitres',unite:true,uniteLabel:'vitre',tiers:['maison','appartement','commerce','bureaux'],
+    tierLabels:{maison:'Maison',appartement:'Appartement',commerce:'Commerce',bureaux:'Bureaux'},
+    tierPlaceholders:{maison:6,appartement:6,commerce:7.2,bureaux:7.8},
+    note:'Prix par vitre, état propre. Le nombre de vitres est fourni par le client.'},
+  {key:'autre',label:'➕ Autre',tiers:null,placeholder:60,note:'Prix de base indicatif, à ajuster au cas par cas dans votre message au client.'}
 ];
+
 async function loadProTarifs(){
   var c=document.getElementById('pro-tarifs-form');
   var html='';
   TARIF_CATEGORIES.forEach(function(cat){
-    var placeholder=cat.unite?('Prix par '+cat.uniteLabel+', ex: '+cat.placeholder):('Prix de base, ex: '+cat.placeholder);
     html+='<div class="field-group" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px">'+
       '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:0">'+
         '<input type="checkbox" id="propose-'+cat.key+'" style="width:auto" onchange="toggleTarifInput(\''+cat.key+'\')">'+
         '<span>'+cat.label+' — je propose cette prestation</span>'+
       '</label>'+
-      '<div style="font-size:11px;color:var(--gray);margin-top:4px">'+cat.reference+(cat.unite?' — tarifé à l\'unité, la quantité est fournie par le client.':' — un coefficient est appliqué automatiquement selon la taille/matière/état réels de la demande.')+'</div>'+
-      '<input type="number" inputmode="decimal" min="1" id="tarif-'+cat.key+'" placeholder="'+placeholder+'" style="margin-top:8px" disabled></div>';
+      '<div style="font-size:11px;color:var(--gray);margin:4px 0 8px">'+cat.note+'</div>';
+    if(cat.tiers){
+      html+='<div id="tarif-tiers-'+cat.key+'" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+      cat.tiers.forEach(function(tier){
+        var ph=cat.unite?('ex: '+cat.tierPlaceholders[tier]):('ex: '+cat.tierPlaceholders[tier]);
+        html+='<div><label style="font-size:11px;margin-top:0">'+cat.tierLabels[tier]+(cat.unite?' (par '+cat.uniteLabel+')':'')+'</label>'+
+          '<input type="number" inputmode="decimal" min="0.5" step="0.5" id="tarif-'+cat.key+'-'+tier+'" placeholder="'+ph+'" disabled></div>';
+      });
+      html+='</div>';
+    }else{
+      html+='<input type="number" inputmode="decimal" min="1" id="tarif-'+cat.key+'" placeholder="Prix de base, ex: '+cat.placeholder+'" disabled>';
+    }
+    html+='</div>';
   });
   c.innerHTML=html;
   try{
@@ -1096,33 +1130,59 @@ async function loadProTarifs(){
     var prestations=d.prestations||[];
     TARIF_CATEGORIES.forEach(function(cat){
       var checkbox=document.getElementById('propose-'+cat.key);
-      var input=document.getElementById('tarif-'+cat.key);
       var propose=prestations.indexOf(cat.key)>=0;
       if(checkbox)checkbox.checked=propose;
-      if(input){
-        var valeur=cat.unite?tarifsUnitaires[cat.key]:tarifs[cat.key];
-        if(valeur)input.value=valeur;
-        input.disabled=!propose;
+      var source=cat.unite?tarifsUnitaires:tarifs;
+      var valeurCat=source[cat.key];
+      if(cat.tiers){
+        cat.tiers.forEach(function(tier){
+          var input=document.getElementById('tarif-'+cat.key+'-'+tier);
+          if(input){
+            if(valeurCat&&valeurCat[tier])input.value=valeurCat[tier];
+            input.disabled=!propose;
+          }
+        });
+      }else{
+        var input=document.getElementById('tarif-'+cat.key);
+        if(input){
+          if(valeurCat)input.value=valeurCat;
+          input.disabled=!propose;
+        }
       }
     });
   }catch(e){}
 }
 function toggleTarifInput(key){
   var checkbox=document.getElementById('propose-'+key);
-  var input=document.getElementById('tarif-'+key);
-  if(input)input.disabled=!checkbox.checked;
+  var cat=TARIF_CATEGORIES.filter(function(c){return c.key===key})[0];
+  if(!cat)return;
+  if(cat.tiers){
+    cat.tiers.forEach(function(tier){
+      var input=document.getElementById('tarif-'+key+'-'+tier);
+      if(input)input.disabled=!checkbox.checked;
+    });
+  }else{
+    var input=document.getElementById('tarif-'+key);
+    if(input)input.disabled=!checkbox.checked;
+  }
 }
 async function saveTarifs(){
   var tarifs={},tarifsUnitaires={},prestations=[];
   TARIF_CATEGORIES.forEach(function(cat){
     var checkbox=document.getElementById('propose-'+cat.key);
-    var input=document.getElementById('tarif-'+cat.key);
-    if(checkbox&&checkbox.checked){
-      prestations.push(cat.key);
-      if(input&&input.value.trim()){
-        if(cat.unite)tarifsUnitaires[cat.key]=parseFloat(input.value);
-        else tarifs[cat.key]=parseFloat(input.value);
-      }
+    if(!checkbox||!checkbox.checked)return;
+    prestations.push(cat.key);
+    var destination=cat.unite?tarifsUnitaires:tarifs;
+    if(cat.tiers){
+      var parPalier={};
+      cat.tiers.forEach(function(tier){
+        var input=document.getElementById('tarif-'+cat.key+'-'+tier);
+        if(input&&input.value.trim())parPalier[tier]=parseFloat(input.value);
+      });
+      if(Object.keys(parPalier).length)destination[cat.key]=parPalier;
+    }else{
+      var input=document.getElementById('tarif-'+cat.key);
+      if(input&&input.value.trim())destination[cat.key]=parseFloat(input.value);
     }
   });
   if(!prestations.length){toast('Cochez au moins une prestation que vous proposez.');return}
@@ -1434,7 +1494,14 @@ function openServiceForm(type){
   renderPhotoInput();
   if(document.getElementById('prix-estime-box'))updateEstimation();
 }
-function closeModal(e){if(e.target===document.getElementById('modal-overlay')){document.getElementById('modal-overlay').classList.remove('open');multiFlow={active:false,queue:[],current:0,results:[]}}}
+function closeModal(e){if(e.target===document.getElementById('modal-overlay')){closeModalForce()}}
+function closeModalForce(){
+  var hadData=multiFlow.active||(document.getElementById('f-addr')&&document.getElementById('f-addr').value.trim());
+  if(hadData&&!confirm('Fermer sans envoyer cette demande ? Les informations saisies seront perdues.'))return;
+  document.getElementById('modal-overlay').classList.remove('open');
+  multiFlow={active:false,queue:[],current:0,results:[]};
+  photos=[];
+}
 function isLastInFlow(){return!multiFlow.active||multiFlow.current===multiFlow.queue.length-1}
 
 function dateTimeBlock(isLast){
@@ -1455,7 +1522,32 @@ function dateTimeBlock(isLast){
     '<div class="photo-previews" id="photo-previews"></div></div>';
 }
 function descBlock(ph){return'<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
-function sendBtn(type){var isLast=isLastInFlow();var label=multiFlow.active&&!isLast?'Suivant →':'✨ Envoyer ma demande';return'<button class="modal-send-btn" id="send-demand-btn" onclick="sendDemand(\''+type+'\')">'+label+'</button>'}
+function sendBtn(type){
+  var isLast=isLastInFlow();
+  var label=multiFlow.active&&!isLast?'Suivant →':'✨ Envoyer ma demande';
+  var html='';
+  if(multiFlow.active&&multiFlow.current>0){
+    html+='<button type="button" onclick="goToPreviousStep(\''+type+'\')" style="width:100%;padding:12px;background:none;border:2px solid var(--border);color:#374151;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">← Étape précédente</button>';
+  }
+  html+='<button class="modal-send-btn" id="send-demand-btn" onclick="sendDemand(\''+type+'\')">'+label+'</button>';
+  return html;
+}
+function goToPreviousStep(currentType){
+  if(!multiFlow.active||multiFlow.current<=0)return;
+  // Sauvegarde l'état actuel de l'étape en cours avant de reculer, pour ne rien perdre si l'utilisateur revient
+  var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
+  var details={};
+  document.querySelectorAll('.opt-btn.sel').forEach(function(b){var group=b.getAttribute('data-group');if(group)details[group]=b.textContent.trim()});
+  if(UNIT_CATEGORIES_CLIENT.indexOf(currentType)>=0){
+    var qEl=document.getElementById('f-quantite');
+    if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
+  }
+  multiFlow.results[multiFlow.current]={type:currentType,description:desc,details:details};
+  multiFlow.current--;
+  openServiceForm(multiFlow.queue[multiFlow.current]);
+  if(multiFlow.results[multiFlow.current]){setTimeout(function(){prefillModifyForm(multiFlow.results[multiFlow.current])},50)}
+  else if(multiFlow.editMode&&multiFlow.editData&&multiFlow.editData[multiFlow.current]){setTimeout(function(){prefillModifyForm(multiFlow.editData[multiFlow.current])},50)}
+}
 
 function etatBlock(){
   return '<div class="field-group"><label>🧽 État actuel</label><div class="options-grid">'+
@@ -1474,7 +1566,7 @@ function quantiteBlock(label,placeholder){
 var currentFormType=null;
 
 const UNIT_CATEGORIES_CLIENT=['vitres','matelas'];
-const COEF_KEYS=['taille','matiere','portee','intervention'];
+const COEF_KEYS=['taille','matiere','portee','intervention','type_bien'];
 
 async function updateEstimation(){
   if(!currentFormType)return;
@@ -1511,15 +1603,15 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this)"><span>✨</span>Extérieur</button>'+
   '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this)"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
   '<div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
-  '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
-  '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
-  '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚌</span>Utilitaire</button></div></div>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="monospace" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚌</span>Utilitaire</button></div></div>'+
   '<div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="seats" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
-  '<button class="opt-btn" data-group="seats" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
-  '<button class="opt-btn" data-group="seats" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">7 places</button>'+
-  '<button class="opt-btn" data-group="seats" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">9+ places</button></div></div>'+
+  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">2 places</button>'+
+  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">5 places</button>'+
+  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">7 places</button>'+
+  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">9+ places</button></div></div>'+
   etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
@@ -1594,10 +1686,10 @@ function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</d
 
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
   '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏠 Maison</button>'+
-  '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏢 Appartement</button>'+
-  '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏪 Commerce</button>'+
-  '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏭 Bureaux</button></div></div>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this)">🏠 Maison</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this)">🏢 Appartement</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this)">🏪 Commerce</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this)">🏭 Bureaux</button></div></div>'+
   quantiteBlock('Nombre exact de vitres à nettoyer','Ex: 10')+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
@@ -1645,10 +1737,11 @@ async function sendDemand(type){
   }
 
   if(multiFlow.active&&multiFlow.current<multiFlow.queue.length-1){
-    multiFlow.results.push({type:type,description:desc,details:details});
+    multiFlow.results[multiFlow.current]={type:type,description:desc,details:details};
     multiFlow.current++;
     openServiceForm(multiFlow.queue[multiFlow.current]);
-    if(multiFlow.editMode&&multiFlow.editData&&multiFlow.editData[multiFlow.current])setTimeout(function(){prefillModifyForm(multiFlow.editData[multiFlow.current])},50);
+    if(multiFlow.results[multiFlow.current]){setTimeout(function(){prefillModifyForm(multiFlow.results[multiFlow.current])},50)}
+    else if(multiFlow.editMode&&multiFlow.editData&&multiFlow.editData[multiFlow.current]){setTimeout(function(){prefillModifyForm(multiFlow.editData[multiFlow.current])},50)}
     return;
   }
 
@@ -1659,7 +1752,7 @@ async function sendDemand(type){
   var flex=document.querySelector('.flex-opt.sel')&&document.querySelector('.flex-opt.sel').textContent||'Heure exacte';
 
   var prestations;
-  if(multiFlow.active){multiFlow.results.push({type:type,description:desc,details:details});prestations=multiFlow.results}
+  if(multiFlow.active){multiFlow.results[multiFlow.current]={type:type,description:desc,details:details};prestations=multiFlow.results}
   else{prestations=[{type:type,description:desc,details:details}]}
 
   var btn=document.getElementById('send-demand-btn');
