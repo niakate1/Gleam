@@ -1064,20 +1064,27 @@ async function envoyerDevis(demandeId){
 
 // ── TARIFICATION (Vague 2) ──
 const TARIF_CATEGORIES=[
-  {key:'voiture',label:'🚗 Voiture'},{key:'canape',label:'🛋️ Canapé'},{key:'matelas',label:'🛏️ Matelas'},
-  {key:'terrasse',label:'☀️ Terrasse'},{key:'piscine',label:'💧 Piscine'},{key:'toiture',label:'🏠 Toiture'},
-  {key:'vitres',label:'🪟 Vitres'},{key:'autre',label:'➕ Autre'}
+  {key:'voiture',label:'🚗 Voiture',placeholder:85,reference:'Prix pour : citadine, intérieur + extérieur, état propre'},
+  {key:'canape',label:'🛋️ Canapé',placeholder:80,reference:'Prix pour : 2 places, tissu, état propre'},
+  {key:'matelas',label:'🛏️ Matelas',unite:true,uniteLabel:'matelas',placeholder:60,reference:'Prix pour : 1 matelas taille 140x190, état propre'},
+  {key:'terrasse',label:'☀️ Terrasse',placeholder:140,reference:'Prix pour : 20 à 50 m², carrelage, état propre'},
+  {key:'piscine',label:'💧 Piscine',placeholder:130,reference:'Prix pour : nettoyage complet, bassin moyen, état propre'},
+  {key:'toiture',label:'🏠 Toiture',placeholder:1500,reference:'Prix pour : 50 à 100 m², tuiles, démoussage + hydrofuge, état propre'},
+  {key:'vitres',label:'🪟 Vitres',unite:true,uniteLabel:'vitre',placeholder:6,reference:'Prix pour : 1 vitre, état propre'},
+  {key:'autre',label:'➕ Autre',placeholder:60,reference:'Prix de base indicatif'}
 ];
 async function loadProTarifs(){
   var c=document.getElementById('pro-tarifs-form');
   var html='';
   TARIF_CATEGORIES.forEach(function(cat){
+    var placeholder=cat.unite?('Prix par '+cat.uniteLabel+', ex: '+cat.placeholder):('Prix de base, ex: '+cat.placeholder);
     html+='<div class="field-group" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px">'+
       '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:0">'+
         '<input type="checkbox" id="propose-'+cat.key+'" style="width:auto" onchange="toggleTarifInput(\''+cat.key+'\')">'+
         '<span>'+cat.label+' — je propose cette prestation</span>'+
       '</label>'+
-      '<input type="number" inputmode="decimal" min="1" id="tarif-'+cat.key+'" placeholder="Prix de base, ex: 60" style="margin-top:8px" disabled></div>';
+      '<div style="font-size:11px;color:var(--gray);margin-top:4px">'+cat.reference+(cat.unite?' — tarifé à l\'unité, la quantité est fournie par le client.':' — un coefficient est appliqué automatiquement selon la taille/matière/état réels de la demande.')+'</div>'+
+      '<input type="number" inputmode="decimal" min="1" id="tarif-'+cat.key+'" placeholder="'+placeholder+'" style="margin-top:8px" disabled></div>';
   });
   c.innerHTML=html;
   try{
@@ -1085,6 +1092,7 @@ async function loadProTarifs(){
     if(!r.ok)return;
     const d=await safeJson(r);
     var tarifs=d.tarifs||{};
+    var tarifsUnitaires=d.tarifs_unitaires||{};
     var prestations=d.prestations||[];
     TARIF_CATEGORIES.forEach(function(cat){
       var checkbox=document.getElementById('propose-'+cat.key);
@@ -1092,7 +1100,8 @@ async function loadProTarifs(){
       var propose=prestations.indexOf(cat.key)>=0;
       if(checkbox)checkbox.checked=propose;
       if(input){
-        if(tarifs[cat.key])input.value=tarifs[cat.key];
+        var valeur=cat.unite?tarifsUnitaires[cat.key]:tarifs[cat.key];
+        if(valeur)input.value=valeur;
         input.disabled=!propose;
       }
     });
@@ -1104,20 +1113,23 @@ function toggleTarifInput(key){
   if(input)input.disabled=!checkbox.checked;
 }
 async function saveTarifs(){
-  var tarifs={},prestations=[];
+  var tarifs={},tarifsUnitaires={},prestations=[];
   TARIF_CATEGORIES.forEach(function(cat){
     var checkbox=document.getElementById('propose-'+cat.key);
     var input=document.getElementById('tarif-'+cat.key);
     if(checkbox&&checkbox.checked){
       prestations.push(cat.key);
-      if(input&&input.value.trim())tarifs[cat.key]=parseFloat(input.value);
+      if(input&&input.value.trim()){
+        if(cat.unite)tarifsUnitaires[cat.key]=parseFloat(input.value);
+        else tarifs[cat.key]=parseFloat(input.value);
+      }
     }
   });
   if(!prestations.length){toast('Cochez au moins une prestation que vous proposez.');return}
   var btn=document.getElementById('save-tarifs-btn');
   btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
-    const r=await fetch(API+'/api/societes/tarifs',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({tarifs,prestations})});
+    const r=await fetch(API+'/api/societes/tarifs',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({tarifs,tarifs_unitaires:tarifsUnitaires,prestations})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast('💾 Tarifs enregistrés !');
@@ -1454,7 +1466,15 @@ function etatBlock(){
     '</div><div id="prix-estime-box" style="margin-top:10px"></div></div>';
 }
 
+function quantiteBlock(label,placeholder){
+  return '<div class="field-group"><label>'+label+'</label>'+
+    '<input type="number" inputmode="numeric" min="1" id="f-quantite" placeholder="'+placeholder+'" oninput="updateEstimation()"></div>';
+}
+
 var currentFormType=null;
+
+const UNIT_CATEGORIES_CLIENT=['vitres','matelas'];
+const COEF_KEYS=['taille','matiere','portee','intervention'];
 
 async function updateEstimation(){
   if(!currentFormType)return;
@@ -1464,9 +1484,22 @@ async function updateEstimation(){
   var etat=etatBtn?etatBtn.getAttribute('data-etat-val'):'propre';
   box.innerHTML='<div style="font-size:12px;color:var(--gray)">Calcul de l\'estimation...</div>';
   try{
-    const r=await fetch(API+'/api/tarifs/estimation?prestation='+encodeURIComponent(currentFormType)+'&etat='+encodeURIComponent(etat),{headers:authHeaders()});
+    var url=API+'/api/tarifs/estimation?prestation='+encodeURIComponent(currentFormType)+'&etat='+encodeURIComponent(etat);
+    if(UNIT_CATEGORIES_CLIENT.indexOf(currentFormType)>=0){
+      var qEl=document.getElementById('f-quantite');
+      var quantite=qEl?parseInt(qEl.value,10):0;
+      if(!quantite||quantite<=0){box.innerHTML='';return}
+      url+='&quantite='+encodeURIComponent(quantite);
+    }
+    // Ajoute tout coefficient sélectionné dans le formulaire courant (taille, matière, portée, intervention...),
+    // quelle que soit la catégorie — chaque coefficient n'est utilisé par le serveur que s'il est pertinent.
+    COEF_KEYS.forEach(function(key){
+      var btn=document.querySelector('[data-coef-key="'+key+'"].sel');
+      if(btn)url+='&'+key+'='+encodeURIComponent(btn.getAttribute('data-coef-val'));
+    });
+    const r=await fetch(url,{headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){box.innerHTML='';return}
+    if(!r.ok||d.prix_min===null||d.prix_min===undefined){box.innerHTML='';return}
     box.innerHTML='<div style="background:var(--light);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--p);font-weight:600">💡 Prix estimé : '+d.prix_min+'€ – '+d.prix_max+'€'+
       (d.base_sur_donnees_reelles?'':' <span style="font-weight:400;color:var(--gray)">(estimation indicative)</span>')+'</div>';
   }catch(e){box.innerHTML=''}
@@ -1474,19 +1507,19 @@ async function updateEstimation(){
 
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="net-type" onclick="selOpt(this)"><span>🪑</span>Intérieur</button>'+
-  '<button class="opt-btn" data-group="net-type" onclick="selOpt(this)"><span>✨</span>Extérieur</button>'+
-  '<button class="opt-btn full" data-group="net-type" onclick="selOpt(this)"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this)"><span>🪑</span>Intérieur</button>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this)"><span>✨</span>Extérieur</button>'+
+  '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this)"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
   '<div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label><div class="options-grid">'+
   '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
   '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
   '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
   '<button class="opt-btn" data-group="veh" onclick="selOpt(this)"><span>🚌</span>Utilitaire</button></div></div>'+
   '<div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">2 places</button>'+
-  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">5 places</button>'+
-  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">7 places</button>'+
-  '<button class="opt-btn" data-group="seats" onclick="selOpt(this)">9+ places</button></div></div>'+
+  '<button class="opt-btn" data-group="seats" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
+  '<button class="opt-btn" data-group="seats" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
+  '<button class="opt-btn" data-group="seats" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">7 places</button>'+
+  '<button class="opt-btn" data-group="seats" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">9+ places</button></div></div>'+
   etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
@@ -1496,67 +1529,67 @@ function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé<
   '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>🪑</span>Canapé lit</button>'+
   '<button class="opt-btn" data-group="can-type" onclick="selOpt(this)"><span>🪑</span>Chauffeuses</button></div></div>'+
   '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="can-pl" onclick="selOpt(this)">2 places</button>'+
-  '<button class="opt-btn" data-group="can-pl" onclick="selOpt(this)">3 places</button>'+
-  '<button class="opt-btn" data-group="can-pl" onclick="selOpt(this)">4 places</button>'+
-  '<button class="opt-btn" data-group="can-pl" onclick="selOpt(this)">5+ places</button></div></div>'+
+  '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
+  '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">3 places</button>'+
+  '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">4 places</button>'+
+  '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">5+ places</button></div></div>'+
   '<div class="field-group"><label>Matière <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Tissu</button>'+
-  '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Cuir</button>'+
-  '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Velours</button>'+
-  '<button class="opt-btn" data-group="can-mat" onclick="selOpt(this)">Microfibre</button></div></div>'+
+  '<button class="opt-btn" data-group="can-mat" data-coef-key="matiere" data-coef-val="tissu" onclick="selOpt(this)">Tissu</button>'+
+  '<button class="opt-btn" data-group="can-mat" data-coef-key="matiere" data-coef-val="cuir" onclick="selOpt(this)">Cuir</button>'+
+  '<button class="opt-btn" data-group="can-mat" data-coef-key="matiere" data-coef-val="velours" onclick="selOpt(this)">Velours</button>'+
+  '<button class="opt-btn" data-group="can-mat" data-coef-key="matiere" data-coef-val="microfibre" onclick="selOpt(this)">Microfibre</button></div></div>'+
   etatBlock()+descBlock('Ex: Taches de café...')+dateTimeBlock(isLastInFlow())+sendBtn('canape')}
 
 function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
   '<div class="field-group"><label>Taille</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="mat-t" onclick="selOpt(this)">90x190 cm</button>'+
-  '<button class="opt-btn" data-group="mat-t" onclick="selOpt(this)">140x190 cm</button>'+
-  '<button class="opt-btn" data-group="mat-t" onclick="selOpt(this)">160x200 cm</button>'+
-  '<button class="opt-btn" data-group="mat-t" onclick="selOpt(this)">180x200 cm</button></div></div>'+
-  '<div class="field-group"><label>Nombre</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">1 matelas</button>'+
-  '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">2 matelas</button>'+
-  '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">3 matelas</button>'+
-  '<button class="opt-btn" data-group="mat-nb" onclick="selOpt(this)">4+ matelas</button></div></div>'+
+  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">90x190 cm</button>'+
+  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">140x190 cm</button>'+
+  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">160x200 cm</button>'+
+  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">180x200 cm</button></div></div>'+
+  quantiteBlock('Nombre exact de matelas','Ex: 2')+
   etatBlock()+descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
 
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
   '<div class="field-group"><label>Surface</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="ter-s" onclick="selOpt(this)">Moins de 20 m²</button>'+
-  '<button class="opt-btn" data-group="ter-s" onclick="selOpt(this)">20 à 50 m²</button>'+
-  '<button class="opt-btn" data-group="ter-s" onclick="selOpt(this)">50 à 100 m²</button>'+
-  '<button class="opt-btn" data-group="ter-s" onclick="selOpt(this)">Plus de 100 m²</button></div></div>'+
+  '<button class="opt-btn" data-group="ter-s" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">Moins de 20 m²</button>'+
+  '<button class="opt-btn" data-group="ter-s" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">20 à 50 m²</button>'+
+  '<button class="opt-btn" data-group="ter-s" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">50 à 100 m²</button>'+
+  '<button class="opt-btn" data-group="ter-s" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">Plus de 100 m²</button></div></div>'+
   '<div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Carrelage</button>'+
-  '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Bois/composite</button>'+
-  '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Béton</button>'+
-  '<button class="opt-btn" data-group="ter-sol" onclick="selOpt(this)">Pierre naturelle</button></div></div>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)">Carrelage</button>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="bois_composite" onclick="selOpt(this)">Bois/composite</button>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="beton" onclick="selOpt(this)">Béton</button>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="pierre_naturelle" onclick="selOpt(this)">Pierre naturelle</button></div></div>'+
   etatBlock()+descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
 
-function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Caractéristiques</div>'+
-  '<div class="field-group"><label>Type</label><div class="options-grid">'+
+function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Quel type d\'intervention souhaitez-vous ?</div>'+
+  '<div class="field-group"><label>Type d\'intervention</label><div class="options-grid">'+
+  '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="entretien" onclick="selOpt(this)">Entretien simple<br><span style="font-weight:400;font-size:11px">(pH, skimmer, contrôle)</span></button>'+
+  '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="complet" onclick="selOpt(this)">Nettoyage complet<br><span style="font-weight:400;font-size:11px">(parois, fond, filtre)</span></button>'+
+  '<button class="opt-btn full" data-group="pisc-int" data-coef-key="intervention" data-coef-val="eau_verte" onclick="selOpt(this)">Eau verte / remise en état</button></div></div>'+
+  '<div class="field-group"><label>Type de bassin <span class="optional">(optionnel)</span></label><div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🏊</span>Enterrée</button>'+
   '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🏖️</span>Hors-sol</button>'+
   '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🌊</span>Semi-enterrée</button>'+
   '<button class="opt-btn" data-group="pisc-t" onclick="selOpt(this)"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
   '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">Moins de 25 m²</button>'+
-  '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">25 à 50 m²</button>'+
-  '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">50 à 80 m²</button>'+
-  '<button class="opt-btn" data-group="pisc-s" onclick="selOpt(this)">Plus de 80 m²</button></div></div>'+
+  '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">Moins de 25 m²</button>'+
+  '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">25 à 50 m²</button>'+
+  '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">50 à 80 m²</button>'+
+  '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">Plus de 80 m²</button></div></div>'+
   etatBlock()+descBlock('Ex: Eau verte...')+dateTimeBlock(isLastInFlow())+sendBtn('piscine')}
 
 function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
   '<div class="field-group"><label>Type de toiture</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="toit-t" onclick="selOpt(this)">Tuiles</button>'+
-  '<button class="opt-btn" data-group="toit-t" onclick="selOpt(this)">Ardoises</button>'+
-  '<button class="opt-btn" data-group="toit-t" onclick="selOpt(this)">Fibrociment</button>'+
-  '<button class="opt-btn" data-group="toit-t" onclick="selOpt(this)">Zinc/Métal</button></div></div>'+
+  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="tuiles" onclick="selOpt(this)">Tuiles</button>'+
+  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="ardoises" onclick="selOpt(this)">Ardoises</button>'+
+  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="fibrociment" onclick="selOpt(this)">Fibrociment</button>'+
+  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="zinc_metal" onclick="selOpt(this)">Zinc/Métal</button></div></div>'+
   '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">Moins de 50 m²</button>'+
-  '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">50 à 100 m²</button>'+
-  '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">100 à 200 m²</button>'+
-  '<button class="opt-btn" data-group="toit-s" onclick="selOpt(this)">Plus de 200 m²</button></div></div>'+
+  '<button class="opt-btn" data-group="toit-s" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">Moins de 50 m²</button>'+
+  '<button class="opt-btn" data-group="toit-s" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">50 à 100 m²</button>'+
+  '<button class="opt-btn" data-group="toit-s" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">100 à 200 m²</button>'+
+  '<button class="opt-btn" data-group="toit-s" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">Plus de 200 m²</button></div></div>'+
   etatBlock()+descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
 
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
@@ -1565,11 +1598,7 @@ function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div
   '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏢 Appartement</button>'+
   '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏪 Commerce</button>'+
   '<button class="opt-btn" data-group="vitr-b" onclick="selOpt(this)">🏭 Bureaux</button></div></div>'+
-  '<div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">Moins de 5</button>'+
-  '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">5 à 10</button>'+
-  '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">10 à 20</button>'+
-  '<button class="opt-btn" data-group="vitr-nb" onclick="selOpt(this)">Plus de 20</button></div></div>'+
+  quantiteBlock('Nombre exact de vitres à nettoyer','Ex: 10')+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
 function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
@@ -1577,7 +1606,7 @@ function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><
   '<div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel..." style="resize:none"></textarea></div>'+
   dateTimeBlock(isLastInFlow())+sendBtn('autre')}
 
-function selOpt(btn){var group=btn.getAttribute('data-group');document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel');if(group==='etat')updateEstimation()}
+function selOpt(btn){var group=btn.getAttribute('data-group');document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel');if(group==='etat'||btn.hasAttribute('data-coef-key'))updateEstimation()}
 function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
 
 async function handlePhotos(input){
@@ -1610,6 +1639,10 @@ async function sendDemand(type){
   var details={};
   document.querySelectorAll('.opt-btn.sel').forEach(function(b){var group=b.getAttribute('data-group');if(group)details[group]=b.textContent.trim()});
   if(type==='autre'){var t=document.getElementById('f-autre-type')&&document.getElementById('f-autre-type').value.trim();if(t)details['type-prestation']=t}
+  if(UNIT_CATEGORIES_CLIENT.indexOf(type)>=0){
+    var qEl=document.getElementById('f-quantite');
+    if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
+  }
 
   if(multiFlow.active&&multiFlow.current<multiFlow.queue.length-1){
     multiFlow.results.push({type:type,description:desc,details:details});
