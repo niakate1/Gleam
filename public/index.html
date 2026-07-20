@@ -1580,7 +1580,10 @@ async function updateEstimation(){
     if(UNIT_CATEGORIES_CLIENT.indexOf(currentFormType)>=0){
       var qEl=document.getElementById('f-quantite');
       var quantite=qEl?parseInt(qEl.value,10):0;
-      if(!quantite||quantite<=0){box.innerHTML='';return}
+      if(!quantite||quantite<=0){
+        box.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic">💡 Indiquez une quantité ci-dessus pour voir une estimation de prix</div>';
+        return;
+      }
       url+='&quantite='+encodeURIComponent(quantite);
     }
     // Ajoute tout coefficient sélectionné dans le formulaire courant (taille, matière, portée, intervention...),
@@ -1591,10 +1594,19 @@ async function updateEstimation(){
     });
     const r=await fetch(url,{headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok||d.prix_min===null||d.prix_min===undefined){box.innerHTML='';return}
+    if(!r.ok){
+      box.innerHTML='<div style="font-size:12px;color:var(--red)">⚠️ Estimation indisponible ('+(d&&d.error?d.error:'code '+r.status)+')</div>';
+      return;
+    }
+    if(d.prix_min===null||d.prix_min===undefined){
+      box.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic">💡 '+(d.message||'Complétez les informations ci-dessus pour voir une estimation de prix')+'</div>';
+      return;
+    }
     box.innerHTML='<div style="background:var(--light);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--p);font-weight:600">💡 Prix estimé : '+d.prix_min+'€ – '+d.prix_max+'€'+
       (d.base_sur_donnees_reelles?'':' <span style="font-weight:400;color:var(--gray)">(estimation indicative)</span>')+'</div>';
-  }catch(e){box.innerHTML=''}
+  }catch(e){
+    box.innerHTML='<div style="font-size:12px;color:var(--red)">⚠️ Estimation indisponible ('+friendlyNetworkError(e)+')</div>';
+  }
 }
 
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
