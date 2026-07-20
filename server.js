@@ -86,14 +86,19 @@ const PRESTATION_CONFIG = {
     tiers: ['citadine', 'suv_4x4', 'monospace', 'utilitaire'],
     tierLabels: { citadine: 'Citadine', suv_4x4: 'SUV / 4x4', monospace: 'Monospace', utilitaire: 'Utilitaire / Van' },
     tierDefaults: { citadine: 85, suv_4x4: 128, monospace: 132, utilitaire: 153 }, // intérieur+extérieur, propre
-    coefPortee: { interieur: 0.70, exterieur: 0.55, complet: 1.0 }
+    coefPortee: { interieur: 0.70, exterieur: 0.55, complet: 1.0 },
+    // Le nombre de places est un facteur secondaire : à type de véhicule identique, plus de places
+    // signifie plus de surface à nettoyer (ex: un SUV 5 places vs un SUV 7 places).
+    coefPlaces: { A: 0.90, B: 1.0, C: 1.15, D: 1.35 } // 2, 5, 7, 9+ places
   },
   canape: {
     tierKey: 'taille', // le pro saisit un prix par nombre de places
     tiers: ['A', 'B', 'C', 'D'],
     tierLabels: { A: '2 places', B: '3 places', C: '4 places', D: '5+ places / angle' },
     tierDefaults: { A: 80, B: 92, C: 108, D: 128 }, // tissu, propre
-    coefMatiere: { tissu: 1.0, cuir: 1.15, velours: 1.05, microfibre: 1.0 }
+    coefMatiere: { tissu: 1.0, cuir: 1.15, velours: 1.05, microfibre: 1.0 },
+    // La forme influence le temps de travail à nombre de places égal (un angle est plus complexe qu'un droit).
+    coefForme: { droit: 1.0, angle: 1.2, canape_lit: 1.15, chauffeuses: 0.85 }
   },
   matelas: {
     unite: true,
@@ -114,7 +119,9 @@ const PRESTATION_CONFIG = {
     tiers: ['entretien', 'complet', 'eau_verte'],
     tierLabels: { entretien: 'Entretien simple', complet: 'Nettoyage complet', eau_verte: 'Eau verte / remise en état' },
     tierDefaults: { entretien: 65, complet: 130, eau_verte: 585 }, // bassin moyen, propre
-    coefTaille: { A: 0.7, B: 1.0, C: 1.4, D: 1.9 }
+    coefTaille: { A: 0.7, B: 1.0, C: 1.4, D: 1.9 },
+    // Un spa/jacuzzi est nettement plus petit qu'un bassin classique ; le hors-sol est aussi souvent plus simple.
+    coefTypeBassin: { enterree: 1.0, semi_enterree: 0.95, hors_sol: 0.8, spa_jacuzzi: 0.35 }
   },
   toiture: {
     tierKey: 'taille', // le pro saisit un prix par surface
@@ -968,6 +975,9 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
     const matiere = req.query.matiere;
     const intervention = req.query.intervention;
     const typeBien = req.query.type_bien;
+    const places = req.query.places;           // voiture (nombre de places, secondaire au type de véhicule)
+    const forme = req.query.forme;             // canapé (droit/angle/canapé lit/chauffeuses, secondaire aux places)
+    const typeBassin = req.query.type_bassin;  // piscine (enterrée/hors-sol/semi-enterrée/spa, secondaire)
     const quantite = req.query.quantite ? parseInt(req.query.quantite, 10) : null;
 
     const config = PRESTATION_CONFIG[prestation];
@@ -1019,7 +1029,10 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
     const coefMatiere = (config.tierKey !== 'matiere' && config.coefMatiere && matiere && config.coefMatiere.hasOwnProperty(matiere)) ? config.coefMatiere[matiere] : 1.0;
     const coefPortee = (config.tierKey !== 'portee' && config.coefPortee && portee && config.coefPortee.hasOwnProperty(portee)) ? config.coefPortee[portee] : 1.0;
     const coefIntervention = (config.tierKey !== 'intervention' && config.coefIntervention && intervention && config.coefIntervention.hasOwnProperty(intervention)) ? config.coefIntervention[intervention] : 1.0;
-    const coef = coefEtat * coefTaille * coefMatiere * coefPortee * coefIntervention;
+    const coefPlaces = (config.coefPlaces && places && config.coefPlaces.hasOwnProperty(places)) ? config.coefPlaces[places] : 1.0;
+    const coefForme = (config.coefForme && forme && config.coefForme.hasOwnProperty(forme)) ? config.coefForme[forme] : 1.0;
+    const coefTypeBassin = (config.coefTypeBassin && typeBassin && config.coefTypeBassin.hasOwnProperty(typeBassin)) ? config.coefTypeBassin[typeBassin] : 1.0;
+    const coef = coefEtat * coefTaille * coefMatiere * coefPortee * coefIntervention * coefPlaces * coefForme * coefTypeBassin;
 
     const prixMoyen = Math.round(base * coef);
     const prixMin = Math.round(prixMoyen * 0.85);
