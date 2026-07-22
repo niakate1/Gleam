@@ -241,24 +241,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="greeting"><h2 id="greeting-name">Bonjour 👋</h2><p>Que souhaitez-vous faire briller aujourd'hui ?</p></div>
     <div class="section-title">Choisissez une ou plusieurs prestations</div>
     <div class="services-grid" id="services-grid">
-      <div class="svc-card" data-svc="voiture" onclick="toggleSvc(this,'voiture')"><span>🚗</span><div class="svc-name">Voiture</div></div>
-      <div class="svc-card" data-svc="canape" onclick="toggleSvc(this,'canape')"><span>🛋️</span><div class="svc-name">Canapé</div></div>
-      <div class="svc-card" data-svc="matelas" onclick="toggleSvc(this,'matelas')"><span>🛏️</span><div class="svc-name">Matelas</div></div>
-      <div class="svc-card" data-svc="terrasse" onclick="toggleSvc(this,'terrasse')"><span>☀️</span><div class="svc-name">Terrasse</div></div>
-      <div class="svc-card" data-svc="piscine" onclick="toggleSvc(this,'piscine')"><span>💧</span><div class="svc-name">Piscine</div></div>
-      <div class="svc-card" data-svc="toiture" onclick="toggleSvc(this,'toiture')"><span>🏠</span><div class="svc-name">Toiture</div></div>
-      <div class="svc-card" data-svc="vitres" onclick="toggleSvc(this,'vitres')"><span>🪟</span><div class="svc-name">Vitres</div></div>
-      <div class="svc-card" data-svc="autre" onclick="toggleSvc(this,'autre')"><span>➕</span><div class="svc-name">Autre</div></div>
+      <div class="svc-card" data-svc="voiture" onclick="toggleSvc(this,'voiture')"><i data-lucide="car" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Voiture</div></div>
+      <div class="svc-card" data-svc="canape" onclick="toggleSvc(this,'canape')"><i data-lucide="sofa" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Canapé</div></div>
+      <div class="svc-card" data-svc="matelas" onclick="toggleSvc(this,'matelas')"><i data-lucide="bed-double" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Matelas</div></div>
+      <div class="svc-card" data-svc="terrasse" onclick="toggleSvc(this,'terrasse')"><i data-lucide="sun" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Terrasse</div></div>
+      <div class="svc-card" data-svc="piscine" onclick="toggleSvc(this,'piscine')"><i data-lucide="droplets" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Piscine</div></div>
+      <div class="svc-card" data-svc="toiture" onclick="toggleSvc(this,'toiture')"><i data-lucide="home" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Toiture</div></div>
+      <div class="svc-card" data-svc="vitres" onclick="toggleSvc(this,'vitres')"><i data-lucide="app-window" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Vitres</div></div>
+      <div class="svc-card" data-svc="autre" onclick="toggleSvc(this,'autre')"><i data-lucide="plus-circle" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Autre</div></div>
     </div>
     <button class="modal-send-btn" id="continue-svc-btn" style="display:none;margin-bottom:24px" onclick="startMultiServiceFlow()">Continuer (<span id="svc-count">0</span> sélectionnée(s))</button>
     <div class="section-title">Mes dernières demandes</div>
     <div id="recent-demands"><div class="empty-state"><span>📋</span><p>Aucune demande pour l'instant.</p></div></div>
   </div>
   <div class="bottom-nav">
-    <button class="bnav-item active" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
-    <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
-    <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
+    <button class="bnav-item active" onclick="goTab('home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
+    <button class="bnav-item" onclick="goTab('messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
+    <button class="bnav-item" onclick="goTab('devis')"><i data-lucide="file-text" style="width:22px;height:22px"></i>Devis</button>
+    <button class="bnav-item" onclick="goTab('profile')"><i data-lucide="user" style="width:22px;height:22px"></i>Profil</button>
   </div>
 </div>
 
@@ -279,10 +279,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Chargement...</p></div></div>
   </div>
   <div class="bottom-nav">
-    <button class="bnav-item active" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
-    <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
-    <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+    <button class="bnav-item active" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
+    <button class="bnav-item" onclick="goProTab('pro-devis')"><i data-lucide="wallet" style="width:22px;height:22px"></i>Mes devis</button>
+    <button class="bnav-item" onclick="goProTab('pro-profile')"><i data-lucide="user" style="width:22px;height:22px"></i>Profil</button>
   </div>
 </div>
 
@@ -291,10 +291,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
   <div id="pro-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
-    <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item active" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
-    <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
-    <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+    <button class="bnav-item" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
+    <button class="bnav-item active" onclick="goProTab('pro-messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
+    <button class="bnav-item" onclick="goProTab('pro-devis')"><i data-lucide="wallet" style="width:22px;height:22px"></i>Mes devis</button>
+    <button class="bnav-item" onclick="goProTab('pro-profile')"><i data-lucide="user" style="width:22px;height:22px"></i>Profil</button>
   </div>
 </div>
 
@@ -303,10 +303,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="navbar"><span class="logo-sm">💰 Mes devis envoyés</span></div>
   <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div></div>
   <div class="bottom-nav">
-    <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
-    <button class="bnav-item active" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
-    <button class="bnav-item" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+    <button class="bnav-item" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
+    <button class="bnav-item active" onclick="goProTab('pro-devis')"><i data-lucide="wallet" style="width:22px;height:22px"></i>Mes devis</button>
+    <button class="bnav-item" onclick="goProTab('pro-profile')"><i data-lucide="user" style="width:22px;height:22px"></i>Profil</button>
   </div>
 </div>
 
@@ -316,20 +316,20 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="profile-content">
     <div class="profile-hero"><div class="avatar">🏢</div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p></div>
     <div class="profile-menu">
-      <div class="profile-item"><span class="pi-icon">💰</span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon">💶</span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">⭐</span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">🔔</span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon">❓</span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon">📄</span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
     </div>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="bottom-nav">
-    <button class="bnav-item" onclick="goProTab('pro-home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goProTab('pro-messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
-    <button class="bnav-item" onclick="goProTab('pro-devis')"><span>💰</span>Mes devis</button>
-    <button class="bnav-item active" onclick="goProTab('pro-profile')"><span>👤</span>Profil</button>
+    <button class="bnav-item" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
+    <button class="bnav-item" onclick="goProTab('pro-messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
+    <button class="bnav-item" onclick="goProTab('pro-devis')"><i data-lucide="wallet" style="width:22px;height:22px"></i>Mes devis</button>
+    <button class="bnav-item active" onclick="goProTab('pro-profile')"><i data-lucide="user" style="width:22px;height:22px"></i>Profil</button>
   </div>
 </div>
 
@@ -355,10 +355,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
   <div id="client-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
-    <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item active" onclick="goTab('messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
-    <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
-    <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
+    <button class="bnav-item" onclick="goTab('home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
+    <button class="bnav-item active" onclick="goTab('messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
+    <button class="bnav-item" onclick="goTab('devis')"><i data-lucide="file-text" style="width:22px;height:22px"></i>Devis</button>
+    <button class="bnav-item" onclick="goTab('profile')"><i data-lucide="user" style="width:22px;height:22px"></i>Profil</button>
   </div>
 </div>
 
@@ -383,10 +383,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="navbar"><span class="logo-sm">📋 Mes Devis</span></div>
   <div class="devis-list" id="devis-list"><div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div></div>
   <div class="bottom-nav">
-    <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
-    <button class="bnav-item active" onclick="goTab('devis')"><span>📋</span>Devis</button>
-    <button class="bnav-item" onclick="goTab('profile')"><span>👤</span>Profil</button>
+    <button class="bnav-item" onclick="goTab('home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
+    <button class="bnav-item" onclick="goTab('messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
+    <button class="bnav-item active" onclick="goTab('devis')"><i data-lucide="file-text" style="width:22px;height:22px"></i>Devis</button>
+    <button class="bnav-item" onclick="goTab('profile')"><i data-lucide="user" style="width:22px;height:22px"></i>Profil</button>
   </div>
 </div>
 
@@ -396,21 +396,21 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="profile-content">
     <div class="profile-hero"><div class="avatar">👤</div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p></div>
     <div class="profile-menu">
-      <div class="profile-item"><span class="pi-icon">📋</span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">⭐</span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">💳</span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">🔔</span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon">🔒</span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon">❓</span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon">📄</span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item"><span class="pi-icon"><i data-lucide="lock" style="width:20px;height:20px"></i></span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
     </div>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="bottom-nav">
-    <button class="bnav-item" onclick="goTab('home')"><span>🏠</span>Accueil</button>
-    <button class="bnav-item" onclick="goTab('messages')"><span>💬</span>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
-    <button class="bnav-item" onclick="goTab('devis')"><span>📋</span>Devis</button>
-    <button class="bnav-item active" onclick="goTab('profile')"><span>👤</span>Profil</button>
+    <button class="bnav-item" onclick="goTab('home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
+    <button class="bnav-item" onclick="goTab('messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
+    <button class="bnav-item" onclick="goTab('devis')"><i data-lucide="file-text" style="width:22px;height:22px"></i>Devis</button>
+    <button class="bnav-item active" onclick="goTab('profile')"><i data-lucide="user" style="width:22px;height:22px"></i>Profil</button>
   </div>
 </div>
 
@@ -457,6 +457,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
 
 <script src="https://js.stripe.com/v3/"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 <script>
 const API='https://gleam-production-9b95.up.railway.app';
 let currentUser=null,userRole='client',photos=[],disponible=true,currentChatDemandeId=null,chatPollInterval=null;
@@ -599,7 +600,14 @@ function enterApp(){
 function doLogout(){stopChatPoll();stopUnreadPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
 
 // ── HELPERS ──
-const ICONS={voiture:'🚗',canape:'🛋️',matelas:'🛏️',terrasse:'☀️',piscine:'💧',toiture:'🏠',vitres:'🪟',autre:'➕'};
+// Icônes vectorielles (Lucide) à la place des emojis, pour un rendu professionnel et cohérent
+// sur tous les appareils (les emojis s'affichent différemment selon iOS/Android/version).
+const ICON_NAMES={voiture:'car',canape:'sofa',matelas:'bed-double',terrasse:'sun',piscine:'droplets',toiture:'home',vitres:'app-window',autre:'plus-circle'};
+function iconHtml(name,size){
+  size=size||18;
+  return '<i data-lucide="'+(name||'sparkles')+'" style="width:'+size+'px;height:'+size+'px;vertical-align:-4px;display:inline-block"></i>';
+}
+function ICONS_get(key){return iconHtml(ICON_NAMES[key])}
 const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],en_cours:['🔧 En cours','s-acceptee'],terminee:['🏁 Terminée','s-terminee']};
 
 function tryParseNotes(notes){
@@ -608,7 +616,7 @@ function tryParseNotes(notes){
     if(n.prestations&&Array.isArray(n.prestations)){
       return n.prestations.map(function(p){
         var det=p.details&&Object.keys(p.details).length?Object.values(p.details).map(escapeHtml).join(' • '):'';
-        return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+(ICONS[p.type]||'✨')+' '+escapeHtml(p.type)+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+escapeHtml(p.description):'')+'</div>';
+        return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+escapeHtml(p.description):'')+'</div>';
       }).join('');
     }
     return escapeHtml(n.description||'');
@@ -693,7 +701,7 @@ async function loadDemandes(){
     var html='';
     data.forEach(function(d){
       var st=STATUTS[d.statut]||['',''];
-      var icon=ICONS[(d.prestation||'').split(' + ')[0]]||'✨';
+      var icon=ICONS_get((d.prestation||'').split(' + ')[0]);
       var urgentStyle=d.statut==='en_cours'?'border-color:var(--green);background:#F0FDF4;':'';
       var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px;margin-left:6px">ACTION REQUISE</span>':'';
       html+='<div class="demand-row" style="'+urgentStyle+'" onclick="openDetail(\''+escAttr(d.id)+'\')">'+
@@ -852,13 +860,13 @@ function renderDetail(d){
     '</div>'+
     (prestations.length?prestations.map(function(p){
       var det=p.details&&Object.keys(p.details).length?Object.values(p.details).map(escapeHtml).join(' • '):'';
-      return '<div class="detail-presta"><span class="detail-presta-icon">'+(ICONS[p.type]||'✨')+'</span>'+
+      return '<div class="detail-presta"><span class="detail-presta-icon">'+ICONS_get(p.type)+'</span>'+
         '<div><div class="detail-presta-name">'+escapeHtml(p.type)+'</div>'+
         (det?'<div class="detail-presta-info">'+det+'</div>':'')+
         (p.description?'<div class="detail-presta-info">'+escapeHtml(p.description)+'</div>':'')+
         '</div></div>';
     }).join(''):
-    '<div class="detail-presta"><span class="detail-presta-icon">'+(ICONS[d.prestation]||'✨')+'</span><div class="detail-presta-name">'+escapeHtml(d.prestation)+'</div></div>')+
+    '<div class="detail-presta"><span class="detail-presta-icon">'+ICONS_get(d.prestation)+'</span><div class="detail-presta-name">'+escapeHtml(d.prestation)+'</div></div>')+
   '</div>';
   if(hasPhotos)html+='<div class="detail-card"><label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>';
   html+='<div class="detail-card">'+
@@ -967,7 +975,7 @@ async function loadProDemandes(){
       var hasPhotos=getPhotosFromNotes(d.notes).length>0;
       var safeId=escAttr(d.id);
       html+='<div class="demande-card">'+
-        '<div class="dc-header"><div class="dc-type">'+(ICONS[d.prestation]||'✨')+' '+escapeHtml(d.prestation)+'</div>'+
+        '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
         '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
         '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+'</div>'+
         (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
@@ -1050,7 +1058,7 @@ async function loadProDevis(){
       else{badge='<span class="devis-badge badge-pending">⏳ En attente</span>'}
       html+='<div class="devis-card">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
-          '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+(ICONS[v.demande&&v.demande.prestation]||'✨')+' '+escapeHtml(v.demande&&v.demande.prestation||'')+'</div>'+badge+
+          '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+ICONS_get(v.demande&&v.demande.prestation)+' '+escapeHtml(v.demande&&v.demande.prestation||'')+'</div>'+badge+
         '</div>'+
         '<div style="font-size:12px;color:var(--gray)">📍 '+escapeHtml(v.demande&&v.demande.adresse||'')+'</div>'+
         '<div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' €</div>'+
@@ -1322,7 +1330,7 @@ function renderConvList(container,data){
       var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
       var unread=isConvUnread(c);
       html+='<div class="conv-row" style="opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
-        '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
+        '<div class="conv-avatar">'+ICONS_get(c.prestation)+'</div>'+
         '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div>'+
         '<div class="conv-preview">Prestation terminée — consulter l\'historique</div></div>'+
         '<div class="conv-time">🏁</div></div>';
@@ -1336,7 +1344,7 @@ function convRowHtml(c){
   var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
   var unread=isConvUnread(c);
   return'<div class="conv-row" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(nameRaw)+'\')">'+
-    '<div class="conv-avatar">'+(ICONS[c.prestation]||'✨')+'</div>'+
+    '<div class="conv-avatar">'+ICONS_get(c.prestation)+'</div>'+
     '<div class="conv-body"><div class="conv-name">'+escapeHtml(nameRaw)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div><div class="conv-preview">'+escapeHtml(preview)+'</div></div>'+
     '<div class="conv-time">'+time+'</div></div>';
 }
@@ -1799,6 +1807,18 @@ async function sendDemand(type){
     else{show('s-success')}
     loadDemandes();
   }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}}
+}
+
+// ── ICÔNES (Lucide) ──
+// Convertit automatiquement toute balise <i data-lucide="..."> en icône vectorielle dès qu'elle
+// apparaît dans la page, sans avoir besoin d'appeler manuellement lucide.createIcons() partout
+// où le contenu est régénéré (très fréquent dans cette app, qui reconstruit le HTML dynamiquement).
+if(window.lucide){
+  lucide.createIcons();
+  var lucideObserver=new MutationObserver(function(){
+    if(window.lucide)lucide.createIcons();
+  });
+  lucideObserver.observe(document.body,{childList:true,subtree:true});
 }
 
 // ── INIT ──
