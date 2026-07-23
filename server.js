@@ -273,6 +273,24 @@ app.get('/api/auth/me', auth, async (req, res) => {
   res.json({ ...data, firstName: data.prenom, lastName: data.nom });
 });
 
+// Met à jour la photo de profil (client ou pro) — reçoit une image compressée en base64 (data URL)
+app.patch('/api/users/photo', auth, async (req, res) => {
+  try {
+    const { photo } = req.body;
+    if (!photo || typeof photo !== 'string' || !photo.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Image invalide.' });
+    }
+    if (photo.length > 600 * 1024) {
+      return res.status(413).json({ error: 'Photo trop volumineuse. Réessayez avec une image plus légère.' });
+    }
+    const { error } = await supabase.from('users').update({ photo }).eq('id', req.user.id);
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: 'Photo mise à jour.', photo });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // ══════════════ DEMANDES ══════════════
 
 app.post('/api/demandes', auth, async (req, res) => {
@@ -486,7 +504,7 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
   if (!devis || !devis.length) return res.json([]);
 
   const proIds = [...new Set(devis.map(d => d.societe_id))];
-  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite').in('id', proIds);
+  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite, photo').in('id', proIds);
   const proMap = {};
   (pros || []).forEach(p => proMap[p.id] = p);
 
@@ -717,12 +735,12 @@ app.get('/api/conversations', auth, async (req, res) => {
 
       let autrePartie = null;
       if (isProType(user?.type)) {
-        const { data: client } = await supabase.from('users').select('prenom, nom').eq('id', d.client_id).single();
+        const { data: client } = await supabase.from('users').select('prenom, nom, photo').eq('id', d.client_id).single();
         autrePartie = client;
       } else {
         const { data: devisAcceptes } = await supabase.from('devis').select('societe_id').eq('demande_id', d.id).eq('statut', 'accepte').maybeSingle();
         if (devisAcceptes) {
-          const { data: pro } = await supabase.from('users').select('prenom, nom').eq('id', devisAcceptes.societe_id).single();
+          const { data: pro } = await supabase.from('users').select('prenom, nom, photo').eq('id', devisAcceptes.societe_id).single();
           autrePartie = pro;
         }
       }
