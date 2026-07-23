@@ -150,6 +150,19 @@ const templates = {
     }),
   }),
 
+  // 7bis. Annulation client → Pro (après acceptation du devis)
+  annulation_client: (d) => ({
+    subject: `Le client a annulé la prestation`,
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Le client a annulé la prestation <strong>${d.prestation}</strong>${d.creneau ? ` prévue le ${d.creneau}` : ''}.</p>
+             ${d.tardive ? `<p style="color:#D97706;"><strong>Annulation tardive</strong> (moins de 24h avant le créneau prévu).</p>` : ''}
+             <p>Vous n'avez plus besoin de vous rendre à ce rendez-vous.</p>`,
+      ctaLabel: 'Voir mes devis',
+      ctaUrl: `${APP_URL}#devis`,
+    }),
+  }),
+
   // 8. Nouveau message → Destinataire (client ou pro)
   nouveau_message: (d) => ({
     subject: `Nouveau message concernant ${d.prestation}`,
