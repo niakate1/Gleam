@@ -395,7 +395,10 @@ app.get('/api/demandes/all', auth, async (req, res) => {
 app.get('/api/demandes/:id', auth, async (req, res) => {
   const { data } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
   if (!data) return res.status(404).json({ error: 'Demande introuvable.' });
-  res.json(data);
+  if (data.client_id === req.user.id) return res.json(data);
+  const { data: monDevis } = await supabase.from('devis').select('id').eq('demande_id', req.params.id).eq('societe_id', req.user.id).maybeSingle();
+  if (monDevis) return res.json(data);
+  return res.status(403).json({ error: 'Accès refusé.' });
 });
 
 // Modifier une demande (uniquement si aucun devis n'a été accepté)
@@ -404,7 +407,7 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
     if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
-    if (demande.statut === 'acceptee' || demande.statut === 'terminee')
+    if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Impossible de modifier : un devis a déjà été accepté pour cette demande.' });
 
     const { prestations, address, date, time, flexibility } = req.body;
@@ -482,8 +485,10 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
     if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
-    if (demande.statut === 'acceptee' || demande.statut === 'terminee')
-      return res.status(400).json({ error: 'Impossible d\'annuler : un devis a déjà été accepté. Des pénalités peuvent s\'appliquer.' });
+    if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee')
+      return res.status(400).json({ error: 'Impossible de supprimer : un devis a déjà été accepté. Utilisez le bouton "Annuler cette prestation" à la place.' });
+    if (demande.statut === 'annulee_client')
+      return res.status(400).json({ error: 'Cette demande est déjà annulée.' });
 
     await supabase.from('devis').delete().eq('demande_id', req.params.id);
     await supabase.from('messages').delete().eq('demande_id', req.params.id);
@@ -545,6 +550,10 @@ app.post('/api/devis', auth, async (req, res) => {
 
 // Devis reçus par un client pour une demande (avec infos pro)
 app.get('/api/devis/demande/:id', auth, async (req, res) => {
+  const { data: demande } = await supabase.from('demandes').select('client_id').eq('id', req.params.id).single();
+  if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+  if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+
   const { data: devis } = await supabase.from('devis').select('*').eq('demande_id', req.params.id).order('prix_ttc', { ascending: true });
   if (!devis || !devis.length) return res.json([]);
 
@@ -659,21 +668,15 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
 
-    // Vérifie le délai de 24h avant le créneau
-    let penalite = false;
+    // Vérifie le délai de 24h avant le créneau (signalé, mais jamais bloquant — cohérent avec l'annulation côté client)
+    let tardive = false;
     if (demande.creneau) {
-      // creneau format "YYYY-MM-DD à HhMM" -> on extrait juste la date pour estimer le délai
-      const dateMatch = demande.creneau.match(/(\d{4}-\d{2}-\d{2})/);
-      if (dateMatch) {
-        const creneauDate = new Date(dateMatch[1]);
-        const maintenant = new Date();
-        const heuresRestantes = (creneauDate - maintenant) / (1000 * 60 * 60);
-        if (heuresRestantes < 24) penalite = true;
+      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(demande.creneau);
+      if (match) {
+        const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
+        const heuresRestantes = (dateCreneau - new Date()) / (1000 * 60 * 60);
+        tardive = heuresRestantes < 24;
       }
-    }
-
-    if (penalite) {
-      return res.status(400).json({ error: 'Annulation impossible : le créneau est dans moins de 24h. Contactez le support si vous avez un empêchement majeur.' });
     }
 
     // Annule le devis et remet la demande disponible pour d'autres pros
@@ -691,7 +694,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
       });
     }
 
-    res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.' });
+    res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.', tardive });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -699,6 +702,16 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
 });
 
 // ══════════════ MESSAGES ══════════════
+
+// Vérifie que l'utilisateur connecté a le droit de participer à la conversation de cette demande
+// (le client propriétaire, ou le pro dont le devis a été accepté) — protège la confidentialité des échanges.
+async function peutAccederConversation(demandeId, userId) {
+  const { data: demande } = await supabase.from('demandes').select('client_id').eq('id', demandeId).single();
+  if (!demande) return false;
+  if (demande.client_id === userId) return true;
+  const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demandeId).eq('statut', 'accepte').maybeSingle();
+  return !!(devisAccepte && devisAccepte.societe_id === userId);
+}
 
 app.post('/api/messages', auth, async (req, res) => {
   try {
@@ -710,6 +723,8 @@ app.post('/api/messages', auth, async (req, res) => {
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!(await peutAccederConversation(demande_id, req.user.id)))
+      return res.status(403).json({ error: 'Accès refusé.' });
 
     const { data, error } = await supabase.from('messages').insert({
       demande_id: demande_id,
@@ -751,6 +766,8 @@ app.post('/api/messages', auth, async (req, res) => {
 });
 
 app.get('/api/messages/:demande_id', auth, async (req, res) => {
+  if (!(await peutAccederConversation(req.params.demande_id, req.user.id)))
+    return res.status(403).json({ error: 'Accès refusé.' });
   const { data } = await supabase.from('messages').select('*').eq('demande_id', req.params.demande_id).order('created_at', { ascending: true });
   res.json(data || []);
 });
@@ -819,6 +836,10 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
 
     const { data: devis } = await supabase.from('devis').select('*').eq('id', devis_id).single();
     if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+
+    const { data: demandePourPaiement } = await supabase.from('demandes').select('client_id').eq('id', devis.demande_id).single();
+    if (!demandePourPaiement || demandePourPaiement.client_id !== req.user.id)
+      return res.status(403).json({ error: 'Accès refusé.' });
 
     const montant = Math.round(devis.prix_ttc * 100);
     const commission = Math.round(montant * 0.15); // 15% commission Gleam
@@ -929,14 +950,33 @@ app.post('/api/evaluations', auth, async (req, res) => {
     const { demande_id, evalue_id, note, commentaire } = req.body;
     if (!demande_id || !evalue_id || !note) return res.status(400).json({ error: 'Champs manquants.' });
     if (note < 1 || note > 5) return res.status(400).json({ error: 'Note entre 1 et 5.' });
+    if (evalue_id === req.user.id) return res.status(400).json({ error: 'Vous ne pouvez pas vous auto-évaluer.' });
 
-    const { data } = await supabase.from('evaluations').insert({
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.statut !== 'terminee') return res.status(400).json({ error: 'Vous ne pouvez noter qu\'une prestation terminée.' });
+
+    const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande_id).eq('statut', 'accepte').maybeSingle();
+    const estClient = demande.client_id === req.user.id;
+    const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Accès refusé.' });
+
+    // Vérifie que la personne notée est bien "l'autre partie" de cette prestation précise
+    const autrePartieAttendue = estClient ? (devisAccepte && devisAccepte.societe_id) : demande.client_id;
+    if (evalue_id !== autrePartieAttendue) return res.status(400).json({ error: 'Cette personne n\'est pas liée à cette prestation.' });
+
+    // Empêche de noter deux fois la même prestation
+    const { data: dejaNote } = await supabase.from('evaluations').select('id').eq('demande_id', demande_id).eq('evaluateur_id', req.user.id).maybeSingle();
+    if (dejaNote) return res.status(400).json({ error: 'Vous avez déjà évalué cette prestation.' });
+
+    const { data, error } = await supabase.from('evaluations').insert({
       demande_id: demande_id,
       evaluateur_id: req.user.id,
       evalue_id: evalue_id,
       note: parseInt(note),
       commentaire: commentaire || null
     }).select().single();
+    if (error) return res.status(400).json({ error: error.message });
 
     const { data: notes } = await supabase.from('evaluations').select('note').eq('evalue_id', evalue_id);
     const moyenne = notes.reduce(function(a, b) { return a + b.note; }, 0) / notes.length;
