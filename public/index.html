@@ -16,8 +16,11 @@
 body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 .screen{display:none;min-height:100vh;flex-direction:column}
 .screen.active{display:flex}
-.auth-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#7C3AED,#4F46E5)}
-.auth-box{background:var(--surface);border-radius:20px;padding:36px 32px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.auth-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden;background:linear-gradient(135deg,#7C3AED,#4F46E5)}
+.auth-wrap::before,.auth-wrap::after,.auth-wrap .aurora-blob{content:'';position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none;z-index:0}
+.auth-wrap::before{width:340px;height:340px;background:var(--gold);opacity:.35;top:-80px;right:-60px}
+.auth-wrap::after{width:300px;height:300px;background:var(--mint);opacity:.3;bottom:-70px;left:-70px}
+.auth-box{position:relative;z-index:1;background:var(--surface);border-radius:20px;padding:36px 32px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
 .logo{text-align:center;margin-bottom:28px}
 .logo h1{font-size:32px;font-weight:800;color:var(--p)}
 .logo p{color:var(--gray);font-size:14px;margin-top:4px}
@@ -32,7 +35,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .role-btn{padding:12px;border:2px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:var(--text-secondary)}
 .role-btn.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .role-btn span{display:block;font-size:22px;margin-bottom:4px}
-.btn{width:100%;padding:13px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px}
+.btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;box-shadow:0 4px 14px rgba(124,58,237,.25)}
 .btn:hover{background:var(--p2)}
 .btn:disabled{opacity:.6;cursor:not-allowed}
 .err{background:#FEF2F2;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none}
@@ -47,9 +50,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .bottom-nav{background:var(--surface);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);position:sticky;bottom:0;padding-bottom:env(safe-area-inset-bottom)}
 .bnav-item{display:flex;flex-direction:column;align-items:center;padding:10px 0;cursor:pointer;border:none;background:none;color:var(--gray);font-size:11px;font-weight:600;gap:3px;position:relative}
 .bnav-item.active{color:var(--p)}
+.bnav-item.active::before{content:'';position:absolute;top:2px;left:50%;transform:translateX(-50%);width:28px;height:3px;border-radius:0 0 4px 4px;background:linear-gradient(90deg,var(--p),var(--p2))}
 .bnav-item span:first-child{font-size:22px}
 .nav-badge{position:absolute;top:4px;left:50%;margin-left:6px;width:9px;height:9px;background:var(--red);border-radius:50%;border:2px solid var(--surface)}
-.home-content,.pro-content,.profile-content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.home-content,.pro-content,.profile-content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;position:relative;
+  background-image:radial-gradient(ellipse 600px 260px at 50% -40px,rgba(124,58,237,.10),transparent 70%);background-repeat:no-repeat}
+@media (prefers-color-scheme: dark){
+  .home-content,.pro-content,.profile-content{background-image:radial-gradient(ellipse 600px 260px at 50% -40px,rgba(167,139,250,.14),transparent 70%)}
+}
 .greeting h2{font-size:22px;font-weight:800;margin-bottom:4px}
 .greeting p{color:var(--gray);font-size:14px;margin-bottom:18px}
 .section-title{font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text)}
@@ -88,7 +96,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .devis-form{background:var(--surface-alt);border-radius:10px;padding:14px;margin-top:12px;border:1px solid var(--border)}
 .devis-form label{font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;margin-top:10px;display:block}
 .devis-form label:first-child{margin-top:0}
-.btn-devis{width:100%;padding:11px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px}
+.btn-devis{width:100%;padding:11px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px;box-shadow:0 4px 14px rgba(124,58,237,.2)}
 .btn-devis:disabled{background:var(--gray);cursor:not-allowed}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .modal-overlay.open{display:flex}
@@ -115,7 +123,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .flex-opt{padding:6px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text-secondary)}
 .flex-opt.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .divider{height:1px;background:var(--border);margin:16px 0}
-.modal-send-btn{width:100%;padding:14px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
+.modal-send-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;box-shadow:0 4px 14px rgba(124,58,237,.25)}
 .modal-send-btn:disabled{opacity:.6;cursor:not-allowed}
 .devis-list{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .devis-card{background:var(--surface);border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05)}
@@ -128,7 +136,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   .badge-accepted{background:rgba(52,211,153,.18)}
   .badge-refused{background:rgba(248,113,113,.18)}
 }
-.btn-accept{flex:1;padding:10px;background:var(--p);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-accept{flex:1;padding:10px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
 .btn-accept:disabled{opacity:.6;cursor:not-allowed}
 .btn-refuse{flex:1;padding:10px;background:var(--surface);color:var(--red);border:2px solid var(--red);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
 .btn-refuse:disabled{opacity:.6;cursor:not-allowed}
@@ -148,10 +156,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .chat-input-bar input{flex:1;padding:10px 14px;border-radius:20px;font-size:16px}
 .chat-send-btn{background:var(--p);color:#fff;border:none;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0}
 .chat-send-btn:disabled{opacity:.6;cursor:not-allowed}
-.empty-state{text-align:center;padding:60px 20px;color:var(--gray)}
-.empty-state span{font-size:48px;display:block;margin-bottom:12px}
-.empty-state p{font-size:15px}
-.profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;text-align:center}
+.empty-state{text-align:center;padding:60px 20px;color:var(--gray);animation:fadeInUp .4s ease-out both}
+.empty-state span{font-size:56px;display:block;margin-bottom:14px;opacity:.85}
+.empty-state p{font-size:15px;line-height:1.5;max-width:280px;margin:0 auto}
+.profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;text-align:center;position:relative;overflow:hidden}
+.profile-hero::before{content:'';position:absolute;width:180px;height:180px;background:var(--gold);opacity:.18;filter:blur(50px);border-radius:50%;top:-60px;right:-40px}
 .profile-hero .avatar{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px}
 .profile-hero h3{font-size:20px;font-weight:800}
 .profile-menu{background:var(--surface);border-radius:14px;overflow:hidden;border:1px solid var(--border)}
@@ -849,39 +858,39 @@ async function loadDevis(){
     all.forEach(function(v,vi){
       var proNameRaw=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
       var proName=escapeHtml(proNameRaw);
-      var proNote=v.pro&&v.pro.note_moyenne?'⭐ '+escapeHtml(v.pro.note_moyenne):'';
+      var proNote=v.pro&&v.pro.note_moyenne?'<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold);vertical-align:-2px"></i> '+escapeHtml(v.pro.note_moyenne):'';
       var badge,actions='';
       var cardStyle='';
       var safeDemandeId=escAttr(v.demande_id),safeVId=escAttr(v.id),safeSocieteId=escAttr(v.societe_id),safeProName=escAttr(proNameRaw);
 
       if(v.statut==='accepte'&&v.demande_statut==='en_cours'){
-        badge='<span class="devis-badge badge-accepted">🔧 En cours</span>';
+        badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
         cardStyle='border-color:var(--green);background:#F0FDF4;';
         actions='<div style="margin-top:12px;display:flex;gap:8px">'+
           '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
           '<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement(\''+safeDemandeId+'\')">✅ Confirmer la prestation</button>'+
         '</div>';
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
-        badge='<span class="devis-badge badge-accepted">🏁 Terminé</span>';
+        badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         cardStyle='opacity:0.7;';
         actions='<div style="margin-top:12px">'+
           '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeSocieteId+'\',\''+safeProName+'\')">⭐ Noter le prestataire</button>'+
         '</div>';
       }else if(v.statut==='accepte'){
-        badge='<span class="devis-badge badge-accepted">✅ Accepté — Paiement requis</span>';
+        badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement requis</span>';
         cardStyle='border-color:#D97706;background:#FFFBEB;';
         actions='<div style="margin-top:12px;display:flex;gap:8px">'+
           '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
           '<button class="btn-accept" style="background:#059669" onclick="openPayment(\''+safeVId+'\','+Number(v.prix_ttc)+')">💳 Payer '+escapeHtml(v.prix_ttc)+'\u20ac</button>'+
         '</div>';
       }else if(v.statut==='refuse'){
-        badge='<span class="devis-badge badge-refused">❌ Refusé</span>';
+        badge='<span class="devis-badge badge-refused"><i data-lucide="x-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Refusé</span>';
         cardStyle='opacity:0.6;';
       }else if(v.statut==='annule_pro'){
-        badge='<span class="devis-badge badge-refused">🚫 Annulé par le pro</span>';
+        badge='<span class="devis-badge badge-refused"><i data-lucide="ban" style="width:12px;height:12px;vertical-align:-2px"></i> Annulé par le pro</span>';
         cardStyle='opacity:0.6;';
       }else{
-        badge='<span class="devis-badge badge-pending">⏳ En attente</span>';
+        badge='<span class="devis-badge badge-pending"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> En attente</span>';
         actions='<div style="display:flex;gap:8px;margin-top:12px">'+
           '<button class="btn-accept" onclick="accepterDevis(\''+safeVId+'\',this)">✅ Accepter</button>'+
           '<button class="btn-refuse" onclick="refuserDevis(\''+safeVId+'\',this)">❌ Refuser</button>'+
@@ -892,7 +901,7 @@ async function loadDevis(){
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'+
           '<div style="display:flex;gap:10px;align-items:center">'+miniAvatarHtml(v.pro&&v.pro.photo,proNameRaw)+
           '<div><div style="font-weight:700;font-size:15px">'+proName+'</div>'+
-          (proNote?'<div style="font-size:12px;color:#D97706;margin-top:2px">'+proNote+'</div>':'')+
+          (proNote?'<div style="font-size:12px;color:var(--gold);margin-top:2px;font-weight:700">'+proNote+'</div>':'')+
           '</div></div>'+badge+
         '</div>'+
         '<div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 '+escapeHtml(v.prestation)+'</div>'+
@@ -1016,14 +1025,15 @@ function prefillModifyForm(p){
 var noteDemandeId=null,noteSocieteId=null;
 function ouvrirNote(demandeId,societeId,proName){
   noteDemandeId=demandeId;noteSocieteId=societeId;
-  var html='<div class="modal-title">⭐ Noter '+escapeHtml(proName)+'</div>'+
+  var starIcon='<i data-lucide="star" style="width:36px;height:36px;fill:var(--gold);color:var(--gold)"></i>';
+  var html='<div class="modal-title gleam-signature">⭐ Noter '+escapeHtml(proName)+'</div>'+
     '<div class="modal-sub">Comment s\'est passée votre prestation ?</div>'+
-    '<div id="star-rating" style="display:flex;gap:12px;justify-content:center;margin:20px 0;font-size:36px">'+
-    '<span class="star" data-note="1" onclick="selectNote(1)" style="cursor:pointer;opacity:0.3">⭐</span>'+
-    '<span class="star" data-note="2" onclick="selectNote(2)" style="cursor:pointer;opacity:0.3">⭐</span>'+
-    '<span class="star" data-note="3" onclick="selectNote(3)" style="cursor:pointer;opacity:0.3">⭐</span>'+
-    '<span class="star" data-note="4" onclick="selectNote(4)" style="cursor:pointer;opacity:0.3">⭐</span>'+
-    '<span class="star" data-note="5" onclick="selectNote(5)" style="cursor:pointer;opacity:0.3">⭐</span>'+
+    '<div id="star-rating" style="display:flex;gap:12px;justify-content:center;margin:20px 0">'+
+    '<span class="star" data-note="1" onclick="selectNote(1)" style="cursor:pointer;opacity:0.3">'+starIcon+'</span>'+
+    '<span class="star" data-note="2" onclick="selectNote(2)" style="cursor:pointer;opacity:0.3">'+starIcon+'</span>'+
+    '<span class="star" data-note="3" onclick="selectNote(3)" style="cursor:pointer;opacity:0.3">'+starIcon+'</span>'+
+    '<span class="star" data-note="4" onclick="selectNote(4)" style="cursor:pointer;opacity:0.3">'+starIcon+'</span>'+
+    '<span class="star" data-note="5" onclick="selectNote(5)" style="cursor:pointer;opacity:0.3">'+starIcon+'</span>'+
     '</div>'+
     '<div id="note-label" style="text-align:center;font-weight:700;font-size:16px;margin-bottom:16px;color:var(--gray)">Sélectionnez une note</div>'+
     '<div class="field-group"><label>Commentaire <span class="optional">(optionnel)</span></label>'+
@@ -1135,25 +1145,25 @@ async function loadProDevis(){
       var safeVId=escAttr(v.id),safeDemandeId=escAttr(v.demande_id);
       var demandeStatut=v.demande&&v.demande.statut;
       if(v.statut==='accepte'&&demandeStatut==='terminee'){
-        badge='<span class="devis-badge badge-accepted">🏁 Terminé</span>';
+        badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         var safeClientId=escAttr(v.demande&&v.demande.client_id);
         extra='<div style="margin-top:10px">'+
           '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeClientId+'\',\'le client\')">⭐ Noter le client</button>'+
         '</div>';
       }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
-        badge='<span class="devis-badge badge-accepted">🔧 En cours</span>';
+        badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
         extra='<div style="display:flex;gap:8px;margin-top:10px">'+
           '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
         '</div>';
       }else if(v.statut==='accepte'){
-        badge='<span class="devis-badge badge-accepted">✅ Accepté — Paiement en attente</span>';
+        badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement en attente</span>';
         extra='<div style="display:flex;gap:8px;margin-top:10px">'+
           '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
           '<button class="btn-refuse" onclick="annulerProDevis(\''+safeVId+'\',this)">🚫 Annuler</button>'+
         '</div>';
-      }else if(v.statut==='refuse'){badge='<span class="devis-badge badge-refused">❌ Refusé</span>'}
-      else if(v.statut==='annule_pro'){badge='<span class="devis-badge badge-refused">🚫 Annulé par vous</span>'}
-      else{badge='<span class="devis-badge badge-pending">⏳ En attente</span>'}
+      }else if(v.statut==='refuse'){badge='<span class="devis-badge badge-refused"><i data-lucide="x-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Refusé</span>'}
+      else if(v.statut==='annule_pro'){badge='<span class="devis-badge badge-refused"><i data-lucide="ban" style="width:12px;height:12px;vertical-align:-2px"></i> Annulé par vous</span>'}
+      else{badge='<span class="devis-badge badge-pending"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> En attente</span>'}
       html+='<div class="devis-card fade-in-item" style="animation-delay:'+(vi*0.04)+'s">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
           '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+ICONS_get(v.demande&&v.demande.prestation)+' '+escapeHtml(v.demande&&v.demande.prestation||'')+'</div>'+badge+
