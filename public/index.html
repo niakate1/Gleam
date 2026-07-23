@@ -997,7 +997,7 @@ function renderDetail(d){
   var prestations=[];
   try{var n=JSON.parse(d.notes);if(n.prestations)prestations=n.prestations}catch(e){}
   var st=STATUTS[d.statut]||['',''];
-  var locked=d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee';
+  var locked=d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee'||d.statut==='annulee_client';
   var canCancel=d.statut==='acceptee'||d.statut==='en_cours';
   var hasPhotos=getPhotosFromNotes(d.notes).length>0;
   var html='';
@@ -1012,6 +1012,8 @@ function renderDetail(d){
         (d.statut==='en_cours'?' et est en cours':'')+'. '+
         (tardive?'Une annulation reste possible, mais le prestataire sera prévenu qu\'elle est tardive (moins de 24h avant le créneau).':'Vous pouvez encore l\'annuler gratuitement (plus de 24h avant le créneau).')+
         '</div></div>';
+    }else if(d.statut==='annulee_client'){
+      html+='<div class="locked-banner"><span>🚫</span><div>Vous avez annulé cette prestation. Le prestataire a été prévenu.</div></div>';
     }else{
       html+='<div class="locked-banner"><span>🔒</span><div>Cette demande est terminée. Elle ne peut plus être modifiée ni annulée.</div></div>';
     }
@@ -1437,7 +1439,7 @@ async function annulerProDevis(devisId,btn){
     const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
-    toast('🚫 Devis annulé.');loadProDevis();
+    toast(d.tardive?'🚫 Devis annulé (annulation tardive signalée).':'🚫 Devis annulé.');loadProDevis();
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
