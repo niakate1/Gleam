@@ -708,7 +708,7 @@ function iconHtml(name,size){
   return '<i data-lucide="'+(name||'sparkles')+'" style="width:'+size+'px;height:'+size+'px;vertical-align:-4px;display:inline-block"></i>';
 }
 function ICONS_get(key){return iconHtml(ICON_NAMES[key])}
-const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],en_cours:['🔧 En cours','s-acceptee'],terminee:['🏁 Terminée','s-terminee']};
+const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],en_cours:['🔧 En cours','s-acceptee'],terminee:['🏁 Terminée','s-terminee'],annulee_client:['🚫 Annulée','s-terminee']};
 
 function tryParseNotes(notes){
   try{
@@ -998,11 +998,24 @@ function renderDetail(d){
   try{var n=JSON.parse(d.notes);if(n.prestations)prestations=n.prestations}catch(e){}
   var st=STATUTS[d.statut]||['',''];
   var locked=d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee';
+  var canCancel=d.statut==='acceptee'||d.statut==='en_cours';
   var hasPhotos=getPhotosFromNotes(d.notes).length>0;
   var html='';
-  if(locked)html+='<div class="locked-banner"><span>🔒</span><div>Cette demande a été acceptée'+
-    (d.statut==='en_cours'?' et est en cours':'')+(d.statut==='terminee'?' et est terminée':'')+
-    '. Elle ne peut plus être modifiée ou annulée. Une annulation à ce stade peut entraîner des pénalités.</div></div>';
+  if(locked){
+    var tardive=false;
+    if(d.creneau){
+      var m=/(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(d.creneau);
+      if(m){var dc=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);tardive=((dc-new Date())/36e5)<24}
+    }
+    if(canCancel){
+      html+='<div class="locked-banner"><span>🔒</span><div>Cette demande a été acceptée'+
+        (d.statut==='en_cours'?' et est en cours':'')+'. '+
+        (tardive?'Une annulation reste possible, mais le prestataire sera prévenu qu\'elle est tardive (moins de 24h avant le créneau).':'Vous pouvez encore l\'annuler gratuitement (plus de 24h avant le créneau).')+
+        '</div></div>';
+    }else{
+      html+='<div class="locked-banner"><span>🔒</span><div>Cette demande est terminée. Elle ne peut plus être modifiée ni annulée.</div></div>';
+    }
+  }
   html+='<div class="detail-card">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
       '<span style="font-weight:700;font-size:13px;color:var(--gray)">'+escapeHtml(d.numero_anonyme||'')+'</span>'+
@@ -1027,10 +1040,22 @@ function renderDetail(d){
     '<button class="btn-modify" onclick="openModifyDemande()">✏️ Modifier</button>'+
     '<button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>'+
   '</div>';
+  if(canCancel)html+='<button class="btn-delete" style="width:100%;margin-top:10px" onclick="annulerDemandeAcceptee()">🚫 Annuler cette prestation</button>';
   if(d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours')
     html+='<button class="modal-send-btn" style="margin-top:14px" onclick="goTab(\'devis\')">📋 Voir les devis reçus</button>';
   c.innerHTML=html;
   if(hasPhotos)renderPhotoPreviews(getPhotosFromNotes(d.notes),'photos-detail');
+}
+async function annulerDemandeAcceptee(){
+  if(!currentDetailDemande)return;
+  if(!confirm('Confirmer l\'annulation de cette prestation ? Le prestataire sera prévenu immédiatement.'))return;
+  try{
+    const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id+'/annuler-client',{method:'POST',headers:authHeaders()});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    toast(d.tardive?'🚫 Prestation annulée (annulation tardive signalée).':'🚫 Prestation annulée.');
+    goTab('home');loadDemandes();
+  }catch(e){toast(friendlyNetworkError(e))}
 }
 async function deleteDemande(){
   if(!currentDetailDemande)return;
@@ -1191,7 +1216,9 @@ async function loadProDevis(){
       var badge,extra='';
       var safeVId=escAttr(v.id),safeDemandeId=escAttr(v.demande_id);
       var demandeStatut=v.demande&&v.demande.statut;
-      if(v.statut==='accepte'&&demandeStatut==='terminee'){
+      if(demandeStatut==='annulee_client'){
+        badge='<span class="devis-badge badge-refused"><i data-lucide="ban" style="width:12px;height:12px;vertical-align:-2px"></i> Annulée par le client</span>';
+      }else if(v.statut==='accepte'&&demandeStatut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         var safeClientId=escAttr(v.demande&&v.demande.client_id);
         extra='<div style="margin-top:10px">'+
@@ -1211,16 +1238,25 @@ async function loadProDevis(){
       }else if(v.statut==='refuse'){badge='<span class="devis-badge badge-refused"><i data-lucide="x-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Refusé</span>'}
       else if(v.statut==='annule_pro'){badge='<span class="devis-badge badge-refused"><i data-lucide="ban" style="width:12px;height:12px;vertical-align:-2px"></i> Annulé par vous</span>'}
       else{badge='<span class="devis-badge badge-pending"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> En attente</span>'}
+      var detailsClient=tryParseNotes(v.demande&&v.demande.notes);
+      var photosClient=getPhotosFromNotes(v.demande&&v.demande.notes);
       html+='<div class="devis-card fade-in-item" style="animation-delay:'+(vi*0.04)+'s">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
           '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+ICONS_get(v.demande&&v.demande.prestation)+' '+escapeHtml(v.demande&&v.demande.prestation||'')+'</div>'+badge+
         '</div>'+
         '<div style="font-size:12px;color:var(--gray)">📍 '+escapeHtml(v.demande&&v.demande.adresse||'')+'</div>'+
+        (v.demande&&v.demande.creneau?'<div style="font-size:12px;color:var(--gray);margin-top:2px">📅 '+formatCreneau(v.demande.creneau)+'</div>':'')+
+        (detailsClient?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+detailsClient+'</div>':'')+
+        (photosClient.length?'<div class="photo-previews" style="margin-top:8px" id="photos-mesdevis-'+safeVId+'"></div>':'')+
         '<div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' €</div>'+
-        (v.description?'<div style="font-size:13px;color:#374151">'+escapeHtml(v.description)+'</div>':'')+
+        (v.description?'<div style="font-size:13px;color:#374151"><strong>Votre message :</strong> '+escapeHtml(v.description)+'</div>':'')+
         extra+'</div>';
     });
     c.innerHTML=html;
+    data.forEach(function(v){
+      var ph=getPhotosFromNotes(v.demande&&v.demande.notes);
+      if(ph.length)renderPhotoPreviews(ph,'photos-mesdevis-'+v.id);
+    });
   }catch(e){console.error('loadProDevis',e)}
 }
 
