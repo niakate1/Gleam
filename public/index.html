@@ -68,6 +68,26 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .svc-card.selected::after{content:'✓';position:absolute;top:6px;right:6px;width:18px;height:18px;background:var(--p);color:#fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700}
 .svc-card span:first-child{font-size:28px;display:block;margin-bottom:6px}
 .svc-card .svc-name{font-size:11px;font-weight:700;color:var(--text-secondary)}
+/* Chaque catégorie a sa propre teinte douce, pour une page d'accueil plus vivante et plus scannable */
+.svc-card[data-svc="voiture"]{background:#EEF2FF;border-color:#EEF2FF;color:#4F46E5}
+.svc-card[data-svc="canape"]{background:#FDF2E9;border-color:#FDF2E9;color:#C2703D}
+.svc-card[data-svc="matelas"]{background:#F5F3FF;border-color:#F5F3FF;color:#7C3AED}
+.svc-card[data-svc="terrasse"]{background:#FFFBEB;border-color:#FFFBEB;color:#D97706}
+.svc-card[data-svc="piscine"]{background:#ECFEFF;border-color:#ECFEFF;color:#0891B2}
+.svc-card[data-svc="toiture"]{background:#FEF3E2;border-color:#FEF3E2;color:#B45309}
+.svc-card[data-svc="vitres"]{background:#EFF6FF;border-color:#EFF6FF;color:#2563EB}
+.svc-card[data-svc="autre"]{background:var(--surface-alt);border-color:var(--surface-alt);color:var(--gray)}
+.svc-card[data-svc] .svc-name{color:inherit}
+.svc-card[data-svc].selected{border-color:currentColor;box-shadow:0 0 0 2px currentColor inset}
+@media (prefers-color-scheme: dark){
+  .svc-card[data-svc="voiture"]{background:rgba(99,102,241,.16);border-color:rgba(99,102,241,.16);color:#A5B4FC}
+  .svc-card[data-svc="canape"]{background:rgba(194,112,61,.16);border-color:rgba(194,112,61,.16);color:#F0B489}
+  .svc-card[data-svc="matelas"]{background:rgba(124,58,237,.18);border-color:rgba(124,58,237,.18);color:#C4B5FD}
+  .svc-card[data-svc="terrasse"]{background:rgba(217,119,6,.16);border-color:rgba(217,119,6,.16);color:#FBBF6C}
+  .svc-card[data-svc="piscine"]{background:rgba(8,145,178,.18);border-color:rgba(8,145,178,.18);color:#67E8F9}
+  .svc-card[data-svc="toiture"]{background:rgba(180,83,9,.18);border-color:rgba(180,83,9,.18);color:#FBBF6C}
+  .svc-card[data-svc="vitres"]{background:rgba(37,99,235,.18);border-color:rgba(37,99,235,.18);color:#93C5FD}
+}
 .demand-row{background:var(--surface);border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.05);cursor:pointer}
 .demand-row:hover{border-color:var(--p)}
 .demand-icon{font-size:28px}
@@ -81,6 +101,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .stat-card{background:var(--surface);border-radius:14px;padding:16px;border:1px solid var(--border);text-align:center}
 .stat-card .stat-num{font-size:28px;font-weight:800;color:var(--p)}
 .stat-card .stat-label{font-size:12px;color:var(--gray);margin-top:4px}
+.stat-card-p{background:linear-gradient(155deg,var(--light),var(--surface) 70%);border-color:var(--light)}
+.stat-card-gold{background:linear-gradient(155deg,#FFFBEB,var(--surface) 70%);border-color:#FEF3C7}
+.stat-card-gold .stat-num{color:#D97706}
+@media (prefers-color-scheme: dark){
+  .stat-card-p{background:linear-gradient(155deg,rgba(124,58,237,.16),var(--surface) 70%)}
+  .stat-card-gold{background:linear-gradient(155deg,rgba(217,119,6,.16),var(--surface) 70%);border-color:rgba(217,119,6,.3)}
+  .stat-card-gold .stat-num{color:var(--gold)}
+}
 .dispo-toggle{background:var(--surface);border-radius:14px;padding:16px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .dispo-toggle .dispo-text{font-size:14px;font-weight:700}
 .dispo-toggle .dispo-sub{font-size:12px;color:var(--gray);margin-top:2px}
@@ -317,8 +345,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="pro-content">
     <div class="greeting"><h2 id="pro-greeting">Bonjour 👋</h2><p>Voici les demandes disponibles</p></div>
     <div class="pro-stats">
-      <div class="stat-card"><div class="stat-num" id="stat-demandes">0</div><div class="stat-label">Demandes disponibles</div></div>
-      <div class="stat-card"><div class="stat-num" id="stat-devis">0</div><div class="stat-label">Devis envoyés</div></div>
+      <div class="stat-card stat-card-p"><div class="stat-num" id="stat-demandes">0</div><div class="stat-label">Demandes disponibles</div></div>
+      <div class="stat-card stat-card-gold"><div class="stat-num" id="stat-devis">0</div><div class="stat-label">Devis envoyés</div></div>
     </div>
     <div class="dispo-toggle">
       <div><div class="dispo-text">Disponibilité</div><div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div></div>
