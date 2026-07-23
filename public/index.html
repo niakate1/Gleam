@@ -316,6 +316,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="navbar"><span class="logo-sm">✨ Gleam</span><span class="user-badge" id="user-name-badge">Bonjour</span></div>
   <div class="home-content">
     <div class="greeting"><h2 id="greeting-name">Bonjour 👋</h2><p>Que souhaitez-vous faire briller aujourd'hui ?</p></div>
+    <div style="background:linear-gradient(135deg,var(--light),var(--surface));border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+      <i data-lucide="shield-check" style="width:20px;height:20px;color:var(--mint);flex-shrink:0"></i>
+      <span style="font-size:12.5px;color:var(--text-secondary);font-weight:600">Tous nos prestataires sont vérifiés et assurés (RC Pro)</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">
+      <div style="text-align:center;padding:10px 4px">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-weight:800;font-size:14px">1</div>
+        <div style="font-size:11px;color:var(--text-secondary);font-weight:600;line-height:1.3">Choisissez votre prestation</div>
+      </div>
+      <div style="text-align:center;padding:10px 4px">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-weight:800;font-size:14px">2</div>
+        <div style="font-size:11px;color:var(--text-secondary);font-weight:600;line-height:1.3">Recevez des devis de pros</div>
+      </div>
+      <div style="text-align:center;padding:10px 4px">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-weight:800;font-size:14px">3</div>
+        <div style="font-size:11px;color:var(--text-secondary);font-weight:600;line-height:1.3">Payez après la prestation</div>
+      </div>
+    </div>
     <div class="section-title">Choisissez une ou plusieurs prestations</div>
     <div class="services-grid" id="services-grid">
       <div class="svc-card" data-svc="voiture" onclick="toggleSvc(this,'voiture')"><i data-lucide="car" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Voiture</div></div>
@@ -475,6 +493,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p></div>
     <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
     <div class="profile-menu">
+      <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
@@ -1646,6 +1665,23 @@ function openService(type){
   multiFlow={active:false,queue:[],current:0,results:[]};
   openServiceForm(type);
 }
+function showHowItWorks(){
+  var html='<div class="modal-title gleam-signature">✨ Comment marche Gleam ?</div>'+
+    '<div class="modal-sub">Simple, transparent, sans surprise.</div>'+
+    '<div style="display:flex;flex-direction:column;gap:16px;margin:20px 0">'+
+      '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">1</div><div><strong>Décrivez votre besoin</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Choisissez une ou plusieurs prestations, précisez l\'état, la taille, vos disponibilités.</div></div></div>'+
+      '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">2</div><div><strong>Recevez des devis</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Des prestataires vérifiés et assurés (RC Pro) vous envoient un prix adapté à votre demande précise.</div></div></div>'+
+      '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">3</div><div><strong>Choisissez et discutez</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Comparez, échangez directement par messagerie avec le prestataire avant de valider.</div></div></div>'+
+      '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">4</div><div><strong>Payez en toute sécurité</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Votre paiement est débité seulement après la prestation, jamais avant.</div></div></div>'+
+    '</div>'+
+    '<div class="divider"></div>'+
+    '<div style="background:var(--surface-alt);border-radius:10px;padding:14px;font-size:13px;color:var(--text-secondary);line-height:1.5">'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px"><i data-lucide="shield-check" style="width:16px;height:16px;color:var(--mint);flex-shrink:0"></i><span><strong>Assurance :</strong> chaque prestataire atteste d\'une assurance responsabilité civile professionnelle en cours de validité.</span></div>'+
+      '<div style="display:flex;gap:8px"><i data-lucide="calendar-x" style="width:16px;height:16px;color:var(--p);flex-shrink:0"></i><span><strong>Annulation :</strong> gratuite tant que le devis n\'a pas été accepté. Une fois la prestation planifiée, contactez le prestataire directement via la messagerie.</span></div>'+
+    '</div>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
 function openServiceForm(type){
   currentFormType=type;
   var bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,autre:autreForm};
@@ -1692,6 +1728,9 @@ function sendBtn(type){
   var html='';
   if(multiFlow.active&&multiFlow.current>0){
     html+='<button type="button" onclick="goToPreviousStep(\''+type+'\')" style="width:100%;padding:12px;background:none;border:2px solid var(--border);color:#374151;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">← Étape précédente</button>';
+  }
+  if(!multiFlow.active||isLast){
+    html+='<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin:10px 0;font-size:11.5px;color:var(--gray)"><i data-lucide="lock" style="width:13px;height:13px"></i> Paiement sécurisé, débité seulement après la prestation</div>';
   }
   html+='<button class="modal-send-btn" id="send-demand-btn" onclick="sendDemand(\''+type+'\')">'+label+'</button>';
   return html;
