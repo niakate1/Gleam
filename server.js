@@ -431,6 +431,51 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
   }
 });
 
+// Annuler une demande déjà acceptée/en cours (jamais bloqué totalement — juste un avertissement si tardif)
+app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
+  try {
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (demande.statut === 'terminee')
+      return res.status(400).json({ error: 'Cette prestation est déjà terminée, elle ne peut plus être annulée.' });
+    if (demande.statut !== 'acceptee' && demande.statut !== 'en_cours')
+      return res.status(400).json({ error: 'Utilisez la suppression classique pour une demande pas encore acceptée.' });
+
+    // Détermine si l'annulation est tardive (moins de 24h avant le créneau prévu)
+    let tardive = false;
+    if (demande.creneau) {
+      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(demande.creneau);
+      if (match) {
+        const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
+        const heuresRestantes = (dateCreneau - new Date()) / (1000 * 60 * 60);
+        tardive = heuresRestantes < 24;
+      }
+    }
+
+    const { data: devisAccepte } = await supabase.from('devis').select('*').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
+
+    await supabase.from('demandes').update({ statut: 'annulee_client' }).eq('id', demande.id);
+    if (devisAccepte) await supabase.from('devis').update({ statut: 'annule_client' }).eq('id', devisAccepte.id);
+
+    // 📧 Notifie immédiatement le prestataire concerné
+    if (devisAccepte) {
+      const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', devisAccepte.societe_id).single();
+      if (pro) {
+        sendEmail('annulation_client', pro.email, {
+          prenom: pro.prenom || '', prestation: demande.prestation, creneau: demande.creneau || '',
+          tardive, demandeId: demande.id,
+        }).catch(e => console.error('Email annulation_client:', e));
+      }
+    }
+
+    res.json({ message: 'Prestation annulée.', tardive });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // Supprimer une demande (uniquement si aucun devis n'a été accepté)
 app.delete('/api/demandes/:id', auth, async (req, res) => {
   try {
@@ -528,7 +573,7 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
     if (!devis || !devis.length) return res.json([]);
 
     const demandeIds = [...new Set(devis.map(d => d.demande_id))];
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme, client_id').in('id', demandeIds);
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme, client_id, notes, creneau').in('id', demandeIds);
     const demandeMap = {};
     (demandes || []).forEach(d => demandeMap[d.id] = d);
 
