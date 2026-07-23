@@ -4,13 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gleam ✨</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#7C3AED;--p2:#6D28D9;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151}
+:root{--p:#7C3AED;--p2:#5B21B6;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151}
 @media (prefers-color-scheme: dark){
-  :root{--p:#A78BFA;--p2:#C4B5FD;--light:#2D2440;--gray:#9CA3AF;--border:#333846;--red:#F87171;--green:#34D399;--bg:#0F1115;--surface:#1A1D23;--surface-alt:#23272F;--text:#F3F4F6;--text-secondary:#D1D5DB}
+  :root{--p:#A78BFA;--p2:#C4B5FD;--light:#2D2440;--gray:#9CA3AF;--border:#333846;--red:#F87171;--green:#34D399;--gold:#FBC85C;--mint:#2DD4BF;--bg:#0F1115;--surface:#1A1D23;--surface-alt:#23272F;--text:#F3F4F6;--text-secondary:#D1D5DB}
 }
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 .screen{display:none;min-height:100vh;flex-direction:column}
 .screen.active{display:flex}
 .auth-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#7C3AED,#4F46E5)}
@@ -181,6 +184,43 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .upload-progress{font-size:12px;color:var(--gray);margin-top:6px;display:none}
 .upload-progress.show{display:block}
 .conv-dot{width:8px;height:8px;background:var(--red);border-radius:50%;flex-shrink:0;margin-left:6px}
+
+/* ── Écrans squelettes : le "reflet" traverse le placeholder pendant le chargement ── */
+.skeleton-card{background:var(--surface);border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid var(--border);overflow:hidden;position:relative}
+.skeleton-line{height:12px;border-radius:6px;background:var(--surface-alt);margin-bottom:8px;position:relative;overflow:hidden}
+.skeleton-line.w-60{width:60%}.skeleton-line.w-40{width:40%}.skeleton-line.w-80{width:80%}.skeleton-line.w-100{width:100%}
+.skeleton-line.tall{height:20px}
+.skeleton-line::after,.skeleton-card::after{content:'';position:absolute;top:0;left:-150%;width:150%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(124,58,237,.14),transparent);animation:gleam-sweep 1.6s ease-in-out infinite}
+
+/* ── Le "coup d'éclat" signature : un reflet diagonal, réservé au logo et aux moments de réussite ── */
+@keyframes gleam-sweep{0%{left:-150%}100%{left:150%}}
+.gleam-signature{position:relative;overflow:hidden;display:inline-block}
+.gleam-signature::after{content:'';position:absolute;top:-20%;left:-60%;width:40%;height:140%;
+  background:linear-gradient(115deg,transparent 30%,rgba(245,185,66,.55) 50%,transparent 70%);
+  animation:gleam-signature-sweep 2.2s ease-out .3s 1}
+@keyframes gleam-signature-sweep{0%{left:-60%}100%{left:130%}}
+
+/* ── Apparition en fondu, échelonnée dans les listes ── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in-item{animation:fadeInUp .35s ease-out both}
+
+/* ── Retour tactile sur les éléments interactifs ── */
+.svc-card,.opt-btn,.role-btn,.flex-opt,.demand-row,.conv-row,.demande-card,.devis-card,.profile-item,.bnav-item,button{transition:transform .12s ease,background-color .15s ease,border-color .15s ease}
+.svc-card:active,.opt-btn:active,.role-btn:active,.flex-opt:active,.btn:active,.modal-send-btn:active,.btn-devis:active,.btn-accept:active{transform:scale(.97)}
+
+/* ── Avatars (vraie photo ou repli sur initiale colorée) ── */
+.avatar-photo{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.mini-avatar{width:36px;height:36px;border-radius:50%;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--light);color:var(--p);font-weight:800;font-size:14px}
+.avatar-wrap{position:relative;width:72px;height:72px;margin:0 auto 12px}
+.avatar-upload-btn{position:absolute;bottom:-2px;right:-2px;width:26px;height:26px;border-radius:50%;background:var(--gold);border:2px solid var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#78350F}
+.avatar-upload-btn i{width:14px;height:14px}
+
+/* ── Respect des préférences d'accessibilité : réduction des animations ── */
+@media (prefers-reduced-motion: reduce){
+  .skeleton-line::after,.skeleton-card::after,.gleam-signature::after,.fade-in-item,.svc-card,.opt-btn,.role-btn,.flex-opt,button{animation:none!important;transition:none!important}
+  .fade-in-item{opacity:1;transform:none}
+}
 </style>
 </head>
 <body>
@@ -190,7 +230,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen active" id="s-auth">
   <div class="auth-wrap">
     <div class="auth-box">
-      <div class="logo"><h1>✨ Gleam</h1><p>Le nettoyage, brillamment simple</p></div>
+      <div class="logo"><h1 class="gleam-signature">✨ Gleam</h1><p>Le nettoyage, brillamment simple</p></div>
       <div class="tabs">
         <button class="tab active" onclick="switchTab('login')">Connexion</button>
         <button class="tab" onclick="switchTab('register')">Inscription</button>
@@ -314,7 +354,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-pro-profile">
   <div class="navbar"><span class="logo-sm">👤 Mon Profil Pro</span></div>
   <div class="profile-content">
-    <div class="profile-hero"><div class="avatar">🏢</div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p></div>
+    <div class="profile-hero"><div class="avatar-wrap" id="pro-profile-avatar"><div class="avatar" id="pro-profile-avatar-inner">🏢</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')"></div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p></div>
+    <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
@@ -336,7 +377,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <!-- PRO TARIFS (Vague 2) -->
 <div class="screen" id="s-pro-tarifs">
   <div class="navbar">
-    <button class="back-btn" onclick="goProTab('pro-profile')">←</button>
+    <button class="back-btn" onclick="goProTab('pro-profile')" aria-label="Retour">←</button>
     <span class="logo-sm" style="font-size:16px">💶 Mes tarifs</span>
     <span style="width:24px"></span>
   </div>
@@ -365,7 +406,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <!-- CHAT -->
 <div class="screen" id="s-chat">
   <div class="navbar">
-    <button class="back-btn" onclick="backFromChat()">←</button>
+    <button class="back-btn" onclick="backFromChat()" aria-label="Retour">←</button>
     <span class="logo-sm" id="chat-title" style="font-size:16px">Conversation</span>
     <span style="width:24px"></span>
   </div>
@@ -373,7 +414,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="chat-messages" id="chat-messages"></div>
     <div class="chat-input-bar">
       <input type="text" id="chat-input" placeholder="Écrivez votre message..." onkeypress="if(event.key==='Enter')sendChatMsg()">
-      <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMsg()">➤</button>
+      <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMsg()" aria-label="Envoyer le message">➤</button>
     </div>
   </div>
 </div>
@@ -394,7 +435,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-profile">
   <div class="navbar"><span class="logo-sm">👤 Mon Profil</span></div>
   <div class="profile-content">
-    <div class="profile-hero"><div class="avatar">👤</div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p></div>
+    <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p></div>
+    <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
       <div class="profile-item"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
@@ -417,7 +459,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <!-- DETAIL DEMANDE -->
 <div class="screen" id="s-detail">
   <div class="navbar">
-    <button class="back-btn" onclick="goTab('home')">←</button>
+    <button class="back-btn" onclick="goTab('home')" aria-label="Retour">←</button>
     <span class="logo-sm" style="font-size:16px">Détail de la demande</span>
     <span style="width:24px"></span>
   </div>
@@ -428,7 +470,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-success">
   <div class="navbar"><span class="logo-sm">✨ Gleam</span></div>
   <div class="success-screen">
-    <div class="success-icon">✨</div>
+    <div class="success-icon gleam-signature">✨</div>
     <h2>Demande envoyée !</h2>
     <p>Votre demande a été transmise aux prestataires Gleam.<br>Vous recevrez des devis dans les plus brefs délais.</p>
     <button class="btn" onclick="goTab('home')" style="max-width:300px">Retour à l'accueil</button>
@@ -438,7 +480,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- MODAL SERVICE -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
-  <div class="modal"><div style="display:flex;justify-content:center;position:relative"><div class="modal-handle"></div><button onclick="closeModalForce()" style="position:absolute;right:0;top:-4px;background:none;border:none;font-size:22px;color:var(--gray);cursor:pointer;padding:4px 8px;line-height:1">✕</button></div><div id="modal-body"></div></div>
+  <div class="modal"><div style="display:flex;justify-content:center;position:relative"><div class="modal-handle"></div><button onclick="closeModalForce()" aria-label="Fermer" style="position:absolute;right:0;top:-4px;background:none;border:none;font-size:22px;color:var(--gray);cursor:pointer;padding:4px 8px;line-height:1">✕</button></div><div id="modal-body"></div></div>
 </div>
 
 <!-- MODAL PAIEMENT -->
@@ -581,6 +623,7 @@ function enterApp(){
     document.getElementById('pro-name-badge').textContent=name;
     document.getElementById('pro-profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
     document.getElementById('pro-profile-email').textContent=(currentUser&&currentUser.email)||'';
+    renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
     disponible=!currentUser||currentUser.disponible!==false;
     document.getElementById('dispo-toggle').classList.toggle('on',disponible);
     document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
@@ -591,6 +634,7 @@ function enterApp(){
     document.getElementById('user-name-badge').textContent=name;
     document.getElementById('profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
     document.getElementById('profile-email').textContent=(currentUser&&currentUser.email)||'';
+    renderProfileAvatar('profile-avatar-inner',currentUser&&currentUser.photo,'👤');
     show('s-home');
     loadDemandes();
   }
@@ -669,6 +713,42 @@ function compressImage(file,maxDim,quality){
   });
 }
 
+// Génère l'avatar d'une carte (devis, conversation...) : une vraie photo si disponible,
+// sinon un cercle coloré avec l'initiale du prénom — jamais un espace vide.
+function miniAvatarHtml(photo,name){
+  if(photo){
+    return '<div class="mini-avatar"><img class="avatar-photo" src="'+photo+'" alt=""></div>';
+  }
+  var initiale=(name||'?').trim().charAt(0).toUpperCase()||'?';
+  return '<div class="mini-avatar">'+escapeHtml(initiale)+'</div>';
+}
+
+// Met à jour l'avatar affiché dans l'écran Profil (photo réelle ou repli sur emoji par défaut)
+function renderProfileAvatar(innerId,photo,fallbackEmoji){
+  var el=document.getElementById(innerId);
+  if(!el)return;
+  if(photo){el.innerHTML='<img class="avatar-photo" src="'+photo+'" alt="">'}
+  else{el.textContent=fallbackEmoji}
+}
+
+// Gère la sélection d'une nouvelle photo de profil : compression, envoi au serveur, mise à jour visuelle
+async function handleProfilePhoto(input,who){
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  var progress=document.getElementById('photo-upload-progress-'+who);
+  if(progress){progress.textContent='Envoi en cours...';progress.classList.add('show')}
+  try{
+    var dataUrl=await compressImage(file,400,0.8);
+    const r=await fetch(API+'/api/users/photo',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({photo:dataUrl})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||'photo non enregistrée'));return}
+    if(who==='pro')renderProfileAvatar('pro-profile-avatar-inner',dataUrl,'🏢');
+    else renderProfileAvatar('profile-avatar-inner',dataUrl,'👤');
+    toast('📸 Photo de profil mise à jour !');
+  }catch(e){toast(friendlyNetworkError(e))}
+  finally{if(progress){progress.textContent='';progress.classList.remove('show')} input.value=''}
+}
+
 function formatCreneau(creneau){
   if(!creneau)return'';
   var match=creneau.match(/(\d{4})-(\d{2})-(\d{2})\s*à\s*(.+)/);
@@ -686,7 +766,18 @@ function localDateISO(d){
 }
 
 // ── CLIENT DEMANDES ──
+function skeletonCards(n){
+  n=n||3;
+  var html='';
+  for(var i=0;i<n;i++){
+    html+='<div class="skeleton-card"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80 tall"></div><div class="skeleton-line w-60"></div></div>';
+  }
+  return html;
+}
+
 async function loadDemandes(){
+  var c0=document.getElementById('recent-demands');
+  if(c0)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/demandes',{headers:authHeaders()});
     if(r.status===401){return doLogout()}
@@ -699,12 +790,12 @@ async function loadDemandes(){
     data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9)});
 
     var html='';
-    data.forEach(function(d){
+    data.forEach(function(d,i){
       var st=STATUTS[d.statut]||['',''];
       var icon=ICONS_get((d.prestation||'').split(' + ')[0]);
       var urgentStyle=d.statut==='en_cours'?'border-color:var(--green);background:#F0FDF4;':'';
       var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px;margin-left:6px">ACTION REQUISE</span>':'';
-      html+='<div class="demand-row" style="'+urgentStyle+'" onclick="openDetail(\''+escAttr(d.id)+'\')">'+
+      html+='<div class="demand-row fade-in-item" style="animation-delay:'+(i*0.04)+'s;'+urgentStyle+'" onclick="openDetail(\''+escAttr(d.id)+'\')">'+
         '<span class="demand-icon">'+icon+'</span>'+
         '<div class="demand-info">'+
           '<div class="demand-type">'+escapeHtml(d.prestation)+urgentBadge+'</div>'+
@@ -719,6 +810,8 @@ async function loadDemandes(){
 }
 
 async function loadDevis(){
+  var c0=document.getElementById('devis-list');
+  if(c0)c0.innerHTML=skeletonCards(3);
   try{
     const rd=await fetch(API+'/api/demandes',{headers:authHeaders()});
     if(rd.status===401){return doLogout()}
@@ -753,7 +846,7 @@ async function loadDevis(){
     });
 
     var html='';
-    all.forEach(function(v){
+    all.forEach(function(v,vi){
       var proNameRaw=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
       var proName=escapeHtml(proNameRaw);
       var proNote=v.pro&&v.pro.note_moyenne?'⭐ '+escapeHtml(v.pro.note_moyenne):'';
@@ -795,11 +888,12 @@ async function loadDevis(){
         '</div>';
       }
 
-      html+='<div class="devis-card" style="'+cardStyle+'">'+
+      html+='<div class="devis-card fade-in-item" style="animation-delay:'+(vi*0.04)+'s;'+cardStyle+'">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'+
+          '<div style="display:flex;gap:10px;align-items:center">'+miniAvatarHtml(v.pro&&v.pro.photo,proNameRaw)+
           '<div><div style="font-weight:700;font-size:15px">'+proName+'</div>'+
           (proNote?'<div style="font-size:12px;color:#D97706;margin-top:2px">'+proNote+'</div>':'')+
-          '</div>'+badge+
+          '</div></div>'+badge+
         '</div>'+
         '<div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 '+escapeHtml(v.prestation)+'</div>'+
         '<div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' \u20ac</div>'+
@@ -961,6 +1055,8 @@ async function envoyerNote(btn){
 
 // ── PRO DEMANDES ──
 async function loadProDemandes(){
+  var c0=document.getElementById('pro-demandes-list');
+  if(c0)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
     const c=document.getElementById('pro-demandes-list');
@@ -971,10 +1067,10 @@ async function loadProDemandes(){
     loadProDevisCount();
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
     var html='';
-    data.forEach(function(d){
+    data.forEach(function(d,di){
       var hasPhotos=getPhotosFromNotes(d.notes).length>0;
       var safeId=escAttr(d.id);
-      html+='<div class="demande-card">'+
+      html+='<div class="demande-card fade-in-item" style="animation-delay:'+(di*0.04)+'s">'+
         '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
         '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
         '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+'</div>'+
@@ -1007,6 +1103,8 @@ async function loadProDevisCount(){
 }
 
 async function loadProDevis(){
+  var c0=document.getElementById('pro-devis-list');
+  if(c0)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
     const c=document.getElementById('pro-devis-list');
@@ -1032,7 +1130,7 @@ async function loadProDevis(){
     });
 
     var html='';
-    data.forEach(function(v){
+    data.forEach(function(v,vi){
       var badge,extra='';
       var safeVId=escAttr(v.id),safeDemandeId=escAttr(v.demande_id);
       var demandeStatut=v.demande&&v.demande.statut;
@@ -1056,7 +1154,7 @@ async function loadProDevis(){
       }else if(v.statut==='refuse'){badge='<span class="devis-badge badge-refused">❌ Refusé</span>'}
       else if(v.statut==='annule_pro'){badge='<span class="devis-badge badge-refused">🚫 Annulé par vous</span>'}
       else{badge='<span class="devis-badge badge-pending">⏳ En attente</span>'}
-      html+='<div class="devis-card">'+
+      html+='<div class="devis-card fade-in-item" style="animation-delay:'+(vi*0.04)+'s">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
           '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+ICONS_get(v.demande&&v.demande.prestation)+' '+escapeHtml(v.demande&&v.demande.prestation||'')+'</div>'+badge+
         '</div>'+
@@ -1291,6 +1389,8 @@ function stopUnreadPoll(){if(unreadPollInterval){clearInterval(unreadPollInterva
 
 // ── CONVERSATIONS ──
 async function loadConversationsClient(){
+  var c0=document.getElementById('client-conv-list');
+  if(c0)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('client-conv-list');
@@ -1301,6 +1401,8 @@ async function loadConversationsClient(){
   }catch(e){}
 }
 async function loadConversationsPro(){
+  var c0=document.getElementById('pro-conv-list');
+  if(c0)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('pro-conv-list');
@@ -1320,17 +1422,19 @@ function renderConvList(container,data){
   var termine=(data||[]).filter(function(c){return c.statut==='terminee'});
   if(!active.length&&!termine.length){container.innerHTML='<div class="empty-state"><span>💬</span><p>Aucune conversation active.<br>Acceptez un devis pour démarrer !</p></div>';return}
   var html='';
+  var idx=0;
   if(active.length){
     html+='<div class="section-title" style="padding:0 0 8px">💬 En cours</div>';
-    active.forEach(function(c){html+=convRowHtml(c)});
+    active.forEach(function(c){html+=convRowHtml(c,idx++)});
   }
   if(termine.length){
     html+='<div class="section-title" style="padding:16px 0 8px;color:var(--gray)">🏁 Terminées</div>';
     termine.forEach(function(c){
       var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
       var unread=isConvUnread(c);
-      html+='<div class="conv-row" style="opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
-        '<div class="conv-avatar">'+ICONS_get(c.prestation)+'</div>'+
+      var photo=c.autre_partie&&c.autre_partie.photo;
+      html+='<div class="conv-row fade-in-item" style="animation-delay:'+(idx++*0.04)+'s;opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
+        '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
         '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div>'+
         '<div class="conv-preview">Prestation terminée — consulter l\'historique</div></div>'+
         '<div class="conv-time">🏁</div></div>';
@@ -1338,13 +1442,14 @@ function renderConvList(container,data){
   }
   container.innerHTML=html;
 }
-function convRowHtml(c){
+function convRowHtml(c,idx){
   var nameRaw=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
   var preview=c.dernier_message||'Démarrez la conversation...';
   var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
   var unread=isConvUnread(c);
-  return'<div class="conv-row" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(nameRaw)+'\')">'+
-    '<div class="conv-avatar">'+ICONS_get(c.prestation)+'</div>'+
+  var photo=c.autre_partie&&c.autre_partie.photo;
+  return'<div class="conv-row fade-in-item" style="animation-delay:'+((idx||0)*0.04)+'s" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(nameRaw)+'\')">'+
+    '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
     '<div class="conv-body"><div class="conv-name">'+escapeHtml(nameRaw)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div><div class="conv-preview">'+escapeHtml(preview)+'</div></div>'+
     '<div class="conv-time">'+time+'</div></div>';
 }
