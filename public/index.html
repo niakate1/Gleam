@@ -1169,7 +1169,15 @@ function prefillModifyForm(p){
       if(group==='quantite'){var qEl=document.getElementById('f-quantite');if(qEl)qEl.value=value}
     });
   }
-  if(isLastInFlow()&&currentDetailDemande){var a=document.getElementById('f-addr');if(a)a.value=currentDetailDemande.adresse||''}
+  if(isLastInFlow()&&currentDetailDemande){
+    var fullAddr=currentDetailDemande.adresse||'';
+    var idx=fullAddr.lastIndexOf(',');
+    var aEl=document.getElementById('f-addr'),vEl=document.getElementById('f-ville');
+    if(idx>-1){
+      if(aEl)aEl.value=fullAddr.slice(0,idx).trim();
+      if(vEl)vEl.value=fullAddr.slice(idx+1).trim();
+    }else if(aEl){aEl.value=fullAddr}
+  }
   if(document.getElementById('prix-estime-box'))updateEstimation();
 }
 
@@ -1871,7 +1879,8 @@ function dateTimeBlock(isLast){
     '<div class="datetime-row"><input type="date" id="f-date" min="'+today+'" value="'+today+'"><select id="f-time">'+opts+'</select></div>'+
     '<label style="margin-top:12px">Flexibilité <span class="optional">(optionnel)</span></label>'+
     '<div class="flex-opts">'+flexBtns+'</div></div>'+
-    '<div class="field-group"><label>📍 Adresse d\'intervention</label><input type="text" id="f-addr" placeholder="12 rue de la Paix, 75001 Paris" autocomplete="street-address"></div>'+
+    '<div class="field-group"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="address-line1"></div>'+
+    '<div class="field-group" style="margin-top:10px"><label>🏙️ Ville *</label><input type="text" id="f-ville" placeholder="Paris" autocomplete="address-level2"></div>'+
     '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel, max 5)</span></label>'+
     '<div class="photo-zone" onclick="document.getElementById(\'photo-input\').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>'+
     '<div class="upload-progress" id="upload-progress">Compression des photos...</div>'+
@@ -1978,12 +1987,12 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this)"><span>🪑</span>Intérieur</button>'+
   '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this)"><span>✨</span>Extérieur</button>'+
   '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this)"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
-  '<div class="field-group"><label>Type de véhicule <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<div class="field-group"><label>Type de véhicule</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="monospace" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚌</span>Utilitaire</button></div></div>'+
-  '<div class="field-group"><label>Nombre de places <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="C" onclick="selOpt(this)">7 places</button>'+
@@ -2001,7 +2010,7 @@ function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé<
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">3 places</button>'+
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">4 places</button>'+
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">5+ places</button></div></div>'+
-  '<div class="field-group"><label>Matière <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<div class="field-group"><label>Matière</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="can-mat" data-coef-key="matiere" data-coef-val="tissu" onclick="selOpt(this)">Tissu</button>'+
   '<button class="opt-btn" data-group="can-mat" data-coef-key="matiere" data-coef-val="cuir" onclick="selOpt(this)">Cuir</button>'+
   '<button class="opt-btn" data-group="can-mat" data-coef-key="matiere" data-coef-val="velours" onclick="selOpt(this)">Velours</button>'+
@@ -2019,7 +2028,7 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
 
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
   quantiteBlock('Surface exacte (en m²)','Ex: 34')+
-  '<div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<div class="field-group"><label>Type de sol</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)">Carrelage</button>'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="bois_composite" onclick="selOpt(this)">Bois/composite</button>'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="beton" onclick="selOpt(this)">Béton</button>'+
@@ -2031,12 +2040,12 @@ function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</d
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="entretien" onclick="selOpt(this)">Entretien simple<br><span style="font-weight:400;font-size:11px">(pH, skimmer, contrôle)</span></button>'+
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="complet" onclick="selOpt(this)">Nettoyage complet<br><span style="font-weight:400;font-size:11px">(parois, fond, filtre)</span></button>'+
   '<button class="opt-btn full" data-group="pisc-int" data-coef-key="intervention" data-coef-val="eau_verte" onclick="selOpt(this)">Eau verte / remise en état</button></div></div>'+
-  '<div class="field-group"><label>Type de bassin <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<div class="field-group"><label>Type de bassin</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="enterree" onclick="selOpt(this)"><span>🏊</span>Enterrée</button>'+
   '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="hors_sol" onclick="selOpt(this)"><span>🏖️</span>Hors-sol</button>'+
   '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="semi_enterree" onclick="selOpt(this)"><span>🌊</span>Semi-enterrée</button>'+
   '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="spa_jacuzzi" onclick="selOpt(this)"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
-  '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<div class="field-group"><label>Surface</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">Moins de 25 m²</button>'+
   '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">25 à 50 m²</button>'+
   '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">50 à 80 m²</button>'+
@@ -2105,7 +2114,46 @@ async function handlePhotos(input){
 }
 function renderPhotoInput(){var c=document.getElementById('photo-previews');if(!c)return;c.innerHTML='';photos.forEach(function(src,i){var div=document.createElement('div');div.className='photo-preview';var img=document.createElement('img');img.src=src;var btn=document.createElement('button');btn.className='del-photo';btn.type='button';btn.textContent='×';btn.onclick=function(){photos.splice(i,1);renderPhotoInput()};div.appendChild(img);div.appendChild(btn);c.appendChild(div)})}
 
+// Retrouve le libellé humain d'un groupe de choix (le texte du <label> le plus proche),
+// pour afficher un message d'erreur précis plutôt que générique.
+function getGroupLabel(group){
+  var el=document.querySelector('[data-group="'+group+'"]');
+  if(!el)return'ce champ';
+  var fg=el.closest('.field-group');
+  var label=fg&&fg.querySelector('label');
+  if(!label)return'ce champ';
+  var clone=label.cloneNode(true);
+  var opt=clone.querySelector('.optional');
+  if(opt)opt.remove();
+  return clone.textContent.trim();
+}
+// Vérifie que tous les champs nécessaires pour obtenir un devis précis sont bien remplis
+// (chaque groupe de choix affiché, ainsi que la quantité/surface exacte le cas échéant),
+// avant d'autoriser à passer à l'étape suivante ou à envoyer la demande.
+function validateCurrentForm(type){
+  var groups=[];
+  document.querySelectorAll('#modal-body [data-group]').forEach(function(el){
+    var g=el.getAttribute('data-group');
+    if(g&&g!=='etat'&&groups.indexOf(g)===-1)groups.push(g);
+  });
+  for(var i=0;i<groups.length;i++){
+    if(!document.querySelector('[data-group="'+groups[i]+'"].sel')){
+      return 'Merci de renseigner : '+getGroupLabel(groups[i]);
+    }
+  }
+  if(UNIT_CATEGORIES_CLIENT.indexOf(type)>=0){
+    var qEl=document.getElementById('f-quantite');
+    var q=qEl?parseFloat(qEl.value):NaN;
+    if(!qEl||!qEl.value.trim()||isNaN(q)||q<=0){
+      var qLabel=qEl&&qEl.closest('.field-group')&&qEl.closest('.field-group').querySelector('label');
+      return 'Merci d\'indiquer '+(qLabel?qLabel.textContent.trim().toLowerCase():'la quantité exacte')+' pour continuer.';
+    }
+  }
+  return null;
+}
 async function sendDemand(type){
+  var validationError=validateCurrentForm(type);
+  if(validationError){toast('❌ '+validationError);return}
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
   document.querySelectorAll('.opt-btn.sel').forEach(function(b){var group=b.getAttribute('data-group');if(group)details[group]=b.textContent.trim()});
@@ -2125,9 +2173,12 @@ async function sendDemand(type){
   }
 
   var addr=document.getElementById('f-addr')&&document.getElementById('f-addr').value.trim()||'';
+  var ville=document.getElementById('f-ville')&&document.getElementById('f-ville').value.trim()||'';
   var date=document.getElementById('f-date')&&document.getElementById('f-date').value||'';
   var time=document.getElementById('f-time')&&document.getElementById('f-time').value||'';
-  if(!addr){toast('Veuillez indiquer une adresse.');return}
+  if(!addr){toast('❌ Merci d\'indiquer l\'adresse d\'intervention.');return}
+  if(!ville){toast('❌ Merci d\'indiquer la ville — c\'est indispensable pour le prestataire.');return}
+  var adresseComplete=addr+', '+ville;
   if(date){
     var todayStr=localDateISO(new Date());
     if(date<todayStr){toast('❌ La date choisie ne peut pas être dans le passé.');return}
@@ -2152,7 +2203,7 @@ async function sendDemand(type){
     var isEdit=multiFlow.editMode&&multiFlow.editId;
     var url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
     var method=isEdit?'PATCH':'POST';
-    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:addr,date:date,time:time,flexibility:flex,photos:photos.slice(0,5)})});
+    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5)})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
