@@ -70,6 +70,26 @@ const auth = async (req, res, next) => {
 
 const isProType = (t) => t === 'pro' || t === 'societe' || t === 'professionnel';
 
+// Vérifie qu'une date (et éventuellement une heure) de créneau n'est pas dans le passé.
+// Retourne un message d'erreur (string) si invalide, ou null si tout va bien.
+function validerCreneauFutur(date, time) {
+  if (!date) return null;
+  const dateDemandee = new Date(date + 'T00:00:00');
+  if (isNaN(dateDemandee.getTime())) return 'Date invalide.';
+  const aujourdhui = new Date();
+  aujourdhui.setHours(0, 0, 0, 0);
+  if (dateDemandee < aujourdhui) return 'La date choisie ne peut pas être dans le passé.';
+  if (dateDemandee.getTime() === aujourdhui.getTime() && time) {
+    const match = /(\d{1,2})h(\d{2})/.exec(time);
+    if (match) {
+      const heureChoisie = new Date();
+      heureChoisie.setHours(+match[1], +match[2], 0, 0);
+      if (heureChoisie < new Date()) return 'Cette heure est déjà passée aujourd\'hui. Choisissez un autre créneau.';
+    }
+  }
+  return null;
+}
+
 // ══════════════ TARIFICATION (Vague 2/3) — calibrée sur des prix de marché réels ══════════════
 // Coefficient d'état, universel à toutes les prestations
 const ETAT_COEF = { propre: 1.0, moyen: 1.15, sale: 1.3, tres_sale: 1.5 };
@@ -299,6 +319,8 @@ app.post('/api/demandes', auth, async (req, res) => {
   try {
     const { type, prestations, address, date, time, flexibility, description, details, photos } = req.body;
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
+    const erreurCreneau = validerCreneauFutur(date, time);
+    if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
     if (photos && Array.isArray(photos)) {
       if (photos.length > 5) return res.status(400).json({ error: 'Maximum 5 photos par demande.' });
       for (const p of photos) {
@@ -417,6 +439,8 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
 
     const { prestations, address, date, time, flexibility } = req.body;
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
+    const erreurCreneau = validerCreneauFutur(date, time);
+    if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
 
     const creneau = date && time ? date + ' à ' + time : demande.creneau;
     const listePrestations = prestations && Array.isArray(prestations) && prestations.length ? prestations : null;
@@ -518,7 +542,7 @@ app.post('/api/devis', auth, async (req, res) => {
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-    if (demande.statut === 'acceptee' || demande.statut === 'terminee')
+    if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Cette demande n\'est plus disponible.' });
 
     const { data: existing } = await supabase.from('devis').select('id').eq('demande_id', demande_id).eq('societe_id', req.user.id).maybeSingle();
