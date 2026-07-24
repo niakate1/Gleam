@@ -168,7 +168,9 @@ function extractPrestationTypes(demande) {
   } catch (e) { /* notes non-JSON ou absent, on utilise le repli ci-dessous */ }
   return (demande.prestation || '').split(' + ').map(s => s.trim()).filter(Boolean);
 }
-const BLOCK_REGEX = /(\b0[67]\d{8}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
+// Détecte un numéro de téléphone français (mobile ou fixe), même écrit avec espaces/points/tirets
+// entre les groupes de chiffres (ex: "06 12 34 56 78", "06.12.34.56.78"), pas seulement collé.
+const BLOCK_REGEX = /(\b0[1-9](?:[\s.-]?\d{2}){4}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', app: 'Gleam API', version: '2.2.0', timestamp: new Date().toISOString() });
@@ -277,8 +279,8 @@ app.get('/api/auth/me', auth, async (req, res) => {
 app.patch('/api/users/photo', auth, async (req, res) => {
   try {
     const { photo } = req.body;
-    if (!photo || typeof photo !== 'string' || !photo.startsWith('data:image/')) {
-      return res.status(400).json({ error: 'Image invalide.' });
+    if (!photo || typeof photo !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(photo)) {
+      return res.status(400).json({ error: 'Format d\'image non supporté (JPEG, PNG ou WEBP uniquement).' });
     }
     if (photo.length > 600 * 1024) {
       return res.status(413).json({ error: 'Photo trop volumineuse. Réessayez avec une image plus légère.' });
@@ -300,7 +302,10 @@ app.post('/api/demandes', auth, async (req, res) => {
     if (photos && Array.isArray(photos)) {
       if (photos.length > 5) return res.status(400).json({ error: 'Maximum 5 photos par demande.' });
       for (const p of photos) {
-        if (typeof p === 'string' && p.length > 3 * 1024 * 1024) {
+        if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
+          return res.status(400).json({ error: 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).' });
+        }
+        if (p.length > 3 * 1024 * 1024) {
           return res.status(400).json({ error: 'Une photo est trop volumineuse. Réessayez avec une photo plus légère.' });
         }
       }
