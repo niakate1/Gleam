@@ -295,7 +295,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
           <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
           <button class="role-btn" id="role-pro" onclick="setRole('pro')"><span>🏢</span>Professionnel</button>
         </div>
-        <div id="pro-rcpro-block" style="display:none;background:#F9FAFB;border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
+        <div id="pro-rcpro-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
           <label style="margin-top:0">Assurance RC Pro <span class="optional">(requis pour les professionnels)</span></label>
           <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Une assurance responsabilité civile professionnelle en cours de validité est nécessaire pour intervenir chez les clients Gleam.</div>
           <label style="font-size:12px;margin-top:0">Compagnie d'assurance <span class="optional">(optionnel)</span></label>
@@ -387,7 +387,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- PRO MESSAGES -->
 <div class="screen" id="s-pro-messages">
-  <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
+  <div class="navbar"><span class="logo-sm"><i data-lucide="message-circle" style="width:20px;height:20px;vertical-align:-4px"></i> Messages</span></div>
   <div id="pro-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
@@ -399,7 +399,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- PRO DEVIS -->
 <div class="screen" id="s-pro-devis">
-  <div class="navbar"><span class="logo-sm">💰 Mes devis envoyés</span></div>
+  <div class="navbar"><span class="logo-sm"><i data-lucide="wallet" style="width:20px;height:20px;vertical-align:-4px"></i> Mes devis envoyés</span></div>
   <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
@@ -411,7 +411,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- PRO PROFILE -->
 <div class="screen" id="s-pro-profile">
-  <div class="navbar"><span class="logo-sm">👤 Mon Profil Pro</span></div>
+  <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil Pro</span></div>
   <div class="profile-content">
     <div class="profile-hero"><div class="avatar-wrap" id="pro-profile-avatar"><div class="avatar" id="pro-profile-avatar-inner">🏢</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')"></div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p></div>
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
@@ -437,7 +437,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-pro-tarifs">
   <div class="navbar">
     <button class="back-btn" onclick="goProTab('pro-profile')" aria-label="Retour">←</button>
-    <span class="logo-sm" style="font-size:16px">💶 Mes tarifs</span>
+    <span class="logo-sm" style="font-size:16px"><i data-lucide="euro" style="width:18px;height:18px;vertical-align:-3px"></i> Mes tarifs</span>
     <span style="width:24px"></span>
   </div>
   <div class="home-content">
@@ -452,7 +452,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- MESSAGES CLIENT -->
 <div class="screen" id="s-messages">
-  <div class="navbar"><span class="logo-sm">💬 Messages</span></div>
+  <div class="navbar"><span class="logo-sm"><i data-lucide="message-circle" style="width:20px;height:20px;vertical-align:-4px"></i> Messages</span></div>
   <div id="client-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
@@ -480,7 +480,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- DEVIS CLIENT -->
 <div class="screen" id="s-devis">
-  <div class="navbar"><span class="logo-sm">📋 Mes Devis</span></div>
+  <div class="navbar"><span class="logo-sm"><i data-lucide="file-text" style="width:20px;height:20px;vertical-align:-4px"></i> Mes Devis</span></div>
   <div class="devis-list" id="devis-list"><div class="empty-state"><span>📋</span><p>Aucun devis reçu.</p></div></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
@@ -492,7 +492,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- PROFIL CLIENT -->
 <div class="screen" id="s-profile">
-  <div class="navbar"><span class="logo-sm">👤 Mon Profil</span></div>
+  <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil</span></div>
   <div class="profile-content">
     <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p></div>
     <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
@@ -534,7 +534,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <h2>Demande envoyée !</h2>
     <p>Votre demande a été transmise aux prestataires Gleam.<br>Vous recevrez des devis dans les plus brefs délais.</p>
     <button class="btn" onclick="goTab('home')" style="max-width:300px">Retour à l'accueil</button>
-    <button class="btn" style="background:#fff;color:var(--p);border:2px solid var(--p);margin-top:10px;max-width:300px" onclick="goTab('devis')">Voir mes devis</button>
+    <button class="btn" style="background:var(--surface);color:var(--p);border:2px solid var(--p);margin-top:10px;max-width:300px" onclick="goTab('devis')">Voir mes devis</button>
   </div>
 </div>
 
@@ -550,7 +550,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="modal-title">💳 Paiement sécurisé</div>
     <div class="modal-sub" id="payment-sub">Montant : --</div>
     <div id="payment-error" class="err"></div>
-    <div id="card-element" style="border:1.5px solid var(--border);border-radius:10px;padding:14px;margin:16px 0;background:#fff"></div>
+    <div id="card-element" style="border:1.5px solid var(--border);border-radius:10px;padding:14px;margin:16px 0;background:var(--surface)"></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--gray);margin-bottom:14px"><i data-lucide="shield-check" style="width:14px;height:14px;color:var(--mint)"></i> Paiement chiffré via Stripe — débité seulement après la prestation</div>
     <button class="modal-send-btn" id="payment-btn" onclick="confirmPayment()">🔒 Payer maintenant</button>
     <button onclick="closePayment()" style="width:100%;padding:12px;background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;margin-top:8px">Annuler</button>
   </div>
@@ -1015,7 +1016,7 @@ async function loadDevis(){
         '</div>'+
         '<div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 '+escapeHtml(v.prestation)+'</div>'+
         '<div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' \u20ac</div>'+
-        (v.description?'<div style="font-size:13px;color:#374151">'+escapeHtml(v.description)+'</div>':'')+
+        (v.description?'<div style="font-size:13px;color:var(--text-secondary)">'+escapeHtml(v.description)+'</div>':'')+
         actions+
       '</div>';
     });
@@ -1095,7 +1096,7 @@ function renderDetail(d){
     }).join(''):
     '<div class="detail-presta"><span class="detail-presta-icon">'+ICONS_get(d.prestation)+'</span><div class="detail-presta-name">'+escapeHtml(d.prestation)+'</div></div>')+
   '</div>';
-  if(hasPhotos)html+='<div class="detail-card"><label style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>';
+  if(hasPhotos)html+='<div class="detail-card"><label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>';
   html+='<div class="detail-card">'+
     '<div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">'+escapeHtml(d.adresse)+'</div></div>'+
     (d.creneau?'<div class="field-group" style="margin-bottom:0"><label>📅 Créneau</label><div style="font-size:14px">'+formatCreneau(d.creneau)+'</div></div>':'')+
@@ -1233,7 +1234,7 @@ async function loadProDemandes(){
         '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
         '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+'</div>'+
         (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
-        (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:#F9FAFB;padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
+        (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
         (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
         '<div class="devis-form">'+
           '<label>💰 Votre prix (€ TTC)</label>'+
@@ -1325,7 +1326,7 @@ async function loadProDevis(){
         (detailsClient?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+detailsClient+'</div>':'')+
         (photosClient.length?'<div class="photo-previews" style="margin-top:8px" id="photos-mesdevis-'+safeVId+'"></div>':'')+
         '<div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' €</div>'+
-        (v.description?'<div style="font-size:13px;color:#374151"><strong>Votre message :</strong> '+escapeHtml(v.description)+'</div>':'')+
+        (v.description?'<div style="font-size:13px;color:var(--text-secondary)"><strong>Votre message :</strong> '+escapeHtml(v.description)+'</div>':'')+
         extra+'</div>';
     });
     c.innerHTML=html;
@@ -1729,7 +1730,8 @@ async function openPayment(devisId,montant){
     if(!stripeInstance)stripeInstance=Stripe(d.publishable_key);
     var elements=stripeInstance.elements();
     if(cardElement)cardElement.destroy();
-    cardElement=elements.create('card',{style:{base:{fontSize:'16px',color:'#111827'}}});
+    var isDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
+    cardElement=elements.create('card',{style:{base:{fontSize:'16px',color:isDark?'#F3F4F6':'#111827','::placeholder':{color:isDark?'#9CA3AF':'#6B7280'}}}});
     cardElement.mount('#card-element');
   }catch(e){document.getElementById('payment-error').textContent=friendlyNetworkError(e);document.getElementById('payment-error').classList.add('show')}
 }
@@ -1879,7 +1881,7 @@ function sendBtn(type){
   var label=multiFlow.active&&!isLast?'Suivant →':'✨ Envoyer ma demande';
   var html='';
   if(multiFlow.active&&multiFlow.current>0){
-    html+='<button type="button" onclick="goToPreviousStep(\''+type+'\')" style="width:100%;padding:12px;background:none;border:2px solid var(--border);color:#374151;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">← Étape précédente</button>';
+    html+='<button type="button" onclick="goToPreviousStep(\''+type+'\')" style="width:100%;padding:12px;background:none;border:2px solid var(--border);color:var(--text-secondary);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">← Étape précédente</button>';
   }
   if(!multiFlow.active||isLast){
     html+='<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin:10px 0;font-size:11.5px;color:var(--gray)"><i data-lucide="lock" style="width:13px;height:13px"></i> Paiement sécurisé, débité seulement après la prestation</div>';
