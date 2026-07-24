@@ -1367,18 +1367,14 @@ const TARIF_CATEGORIES=[
     tierLabels:{A:'90x190 cm',B:'140x190 cm',C:'160x200 cm',D:'180x200 cm+'},
     tierPlaceholders:{A:45,B:60,C:72,D:90},
     note:'Prix par matelas, état propre. Le nombre de matelas est fourni par le client.'},
-  {key:'terrasse',label:'☀️ Terrasse',tiers:['A','B','C','D'],
-    tierLabels:{A:'Moins de 20 m²',B:'20 à 50 m²',C:'50 à 100 m²',D:'Plus de 100 m²'},
-    tierPlaceholders:{A:70,B:140,C:252,D:420},
-    note:'Prix pour une terrasse en carrelage, état propre. Bois/béton/pierre ajustent ensuite automatiquement le prix.'},
+  {key:'terrasse',label:'☀️ Terrasse',unite:true,uniteLabel:'m²',tiers:null,placeholder:4,
+    note:'Prix par m², pour une terrasse en carrelage, état propre. Bois/béton/pierre ajustent ensuite automatiquement le prix. Le client indique la surface exacte.'},
   {key:'piscine',label:'💧 Piscine',tiers:['entretien','complet','eau_verte'],
     tierLabels:{entretien:'Entretien simple',complet:'Nettoyage complet',eau_verte:'Eau verte / remise en état'},
     tierPlaceholders:{entretien:65,complet:130,eau_verte:585},
     note:'Prix pour un bassin de taille moyenne, état propre. La surface exacte ajuste ensuite automatiquement le prix.'},
-  {key:'toiture',label:'🏠 Toiture',tiers:['A','B','C','D'],
-    tierLabels:{A:'Moins de 50 m²',B:'50 à 100 m²',C:'100 à 200 m²',D:'Plus de 200 m²'},
-    tierPlaceholders:{A:675,B:1500,C:2850,D:4950},
-    note:'Prix pour une toiture en tuiles, démoussage + hydrofuge, état propre. Ardoises/fibrociment/zinc ajustent ensuite automatiquement le prix.'},
+  {key:'toiture',label:'🏠 Toiture',unite:true,uniteLabel:'m²',tiers:null,placeholder:20,
+    note:'Prix par m², pour une toiture en tuiles, démoussage + hydrofuge, état propre. Ardoises/fibrociment/zinc ajustent ensuite automatiquement le prix. Le client indique la surface exacte.'},
   {key:'vitres',label:'🪟 Vitres',unite:true,uniteLabel:'vitre',tiers:['maison','appartement','commerce','bureaux'],
     tierLabels:{maison:'Maison',appartement:'Appartement',commerce:'Commerce',bureaux:'Bureaux'},
     tierPlaceholders:{maison:6,appartement:6,commerce:7.2,bureaux:7.8},
@@ -1405,7 +1401,8 @@ async function loadProTarifs(){
       });
       html+='</div>';
     }else{
-      html+='<input type="number" inputmode="decimal" min="1" id="tarif-'+cat.key+'" placeholder="Prix de base, ex: '+cat.placeholder+'" disabled>';
+      var placeholderTxt=cat.unite?('Prix par '+cat.uniteLabel+', ex: '+cat.placeholder):('Prix de base, ex: '+cat.placeholder);
+      html+='<input type="number" inputmode="decimal" min="0.5" step="0.5" id="tarif-'+cat.key+'" placeholder="'+placeholderTxt+'" disabled>';
     }
     html+='</div>';
   });
@@ -1922,7 +1919,7 @@ function quantiteBlock(label,placeholder){
 
 var currentFormType=null;
 
-const UNIT_CATEGORIES_CLIENT=['vitres','matelas'];
+const UNIT_CATEGORIES_CLIENT=['vitres','matelas','terrasse','toiture'];
 const COEF_KEYS=['taille','matiere','portee','intervention','type_bien','places','forme','type_bassin'];
 
 async function updateEstimation(){
@@ -2016,11 +2013,7 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
   etatBlock()+descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
 
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
-  '<div class="field-group"><label>Surface</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="ter-s" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">Moins de 20 m²</button>'+
-  '<button class="opt-btn" data-group="ter-s" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">20 à 50 m²</button>'+
-  '<button class="opt-btn" data-group="ter-s" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">50 à 100 m²</button>'+
-  '<button class="opt-btn" data-group="ter-s" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">Plus de 100 m²</button></div></div>'+
+  quantiteBlock('Surface exacte (en m²)','Ex: 34')+
   '<div class="field-group"><label>Type de sol <span class="optional">(optionnel)</span></label><div class="options-grid">'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)">Carrelage</button>'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="bois_composite" onclick="selOpt(this)">Bois/composite</button>'+
@@ -2051,11 +2044,7 @@ function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</d
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="ardoises" onclick="selOpt(this)">Ardoises</button>'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="fibrociment" onclick="selOpt(this)">Fibrociment</button>'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="zinc_metal" onclick="selOpt(this)">Zinc/Métal</button></div></div>'+
-  '<div class="field-group"><label>Surface <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="toit-s" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">Moins de 50 m²</button>'+
-  '<button class="opt-btn" data-group="toit-s" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">50 à 100 m²</button>'+
-  '<button class="opt-btn" data-group="toit-s" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">100 à 200 m²</button>'+
-  '<button class="opt-btn" data-group="toit-s" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">Plus de 200 m²</button></div></div>'+
+  quantiteBlock('Surface exacte (en m²)','Ex: 90')+
   etatBlock()+descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
 
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
@@ -2065,6 +2054,10 @@ function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this)">🏪 Commerce</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this)">🏭 Bureaux</button></div></div>'+
   quantiteBlock('Nombre exact de vitres à nettoyer','Ex: 10')+
+  '<div class="field-group"><label>Taille moyenne des vitres <span class="optional">(optionnel)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" data-group="vitr-taille" data-coef-key="taille" data-coef-val="petite" onclick="selOpt(this)">Petite</button>'+
+  '<button class="opt-btn" data-group="vitr-taille" data-coef-key="taille" data-coef-val="moyenne" onclick="selOpt(this)">Standard</button>'+
+  '<button class="opt-btn full" data-group="vitr-taille" data-coef-key="taille" data-coef-val="grande" onclick="selOpt(this)">Grande baie vitrée</button></div></div>'+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
 function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
