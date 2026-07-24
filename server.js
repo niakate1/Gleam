@@ -509,6 +509,23 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
 });
 
 // Supprimer une demande (uniquement si aucun devis n'a été accepté)
+// Le client "range" une demande définitivement close (annulée ou terminée) de sa vue,
+// sans jamais la supprimer réellement — l'historique reste intact pour le suivi de fiabilité
+// et en cas de litige. Utilisable à tout moment, contrairement à la suppression.
+app.patch('/api/demandes/:id/archiver', auth, async (req, res) => {
+  try {
+    const { data: demande } = await supabase.from('demandes').select('client_id, statut').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+
+    const { error } = await supabase.from('demandes').update({ archivee_client: true }).eq('id', req.params.id);
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ message: 'Demande archivée.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 app.delete('/api/demandes/:id', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
@@ -521,6 +538,8 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
 
     await supabase.from('devis').delete().eq('demande_id', req.params.id);
     await supabase.from('messages').delete().eq('demande_id', req.params.id);
+    await supabase.from('paiements').delete().eq('demande_id', req.params.id);
+    await supabase.from('evaluations').delete().eq('demande_id', req.params.id);
     const { error } = await supabase.from('demandes').delete().eq('id', req.params.id);
     if (error) return res.status(400).json({ error: error.message });
 
