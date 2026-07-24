@@ -851,10 +851,11 @@ async function loadDemandes(){
     const r=await fetch(API+'/api/demandes',{headers:authHeaders()});
     if(r.status===401){return doLogout()}
     if(!r.ok)return;
-    const data=await safeJson(r);
+    const dataAll=await safeJson(r);
     const c=document.getElementById('recent-demands');
-    renderActiveRequestBanner(data);
-    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
+    renderActiveRequestBanner(dataAll);
+    var data=(dataAll||[]).filter(function(d){return!d.archivee_client});
+    if(!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
 
     var order={en_cours:0,acceptee:1,devis_recus:2,en_attente:3,terminee:4};
     data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9)});
@@ -882,7 +883,7 @@ async function loadDemandes(){
 // Met en avant, tout en haut de l'accueil, ce qui compte vraiment pour CET utilisateur en ce moment précis
 // (une prestation en cours, un devis à examiner, ou une prestation à venir) — plutôt que toujours
 // afficher la même grille générique en premier, comme le font les meilleures apps de service.
-function renderActiveRequestBanner(data){
+async function renderActiveRequestBanner(data){
   var banner=document.getElementById('active-request-banner');
   if(!banner)return;
   var priorite=['en_cours','devis_recus','acceptee'];
@@ -892,19 +893,38 @@ function renderActiveRequestBanner(data){
   }
   if(!meilleure){banner.innerHTML='';return}
   var config={
-    en_cours:{label:'Prestation en cours',cta:'Voir les détails',color:'var(--green)',icon:'wrench'},
-    devis_recus:{label:'Devis à examiner',cta:'Voir les devis',color:'var(--gold)',icon:'file-text'},
-    acceptee:{label:'Prestation à venir',cta:'Voir les détails',color:'var(--p)',icon:'calendar-check'}
+    en_cours:{label:'Prestation en cours',color:'var(--green)',action:"openDetail('"+escAttr(meilleure.id)+"')"},
+    devis_recus:{label:'Devis à examiner',color:'var(--gold)',action:"goTab('devis')"},
+    acceptee:{label:'Prestation à venir',color:'var(--p)',action:"openDetail('"+escAttr(meilleure.id)+"')"}
   }[meilleure.statut];
   var icon=ICONS_get((meilleure.prestation||'').split(' + ')[0]);
-  banner.innerHTML='<div class="fade-in-item" style="background:var(--surface);border:1.5px solid '+config.color+';border-radius:14px;padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openDetail(\''+escAttr(meilleure.id)+'\')">'+
+  var sousTitre=escapeHtml(meilleure.prestation);
+
+  // Pour "devis à examiner", on va chercher le vrai nombre de devis reçus et le prix le plus bas,
+  // pour donner une info concrète et utile plutôt qu'un simple intitulé générique.
+  if(meilleure.statut==='devis_recus'){
+    try{
+      const rDevis=await fetch(API+'/api/devis/demande/'+meilleure.id,{headers:authHeaders()});
+      if(rDevis.ok){
+        const devisList=await safeJson(rDevis);
+        var actifs=(devisList||[]).filter(function(v){return v.statut==='envoye'});
+        if(actifs.length){
+          var prixMin=Math.min.apply(null,actifs.map(function(v){return parseFloat(v.prix_ttc)}));
+          sousTitre=actifs.length+' devis reçu'+(actifs.length>1?'s':'')+' — à partir de '+prixMin+'€';
+        }
+      }
+    }catch(e){}
+  }
+
+  banner.innerHTML='<div class="fade-in-item" style="background:var(--surface);border:1.5px solid '+config.color+';border-radius:14px;padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="'+config.action+'">'+
     '<span style="font-size:26px;flex-shrink:0">'+icon+'</span>'+
     '<div style="flex:1;min-width:0">'+
       '<div style="font-size:11px;font-weight:700;color:'+config.color+';text-transform:uppercase;letter-spacing:.03em">'+config.label+'</div>'+
-      '<div style="font-weight:700;font-size:14px;text-transform:capitalize">'+escapeHtml(meilleure.prestation)+'</div>'+
+      '<div style="font-weight:700;font-size:14px">'+sousTitre+'</div>'+
     '</div>'+
     '<i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--gray);flex-shrink:0"></i>'+
   '</div>';
+  if(window.lucide)lucide.createIcons();
 }
 
 async function loadDevis(){
@@ -1085,6 +1105,8 @@ function renderDetail(d){
     '<button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>'+
   '</div>';
   if(canCancel)html+='<button class="btn-delete" style="width:100%;margin-top:10px" onclick="annulerDemandeAcceptee()">🚫 Annuler cette prestation</button>';
+  var isClosed=d.statut==='terminee'||d.statut==='annulee_client';
+  if(isClosed&&!d.archivee_client)html+='<button class="btn-modify" style="width:100%;margin-top:10px" onclick="archiverDemande()"><i data-lucide="archive" style="width:15px;height:15px;vertical-align:-3px"></i> Archiver (la ranger de ma liste)</button>';
   if(d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours')
     html+='<button class="modal-send-btn" style="margin-top:14px" onclick="goTab(\'devis\')">📋 Voir les devis reçus</button>';
   c.innerHTML=html;
@@ -1098,6 +1120,16 @@ async function annulerDemandeAcceptee(){
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast(d.tardive?'🚫 Prestation annulée (annulation tardive signalée).':'🚫 Prestation annulée.');
+    goTab('home');loadDemandes();
+  }catch(e){toast(friendlyNetworkError(e))}
+}
+async function archiverDemande(){
+  if(!currentDetailDemande)return;
+  try{
+    const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id+'/archiver',{method:'PATCH',headers:authHeaders()});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    toast('📥 Demande archivée — elle ne s\'affichera plus dans votre liste.');
     goTab('home');loadDemandes();
   }catch(e){toast(friendlyNetworkError(e))}
 }
