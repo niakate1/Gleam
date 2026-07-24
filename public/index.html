@@ -713,8 +713,9 @@ function enterApp(){
   }
   toast('Bienvenue sur Gleam ✨');
   startUnreadPoll();
+  startDataPoll();
 }
-function doLogout(){stopChatPoll();stopUnreadPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
+function doLogout(){stopChatPoll();stopUnreadPoll();stopDataPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
 
 // ── HELPERS ──
 // Icônes vectorielles (Lucide) à la place des emojis, pour un rendu professionnel et cohérent
@@ -861,9 +862,9 @@ function skeletonCards(n){
   return html;
 }
 
-async function loadDemandes(){
+async function loadDemandes(silent){
   var c0=document.getElementById('recent-demands');
-  if(c0)c0.innerHTML=skeletonCards(3);
+  if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/demandes',{headers:authHeaders()});
     if(r.status===401){return doLogout()}
@@ -944,9 +945,9 @@ async function renderActiveRequestBanner(data){
   if(window.lucide)lucide.createIcons();
 }
 
-async function loadDevis(){
+async function loadDevis(silent){
   var c0=document.getElementById('devis-list');
-  if(c0)c0.innerHTML=skeletonCards(3);
+  if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const rd=await fetch(API+'/api/demandes',{headers:authHeaders()});
     if(rd.status===401){return doLogout()}
@@ -1237,9 +1238,9 @@ async function envoyerNote(btn){
 }
 
 // ── PRO DEMANDES ──
-async function loadProDemandes(){
+async function loadProDemandes(silent){
   var c0=document.getElementById('pro-demandes-list');
-  if(c0)c0.innerHTML=skeletonCards(3);
+  if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
     const c=document.getElementById('pro-demandes-list');
@@ -1285,9 +1286,9 @@ async function loadProDevisCount(){
   }catch(e){}
 }
 
-async function loadProDevis(){
+async function loadProDevis(silent){
   var c0=document.getElementById('pro-devis-list');
-  if(c0)c0.innerHTML=skeletonCards(3);
+  if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
     const c=document.getElementById('pro-devis-list');
@@ -1579,11 +1580,34 @@ function startUnreadPoll(){
   unreadPollInterval=setInterval(refreshUnreadBadge,5000);
 }
 function stopUnreadPoll(){if(unreadPollInterval){clearInterval(unreadPollInterval);unreadPollInterval=null}}
+
+// Recharge silencieusement l'écran actuellement affiché s'il s'agit d'une liste de demandes/devis,
+// pour que les nouvelles demandes (côté pro) ou les nouveaux statuts (côté client) apparaissent
+// automatiquement, sans jamais avoir besoin de recharger la page ou de changer d'onglet pour "forcer" la mise à jour.
+function refreshActiveScreenData(){
+  var active=document.querySelector('.screen.active');
+  if(!active)return;
+  var loaders={
+    's-home':loadDemandes,
+    's-pro-home':loadProDemandes,
+    's-devis':loadDevis,
+    's-pro-devis':loadProDevis
+  };
+  var fn=loaders[active.id];
+  if(fn)fn(true);
+}
+let dataPollInterval=null;
+function startDataPoll(){
+  stopDataPoll();
+  dataPollInterval=setInterval(refreshActiveScreenData,8000);
+}
+function stopDataPoll(){if(dataPollInterval){clearInterval(dataPollInterval);dataPollInterval=null}}
+
 // Vérifie immédiatement les notifications dès que l'utilisateur revient sur l'app (changement d'onglet,
 // retour au premier plan depuis une autre application sur téléphone) — plutôt que d'attendre le prochain
 // sondage programmé, qui pourrait tomber juste après le retour de l'utilisateur.
 document.addEventListener('visibilitychange',function(){
-  if(!document.hidden&&currentUser){refreshUnreadBadge();if(currentChatDemandeId)loadChatMessages()}
+  if(!document.hidden&&currentUser){refreshUnreadBadge();refreshActiveScreenData();if(currentChatDemandeId)loadChatMessages()}
 });
 
 // ── CONVERSATIONS ──
