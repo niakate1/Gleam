@@ -76,6 +76,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .svc-card[data-svc="piscine"]{background:#ECFEFF;border-color:#ECFEFF;color:#0891B2}
 .svc-card[data-svc="toiture"]{background:#FEF3E2;border-color:#FEF3E2;color:#B45309}
 .svc-card[data-svc="vitres"]{background:#EFF6FF;border-color:#EFF6FF;color:#2563EB}
+.svc-card[data-svc="tapis"]{background:#FDF4FF;border-color:#FDF4FF;color:#A21CAF}
 .svc-card[data-svc="autre"]{background:var(--surface-alt);border-color:var(--surface-alt);color:var(--gray)}
 .svc-card[data-svc] .svc-name{color:inherit}
 .svc-card[data-svc].selected{border-color:currentColor;box-shadow:0 0 0 2px currentColor inset}
@@ -87,6 +88,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   .svc-card[data-svc="piscine"]{background:rgba(8,145,178,.18);border-color:rgba(8,145,178,.18);color:#67E8F9}
   .svc-card[data-svc="toiture"]{background:rgba(180,83,9,.18);border-color:rgba(180,83,9,.18);color:#FBBF6C}
   .svc-card[data-svc="vitres"]{background:rgba(37,99,235,.18);border-color:rgba(37,99,235,.18);color:#93C5FD}
+  .svc-card[data-svc="tapis"]{background:rgba(162,28,175,.18);border-color:rgba(162,28,175,.18);color:#E9A8F0}
 }
 .demand-row{background:var(--surface);border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.05);cursor:pointer}
 .demand-row:hover{border-color:var(--p)}
@@ -347,6 +349,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="svc-card" data-svc="piscine" onclick="toggleSvc(this,'piscine')"><i data-lucide="droplets" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Piscine</div></div>
       <div class="svc-card" data-svc="toiture" onclick="toggleSvc(this,'toiture')"><i data-lucide="home" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Toiture</div></div>
       <div class="svc-card" data-svc="vitres" onclick="toggleSvc(this,'vitres')"><i data-lucide="app-window" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Vitres</div></div>
+      <div class="svc-card" data-svc="tapis" onclick="toggleSvc(this,'tapis')"><i data-lucide="square" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Tapis</div></div>
       <div class="svc-card" data-svc="autre" onclick="toggleSvc(this,'autre')"><i data-lucide="plus-circle" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Autre</div></div>
     </div>
     <button class="modal-send-btn" id="continue-svc-btn" style="display:none;margin-bottom:24px" onclick="startMultiServiceFlow()">Continuer (<span id="svc-count">0</span> sélectionnée(s))</button>
@@ -716,7 +719,7 @@ function doLogout(){stopChatPoll();stopUnreadPoll();localStorage.removeItem('gle
 // ── HELPERS ──
 // Icônes vectorielles (Lucide) à la place des emojis, pour un rendu professionnel et cohérent
 // sur tous les appareils (les emojis s'affichent différemment selon iOS/Android/version).
-const ICON_NAMES={voiture:'car',canape:'sofa',matelas:'bed-double',terrasse:'sun',piscine:'droplets',toiture:'home',vitres:'app-window',autre:'plus-circle'};
+const ICON_NAMES={voiture:'car',canape:'sofa',matelas:'bed-double',terrasse:'sun',piscine:'droplets',toiture:'home',vitres:'app-window',tapis:'square',autre:'plus-circle'};
 function iconHtml(name,size){
   size=size||18;
   return '<i data-lucide="'+(name||'sparkles')+'" style="width:'+size+'px;height:'+size+'px;vertical-align:-4px;display:inline-block"></i>';
@@ -1375,10 +1378,12 @@ const TARIF_CATEGORIES=[
     note:'Prix pour un bassin de taille moyenne, état propre. La surface exacte ajuste ensuite automatiquement le prix.'},
   {key:'toiture',label:'🏠 Toiture',unite:true,uniteLabel:'m²',tiers:null,placeholder:20,
     note:'Prix par m², pour une toiture en tuiles, démoussage + hydrofuge, état propre. Ardoises/fibrociment/zinc ajustent ensuite automatiquement le prix. Le client indique la surface exacte.'},
-  {key:'vitres',label:'🪟 Vitres',unite:true,uniteLabel:'vitre',tiers:['maison','appartement','commerce','bureaux'],
+  {key:'vitres',label:'🪟 Vitres',unite:true,uniteLabel:'m²',tiers:['maison','appartement','commerce','bureaux'],
     tierLabels:{maison:'Maison',appartement:'Appartement',commerce:'Commerce',bureaux:'Bureaux'},
-    tierPlaceholders:{maison:6,appartement:6,commerce:7.2,bureaux:7.8},
-    note:'Prix par vitre, état propre. Le nombre de vitres est fourni par le client.'},
+    tierPlaceholders:{maison:4,appartement:4,commerce:4.8,bureaux:5.2},
+    note:'Prix par m² de surface vitrée, état propre. Le client indique la surface exacte.'},
+  {key:'tapis',label:'🧶 Tapis',unite:true,uniteLabel:'m²',tiers:null,placeholder:20,
+    note:'Prix par m², pour un tapis synthétique, état propre. Coton/jute-sisal/berbère/laine/soie ajustent ensuite automatiquement le prix (la soie coûte nettement plus cher à nettoyer). Le client indique la surface exacte.'},
   {key:'autre',label:'➕ Autre',tiers:null,placeholder:60,note:'Prix de base indicatif, à ajuster au cas par cas dans votre message au client.'}
 ];
 
@@ -1827,7 +1832,7 @@ function showHowItWorks(){
 }
 function openServiceForm(type){
   currentFormType=type;
-  var bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,autre:autreForm};
+  var bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,tapis:tapisForm,autre:autreForm};
   var html=(bodies[type]||autreForm)();
   if(multiFlow.active&&multiFlow.queue.length>1){
     var dots='';
@@ -1919,7 +1924,7 @@ function quantiteBlock(label,placeholder){
 
 var currentFormType=null;
 
-const UNIT_CATEGORIES_CLIENT=['vitres','matelas','terrasse','toiture'];
+const UNIT_CATEGORIES_CLIENT=['vitres','matelas','terrasse','toiture','tapis'];
 const COEF_KEYS=['taille','matiere','portee','intervention','type_bien','places','forme','type_bassin'];
 
 async function updateEstimation(){
@@ -2053,12 +2058,19 @@ function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this)">🏢 Appartement</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this)">🏪 Commerce</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this)">🏭 Bureaux</button></div></div>'+
-  quantiteBlock('Nombre exact de vitres à nettoyer','Ex: 10')+
-  '<div class="field-group"><label>Taille moyenne des vitres <span class="optional">(optionnel)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="vitr-taille" data-coef-key="taille" data-coef-val="petite" onclick="selOpt(this)">Petite</button>'+
-  '<button class="opt-btn" data-group="vitr-taille" data-coef-key="taille" data-coef-val="moyenne" onclick="selOpt(this)">Standard</button>'+
-  '<button class="opt-btn full" data-group="vitr-taille" data-coef-key="taille" data-coef-val="grande" onclick="selOpt(this)">Grande baie vitrée</button></div></div>'+
+  quantiteBlock('Surface vitrée exacte (en m²)','Ex: 12')+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
+
+function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><div class="modal-sub">Matière et surface</div>'+
+  '<div class="field-group"><label>Matière du tapis</label><div class="options-grid">'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="synthetique" onclick="selOpt(this)">Synthétique</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="coton" onclick="selOpt(this)">Coton</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="jute_sisal" onclick="selOpt(this)">Jute / Sisal</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="berbere" onclick="selOpt(this)">Berbère</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="laine" onclick="selOpt(this)">Laine</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="soie" onclick="selOpt(this)">Soie / Tapis d\'Orient</button></div></div>'+
+  quantiteBlock('Surface exacte (en m²)','Ex: 6')+
+  etatBlock()+descBlock('Ex: Taches, poils d\'animaux...')+dateTimeBlock(isLastInFlow())+sendBtn('tapis')}
 
 function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
   '<div class="field-group"><label>De quoi s\'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: Bateau, jacuzzi..."></div>'+
