@@ -4,30 +4,37 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aide — Gleam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#7C3AED;--gray:#6B7280;--border:#E5E7EB;--light:#F5F3FF}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#F9FAFB;color:#111827;line-height:1.6}
-.navbar{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0}
+:root{--p:#7C3AED;--p2:#5B21B6;--gray:#6B7280;--border:#E5E7EB;--light:#F5F3FF;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151}
+@media (prefers-color-scheme: dark){
+  :root{--p:#A78BFA;--p2:#C4B5FD;--gray:#9CA3AF;--border:#333846;--light:#2D2440;--gold:#FBC85C;--mint:#2DD4BF;--bg:#0F1115;--surface:#1A1D23;--surface-alt:#23272F;--text:#F3F4F6;--text-secondary:#D1D5DB}
+}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+.navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0}
 .navbar a{font-size:22px;font-weight:800;color:var(--p);text-decoration:none}
 .back{font-size:14px;color:var(--gray);text-decoration:none;font-weight:600}
 .wrap{max-width:720px;margin:0 auto;padding:32px 20px 60px}
 h1{font-size:26px;font-weight:800;margin-bottom:6px}
 .sub{color:var(--gray);font-size:14px;margin-bottom:24px}
-.tabs{display:flex;background:#F3F4F6;border-radius:10px;padding:4px;margin-bottom:24px;gap:4px}
+.tabs{display:flex;background:var(--surface-alt);border-radius:10px;padding:4px;margin-bottom:24px;gap:4px}
 .tab{flex:1;padding:10px;border:none;background:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;color:var(--gray)}
-.tab.active{background:#fff;color:var(--p);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.tab.active{background:var(--surface);color:var(--p);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 .section{display:none}
 .section.active{display:block}
-details{background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden}
+details{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;transition:border-color .15s}
+details[open]{border-color:var(--p)}
 summary{padding:14px 16px;font-weight:700;font-size:15px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
 summary::-webkit-details-marker{display:none}
 summary::after{content:'+';font-size:20px;color:var(--p);font-weight:400}
 details[open] summary::after{content:'−'}
-.details-body{padding:0 16px 16px;font-size:14px;color:#374151}
-.contact-box{background:var(--light);border-radius:12px;padding:18px;margin-top:28px;text-align:center}
-.contact-box p{font-size:14px;color:#374151;margin-bottom:10px}
-.contact-box a{display:inline-block;background:var(--p);color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px}
+.details-body{padding:0 16px 16px;font-size:14px;color:var(--text-secondary)}
+.contact-box{background:linear-gradient(135deg,var(--light),var(--surface));border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:28px;text-align:center}
+.contact-box p{font-size:14px;color:var(--text-secondary);margin-bottom:10px}
+.contact-box a{display:inline-block;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;box-shadow:0 4px 14px rgba(124,58,237,.25)}
 .section-title{font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:22px 0 10px}
 .section-title:first-child{margin-top:0}
 </style>
@@ -52,13 +59,13 @@ details[open] summary::after{content:'−'}
     </details>
     <details>
       <summary>Puis-je modifier ou annuler ma demande ?</summary>
-      <div class="details-body">Oui, tant qu'aucun devis n'a été accepté. Une fois un devis accepté, la demande est verrouillée et une annulation peut entraîner des pénalités — contactez le prestataire via la messagerie en cas d'imprévu.</div>
+      <div class="details-body">Oui. Tant qu'aucun devis n'a été accepté, vous pouvez modifier ou supprimer librement votre demande. Une fois un devis accepté, vous pouvez toujours annuler : gratuitement si c'est plus de 24h avant le créneau prévu, ou avec un simple avertissement si c'est plus tardif — le prestataire est alors prévenu immédiatement.</div>
     </details>
 
     <div class="section-title">Devis et paiement</div>
     <details>
       <summary>Combien de temps pour recevoir un devis ?</summary>
-      <div class="details-body">Ça dépend du nombre de prestataires disponibles dans votre zone et de la nature de la demande. Vous recevez un email dès qu'un devis arrive, et vous pouvez consulter tous vos devis dans l'onglet "📋 Devis".</div>
+      <div class="details-body">Ça dépend du nombre de prestataires disponibles dans votre zone et de la nature de la demande. Vous recevez un email dès qu'un devis arrive, et vous pouvez consulter tous vos devis dans l'onglet "Devis".</div>
     </details>
     <details>
       <summary>Quand suis-je débité ?</summary>
@@ -72,11 +79,11 @@ details[open] summary::after{content:'−'}
     <div class="section-title">Pendant et après la prestation</div>
     <details>
       <summary>Comment contacter mon prestataire ?</summary>
-      <div class="details-body">Une fois un devis accepté, une messagerie s'ouvre automatiquement dans l'onglet "💬 Messages". Elle se ferme une fois la prestation confirmée terminée.</div>
+      <div class="details-body">Une fois un devis accepté, une messagerie s'ouvre automatiquement dans l'onglet "Messages". Elle se ferme une fois la prestation confirmée terminée.</div>
     </details>
     <details>
       <summary>Comment confirmer que la prestation est terminée ?</summary>
-      <div class="details-body">Depuis l'onglet "📋 Devis", cliquez sur "✅ Confirmer la prestation" une fois le travail réalisé. Le paiement est alors libéré au prestataire, et vous pouvez laisser un avis.</div>
+      <div class="details-body">Depuis l'onglet "Devis", cliquez sur "Confirmer la prestation" une fois le travail réalisé. Le paiement est alors libéré au prestataire, et vous pouvez laisser un avis.</div>
     </details>
   </div>
 
@@ -85,11 +92,11 @@ details[open] summary::after{content:'−'}
     <div class="section-title">Trouver des demandes</div>
     <details>
       <summary>Comment voir les demandes disponibles ?</summary>
-      <div class="details-body">Depuis votre accueil Pro, la liste "📋 Demandes clients" affiche toutes les demandes en attente de devis dans votre zone. Activez votre disponibilité pour continuer à en recevoir de nouvelles.</div>
+      <div class="details-body">Depuis votre accueil Pro, la liste "Demandes clients" affiche toutes les demandes en attente de devis correspondant aux prestations que vous avez cochées dans "Mes tarifs". Activez votre disponibilité pour continuer à en recevoir de nouvelles.</div>
     </details>
     <details>
       <summary>Comment envoyer un devis ?</summary>
-      <div class="details-body">Sur chaque demande, indiquez votre prix TTC et un message personnalisé pour le client, puis cliquez sur "✨ Envoyer mon devis". Le client sera notifié par email.</div>
+      <div class="details-body">Sur chaque demande, indiquez votre prix TTC et un message personnalisé pour le client, puis cliquez sur "Envoyer mon devis". Le client sera notifié par email.</div>
     </details>
 
     <div class="section-title">Devis, paiement et annulation</div>
@@ -99,7 +106,7 @@ details[open] summary::after{content:'−'}
     </details>
     <details>
       <summary>Puis-je annuler un devis accepté ?</summary>
-      <div class="details-body">Oui, mais uniquement plus de 24h avant le créneau prévu, depuis "💰 Mes devis". Le client est notifié automatiquement et sa demande redevient disponible pour d'autres prestataires. Une annulation tardive répétée peut affecter votre taux de fiabilité.</div>
+      <div class="details-body">Oui, à tout moment depuis "Mes devis". Si c'est plus de 24h avant le créneau prévu, l'annulation est simple et sans conséquence. Si c'est plus tardif, elle reste possible mais sera signalée comme tardive et peut affecter votre taux de fiabilité si elle se répète. Le client est notifié automatiquement et sa demande redevient disponible pour d'autres prestataires.</div>
     </details>
 
     <div class="section-title">Compte et assurance</div>
@@ -113,7 +120,7 @@ details[open] summary::after{content:'−'}
     </details>
     <details>
       <summary>Comment noter un client ?</summary>
-      <div class="details-body">Une fois une prestation terminée, un bouton "⭐ Noter le client" apparaît dans "💰 Mes devis", sur la carte correspondante.</div>
+      <div class="details-body">Une fois une prestation terminée, un bouton "Noter le client" apparaît dans "Mes devis", sur la carte correspondante.</div>
     </details>
   </div>
 
