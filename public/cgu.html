@@ -4,21 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Conditions Générales d'Utilisation et de Vente — Gleam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#7C3AED;--gray:#6B7280;--border:#E5E7EB}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#F9FAFB;color:#111827;line-height:1.6}
-.navbar{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0}
+:root{--p:#7C3AED;--p2:#5B21B6;--gray:#6B7280;--border:#E5E7EB;--light:#F5F3FF;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--text:#111827;--text-secondary:#374151}
+@media (prefers-color-scheme: dark){
+  :root{--p:#A78BFA;--p2:#C4B5FD;--gray:#9CA3AF;--border:#333846;--light:#2D2440;--gold:#FBC85C;--mint:#2DD4BF;--bg:#0F1115;--surface:#1A1D23;--text:#F3F4F6;--text-secondary:#D1D5DB}
+}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+.navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0}
 .navbar a{font-size:22px;font-weight:800;color:var(--p);text-decoration:none}
 .back{font-size:14px;color:var(--gray);text-decoration:none;font-weight:600}
 .wrap{max-width:720px;margin:0 auto;padding:32px 20px 60px}
 h1{font-size:26px;font-weight:800;margin-bottom:6px}
 .updated{color:var(--gray);font-size:13px;margin-bottom:28px}
 h2{font-size:18px;font-weight:700;margin:28px 0 10px;color:var(--p)}
-p,li{font-size:15px;color:#374151;margin-bottom:10px}
+p,li{font-size:15px;color:var(--text-secondary);margin-bottom:10px}
 ul{padding-left:22px;margin-bottom:14px}
 .todo{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:24px}
-.placeholder{background:#FEF3C7;padding:1px 6px;border-radius:4px;font-family:monospace;font-size:13px}
+.placeholder{background:#FEF3C7;padding:1px 6px;border-radius:4px;font-family:monospace;font-size:13px;color:#92400E}
 </style>
 </head>
 <body>
@@ -48,7 +54,7 @@ ul{padding-left:22px;margin-bottom:14px}
   <p>Le paiement s'effectue en ligne par carte bancaire via un prestataire de paiement sécurisé tiers (Stripe). Le montant est prélevé à l'acceptation du devis, puis conservé par Gleam jusqu'à confirmation de la bonne exécution de la prestation, avant reversement au Prestataire.</p>
 
   <h2>Article 7 — Annulation</h2>
-  <p>Le Client peut annuler une demande sans frais tant qu'aucun devis n'est accepté. Le Prestataire ayant accepté une mission ne peut l'annuler que plus de 24 heures avant le créneau prévu, sauf circonstance exceptionnelle justifiée.</p>
+  <p>Le Client peut annuler une demande sans frais tant qu'aucun devis n'est accepté. Une fois un devis accepté, le Client comme le Prestataire peuvent annuler à tout moment : l'annulation est gratuite et sans conséquence si elle intervient plus de 24 heures avant le créneau prévu ; en deçà de ce délai, elle reste possible mais est signalée comme tardive à l'autre partie, qui est notifiée immédiatement. Des annulations tardives répétées peuvent affecter le taux de fiabilité affiché sur le compte concerné.</p>
 
   <h2>Article 8 — Évaluations</h2>
   <p>À l'issue de chaque prestation, le Client et le Prestataire peuvent chacun évaluer l'autre partie. Les évaluations doivent refléter une expérience réelle et ne pas comporter de propos injurieux ou diffamatoires.</p>
