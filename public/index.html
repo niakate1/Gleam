@@ -337,6 +337,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
         <div style="font-size:11px;color:var(--text-secondary);font-weight:600;line-height:1.3">Payez après la prestation</div>
       </div>
     </div>
+    <div id="active-request-banner"></div>
     <div class="section-title">Choisissez une ou plusieurs prestations</div>
     <div class="services-grid" id="services-grid">
       <div class="svc-card" data-svc="voiture" onclick="toggleSvc(this,'voiture')"><i data-lucide="car" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Voiture</div></div>
@@ -852,6 +853,7 @@ async function loadDemandes(){
     if(!r.ok)return;
     const data=await safeJson(r);
     const c=document.getElementById('recent-demands');
+    renderActiveRequestBanner(data);
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
 
     var order={en_cours:0,acceptee:1,devis_recus:2,en_attente:3,terminee:4};
@@ -875,6 +877,34 @@ async function loadDemandes(){
     });
     c.innerHTML=html;
   }catch(e){console.error('loadDemandes',e)}
+}
+
+// Met en avant, tout en haut de l'accueil, ce qui compte vraiment pour CET utilisateur en ce moment précis
+// (une prestation en cours, un devis à examiner, ou une prestation à venir) — plutôt que toujours
+// afficher la même grille générique en premier, comme le font les meilleures apps de service.
+function renderActiveRequestBanner(data){
+  var banner=document.getElementById('active-request-banner');
+  if(!banner)return;
+  var priorite=['en_cours','devis_recus','acceptee'];
+  var meilleure=null;
+  for(var i=0;i<priorite.length&&!meilleure;i++){
+    meilleure=(data||[]).filter(function(d){return d.statut===priorite[i]})[0];
+  }
+  if(!meilleure){banner.innerHTML='';return}
+  var config={
+    en_cours:{label:'Prestation en cours',cta:'Voir les détails',color:'var(--green)',icon:'wrench'},
+    devis_recus:{label:'Devis à examiner',cta:'Voir les devis',color:'var(--gold)',icon:'file-text'},
+    acceptee:{label:'Prestation à venir',cta:'Voir les détails',color:'var(--p)',icon:'calendar-check'}
+  }[meilleure.statut];
+  var icon=ICONS_get((meilleure.prestation||'').split(' + ')[0]);
+  banner.innerHTML='<div class="fade-in-item" style="background:var(--surface);border:1.5px solid '+config.color+';border-radius:14px;padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openDetail(\''+escAttr(meilleure.id)+'\')">'+
+    '<span style="font-size:26px;flex-shrink:0">'+icon+'</span>'+
+    '<div style="flex:1;min-width:0">'+
+      '<div style="font-size:11px;font-weight:700;color:'+config.color+';text-transform:uppercase;letter-spacing:.03em">'+config.label+'</div>'+
+      '<div style="font-weight:700;font-size:14px;text-transform:capitalize">'+escapeHtml(meilleure.prestation)+'</div>'+
+    '</div>'+
+    '<i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--gray);flex-shrink:0"></i>'+
+  '</div>';
 }
 
 async function loadDevis(){
@@ -2053,6 +2083,18 @@ async function sendDemand(type){
   var date=document.getElementById('f-date')&&document.getElementById('f-date').value||'';
   var time=document.getElementById('f-time')&&document.getElementById('f-time').value||'';
   if(!addr){toast('Veuillez indiquer une adresse.');return}
+  if(date){
+    var todayStr=localDateISO(new Date());
+    if(date<todayStr){toast('❌ La date choisie ne peut pas être dans le passé.');return}
+    if(date===todayStr&&time){
+      var now=new Date();
+      var tp=time.match(/(\d+)h(\d+)/);
+      if(tp){
+        var heureChoisie=new Date();heureChoisie.setHours(+tp[1],+tp[2],0,0);
+        if(heureChoisie<now){toast('❌ Cette heure est déjà passée aujourd\'hui. Choisissez un autre créneau.');return}
+      }
+    }
+  }
   var flex=document.querySelector('.flex-opt.sel')&&document.querySelector('.flex-opt.sel').textContent||'Heure exacte';
 
   var prestations;
