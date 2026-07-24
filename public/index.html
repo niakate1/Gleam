@@ -1552,9 +1552,15 @@ let unreadPollInterval=null;
 function startUnreadPoll(){
   stopUnreadPoll();
   refreshUnreadBadge();
-  unreadPollInterval=setInterval(refreshUnreadBadge,20000);
+  unreadPollInterval=setInterval(refreshUnreadBadge,5000);
 }
 function stopUnreadPoll(){if(unreadPollInterval){clearInterval(unreadPollInterval);unreadPollInterval=null}}
+// Vérifie immédiatement les notifications dès que l'utilisateur revient sur l'app (changement d'onglet,
+// retour au premier plan depuis une autre application sur téléphone) — plutôt que d'attendre le prochain
+// sondage programmé, qui pourrait tomber juste après le retour de l'utilisateur.
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&currentUser){refreshUnreadBadge();if(currentChatDemandeId)loadChatMessages()}
+});
 
 // ── CONVERSATIONS ──
 async function loadConversationsClient(){
