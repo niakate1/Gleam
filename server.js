@@ -128,11 +128,10 @@ const PRESTATION_CONFIG = {
     tierDefaults: { A: 45, B: 60, C: 72, D: 90 } // propre
   },
   terrasse: {
-    tierKey: 'taille', // le pro saisit un prix par surface
-    tiers: ['A', 'B', 'C', 'D'],
-    tierLabels: { A: 'Moins de 20 m²', B: '20 à 50 m²', C: '50 à 100 m²', D: 'Plus de 100 m²' },
-    tierDefaults: { A: 70, B: 140, C: 252, D: 420 }, // carrelage, propre
-    coefMatiere: { carrelage: 1.0, beton: 1.05, pierre_naturelle: 1.1, bois_composite: 2.2 }
+    unite: true,
+    uniteLabel: 'm²', // le pro fixe un prix par m² réel, le client indique la surface exacte
+    prixReferenceDefaut: 4, // €/m², carrelage, état propre (marché observé : 2 à 5€/m² carrelage)
+    coefMatiere: { carrelage: 1.0, beton: 1.05, pierre_naturelle: 1.1, bois_composite: 2.75 } // bois/composite : 5 à 15€/m² observé
   },
   piscine: {
     tierKey: 'intervention', // le pro saisit un prix par type d'intervention (le vrai driver de prix du métier)
@@ -144,10 +143,9 @@ const PRESTATION_CONFIG = {
     coefTypeBassin: { enterree: 1.0, semi_enterree: 0.95, hors_sol: 0.8, spa_jacuzzi: 0.35 }
   },
   toiture: {
-    tierKey: 'taille', // le pro saisit un prix par surface
-    tiers: ['A', 'B', 'C', 'D'],
-    tierLabels: { A: 'Moins de 50 m²', B: '50 à 100 m²', C: '100 à 200 m²', D: 'Plus de 200 m²' },
-    tierDefaults: { A: 675, B: 1500, C: 2850, D: 4950 }, // tuiles, démoussage+hydrofuge, propre
+    unite: true,
+    uniteLabel: 'm²', // le pro fixe un prix par m² réel, le client indique la surface exacte
+    prixReferenceDefaut: 20, // €/m², tuiles, démoussage + hydrofuge, état propre (marché observé : 9 à 40€/m²)
     coefMatiere: { tuiles: 1.0, ardoises: 0.75, fibrociment: 0.9, zinc_metal: 1.1 }
   },
   vitres: {
@@ -155,7 +153,10 @@ const PRESTATION_CONFIG = {
     tierKey: 'type_bien', // le pro saisit un prix unitaire par type de bien
     tiers: ['maison', 'appartement', 'commerce', 'bureaux'],
     tierLabels: { maison: 'Maison', appartement: 'Appartement', commerce: 'Commerce', bureaux: 'Bureaux' },
-    tierDefaults: { maison: 6, appartement: 6, commerce: 7.2, bureaux: 7.8 } // propre
+    tierDefaults: { maison: 6, appartement: 6, commerce: 7.2, bureaux: 7.8 }, // propre
+    // Une petite vitre et une grande baie vitrée ne se nettoient pas au même prix — coefficient secondaire
+    // plutôt qu'un passage au m² (compter des vitres reste plus naturel pour un client qu'estimer une surface vitrée).
+    coefTaille: { petite: 0.6, moyenne: 1.0, grande: 1.8 }
   },
   autre: {
     tierKey: null, // pas de dimension structurée, un seul prix indicatif
@@ -167,9 +168,14 @@ const UNIT_CATEGORIES = Object.keys(PRESTATION_CONFIG).filter(k => PRESTATION_CO
 
 // Calcule le prix pour un palier donné d'une prestation, en utilisant la moyenne des prix
 // déclarés par les pros disponibles pour CE palier précis, ou le prix par défaut sinon.
+// Fonctionne aussi pour les catégories sans palier (prix unique par pro, ex: prix au m²).
 function prixPourPalier(config, prestation, tierValue, prosTarifs) {
-  const key = tierValue && config.tiers && config.tiers.includes(tierValue) ? tierValue : (config.tiers ? config.tiers[0] : null);
-  if (!key) return { prix: config.prixReferenceDefaut, reel: false, nbPros: 0 };
+  if (!config.tiers) {
+    const declares = (prosTarifs || []).filter(v => typeof v === 'number' && v > 0);
+    const prix = declares.length ? declares.reduce((a, b) => a + b, 0) / declares.length : config.prixReferenceDefaut;
+    return { prix, reel: declares.length > 0, nbPros: declares.length };
+  }
+  const key = tierValue && config.tiers.includes(tierValue) ? tierValue : config.tiers[0];
   const declares = (prosTarifs || [])
     .map(t => t && t[key])
     .filter(v => typeof v === 'number' && v > 0);
@@ -1150,12 +1156,14 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
       const { data: prosUnit } = await supabase.from('users').select('tarifs_unitaires').eq('type', 'pro').eq('disponible', true);
       const { prix: prixUnitaire, reel, nbPros } = prixPourPalier(config, prestation, tierValue, (prosUnit || []).map(p => p.tarifs_unitaires && p.tarifs_unitaires[prestation]));
 
-      const prixMoyen = Math.round(prixUnitaire * quantite * coefEtat);
+      const coefMatiereUnite = (config.tierKey !== 'matiere' && config.coefMatiere && matiere && config.coefMatiere.hasOwnProperty(matiere)) ? config.coefMatiere[matiere] : 1.0;
+      const coefTailleUnite = (config.tierKey !== 'taille' && config.coefTaille && taille && config.coefTaille.hasOwnProperty(taille)) ? config.coefTaille[taille] : 1.0;
+      const prixMoyen = Math.round(prixUnitaire * quantite * coefEtat * coefMatiereUnite * coefTailleUnite);
       const prixMin = Math.round(prixMoyen * 0.85);
       const prixMax = Math.round(prixMoyen * 1.15);
 
       return res.json({
-        prestation, etat, quantite, taille: taille || null, type_bien: typeBien || null,
+        prestation, etat, quantite, taille: taille || null, matiere: matiere || null, type_bien: typeBien || null,
         prix_unitaire: Math.round(prixUnitaire * 100) / 100,
         prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
         base_sur_donnees_reelles: reel, nombre_pros_reference: nbPros
