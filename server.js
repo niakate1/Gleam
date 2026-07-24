@@ -150,13 +150,18 @@ const PRESTATION_CONFIG = {
   },
   vitres: {
     unite: true,
-    tierKey: 'type_bien', // le pro saisit un prix unitaire par type de bien
+    uniteLabel: 'm²', // le pro fixe un prix par m² de surface vitrée réelle
+    tierKey: 'type_bien', // le type de bien reste pertinent : accès et vitrages souvent plus complexes en commerce/bureaux
     tiers: ['maison', 'appartement', 'commerce', 'bureaux'],
     tierLabels: { maison: 'Maison', appartement: 'Appartement', commerce: 'Commerce', bureaux: 'Bureaux' },
-    tierDefaults: { maison: 6, appartement: 6, commerce: 7.2, bureaux: 7.8 }, // propre
-    // Une petite vitre et une grande baie vitrée ne se nettoient pas au même prix — coefficient secondaire
-    // plutôt qu'un passage au m² (compter des vitres reste plus naturel pour un client qu'estimer une surface vitrée).
-    coefTaille: { petite: 0.6, moyenne: 1.0, grande: 1.8 }
+    tierDefaults: { maison: 4, appartement: 4, commerce: 4.8, bureaux: 5.2 } // €/m², propre (marché observé : 1 à 5€/m²)
+  },
+  tapis: {
+    unite: true,
+    uniteLabel: 'm²', // le pro fixe un prix par m² réel, le client indique la surface exacte
+    prixReferenceDefaut: 20, // €/m², synthétique, état propre (marché observé : 15 à 35€/m² synthétique)
+    // Écart de prix très marqué selon la matière (jusqu'à x4 entre synthétique et soie) — recherche de marché à l'appui.
+    coefMatiere: { synthetique: 1.0, coton: 1.2, jute_sisal: 1.3, berbere: 1.4, laine: 1.6, soie: 3.5 }
   },
   autre: {
     tierKey: null, // pas de dimension structurée, un seul prix indicatif
