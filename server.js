@@ -220,11 +220,14 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const assuranceRcPro = Boolean(req.body.assurance_rc_pro);
     const assuranceCompagnie = req.body.assurance_compagnie || null;
     const assurancePolice = req.body.assurance_police || null;
+    const cguAcceptees = Boolean(req.body.cgu_accepte);
 
     if (!email || !password || !prenom || !nom)
       return res.status(400).json({ error: 'Tous les champs sont requis.' });
     if (password.length < 8)
       return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
+    if (!cguAcceptees)
+      return res.status(400).json({ error: 'Merci d\'accepter les CGU et la politique de confidentialité pour continuer.' });
     if (isProType(type) && !assuranceRcPro)
       return res.status(400).json({ error: 'L\'attestation d\'assurance RC Pro est requise pour créer un compte professionnel.' });
 
@@ -245,7 +248,8 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       disponible: true,
       assurance_rc_pro: isProType(type) ? assuranceRcPro : null,
       assurance_compagnie: isProType(type) ? assuranceCompagnie : null,
-      assurance_police: isProType(type) ? assurancePolice : null
+      assurance_police: isProType(type) ? assurancePolice : null,
+      cgu_acceptees_le: new Date().toISOString()
     }).select().single();
 
     if (error) return res.status(400).json({ error: error.message });
@@ -319,6 +323,34 @@ app.patch('/api/users/photo', auth, async (req, res) => {
     const { error } = await supabase.from('users').update({ photo }).eq('id', req.user.id);
     if (error) return res.status(400).json({ error: error.message });
     res.json({ message: 'Photo mise à jour.', photo });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Suppression de compte (droit à l'effacement RGPD) : anonymise les données personnelles
+// identifiantes plutôt qu'une suppression brute, pour préserver l'historique des transactions
+// (nécessaire pour la comptabilité, le suivi de fiabilité, et les litiges éventuels), tout en
+// révoquant définitivement l'accès de connexion — cohérent avec l'approche "archiver plutôt
+// que supprimer" déjà retenue ailleurs dans l'app.
+app.post('/api/users/me/supprimer', auth, async (req, res) => {
+  try {
+    const anonEmail = `compte-supprime-${req.user.id}@gleam-deleted.local`;
+    const { error } = await supabase.from('users').update({
+      email: anonEmail,
+      prenom: 'Compte',
+      nom: 'supprimé',
+      telephone: null,
+      photo: null,
+      disponible: false,
+      compte_supprime: true
+    }).eq('id', req.user.id);
+    if (error) return res.status(400).json({ error: error.message });
+
+    // Révoque l'accès de connexion (best-effort : n'empêche pas la suppression si ça échoue)
+    try { await supabase.auth.admin.deleteUser(req.user.id); } catch (e) { console.error('Suppression auth:', e); }
+
+    res.json({ message: 'Compte supprimé.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
@@ -997,6 +1029,42 @@ app.post('/api/paiements/liberer', auth, async (req, res) => {
     // }
 
     res.json({ message: 'Paiement Gleam libéré ✨' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Historique des paiements du client (rubrique "Paiements" du profil)
+app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
+  try {
+    const { data: paiements } = await supabase.from('paiements').select('*').eq('client_id', req.user.id).order('created_at', { ascending: false });
+    if (!paiements || !paiements.length) return res.json([]);
+    const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
+    const demandesMap = {};
+    (demandes || []).forEach(d => { demandesMap[d.id] = d; });
+    res.json(paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null })));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Historique des gains du pro (rubrique "Mes gains" du profil)
+app.get('/api/paiements/mes-gains', auth, async (req, res) => {
+  try {
+    const { data: paiements } = await supabase.from('paiements').select('*').eq('societe_id', req.user.id).order('created_at', { ascending: false });
+    if (!paiements || !paiements.length) return res.json({ total_libere: 0, total_en_attente: 0, paiements: [] });
+    const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
+    const demandesMap = {};
+    (demandes || []).forEach(d => { demandesMap[d.id] = d; });
+    const totalLibere = paiements.filter(p => p.statut === 'libere').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
+    const totalEnAttente = paiements.filter(p => p.statut === 'paye').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
+    res.json({
+      total_libere: Math.round(totalLibere * 100) / 100,
+      total_en_attente: Math.round(totalEnAttente * 100) / 100,
+      paiements: paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }))
+    });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
