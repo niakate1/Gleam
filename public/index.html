@@ -1341,13 +1341,13 @@ async function loadProDevis(silent){
     var notesDonnees=[];
     try{const rn=await fetch(API+'/api/evaluations/mes-notes-donnees',{headers:authHeaders()});if(rn.ok)notesDonnees=await safeJson(rn)}catch(e){}
 
-    // Tri logique : terminé > en cours > accepté (paiement en attente) > en attente > refusé/annulé
+    // Tri logique : en cours (action requise maintenant) > accepté-paiement en attente > en attente de réponse > terminé (historique) > refusé/annulé
     function proDevisScore(v){
       var demandeStatut=v.demande&&v.demande.statut;
-      if(v.statut==='accepte'&&demandeStatut==='terminee')return 0;
-      if(v.statut==='accepte'&&demandeStatut==='en_cours')return 1;
-      if(v.statut==='accepte')return 2;
-      if(v.statut==='envoye')return 3;
+      if(v.statut==='accepte'&&demandeStatut==='en_cours')return 0;
+      if(v.statut==='accepte'&&demandeStatut!=='terminee')return 1;
+      if(v.statut==='envoye')return 2;
+      if(v.statut==='accepte'&&demandeStatut==='terminee')return 3;
       return 4; // refuse, annule_pro
     }
     data.sort(function(a,b){
