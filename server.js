@@ -1037,7 +1037,10 @@ app.post('/api/paiements/liberer', auth, async (req, res) => {
 // Historique des paiements du client (rubrique "Paiements" du profil)
 app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
   try {
-    const { data: paiements } = await supabase.from('paiements').select('*').eq('client_id', req.user.id).order('created_at', { ascending: false });
+    // On n'affiche que les paiements réellement effectués (payé ou libéré) — un paiement "en_attente"
+    // (intention de paiement créée mais jamais finalisée, souvent parce que la demande a été annulée
+    // avant que la carte ne soit validée) ne représente aucune transaction réelle et n'a rien à faire ici.
+    const { data: paiements } = await supabase.from('paiements').select('*').eq('client_id', req.user.id).in('statut', ['paye', 'libere']).order('created_at', { ascending: false });
     if (!paiements || !paiements.length) return res.json([]);
     const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
     const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
@@ -1052,7 +1055,9 @@ app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
 // Historique des gains du pro (rubrique "Mes gains" du profil)
 app.get('/api/paiements/mes-gains', auth, async (req, res) => {
   try {
-    const { data: paiements } = await supabase.from('paiements').select('*').eq('societe_id', req.user.id).order('created_at', { ascending: false });
+    // Même logique : un paiement jamais finalisé ne représente aucun gain, réel ou potentiel,
+    // et n'a pas sa place dans un historique de gains — seuls "payé" et "libéré" sont montrés.
+    const { data: paiements } = await supabase.from('paiements').select('*').eq('societe_id', req.user.id).in('statut', ['paye', 'libere']).order('created_at', { ascending: false });
     if (!paiements || !paiements.length) return res.json({ total_libere: 0, total_en_attente: 0, paiements: [] });
     const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
     const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
