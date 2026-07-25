@@ -420,7 +420,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-pro-profile">
   <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil Pro</span></div>
   <div class="profile-content">
-    <div class="profile-hero"><div class="avatar-wrap" id="pro-profile-avatar"><div class="avatar" id="pro-profile-avatar-inner">🏢</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')"></div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p></div>
+    <div class="profile-hero"><div class="avatar-wrap" id="pro-profile-avatar"><div class="avatar" id="pro-profile-avatar-inner">🏢</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')"></div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p><div id="pro-profile-note" style="display:none;margin-top:8px"></div></div>
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
@@ -502,7 +502,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-profile">
   <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil</span></div>
   <div class="profile-content">
-    <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p></div>
+    <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p><div id="profile-note" style="display:none;margin-top:8px"></div></div>
     <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
@@ -721,6 +721,7 @@ function enterApp(){
     document.getElementById('pro-profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
     document.getElementById('pro-profile-email').textContent=(currentUser&&currentUser.email)||'';
     renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
+    renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
     disponible=!currentUser||currentUser.disponible!==false;
     document.getElementById('dispo-toggle').classList.toggle('on',disponible);
     document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
@@ -732,6 +733,7 @@ function enterApp(){
     document.getElementById('profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
     document.getElementById('profile-email').textContent=(currentUser&&currentUser.email)||'';
     renderProfileAvatar('profile-avatar-inner',currentUser&&currentUser.photo,'👤');
+    renderNoteGlobale('profile-note',currentUser&&currentUser.note_moyenne);
     show('s-home');
     loadDemandes();
   }
@@ -853,6 +855,18 @@ function renderProfileAvatar(innerId,photo,fallbackEmoji){
   else{el.textContent=fallbackEmoji}
 }
 
+// Affiche la note globale (ex: "4,93") en évidence sur l'en-tête du profil, avec l'étoile signature.
+// Reste masqué tant qu'aucun avis n'a encore été reçu, pour ne jamais afficher un "0" trompeur.
+function renderNoteGlobale(elId,noteMoyenne){
+  var el=document.getElementById(elId);
+  if(!el)return;
+  if(noteMoyenne===null||noteMoyenne===undefined||noteMoyenne===0){el.style.display='none';return}
+  var noteTxt=Number(noteMoyenne).toFixed(2).replace('.',',');
+  el.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.18);padding:5px 14px;border-radius:20px;font-weight:800;font-size:15px;color:#fff"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold)"></i> '+noteTxt+' <span style="font-weight:500;font-size:12px;opacity:.85">/ 5</span></span>';
+  el.style.display='block';
+  if(window.lucide)lucide.createIcons();
+}
+
 // Gère la sélection d'une nouvelle photo de profil : compression, envoi au serveur, mise à jour visuelle
 async function handleProfilePhoto(input,who){
   var file=input.files&&input.files[0];
@@ -897,6 +911,18 @@ function skeletonCards(n){
   return html;
 }
 
+// Compare les données fraîchement reçues à ce qui était déjà affiché à l'écran, pour ce point
+// de données précis. Si rien n'a réellement changé, on l'indique — ce qui permet aux rafraîchissements
+// automatiques en arrière-plan de ne JAMAIS reconstruire l'écran (donc jamais rejouer les animations
+// d'apparition ni provoquer le moindre clignotement) tant qu'il n'y a rien de nouveau à montrer.
+var lastDataSignatures={};
+function hasDataChanged(key,data){
+  var sig=JSON.stringify(data);
+  if(lastDataSignatures[key]===sig)return false;
+  lastDataSignatures[key]=sig;
+  return true;
+}
+
 async function loadDemandes(silent){
   var c0=document.getElementById('recent-demands');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
@@ -905,6 +931,8 @@ async function loadDemandes(silent){
     if(r.status===401){return doLogout()}
     if(!r.ok)return;
     const dataAll=await safeJson(r);
+    var changed0=hasDataChanged('demandes',dataAll);
+    if(silent&&!changed0)return;
     const c=document.getElementById('recent-demands');
     renderActiveRequestBanner(dataAll);
     var data=(dataAll||[]).filter(function(d){return!d.archivee_client});
@@ -1017,6 +1045,8 @@ async function loadDevis(silent){
       if(diff!==0)return diff;
       return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
+    var changed1=hasDataChanged('devis',all);
+    if(silent&&!changed1)return;
 
     var html='';
     all.forEach(function(v,vi){
@@ -1291,6 +1321,8 @@ async function loadProDemandes(silent){
     document.getElementById('stat-demandes').textContent=data.length||0;
     loadProDevisCount();
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
+    var changed2=hasDataChanged('proDemandes',data);
+    if(silent&&!changed2)return;
     var html='';
     data.forEach(function(d,di){
       var hasPhotos=getPhotosFromNotes(d.notes).length>0;
@@ -1355,6 +1387,8 @@ async function loadProDevis(silent){
       if(diff!==0)return diff;
       return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
+    var changed3=hasDataChanged('proDevis',data);
+    if(silent&&!changed3)return;
 
     var html='';
     data.forEach(function(v,vi){
@@ -1668,8 +1702,10 @@ async function loadConversationsClient(silent){
     const c=document.getElementById('client-conv-list');
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await safeJson(r);
-    renderConvList(c,data);
     updateNavBadge(hasAnyUnreadVisible(data));
+    var changed4=hasDataChanged('convClient',data);
+    if(silent&&!changed4)return;
+    renderConvList(c,data);
   }catch(e){}
 }
 async function loadConversationsPro(silent){
@@ -1680,8 +1716,10 @@ async function loadConversationsPro(silent){
     const c=document.getElementById('pro-conv-list');
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await safeJson(r);
-    renderConvList(c,data);
     updateNavBadge(hasAnyUnreadVisible(data));
+    var changed5=hasDataChanged('convPro',data);
+    if(silent&&!changed5)return;
+    renderConvList(c,data);
   }catch(e){}
 }
 // Ne considère que les conversations réellement affichées et cliquables dans la liste
@@ -1912,7 +1950,7 @@ function comingSoon(label){
 }
 async function showMesAvis(){
   var sousTitre=isPro()?'Ce que vos clients disent de vous':'Ce que vos prestataires disent de vous';
-  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes avis</div><div class="modal-sub">'+sousTitre+'</div><div id="avis-list">'+skeletonCards(3)+'</div>';
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes avis</div><div class="modal-sub">'+sousTitre+'</div><div id="avis-summary"></div><div id="avis-list">'+skeletonCards(3)+'</div>';
   document.getElementById('modal-overlay').classList.add('open');
   try{
     const r=await fetch(API+'/api/evaluations/mes-avis',{headers:authHeaders()});
@@ -1920,6 +1958,12 @@ async function showMesAvis(){
     var c=document.getElementById('avis-list');
     if(!c)return;
     if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>⭐</span><p>Aucun avis reçu pour l\u2019instant.<br>Terminez une prestation pour recevoir vos premiers avis !</p></div>';return}
+    var moyenne=d.reduce(function(a,b){return a+b.note},0)/d.length;
+    var sumEl=document.getElementById('avis-summary');
+    if(sumEl)sumEl.innerHTML='<div style="display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,var(--light),var(--surface));border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:16px">'+
+      '<div style="font-size:30px;font-weight:800;color:var(--p)">'+moyenne.toFixed(2).replace('.',',')+'</div>'+
+      '<div style="flex:1"><div style="color:var(--gold);font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold)"></i> sur 5</div>'+
+      '<div style="font-size:12px;color:var(--gray)">basée sur '+d.length+' avis</div></div></div>';
     var starIcon='<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold)"></i>';
     var whoLabel=isPro()?' (client)':' (prestataire)';
     c.innerHTML=d.map(function(a,i){
