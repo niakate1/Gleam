@@ -220,6 +220,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const assuranceRcPro = Boolean(req.body.assurance_rc_pro);
     const assuranceCompagnie = req.body.assurance_compagnie || null;
     const assurancePolice = req.body.assurance_police || null;
+    const siret = (req.body.siret || '').replace(/\s/g, '').trim();
+    const raisonSociale = req.body.raison_sociale || null;
+    const tvaIntracom = req.body.tva_intracom || null;
+    const adresseFacturation = req.body.adresse_facturation || null;
     const cguAcceptees = Boolean(req.body.cgu_accepte);
 
     if (!email || !password || !prenom || !nom)
@@ -230,6 +234,13 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Merci d\'accepter les CGU et la politique de confidentialité pour continuer.' });
     if (isProType(type) && !assuranceRcPro)
       return res.status(400).json({ error: 'L\'attestation d\'assurance RC Pro est requise pour créer un compte professionnel.' });
+    if (isProType(type) && !/^\d{14}$/.test(siret))
+      return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus).' });
+    if (type === 'entreprise') {
+      if (!raisonSociale) return res.status(400).json({ error: 'Raison sociale requise.' });
+      if (!/^\d{14}$/.test(siret)) return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus).' });
+      if (!adresseFacturation) return res.status(400).json({ error: 'Adresse de facturation requise.' });
+    }
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: email.toLowerCase().trim(),
@@ -249,6 +260,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       assurance_rc_pro: isProType(type) ? assuranceRcPro : null,
       assurance_compagnie: isProType(type) ? assuranceCompagnie : null,
       assurance_police: isProType(type) ? assurancePolice : null,
+      siret: (isProType(type) || type === 'entreprise') ? siret : null,
+      raison_sociale: type === 'entreprise' ? raisonSociale : null,
+      tva_intracom: type === 'entreprise' ? tvaIntracom : null,
+      adresse_facturation: type === 'entreprise' ? adresseFacturation : null,
       cgu_acceptees_le: new Date().toISOString()
     }).select().single();
 
