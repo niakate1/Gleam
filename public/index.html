@@ -1911,7 +1911,8 @@ function comingSoon(label){
   toast('🔧 '+label+' — bientôt disponible.');
 }
 async function showMesAvis(){
-  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes avis</div><div class="modal-sub">Ce que l\'on dit de vous</div><div id="avis-list">'+skeletonCards(3)+'</div>';
+  var sousTitre=isPro()?'Ce que vos clients disent de vous':'Ce que vos prestataires disent de vous';
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes avis</div><div class="modal-sub">'+sousTitre+'</div><div id="avis-list">'+skeletonCards(3)+'</div>';
   document.getElementById('modal-overlay').classList.add('open');
   try{
     const r=await fetch(API+'/api/evaluations/mes-avis',{headers:authHeaders()});
@@ -1919,17 +1920,26 @@ async function showMesAvis(){
     var c=document.getElementById('avis-list');
     if(!c)return;
     if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>⭐</span><p>Aucun avis reçu pour l\u2019instant.<br>Terminez une prestation pour recevoir vos premiers avis !</p></div>';return}
-    var starIcon='<i data-lucide="star" style="width:14px;height:14px;fill:var(--gold);color:var(--gold)"></i>';
+    var starIcon='<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold)"></i>';
+    var whoLabel=isPro()?' (client)':' (prestataire)';
     c.innerHTML=d.map(function(a,i){
       var stars='';
-      for(var s=0;s<5;s++)stars+='<span style="opacity:'+(s<a.note?'1':'.25')+'">'+starIcon+'</span>';
+      for(var s=0;s<5;s++)stars+='<span style="opacity:'+(s<a.note?'1':'.2')+'">'+starIcon+'</span>';
+      var initiale=(a.evaluateur_prenom||'?').trim().charAt(0).toUpperCase()||'?';
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
-        '<div style="font-weight:700">'+escapeHtml(a.evaluateur_prenom)+'</div>'+
-        '<div style="font-size:11px;color:var(--gray)">'+new Date(a.created_at).toLocaleDateString('fr-FR')+'</div></div>'+
-        '<div style="margin-bottom:6px">'+stars+'</div>'+
-        (a.prestation?'<div style="font-size:12px;color:var(--gray);text-transform:capitalize;margin-bottom:4px">'+escapeHtml(a.prestation)+'</div>':'')+
-        (a.commentaire?'<div style="font-size:13px;color:var(--text-secondary)">'+escapeHtml(a.commentaire)+'</div>':'')+
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+          '<div class="mini-avatar" style="width:38px;height:38px;font-size:15px">'+escapeHtml(initiale)+'</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-weight:700;font-size:14px">'+escapeHtml(a.evaluateur_prenom)+'<span style="font-weight:400;color:var(--gray);font-size:12px">'+whoLabel+'</span></div>'+
+            '<div style="font-size:11px;color:var(--gray)">'+new Date(a.created_at).toLocaleDateString('fr-FR')+'</div>'+
+          '</div>'+
+          '<div style="text-align:right;flex-shrink:0">'+
+            '<div style="font-weight:800;color:var(--gold);font-size:15px">'+a.note.toFixed(1)+'<span style="font-size:11px;font-weight:600">/5</span></div>'+
+            '<div>'+stars+'</div>'+
+          '</div>'+
+        '</div>'+
+        (a.prestation?'<div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface-alt);color:var(--text-secondary);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;text-transform:capitalize;margin-bottom:8px">'+ICONS_get(a.prestation)+' '+escapeHtml(a.prestation)+'</div>':'')+
+        (a.commentaire?'<div style="font-size:13px;color:var(--text-secondary);line-height:1.4;padding-top:4px;border-top:1px solid var(--border)">"'+escapeHtml(a.commentaire)+'"</div>':'')+
         '</div>';
     }).join('');
   }catch(e){var c2=document.getElementById('avis-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
