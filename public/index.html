@@ -309,6 +309,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
             <span>J'atteste disposer d'une assurance responsabilité civile professionnelle en cours de validité, couvrant les dommages pouvant survenir dans le cadre de mes prestations.</span>
           </label>
         </div>
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:16px;cursor:pointer;font-weight:400;font-size:13px">
+          <input type="checkbox" id="r-cgu-accept" style="width:auto;margin-top:2px">
+          <span>J'accepte les <a href="cgu.html" target="_blank" style="color:var(--p);font-weight:600">Conditions Générales d'Utilisation</a> et la <a href="confidentialite.html" target="_blank" style="color:var(--p);font-weight:600">Politique de Confidentialité</a> de Gleam.</span>
+        </label>
         <button class="btn" id="register-btn" onclick="doRegister()">Créer mon compte Gleam</button>
         <div class="err" id="rerr"></div>
       </div>
@@ -419,13 +423,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-hero"><div class="avatar-wrap" id="pro-profile-avatar"><div class="avatar" id="pro-profile-avatar-inner">🏢</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')"></div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p></div>
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
-      <div class="profile-item"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="comingSoon('Mes avis')"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
     </div>
+    <button class="btn-delete" style="width:100%;margin-top:14px" onclick="supprimerCompte()"><i data-lucide="trash-2" style="width:15px;height:15px;vertical-align:-3px"></i> Supprimer mon compte</button>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="bottom-nav">
@@ -501,14 +506,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item"><span class="pi-icon"><i data-lucide="lock" style="width:20px;height:20px"></i></span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="comingSoon('Mes avis')"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="comingSoon('Sécurité')"><span class="pi-icon"><i data-lucide="lock" style="width:20px;height:20px"></i></span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
     </div>
+    <button class="btn-delete" style="width:100%;margin-top:14px" onclick="supprimerCompte()"><i data-lucide="trash-2" style="width:15px;height:15px;vertical-align:-3px"></i> Supprimer mon compte</button>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="bottom-nav">
@@ -566,6 +572,23 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <script src="https://unpkg.com/lucide@1.25.0/dist/umd/lucide.js"></script>
 <script>
 const API='https://gleam-production-9b95.up.railway.app';
+// Intercepte TOUTES les requêtes réseau de l'app : si une réponse 401 (session expirée/invalide)
+// arrive sur une requête authentifiée, l'utilisateur est prévenu et déconnecté proprement —
+// plutôt que de devoir ajouter cette vérification à chacun des nombreux appels au serveur.
+(function(){
+  var nativeFetch=window.fetch;
+  var sessionExpiredHandled=false;
+  window.fetch=function(url,opts){
+    return nativeFetch(url,opts).then(function(r){
+      if(r.status===401&&opts&&opts.headers&&opts.headers.Authorization&&!sessionExpiredHandled){
+        sessionExpiredHandled=true;
+        toast('⚠️ Votre session a expiré. Reconnectez-vous.');
+        setTimeout(function(){ if(typeof doLogout==='function')doLogout() },1200);
+      }
+      return r;
+    });
+  };
+})();
 let currentUser=null,userRole='client',photos=[],disponible=true,currentChatDemandeId=null,chatPollInterval=null;
 let selectedServices=[],multiFlow={active:false,queue:[],current:0,results:[]};
 let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisId=null;
@@ -669,6 +692,7 @@ async function doRegister(){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return showErr('rerr','Format d\'email invalide.');
   if(!phone)return showErr('rerr','Téléphone requis.');
   if(!pw||pw.length<8)return showErr('rerr','Mot de passe min 8 caractères.');
+  if(!document.getElementById('r-cgu-accept').checked)return showErr('rerr','Merci d\'accepter les CGU et la politique de confidentialité pour continuer.');
   var assuranceCompagnie='',assurancePolice='',assuranceAtteste=false;
   if(userRole==='pro'){
     assuranceAtteste=document.getElementById('r-assurance-atteste').checked;
@@ -680,7 +704,7 @@ async function doRegister(){
   try{
     const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({firstName:fn,lastName:ln,prenom:fn,nom:ln,email,phone,telephone:phone,password:pw,role:userRole,type:userRole,
-        assurance_rc_pro:assuranceAtteste,assurance_compagnie:assuranceCompagnie,assurance_police:assurancePolice})});
+        assurance_rc_pro:assuranceAtteste,assurance_compagnie:assuranceCompagnie,assurance_police:assurancePolice,cgu_accepte:true})});
     const d=await safeJson(r);
     if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
@@ -714,6 +738,17 @@ function enterApp(){
   toast('Bienvenue sur Gleam ✨');
   startUnreadPoll();
   startDataPoll();
+}
+async function supprimerCompte(){
+  if(!confirm('Voulez-vous vraiment supprimer votre compte Gleam ? Vos informations personnelles seront effacées définitivement. Vos demandes/prestations passées resteront visibles pour l\'historique, mais sans vos données personnelles.'))return;
+  if(!confirm('Dernière confirmation : cette action est irréversible. Continuer ?'))return;
+  try{
+    const r=await fetch(API+'/api/users/me/supprimer',{method:'POST',headers:authHeaders()});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    toast('Votre compte a été supprimé.');
+    setTimeout(doLogout,1200);
+  }catch(e){toast(friendlyNetworkError(e))}
 }
 function doLogout(){stopChatPoll();stopUnreadPoll();stopDataPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
 
@@ -1591,7 +1626,9 @@ function refreshActiveScreenData(){
     's-home':loadDemandes,
     's-pro-home':loadProDemandes,
     's-devis':loadDevis,
-    's-pro-devis':loadProDevis
+    's-pro-devis':loadProDevis,
+    's-messages':loadConversationsClient,
+    's-pro-messages':loadConversationsPro
   };
   var fn=loaders[active.id];
   if(fn)fn(true);
@@ -1611,9 +1648,9 @@ document.addEventListener('visibilitychange',function(){
 });
 
 // ── CONVERSATIONS ──
-async function loadConversationsClient(){
+async function loadConversationsClient(silent){
   var c0=document.getElementById('client-conv-list');
-  if(c0)c0.innerHTML=skeletonCards(3);
+  if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('client-conv-list');
@@ -1623,9 +1660,9 @@ async function loadConversationsClient(){
     updateNavBadge(hasAnyUnreadVisible(data));
   }catch(e){}
 }
-async function loadConversationsPro(){
+async function loadConversationsPro(silent){
   var c0=document.getElementById('pro-conv-list');
-  if(c0)c0.innerHTML=skeletonCards(3);
+  if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('pro-conv-list');
@@ -1857,6 +1894,53 @@ function openService(type){
   photos=[];
   multiFlow={active:false,queue:[],current:0,results:[]};
   openServiceForm(type);
+}
+function comingSoon(label){
+  toast('🔧 '+label+' — bientôt disponible.');
+}
+async function showMesPaiements(){
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="credit-card" style="width:20px;height:20px;vertical-align:-4px"></i> Mes paiements</div><div class="modal-sub">Historique de vos transactions</div><div id="paiements-list">'+skeletonCards(3)+'</div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  try{
+    const r=await fetch(API+'/api/paiements/mes-paiements',{headers:authHeaders()});
+    const d=await safeJson(r);
+    var c=document.getElementById('paiements-list');
+    if(!c)return;
+    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>💳</span><p>Aucun paiement pour l\u2019instant.</p></div>';return}
+    var statutLabels={en_attente:['En attente','var(--gray)'],paye:['Payé — en attente de confirmation','var(--gold)'],libere:['Confirmé','var(--mint)'],bloque:['Bloqué',' var(--red)']};
+    c.innerHTML=d.map(function(p,i){
+      var st=statutLabels[p.statut]||['',''];
+      return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+        '<div><div style="font-weight:700;text-transform:capitalize">'+escapeHtml(p.demande&&p.demande.prestation||'Prestation')+'</div>'+
+        '<div style="font-size:12px;color:var(--gray)">'+new Date(p.created_at).toLocaleDateString('fr-FR')+'</div></div>'+
+        '<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--p)">'+escapeHtml(p.montant_ttc)+'€</div>'+
+        '<div style="font-size:11px;font-weight:700;color:'+st[1]+'">'+st[0]+'</div></div></div></div>';
+    }).join('');
+  }catch(e){var c2=document.getElementById('paiements-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
+}
+async function showMesGains(){
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="wallet" style="width:20px;height:20px;vertical-align:-4px"></i> Mes gains</div><div class="modal-sub">Récapitulatif de vos revenus Gleam</div><div id="gains-summary" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div><div id="gains-list">'+skeletonCards(3)+'</div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  try{
+    const r=await fetch(API+'/api/paiements/mes-gains',{headers:authHeaders()});
+    const d=await safeJson(r);
+    var sum=document.getElementById('gains-summary'),c=document.getElementById('gains-list');
+    if(!r.ok){if(c)c.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>';return}
+    if(sum)sum.innerHTML='<div class="stat-card stat-card-p"><div class="stat-num">'+d.total_libere+'€</div><div class="stat-label">Reçu</div></div>'+
+      '<div class="stat-card stat-card-gold"><div class="stat-num">'+d.total_en_attente+'€</div><div class="stat-label">En attente</div></div>';
+    if(!d.paiements||!d.paiements.length){if(c)c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun gain pour l\u2019instant.</p></div>';return}
+    var statutLabels={en_attente:['Client pas encore payé','var(--gray)'],paye:['En attente de confirmation client','var(--gold)'],libere:['Reçu','var(--mint)'],bloque:['Bloqué','var(--red)']};
+    if(c)c.innerHTML=d.paiements.map(function(p,i){
+      var st=statutLabels[p.statut]||['',''];
+      return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+        '<div><div style="font-weight:700;text-transform:capitalize">'+escapeHtml(p.demande&&p.demande.prestation||'Prestation')+'</div>'+
+        '<div style="font-size:12px;color:var(--gray)">'+new Date(p.created_at).toLocaleDateString('fr-FR')+'</div></div>'+
+        '<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--p)">'+escapeHtml(p.montant_societe)+'€</div>'+
+        '<div style="font-size:11px;font-weight:700;color:'+st[1]+'">'+st[0]+'</div></div></div></div>';
+    }).join('');
+  }catch(e){var c2=document.getElementById('gains-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
 }
 function showHowItWorks(){
   var html='<div class="modal-title gleam-signature">✨ Comment marche Gleam ?</div>'+
