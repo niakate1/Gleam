@@ -446,6 +446,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="configurerPaiementsPro()"><span class="pi-icon"><i data-lucide="landmark" style="width:20px;height:20px"></i></span><span class="pi-text">Configurer mes paiements</span><span class="pi-arrow" id="connect-statut-badge"></span></div>
       <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
@@ -764,6 +765,7 @@ function enterApp(){
     document.getElementById('pro-profile-email').textContent=(currentUser&&currentUser.email)||'';
     renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
     renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
+    checkConnectStatut();
     disponible=!currentUser||currentUser.disponible!==false;
     document.getElementById('dispo-toggle').classList.toggle('on',disponible);
     document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
@@ -1140,10 +1142,11 @@ function renderDevisClientCards(){
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         cardStyle='opacity:0.7;';
+        actions='<button class="btn-accept" style="background:var(--p);width:100%;margin-top:12px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>';
         if(notesDonnees.indexOf(v.demande_id)>=0){
-          actions='<div style="margin-top:12px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
+          actions+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
         }else{
-          actions='<div style="margin-top:12px">'+
+          actions+='<div style="margin-top:8px">'+
             '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeSocieteId+'\',\''+safeProName+'\')">⭐ Noter le prestataire</button>'+
           '</div>';
         }
@@ -1533,10 +1536,11 @@ function renderProDevisCards(){
       }else if(v.statut==='accepte'&&demandeStatut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         var safeClientId=escAttr(v.demande&&v.demande.client_id);
+        extra='<button class="btn-accept" style="background:var(--p);width:100%;margin-top:10px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir mon relevé</button>';
         if(notesDonnees.indexOf(v.demande_id)>=0){
-          extra='<div style="margin-top:10px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
+          extra+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
         }else{
-          extra='<div style="margin-top:10px">'+
+          extra+='<div style="margin-top:8px">'+
             '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeClientId+'\',\'le client\')">⭐ Noter le client</button>'+
           '</div>';
         }
@@ -2169,6 +2173,69 @@ async function showMesPaiements(){
         '<div style="font-size:11px;font-weight:700;color:'+st[1]+'">'+st[0]+'</div></div></div></div>';
     }).join('');
   }catch(e){var c2=document.getElementById('paiements-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
+}
+async function configurerPaiementsPro(){
+  toast('Redirection vers Stripe...');
+  try{
+    const r=await fetch(API+'/api/paiements/connect/onboarding',{method:'POST',headers:authHeaders()});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    window.location.href=d.url;
+  }catch(e){toast(friendlyNetworkError(e))}
+}
+async function checkConnectStatut(){
+  var badge=document.getElementById('connect-statut-badge');
+  if(!badge)return;
+  try{
+    const r=await fetch(API+'/api/paiements/connect/statut',{headers:authHeaders()});
+    const d=await safeJson(r);
+    if(d.statut==='pret')badge.innerHTML='<span style="color:var(--mint);font-size:11px;font-weight:700">✓ Prêt</span>';
+    else if(d.statut==='en_cours')badge.innerHTML='<span style="color:var(--gold);font-size:11px;font-weight:700">En cours</span>';
+    else badge.textContent='›';
+  }catch(e){}
+}
+// Ouvre la facture (client/entreprise) ou le relevé (pro) dans un nouvel onglet, prêt à imprimer
+// ou enregistrer en PDF via la fonction native du navigateur — pas besoin de générateur de PDF côté serveur.
+async function showFacture(demandeId){
+  try{
+    const r=await fetch(API+'/api/demandes/'+demandeId+'/facture',{headers:authHeaders()});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    var w=window.open('','_blank');
+    if(!w){toast('Autorisez les fenêtres pop-up pour voir le document.');return}
+    w.document.write(buildFactureHtml(d,isPro()));
+    w.document.close();
+  }catch(e){toast(friendlyNetworkError(e))}
+}
+function buildFactureHtml(d,vuePro){
+  var estEntreprise=d.client&&d.client.est_entreprise;
+  var titre=vuePro?'Relevé de prestation':'Facture';
+  var lignes='<tr><td>Prestation</td><td style="text-align:right">'+escapeHtml(d.prestation||'')+'</td></tr>'+
+    '<tr><td>Adresse d\'intervention</td><td style="text-align:right">'+escapeHtml(d.adresse||'')+'</td></tr>';
+  if(vuePro){
+    lignes+='<tr><td>Montant total payé par le client (TTC)</td><td style="text-align:right">'+d.montant_ttc+' €</td></tr>'+
+      '<tr><td>Commission Gleam (15%)</td><td style="text-align:right">- '+d.commission_gleam+' €</td></tr>'+
+      '<tr><td class="total">Montant net reçu</td><td class="total" style="text-align:right">'+d.montant_pro+' €</td></tr>';
+  }else{
+    lignes+='<tr><td class="total">Montant total TTC</td><td class="total" style="text-align:right">'+d.montant_ttc+' €</td></tr>';
+  }
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>'+titre+' '+escapeHtml(d.numero)+'</title>'+
+    '<style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;padding:0 20px;color:#111827}'+
+    'h1{font-size:22px;color:#7C3AED;margin:0}table{width:100%;border-collapse:collapse;margin-top:20px}'+
+    'td{padding:9px 0;border-bottom:1px solid #E5E7EB;font-size:14px}.total{font-size:19px;font-weight:800;color:#7C3AED}'+
+    '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:2px solid #7C3AED;padding-bottom:16px}'+
+    'p{font-size:13px;line-height:1.6}</style></head><body>'+
+    '<div class="header"><div><h1>✨ Gleam</h1><div style="font-size:11px;color:#6B7280;margin-top:4px">Plateforme de mise en relation — [Raison sociale à compléter]</div></div>'+
+    '<div style="text-align:right;font-size:13px"><strong>'+titre+' '+escapeHtml(d.numero)+'</strong><br>'+new Date(d.date).toLocaleDateString('fr-FR')+'</div></div>'+
+    '<p><strong>Prestataire :</strong> '+escapeHtml(d.pro?d.pro.nom_affiche:'')+(d.pro&&d.pro.siret?' — SIRET '+escapeHtml(d.pro.siret):'')+'</p>'+
+    '<p><strong>'+(estEntreprise?'Entreprise cliente':'Client')+' :</strong> '+escapeHtml(d.client?d.client.nom_affiche:'')+
+      (estEntreprise&&d.client.siret?'<br>SIRET '+escapeHtml(d.client.siret):'')+
+      (estEntreprise&&d.client.tva_intracom?'<br>TVA '+escapeHtml(d.client.tva_intracom):'')+
+      (estEntreprise&&d.client.adresse_facturation?'<br>'+escapeHtml(d.client.adresse_facturation):'')+'</p>'+
+    '<table>'+lignes+'</table>'+
+    '<p style="color:#6B7280;margin-top:30px">Document généré automatiquement par Gleam. TVA non applicable, article 293B du CGI, sauf mention contraire du prestataire.</p>'+
+    '<script>window.onload=function(){window.print()}<\/script>'+
+    '</body></html>';
 }
 async function showMesGains(){
   document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="wallet" style="width:20px;height:20px;vertical-align:-4px"></i> Mes gains</div><div class="modal-sub">Récapitulatif de vos revenus Gleam</div><div id="gains-summary" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div><div id="gains-list">'+skeletonCards(3)+'</div>';
