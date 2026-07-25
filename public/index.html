@@ -31,8 +31,9 @@ label{display:block;font-size:13px;font-weight:600;color:var(--text-secondary);m
 input,select,textarea{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;outline:none;transition:.2s;background:var(--surface);color:var(--text);font-family:inherit}
 input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.role-select{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-.role-btn{padding:12px;border:2px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:var(--text-secondary)}
+.role-select{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
+.role-btn{padding:10px 4px;border:2px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;text-align:center;font-size:11.5px;font-weight:600;color:var(--text-secondary)}
+.role-btn span{display:block;font-size:20px;margin-bottom:2px}
 .role-btn.sel{border-color:var(--p);background:var(--light);color:var(--p)}
 .role-btn span{display:block;font-size:22px;margin-bottom:4px}
 .btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;box-shadow:0 4px 14px rgba(124,58,237,.25)}
@@ -301,10 +302,25 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
         <label>Vous êtes</label>
         <div class="role-select">
           <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
-          <button class="role-btn" id="role-pro" onclick="setRole('pro')"><span>🏢</span>Professionnel</button>
+          <button class="role-btn" id="role-entreprise" onclick="setRole('entreprise')"><span>🏢</span>Entreprise</button>
+          <button class="role-btn" id="role-pro" onclick="setRole('pro')"><span>🧰</span>Prestataire</button>
+        </div>
+        <div id="entreprise-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
+          <label style="margin-top:0">Raison sociale *</label>
+          <input type="text" id="r-raison-sociale" placeholder="Ex: Dupont Nettoyage SARL">
+          <label>Numéro SIRET *</label>
+          <input type="text" id="r-siret-entreprise" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="14">
+          <label>Numéro de TVA intracommunautaire <span class="optional">(optionnel)</span></label>
+          <input type="text" id="r-tva" placeholder="Ex: FR12345678901">
+          <label>Adresse de facturation *</label>
+          <input type="text" id="r-adresse-facturation" placeholder="12 rue de la Paix, 75001 Paris">
+          <div style="font-size:12px;color:var(--gray);margin-top:8px">Cette adresse sert uniquement à la facturation — l'adresse d'intervention est précisée à chaque demande.</div>
         </div>
         <div id="pro-rcpro-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
-          <label style="margin-top:0">Assurance RC Pro <span class="optional">(requis pour les professionnels)</span></label>
+          <label style="margin-top:0">Numéro SIRET *</label>
+          <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Nécessaire pour vérifier votre statut légal d'indépendant ou d'entreprise.</div>
+          <input type="text" id="r-siret" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="14">
+          <label style="margin-top:14px">Assurance RC Pro <span class="optional">(requis pour les professionnels)</span></label>
           <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Une assurance responsabilité civile professionnelle en cours de validité est nécessaire pour intervenir chez les clients Gleam.</div>
           <label style="font-size:12px;margin-top:0">Compagnie d'assurance <span class="optional">(optionnel)</span></label>
           <input type="text" id="r-assurance-compagnie" placeholder="Ex: MAIF, AXA...">
@@ -613,7 +629,14 @@ function toast(msg,dur=3000){
 }
 function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.add('show')}
 function hideErr(id){document.getElementById(id).classList.remove('show')}
-function setRole(r){userRole=r;document.getElementById('role-client').classList.toggle('sel',r==='client');document.getElementById('role-pro').classList.toggle('sel',r==='pro');var b=document.getElementById('pro-rcpro-block');if(b)b.style.display=(r==='pro')?'block':'none'}
+function setRole(r){
+  userRole=r;
+  document.getElementById('role-client').classList.toggle('sel',r==='client');
+  document.getElementById('role-entreprise').classList.toggle('sel',r==='entreprise');
+  document.getElementById('role-pro').classList.toggle('sel',r==='pro');
+  var b=document.getElementById('pro-rcpro-block');if(b)b.style.display=(r==='pro')?'block':'none';
+  var e=document.getElementById('entreprise-block');if(e)e.style.display=(r==='entreprise')?'block':'none';
+}
 function switchTab(t){
   document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(t==='login'&&i===0)||(t==='register'&&i===1)));
   document.getElementById('form-login').style.display=t==='login'?'block':'none';
@@ -699,18 +722,31 @@ async function doRegister(){
   if(!phone)return showErr('rerr','Téléphone requis.');
   if(!pw||pw.length<8)return showErr('rerr','Mot de passe min 8 caractères.');
   if(!document.getElementById('r-cgu-accept').checked)return showErr('rerr','Merci d\'accepter les CGU et la politique de confidentialité pour continuer.');
-  var assuranceCompagnie='',assurancePolice='',assuranceAtteste=false;
+  var assuranceCompagnie='',assurancePolice='',assuranceAtteste=false,siret='';
   if(userRole==='pro'){
+    siret=document.getElementById('r-siret').value.replace(/\s/g,'').trim();
+    if(!/^\d{14}$/.test(siret))return showErr('rerr','SIRET invalide (14 chiffres attendus).');
     assuranceAtteste=document.getElementById('r-assurance-atteste').checked;
     if(!assuranceAtteste)return showErr('rerr','L\'attestation d\'assurance RC Pro est requise pour créer un compte professionnel.');
     assuranceCompagnie=document.getElementById('r-assurance-compagnie').value.trim();
     assurancePolice=document.getElementById('r-assurance-police').value.trim();
   }
+  var raisonSociale='',tva='',adresseFacturation='';
+  if(userRole==='entreprise'){
+    raisonSociale=document.getElementById('r-raison-sociale').value.trim();
+    siret=document.getElementById('r-siret-entreprise').value.replace(/\s/g,'').trim();
+    tva=document.getElementById('r-tva').value.trim();
+    adresseFacturation=document.getElementById('r-adresse-facturation').value.trim();
+    if(!raisonSociale)return showErr('rerr','Raison sociale requise.');
+    if(!/^\d{14}$/.test(siret))return showErr('rerr','SIRET invalide (14 chiffres attendus).');
+    if(!adresseFacturation)return showErr('rerr','Adresse de facturation requise.');
+  }
   const btn=document.getElementById('register-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({firstName:fn,lastName:ln,prenom:fn,nom:ln,email,phone,telephone:phone,password:pw,role:userRole,type:userRole,
-        assurance_rc_pro:assuranceAtteste,assurance_compagnie:assuranceCompagnie,assurance_police:assurancePolice,cgu_accepte:true})});
+        assurance_rc_pro:assuranceAtteste,assurance_compagnie:assuranceCompagnie,assurance_police:assurancePolice,siret:siret,
+        raison_sociale:raisonSociale,tva_intracom:tva,adresse_facturation:adresseFacturation,cgu_accepte:true})});
     const d=await safeJson(r);
     if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
