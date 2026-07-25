@@ -425,7 +425,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-menu">
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="comingSoon('Mes avis')"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
@@ -507,7 +507,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-menu">
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="comingSoon('Mes avis')"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="comingSoon('Sécurité')"><span class="pi-icon"><i data-lucide="lock" style="width:20px;height:20px"></i></span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
@@ -989,6 +989,8 @@ async function loadDevis(silent){
     if(!rd.ok)return;
     const demandes=await safeJson(rd);
     const c=document.getElementById('devis-list');
+    var notesDonnees=[];
+    try{const rn=await fetch(API+'/api/evaluations/mes-notes-donnees',{headers:authHeaders()});if(rn.ok)notesDonnees=await safeJson(rn)}catch(e){}
     const avecDevis=demandes.filter(function(d){return d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee'});
     if(!avecDevis.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
     var all=[];
@@ -1035,9 +1037,13 @@ async function loadDevis(silent){
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         cardStyle='opacity:0.7;';
-        actions='<div style="margin-top:12px">'+
-          '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeSocieteId+'\',\''+safeProName+'\')">⭐ Noter le prestataire</button>'+
-        '</div>';
+        if(notesDonnees.indexOf(v.demande_id)>=0){
+          actions='<div style="margin-top:12px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
+        }else{
+          actions='<div style="margin-top:12px">'+
+            '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeSocieteId+'\',\''+safeProName+'\')">⭐ Noter le prestataire</button>'+
+          '</div>';
+        }
       }else if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement requis</span>';
         cardStyle='border-color:#D97706;background:#FFFBEB;';
@@ -1268,7 +1274,7 @@ async function envoyerNote(btn){
     if(!r.ok){const d=await safeJson(r);toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
     document.getElementById('modal-overlay').classList.remove('open');
     toast('⭐ Merci pour votre avis !',4000);
-    loadDevis();
+    if(isPro())loadProDevis();else loadDevis();
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
@@ -1332,6 +1338,8 @@ async function loadProDevis(silent){
     const data=await safeJson(r);
     document.getElementById('stat-devis').textContent=data.length||0;
     if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\u2019instant.</p></div>';return}
+    var notesDonnees=[];
+    try{const rn=await fetch(API+'/api/evaluations/mes-notes-donnees',{headers:authHeaders()});if(rn.ok)notesDonnees=await safeJson(rn)}catch(e){}
 
     // Tri logique : terminé > en cours > accepté (paiement en attente) > en attente > refusé/annulé
     function proDevisScore(v){
@@ -1358,9 +1366,13 @@ async function loadProDevis(silent){
       }else if(v.statut==='accepte'&&demandeStatut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         var safeClientId=escAttr(v.demande&&v.demande.client_id);
-        extra='<div style="margin-top:10px">'+
-          '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeClientId+'\',\'le client\')">⭐ Noter le client</button>'+
-        '</div>';
+        if(notesDonnees.indexOf(v.demande_id)>=0){
+          extra='<div style="margin-top:10px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
+        }else{
+          extra='<div style="margin-top:10px">'+
+            '<button class="btn-accept" style="background:#6B7280" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeClientId+'\',\'le client\')">⭐ Noter le client</button>'+
+          '</div>';
+        }
       }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
         extra='<div style="display:flex;gap:8px;margin-top:10px">'+
@@ -1897,6 +1909,30 @@ function openService(type){
 }
 function comingSoon(label){
   toast('🔧 '+label+' — bientôt disponible.');
+}
+async function showMesAvis(){
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes avis</div><div class="modal-sub">Ce que l\'on dit de vous</div><div id="avis-list">'+skeletonCards(3)+'</div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  try{
+    const r=await fetch(API+'/api/evaluations/mes-avis',{headers:authHeaders()});
+    const d=await safeJson(r);
+    var c=document.getElementById('avis-list');
+    if(!c)return;
+    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>⭐</span><p>Aucun avis reçu pour l\u2019instant.<br>Terminez une prestation pour recevoir vos premiers avis !</p></div>';return}
+    var starIcon='<i data-lucide="star" style="width:14px;height:14px;fill:var(--gold);color:var(--gold)"></i>';
+    c.innerHTML=d.map(function(a,i){
+      var stars='';
+      for(var s=0;s<5;s++)stars+='<span style="opacity:'+(s<a.note?'1':'.25')+'">'+starIcon+'</span>';
+      return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
+        '<div style="font-weight:700">'+escapeHtml(a.evaluateur_prenom)+'</div>'+
+        '<div style="font-size:11px;color:var(--gray)">'+new Date(a.created_at).toLocaleDateString('fr-FR')+'</div></div>'+
+        '<div style="margin-bottom:6px">'+stars+'</div>'+
+        (a.prestation?'<div style="font-size:12px;color:var(--gray);text-transform:capitalize;margin-bottom:4px">'+escapeHtml(a.prestation)+'</div>':'')+
+        (a.commentaire?'<div style="font-size:13px;color:var(--text-secondary)">'+escapeHtml(a.commentaire)+'</div>':'')+
+        '</div>';
+    }).join('');
+  }catch(e){var c2=document.getElementById('avis-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
 }
 async function showMesPaiements(){
   document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="credit-card" style="width:20px;height:20px;vertical-align:-4px"></i> Mes paiements</div><div class="modal-sub">Historique de vos transactions</div><div id="paiements-list">'+skeletonCards(3)+'</div>';
