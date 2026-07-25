@@ -2210,8 +2210,7 @@ async function showFacture(demandeId){
 function buildFactureHtml(d,vuePro){
   var estEntreprise=d.client&&d.client.est_entreprise;
   var titre=vuePro?'Relevé de prestation':'Facture';
-  var lignes='<tr><td>Prestation</td><td style="text-align:right">'+escapeHtml(d.prestation||'')+'</td></tr>'+
-    '<tr><td>Adresse d\'intervention</td><td style="text-align:right">'+escapeHtml(d.adresse||'')+'</td></tr>';
+  var lignes='<tr><td>Adresse d\'intervention</td><td style="text-align:right">'+escapeHtml(d.adresse||'')+'</td></tr>';
   if(vuePro){
     lignes+='<tr><td>Montant total payé par le client (TTC)</td><td style="text-align:right">'+d.montant_ttc+' €</td></tr>'+
       '<tr><td>Commission Gleam (15%)</td><td style="text-align:right">- '+d.commission_gleam+' €</td></tr>'+
@@ -2224,6 +2223,7 @@ function buildFactureHtml(d,vuePro){
     'h1{font-size:22px;color:#7C3AED;margin:0}table{width:100%;border-collapse:collapse;margin-top:20px}'+
     'td{padding:9px 0;border-bottom:1px solid #E5E7EB;font-size:14px}.total{font-size:19px;font-weight:800;color:#7C3AED}'+
     '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:2px solid #7C3AED;padding-bottom:16px}'+
+    '.presta-box{background:#F5F3FF;border-radius:8px;padding:12px 14px;margin-top:14px}'+
     'p{font-size:13px;line-height:1.6}</style></head><body>'+
     '<div class="header"><div><h1>✨ Gleam</h1><div style="font-size:11px;color:#6B7280;margin-top:4px">Plateforme de mise en relation — [Raison sociale à compléter]</div></div>'+
     '<div style="text-align:right;font-size:13px"><strong>'+titre+' '+escapeHtml(d.numero)+'</strong><br>'+new Date(d.date).toLocaleDateString('fr-FR')+'</div></div>'+
@@ -2232,8 +2232,10 @@ function buildFactureHtml(d,vuePro){
       (estEntreprise&&d.client.siret?'<br>SIRET '+escapeHtml(d.client.siret):'')+
       (estEntreprise&&d.client.tva_intracom?'<br>TVA '+escapeHtml(d.client.tva_intracom):'')+
       (estEntreprise&&d.client.adresse_facturation?'<br>'+escapeHtml(d.client.adresse_facturation):'')+'</p>'+
+    '<div class="presta-box"><strong>Prestation réalisée</strong><br>'+escapeHtml(d.prestation||'')+'</div>'+
     '<table>'+lignes+'</table>'+
     '<p style="color:#6B7280;margin-top:30px">Document généré automatiquement par Gleam. TVA non applicable, article 293B du CGI, sauf mention contraire du prestataire.</p>'+
+    '<p style="color:#6B7280;font-size:11px">Ce document ne constitue pas une attestation fiscale au titre des services à la personne, sauf déclaration spécifique du prestataire auprès des autorités compétentes.</p>'+
     '<script>window.onload=function(){window.print()}<\/script>'+
     '</body></html>';
 }
