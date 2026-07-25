@@ -61,6 +61,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .greeting h2{font-size:22px;font-weight:800;margin-bottom:4px}
 .greeting p{color:var(--gray);font-size:14px;margin-bottom:18px}
 .section-title{font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text)}
+.filter-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:4px;-webkit-overflow-scrolling:touch}
+.filter-chips::-webkit-scrollbar{display:none}
+.filter-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:12.5px;font-weight:700;white-space:nowrap;cursor:pointer;flex-shrink:0;transition:.15s}
+.filter-chip.active{background:var(--p);border-color:var(--p);color:#fff}
 .services-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
 .svc-card{background:var(--surface);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;border:2px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05);position:relative}
 .svc-card:hover{border-color:var(--p)}
@@ -1010,6 +1014,20 @@ async function renderActiveRequestBanner(data){
   if(window.lucide)lucide.createIcons();
 }
 
+var devisClientCache={all:[],notesDonnees:[]};
+var devisClientFilterActive='tous';
+function devisClientMatchesFilter(v,f){
+  if(f==='tous')return true;
+  if(f==='attente')return v.statut==='envoye';
+  if(f==='acceptes')return v.statut==='accepte'&&v.demande_statut!=='terminee';
+  if(f==='termines')return v.statut==='accepte'&&v.demande_statut==='terminee';
+  if(f==='refuses')return v.statut==='refuse'||v.statut==='annule_pro';
+  return true;
+}
+function setDevisClientFilter(f){
+  devisClientFilterActive=f;
+  renderDevisClientCards();
+}
 async function loadDevis(silent){
   var c0=document.getElementById('devis-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
@@ -1022,7 +1040,7 @@ async function loadDevis(silent){
     var notesDonnees=[];
     try{const rn=await fetch(API+'/api/evaluations/mes-notes-donnees',{headers:authHeaders()});if(rn.ok)notesDonnees=await safeJson(rn)}catch(e){}
     const avecDevis=demandes.filter(function(d){return d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee'});
-    if(!avecDevis.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
+    if(!avecDevis.length){devisClientCache={all:[],notesDonnees:notesDonnees};renderDevisClientCards();return}
     var all=[];
     for(var i=0;i<avecDevis.length;i++){
       try{
@@ -1030,7 +1048,7 @@ async function loadDevis(silent){
         if(r.ok){const dv=await safeJson(r);dv.forEach(function(v){all.push(Object.assign({},v,{prestation:avecDevis[i].prestation,demande_statut:avecDevis[i].statut}))})}
       }catch(e){}
     }
-    if(!all.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
+    if(!all.length){devisClientCache={all:[],notesDonnees:notesDonnees};renderDevisClientCards();return}
 
     // Tri logique explicite (indépendant du statut de la demande associée à d'autres devis) :
     // En cours > Terminé (à noter) > Accepté-paiement requis > En attente > Refusé > Annulé par le pro
@@ -1050,8 +1068,25 @@ async function loadDevis(silent){
     var changed1=hasDataChanged('devis',all);
     if(silent&&!changed1)return;
 
-    var html='';
-    all.forEach(function(v,vi){
+    devisClientCache={all:all,notesDonnees:notesDonnees};
+    renderDevisClientCards();
+  }catch(e){console.error('loadDevis',e)}
+}
+function renderDevisClientCards(){
+  var c=document.getElementById('devis-list');
+  if(!c)return;
+  var all=devisClientCache.all,notesDonnees=devisClientCache.notesDonnees;
+  var chips='<div class="filter-chips">'+
+    ['tous:Tous','attente:En attente','acceptes:Acceptés','termines:Terminés','refuses:Refusés/Annulés'].map(function(f){
+      var parts=f.split(':');
+      return '<button class="filter-chip'+(devisClientFilterActive===parts[0]?' active':'')+'" onclick="setDevisClientFilter(\''+parts[0]+'\')">'+parts[1]+'</button>';
+    }).join('')+'</div>';
+  if(!all.length){c.innerHTML=chips+'<div class="empty-state"><span>📋</span><p>Aucun devis reçu pour l\u2019instant.</p></div>';return}
+  var filtered=all.filter(function(v){return devisClientMatchesFilter(v,devisClientFilterActive)});
+  if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span>🔍</span><p>Aucun devis dans cette catégorie.</p></div>';return}
+
+  var html=chips;
+  filtered.forEach(function(v,vi){
       var proNameRaw=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
       var proName=escapeHtml(proNameRaw);
       var proNote=v.pro&&v.pro.note_moyenne?'<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold);vertical-align:-2px"></i> '+escapeHtml(v.pro.note_moyenne):'';
@@ -1109,9 +1144,8 @@ async function loadDevis(silent){
         (v.description?'<div style="font-size:13px;color:var(--text-secondary)">'+escapeHtml(v.description)+'</div>':'')+
         actions+
       '</div>';
-    });
-    c.innerHTML=html;
-  }catch(e){console.error('loadDevis',e)}
+  });
+  c.innerHTML=html;
 }
 
 async function accepterDevis(devisId,btn){
@@ -1311,6 +1345,12 @@ async function envoyerNote(btn){
 }
 
 // ── PRO DEMANDES ──
+var proDemandesCache=[];
+var proDemandesFilterActive='tous';
+function setProDemandesFilter(f){
+  proDemandesFilterActive=f;
+  renderProDemandesCards();
+}
 async function loadProDemandes(silent){
   var c0=document.getElementById('pro-demandes-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
@@ -1322,34 +1362,58 @@ async function loadProDemandes(silent){
     const data=await safeJson(r);
     document.getElementById('stat-demandes').textContent=data.length||0;
     loadProDevisCount();
-    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
+    if(!data||!data.length){proDemandesCache=[];renderProDemandesCards();return}
     var changed2=hasDataChanged('proDemandes',data);
     if(silent&&!changed2)return;
-    var html='';
-    data.forEach(function(d,di){
-      var hasPhotos=getPhotosFromNotes(d.notes).length>0;
-      var safeId=escAttr(d.id);
-      html+='<div class="demande-card fade-in-item" style="animation-delay:'+(di*0.04)+'s">'+
-        '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
-        '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
-        '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+'</div>'+
-        (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
-        (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
-        (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
-        '<div class="devis-form">'+
-          '<label>💰 Votre prix (€ TTC)</label>'+
-          '<input type="number" inputmode="decimal" id="prix-'+safeId+'" placeholder="Ex: 150" min="1">'+
-          '<label>📝 Message pour le client</label>'+
-          '<textarea id="msg-'+safeId+'" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>'+
-          '<button class="btn-devis" id="btn-devis-'+safeId+'" onclick="envoyerDevis(\''+safeId+'\')">✨ Envoyer mon devis</button>'+
-        '</div></div>';
-    });
-    c.innerHTML=html;
-    data.forEach(function(d){
-      var ph=getPhotosFromNotes(d.notes);
-      if(ph.length)renderPhotoPreviews(ph,'photos-pro-'+d.id);
-    });
+    proDemandesCache=data;
+    renderProDemandesCards();
   }catch(e){document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement. Tirez vers le bas pour réessayer.</p></div>'}
+}
+function renderProDemandesCards(){
+  var c=document.getElementById('pro-demandes-list');
+  if(!c)return;
+  var data=proDemandesCache;
+  if(!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
+
+  // Puces construites dynamiquement à partir des catégories réellement présentes dans les demandes
+  // en attente — pas de puce vide pour une prestation que le pro ne voit jamais.
+  var categories=[];
+  data.forEach(function(d){
+    var cat=(d.prestation||'').split(' + ')[0].trim();
+    if(cat&&categories.indexOf(cat)===-1)categories.push(cat);
+  });
+  var chips='<div class="filter-chips"><button class="filter-chip'+(proDemandesFilterActive==='tous'?' active':'')+'" onclick="setProDemandesFilter(\'tous\')">Toutes</button>'+
+    categories.map(function(cat){
+      return '<button class="filter-chip'+(proDemandesFilterActive===cat?' active':'')+'" onclick="setProDemandesFilter(\''+escAttr(cat)+'\')">'+escapeHtml(cat)+'</button>';
+    }).join('')+'</div>';
+
+  var filtered=proDemandesFilterActive==='tous'?data:data.filter(function(d){return(d.prestation||'').indexOf(proDemandesFilterActive)>=0});
+  if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span>🔍</span><p>Aucune demande dans cette catégorie.</p></div>';return}
+
+  var html=chips;
+  filtered.forEach(function(d,di){
+    var hasPhotos=getPhotosFromNotes(d.notes).length>0;
+    var safeId=escAttr(d.id);
+    html+='<div class="demande-card fade-in-item" style="animation-delay:'+(di*0.04)+'s">'+
+      '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
+      '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
+      '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+'</div>'+
+      (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
+      (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
+      (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
+      '<div class="devis-form">'+
+        '<label>💰 Votre prix (€ TTC)</label>'+
+        '<input type="number" inputmode="decimal" id="prix-'+safeId+'" placeholder="Ex: 150" min="1">'+
+        '<label>📝 Message pour le client</label>'+
+        '<textarea id="msg-'+safeId+'" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>'+
+        '<button class="btn-devis" id="btn-devis-'+safeId+'" onclick="envoyerDevis(\''+safeId+'\')">✨ Envoyer mon devis</button>'+
+      '</div></div>';
+  });
+  c.innerHTML=html;
+  filtered.forEach(function(d){
+    var ph=getPhotosFromNotes(d.notes);
+    if(ph.length)renderPhotoPreviews(ph,'photos-pro-'+d.id);
+  });
 }
 
 async function loadProDevisCount(){
@@ -1361,6 +1425,21 @@ async function loadProDevisCount(){
   }catch(e){}
 }
 
+var proDevisCache={data:[],notesDonnees:[]};
+var proDevisFilterActive='tous';
+function proDevisMatchesFilter(v,f){
+  var demandeStatut=v.demande&&v.demande.statut;
+  if(f==='tous')return true;
+  if(f==='attente')return v.statut==='envoye';
+  if(f==='acceptes')return v.statut==='accepte'&&demandeStatut!=='terminee';
+  if(f==='termines')return v.statut==='accepte'&&demandeStatut==='terminee';
+  if(f==='refuses')return v.statut==='refuse'||v.statut==='annule_pro'||demandeStatut==='annulee_client';
+  return true;
+}
+function setProDevisFilter(f){
+  proDevisFilterActive=f;
+  renderProDevisCards();
+}
 async function loadProDevis(silent){
   var c0=document.getElementById('pro-devis-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
@@ -1392,8 +1471,24 @@ async function loadProDevis(silent){
     var changed3=hasDataChanged('proDevis',data);
     if(silent&&!changed3)return;
 
-    var html='';
-    data.forEach(function(v,vi){
+    proDevisCache={data:data,notesDonnees:notesDonnees};
+    renderProDevisCards();
+  }catch(e){console.error('loadProDevis',e)}
+}
+function renderProDevisCards(){
+  var c=document.getElementById('pro-devis-list');
+  if(!c)return;
+  var data=proDevisCache.data,notesDonnees=proDevisCache.notesDonnees;
+  var chips='<div class="filter-chips">'+
+    ['tous:Tous','attente:En attente','acceptes:Acceptés','termines:Terminés','refuses:Refusés/Annulés'].map(function(f){
+      var parts=f.split(':');
+      return '<button class="filter-chip'+(proDevisFilterActive===parts[0]?' active':'')+'" onclick="setProDevisFilter(\''+parts[0]+'\')">'+parts[1]+'</button>';
+    }).join('')+'</div>';
+  var filtered=data.filter(function(v){return proDevisMatchesFilter(v,proDevisFilterActive)});
+  if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span>🔍</span><p>Aucun devis dans cette catégorie.</p></div>';return}
+
+  var html=chips;
+  filtered.forEach(function(v,vi){
       var badge,extra='';
       var safeVId=escAttr(v.id),safeDemandeId=escAttr(v.demande_id);
       var demandeStatut=v.demande&&v.demande.statut;
@@ -1436,13 +1531,12 @@ async function loadProDevis(silent){
         '<div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' €</div>'+
         (v.description?'<div style="font-size:13px;color:var(--text-secondary)"><strong>Votre message :</strong> '+escapeHtml(v.description)+'</div>':'')+
         extra+'</div>';
-    });
-    c.innerHTML=html;
-    data.forEach(function(v){
-      var ph=getPhotosFromNotes(v.demande&&v.demande.notes);
-      if(ph.length)renderPhotoPreviews(ph,'photos-mesdevis-'+v.id);
-    });
-  }catch(e){console.error('loadProDevis',e)}
+  });
+  c.innerHTML=html;
+  filtered.forEach(function(v){
+    var ph=getPhotosFromNotes(v.demande&&v.demande.notes);
+    if(ph.length)renderPhotoPreviews(ph,'photos-mesdevis-'+v.id);
+  });
 }
 
 async function envoyerDevis(demandeId){
