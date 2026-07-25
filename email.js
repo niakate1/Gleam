@@ -19,7 +19,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@gleam-app.fr';
 const FROM_NAME = 'Gleam';
-const APP_URL = process.env.FRONTEND_URL || 'https://niakate1.github.io/Gleam/public/';
+const APP_URL = process.env.FRONTEND_URL || 'https://gleam-app.fr/';
 
 // ---------------------------------------------------------------------------
 // Gabarit HTML commun (header / footer identiques pour tous les emails)
