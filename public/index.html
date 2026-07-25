@@ -77,7 +77,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .svc-card[data-svc="toiture"]{background:#FEF3E2;border-color:#FEF3E2;color:#B45309}
 .svc-card[data-svc="vitres"]{background:#EFF6FF;border-color:#EFF6FF;color:#2563EB}
 .svc-card[data-svc="tapis"]{background:#FDF4FF;border-color:#FDF4FF;color:#A21CAF}
-.svc-card[data-svc="autre"]{background:var(--surface-alt);border-color:var(--surface-alt);color:var(--gray)}
+.svc-card[data-svc="autre"]{background:var(--surface-alt);border-color:var(--surface-alt);color:var(--gray);grid-column:1 / -1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px}
+.svc-card[data-svc="autre"] i{margin-bottom:0!important}
+.svc-card[data-svc="autre"] .svc-name{font-size:13px}
 .svc-card[data-svc] .svc-name{color:inherit}
 .svc-card[data-svc].selected{border-color:currentColor;box-shadow:0 0 0 2px currentColor inset}
 @media (prefers-color-scheme: dark){
@@ -1724,8 +1726,10 @@ async function loadConversationsPro(silent){
 }
 // Ne considère que les conversations réellement affichées et cliquables dans la liste
 // (acceptee/en_cours/terminee), pour garantir que le badge peut toujours être effacé par l'utilisateur.
+// Une conversation "terminée" ne compte jamais pour la notification globale : la prestation est
+// close, il n'y a plus rien d'actionnable, un point rouge dessus induirait en erreur.
 function hasAnyUnreadVisible(data){
-  return (data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'||c.statut==='terminee'}).some(isConvUnread);
+  return (data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'}).some(isConvUnread);
 }
 function renderConvList(container,data){
   var active=(data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'});
@@ -1741,11 +1745,10 @@ function renderConvList(container,data){
     html+='<div class="section-title" style="padding:16px 0 8px;color:var(--gray)">🏁 Terminées</div>';
     termine.forEach(function(c){
       var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
-      var unread=isConvUnread(c);
       var photo=c.autre_partie&&c.autre_partie.photo;
       html+='<div class="conv-row fade-in-item" style="animation-delay:'+(idx++*0.04)+'s;opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
         '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
-        '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div>'+
+        '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
         '<div class="conv-preview">Prestation terminée — consulter l\'historique</div></div>'+
         '<div class="conv-time">🏁</div></div>';
     });
