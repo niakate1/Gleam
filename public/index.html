@@ -1943,7 +1943,7 @@ async function showMesPaiements(){
     var c=document.getElementById('paiements-list');
     if(!c)return;
     if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>💳</span><p>Aucun paiement pour l\u2019instant.</p></div>';return}
-    var statutLabels={en_attente:['En attente','var(--gray)'],paye:['Payé — en attente de confirmation','var(--gold)'],libere:['Confirmé','var(--mint)'],bloque:['Bloqué',' var(--red)']};
+    var statutLabels={paye:['Payé — en attente de confirmation','var(--gold)'],libere:['Confirmé','var(--mint)'],bloque:['Bloqué',' var(--red)']};
     c.innerHTML=d.map(function(p,i){
       var st=statutLabels[p.statut]||['',''];
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
@@ -1966,7 +1966,7 @@ async function showMesGains(){
     if(sum)sum.innerHTML='<div class="stat-card stat-card-p"><div class="stat-num">'+d.total_libere+'€</div><div class="stat-label">Reçu</div></div>'+
       '<div class="stat-card stat-card-gold"><div class="stat-num">'+d.total_en_attente+'€</div><div class="stat-label">En attente</div></div>';
     if(!d.paiements||!d.paiements.length){if(c)c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun gain pour l\u2019instant.</p></div>';return}
-    var statutLabels={en_attente:['Client pas encore payé','var(--gray)'],paye:['En attente de confirmation client','var(--gold)'],libere:['Reçu','var(--mint)'],bloque:['Bloqué','var(--red)']};
+    var statutLabels={paye:['En attente de confirmation client','var(--gold)'],libere:['Reçu','var(--mint)'],bloque:['Bloqué','var(--red)']};
     if(c)c.innerHTML=d.paiements.map(function(p,i){
       var st=statutLabels[p.statut]||['',''];
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
