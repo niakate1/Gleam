@@ -1156,6 +1156,25 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
 // Génère les données d'une facture pour une prestation terminée — accessible au client (ou à
 // l'entreprise) et au prestataire concernés. Le document lui-même (mise en forme imprimable)
 // est construit côté app à partir de ces données ; rien n'est stocké en double ici.
+// Construit une description complète de la prestation (matière, surface/quantité, état) à partir
+// des notes structurées de la demande — plutôt que d'afficher juste le nom brut de la catégorie
+// sur la facture, ce qui serait trop pauvre pour un usage comptable ou professionnel sérieux.
+function construireDescriptionPrestation(notes, prestationFallback) {
+  try {
+    const n = JSON.parse(notes);
+    if (n.prestations && Array.isArray(n.prestations) && n.prestations.length) {
+      return n.prestations.map(p => {
+        const details = p.details && Object.keys(p.details).length ? Object.values(p.details).join(', ') : '';
+        let ligne = 'Nettoyage — ' + (p.type || '');
+        if (details) ligne += ' (' + details + ')';
+        if (p.description) ligne += ' : ' + p.description;
+        return ligne;
+      }).join(' ; ');
+    }
+  } catch (e) { /* notes non structurées ou absentes */ }
+  return 'Nettoyage — ' + (prestationFallback || '');
+}
+
 app.get('/api/demandes/:id/facture', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
@@ -1180,7 +1199,7 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
     res.json({
       numero: 'GLEAM-' + demande.id.slice(0, 8).toUpperCase(),
       date: demande.updated_at || demande.created_at,
-      prestation: demande.prestation,
+      prestation: construireDescriptionPrestation(demande.notes, demande.prestation),
       adresse: demande.adresse,
       client: client ? {
         est_entreprise: client.type === 'entreprise',
