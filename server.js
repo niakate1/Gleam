@@ -1112,7 +1112,7 @@ app.post('/api/evaluations', auth, async (req, res) => {
 
     const { data: notes } = await supabase.from('evaluations').select('note').eq('evalue_id', evalue_id);
     const moyenne = notes.reduce(function(a, b) { return a + b.note; }, 0) / notes.length;
-    await supabase.from('users').update({ note_moyenne: Math.round(moyenne * 10) / 10 }).eq('id', evalue_id);
+    await supabase.from('users').update({ note_moyenne: Math.round(moyenne * 100) / 100 }).eq('id', evalue_id);
 
     res.status(201).json(data);
   } catch (e) {
