@@ -1892,6 +1892,7 @@ async function loadChatMessages(){
     const r=await fetch(API+'/api/messages/'+currentChatDemandeId,{headers:authHeaders()});
     if(!r.ok)return;
     const data=await safeJson(r);
+    if(!hasDataChanged('chat-'+currentChatDemandeId,data))return;
     const c=document.getElementById('chat-messages');
     var atBottom=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
     var html='';
@@ -1935,12 +1936,39 @@ async function sendChatMsg(){
   var sendBtn=document.getElementById('chat-send-btn');
   input.value='';
   if(sendBtn)sendBtn.disabled=true;
+
+  // Affichage optimiste : le message apparaît immédiatement, sans attendre l'aller-retour serveur,
+  // qui se fait ensuite silencieusement en arrière-plan — supprime le temps d'attente perçu à l'envoi.
+  var tempId='temp-'+Date.now();
+  var c=document.getElementById('chat-messages');
+  var heureLocale=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  if(c){
+    var emptyState=c.querySelector('.empty-state');
+    if(emptyState)emptyState.remove();
+    var div=document.createElement('div');
+    div.id=tempId;
+    div.style.cssText='display:flex;flex-direction:column;align-items:flex-end';
+    div.innerHTML='<div class="chat-bubble mine" style="opacity:.6">'+escapeHtml(msg)+'</div><span style="font-size:10px;color:var(--gray);margin:2px 6px 0">'+heureLocale+'</span>';
+    c.appendChild(div);
+    c.scrollTop=c.scrollHeight;
+  }
+
   try{
     const r=await fetch(API+'/api/messages',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:currentChatDemandeId,contenu:msg})});
     const d=await safeJson(r);
-    if(!r.ok){toast(d.error||'Message bloqué.');input.value=msg;return}
+    if(!r.ok){
+      var failedEl=document.getElementById(tempId);
+      if(failedEl)failedEl.remove();
+      toast(d.error||'Message bloqué.');input.value=msg;return;
+    }
+    var sentEl=document.getElementById(tempId);
+    if(sentEl){var bubble=sentEl.querySelector('.chat-bubble');if(bubble)bubble.style.opacity='1'}
     loadChatMessages();
-  }catch(e){toast(friendlyNetworkError(e));input.value=msg}
+  }catch(e){
+    var errEl=document.getElementById(tempId);
+    if(errEl)errEl.remove();
+    toast(friendlyNetworkError(e));input.value=msg;
+  }
   finally{if(sendBtn)sendBtn.disabled=false}
 }
 
