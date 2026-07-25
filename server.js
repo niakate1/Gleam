@@ -935,6 +935,54 @@ app.get('/api/conversations', auth, async (req, res) => {
 
 // ══════════════ PAIEMENTS ══════════════
 
+// Crée (si besoin) le compte Stripe Connect du pro, puis renvoie un lien d'inscription hébergé
+// par Stripe lui-même — Gleam ne collecte ni ne stocke jamais l'IBAN ou l'identité du pro,
+// tout se passe directement chez Stripe, qui gère la conformité (DSP2, vérification d'identité...).
+app.post('/api/paiements/connect/onboarding', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type, stripe_account_id, email').eq('id', req.user.id).single();
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+
+    let accountId = user.stripe_account_id;
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email: user.email,
+        capabilities: { transfers: { requested: true } },
+        business_type: 'individual'
+      });
+      accountId = account.id;
+      await supabase.from('users').update({ stripe_account_id: accountId }).eq('id', req.user.id);
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${process.env.FRONTEND_URL || 'https://gleam-app.fr/'}#paiements-refresh`,
+      return_url: `${process.env.FRONTEND_URL || 'https://gleam-app.fr/'}#paiements-retour`,
+      type: 'account_onboarding'
+    });
+
+    res.json({ url: accountLink.url });
+  } catch (e) {
+    console.error('Stripe Connect onboarding:', e);
+    res.status(500).json({ error: 'Impossible de démarrer la configuration des paiements. Réessayez dans un instant.' });
+  }
+});
+
+// Vérifie où en est le pro dans la configuration de ses paiements (jamais configuré / en cours / prêt)
+app.get('/api/paiements/connect/statut', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('stripe_account_id').eq('id', req.user.id).single();
+    if (!user || !user.stripe_account_id) return res.json({ statut: 'non_configure' });
+
+    const account = await stripe.accounts.retrieve(user.stripe_account_id);
+    const pret = account.charges_enabled && account.payouts_enabled;
+    res.json({ statut: pret ? 'pret' : 'en_cours' });
+  } catch (e) {
+    res.json({ statut: 'non_configure' });
+  }
+});
+
 app.post('/api/paiements/intent', auth, async (req, res) => {
   try {
     const { devis_id } = req.body;
@@ -1024,24 +1072,39 @@ app.post('/api/paiements/liberer', auth, async (req, res) => {
     if (!paiement) return res.status(404).json({ error: 'Paiement introuvable.' });
     if (paiement.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
 
+    const { data: pro } = await supabase.from('users').select('email, prenom, stripe_account_id').eq('id', paiement.societe_id).single();
+    if (!pro || !pro.stripe_account_id) {
+      return res.status(400).json({ error: 'Le prestataire n\'a pas encore configuré ses paiements. Le virement ne peut pas être effectué pour l\'instant — contactez le support Gleam.' });
+    }
+
+    // Déclenche le vrai virement Stripe vers le compte Connect du pro (montant net, commission déjà déduite)
+    try {
+      await stripe.transfers.create({
+        amount: Math.round(parseFloat(paiement.montant_societe) * 100),
+        currency: 'eur',
+        destination: pro.stripe_account_id,
+        transfer_group: `demande_${paiement.demande_id}`
+      });
+    } catch (stripeErr) {
+      console.error('Virement Stripe échoué:', stripeErr);
+      return res.status(400).json({ error: 'Le virement vers le prestataire a échoué (' + (stripeErr.message || 'compte Stripe non prêt') + '). Réessayez plus tard ou contactez le support.' });
+    }
+
     await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id);
     await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
 
-    // 📧 Email "prestation confirmée" désactivé pour l'instant (redondant avec l'app).
-    // Pour le réactiver, décommentez le bloc ci-dessous :
-    // const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
-    // const { data: client } = await supabase.from('users').select('email, prenom').eq('id', paiement.client_id).single();
-    // const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', paiement.societe_id).single();
-    // if (client) {
-    //   sendEmail('prestation_confirmee', client.email, {
-    //     prenom: client.prenom, role: 'client', prestation: demandeInfo ? demandeInfo.prestation : '', demandeId: paiement.demande_id
-    //   });
-    // }
-    // if (pro) {
-    //   sendEmail('prestation_confirmee', pro.email, {
-    //     prenom: pro.prenom, role: 'pro', prestation: demandeInfo ? demandeInfo.prestation : '', montantPro: paiement.montant_societe, demandeId: paiement.demande_id
-    //   });
-    // }
+    const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
+    const { data: client } = await supabase.from('users').select('email, prenom').eq('id', paiement.client_id).single();
+    if (client) {
+      sendEmail('prestation_confirmee', client.email, {
+        prenom: client.prenom, role: 'client', prestation: demandeInfo ? demandeInfo.prestation : '', demandeId: paiement.demande_id
+      }).catch(e => console.error('Email prestation_confirmee client:', e));
+    }
+    if (pro) {
+      sendEmail('prestation_confirmee', pro.email, {
+        prenom: pro.prenom, role: 'pro', prestation: demandeInfo ? demandeInfo.prestation : '', montantPro: paiement.montant_societe, demandeId: paiement.demande_id
+      }).catch(e => console.error('Email prestation_confirmee pro:', e));
+    }
 
     res.json({ message: 'Paiement Gleam libéré ✨' });
   } catch (e) {
@@ -1084,6 +1147,52 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
       total_libere: Math.round(totalLibere * 100) / 100,
       total_en_attente: Math.round(totalEnAttente * 100) / 100,
       paiements: paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }))
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Génère les données d'une facture pour une prestation terminée — accessible au client (ou à
+// l'entreprise) et au prestataire concernés. Le document lui-même (mise en forme imprimable)
+// est construit côté app à partir de ces données ; rien n'est stocké en double ici.
+app.get('/api/demandes/:id/facture', auth, async (req, res) => {
+  try {
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.statut !== 'terminee') return res.status(400).json({ error: 'La facture n\'est disponible qu\'une fois la prestation terminée.' });
+
+    const { data: devisAccepte } = await supabase.from('devis').select('*').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
+    if (!devisAccepte) return res.status(404).json({ error: 'Devis introuvable.' });
+
+    const estClient = demande.client_id === req.user.id;
+    const estPro = devisAccepte.societe_id === req.user.id;
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Accès refusé.' });
+
+    const { data: client } = await supabase.from('users').select('prenom, nom, email, type, raison_sociale, siret, tva_intracom, adresse_facturation').eq('id', demande.client_id).single();
+    const { data: pro } = await supabase.from('users').select('prenom, nom, email, siret').eq('id', devisAccepte.societe_id).single();
+    const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demande.id).maybeSingle();
+
+    const montantTtc = parseFloat(devisAccepte.prix_ttc);
+    const commission = paiement ? parseFloat(paiement.commission) : Math.round(montantTtc * 0.15 * 100) / 100;
+    const montantPro = paiement ? parseFloat(paiement.montant_societe) : Math.round((montantTtc - commission) * 100) / 100;
+
+    res.json({
+      numero: 'GLEAM-' + demande.id.slice(0, 8).toUpperCase(),
+      date: demande.updated_at || demande.created_at,
+      prestation: demande.prestation,
+      adresse: demande.adresse,
+      client: client ? {
+        est_entreprise: client.type === 'entreprise',
+        nom_affiche: client.type === 'entreprise' ? client.raison_sociale : ((client.prenom || '') + ' ' + (client.nom || '')).trim(),
+        siret: client.type === 'entreprise' ? client.siret : null,
+        tva_intracom: client.type === 'entreprise' ? client.tva_intracom : null,
+        adresse_facturation: client.type === 'entreprise' ? client.adresse_facturation : null
+      } : null,
+      pro: pro ? { nom_affiche: ((pro.prenom || '') + ' ' + (pro.nom || '')).trim(), siret: pro.siret } : null,
+      montant_ttc: montantTtc,
+      commission_gleam: commission,
+      montant_pro: montantPro
     });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
