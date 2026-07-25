@@ -1115,6 +1115,38 @@ app.post('/api/evaluations', auth, async (req, res) => {
   }
 });
 
+// Liste des avis reçus par l'utilisateur connecté (rubrique "Mes avis")
+app.get('/api/evaluations/mes-avis', auth, async (req, res) => {
+  try {
+    const { data: evaluations } = await supabase.from('evaluations').select('*').eq('evalue_id', req.user.id).order('created_at', { ascending: false });
+    if (!evaluations || !evaluations.length) return res.json([]);
+    const demandeIds = [...new Set(evaluations.map(e => e.demande_id))];
+    const evaluateurIds = [...new Set(evaluations.map(e => e.evaluateur_id))];
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation').in('id', demandeIds);
+    const { data: evaluateurs } = await supabase.from('users').select('id, prenom').in('id', evaluateurIds);
+    const demandesMap = {}; (demandes || []).forEach(d => { demandesMap[d.id] = d; });
+    const evaluateursMap = {}; (evaluateurs || []).forEach(u => { evaluateursMap[u.id] = u; });
+    res.json(evaluations.map(e => ({
+      ...e,
+      prestation: demandesMap[e.demande_id] ? demandesMap[e.demande_id].prestation : null,
+      evaluateur_prenom: evaluateursMap[e.evaluateur_id] ? evaluateursMap[e.evaluateur_id].prenom : 'Utilisateur Gleam'
+    })));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Liste des identifiants de demandes déjà notées par l'utilisateur connecté (pour cacher le
+// bouton "Noter" une fois l'avis déjà donné, plutôt que de compter uniquement sur le refus serveur)
+app.get('/api/evaluations/mes-notes-donnees', auth, async (req, res) => {
+  try {
+    const { data } = await supabase.from('evaluations').select('demande_id').eq('evaluateur_id', req.user.id);
+    res.json((data || []).map(e => e.demande_id));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // ══════════════ PROS / SOCIÉTÉS ══════════════
 
 app.get('/api/societes', auth, async (req, res) => {
