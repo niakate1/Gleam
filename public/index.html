@@ -495,10 +495,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- CHAT -->
 <div class="screen" id="s-chat">
-  <div class="navbar">
-    <button class="back-btn" onclick="backFromChat()" aria-label="Retour">←</button>
-    <span class="logo-sm" id="chat-title" style="font-size:16px">Conversation</span>
-    <span style="width:24px"></span>
+  <div class="navbar" style="justify-content:flex-start;gap:10px">
+    <button class="back-btn" onclick="backFromChat()" aria-label="Retour" style="flex-shrink:0">←</button>
+    <div class="mini-avatar" id="chat-avatar" style="width:34px;height:34px;font-size:14px;flex-shrink:0"></div>
+    <div style="flex:1;min-width:0;overflow:hidden">
+      <div class="logo-sm" id="chat-title" style="font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Conversation</div>
+      <div id="chat-subtitle" style="font-size:11px;color:var(--gray);display:none"></div>
+    </div>
   </div>
   <div class="chat-screen">
     <div class="chat-messages" id="chat-messages"></div>
@@ -613,6 +616,9 @@ const API='https://gleam-production-9b95.up.railway.app';
   };
 })();
 let currentUser=null,userRole='client',photos=[],disponible=true,currentChatDemandeId=null,chatPollInterval=null;
+// Table de correspondance demande_id -> {photo, note} de l'autre partie, pour afficher son identité
+// dans l'en-tête du chat sans avoir à embarquer de longues photos en base64 dans des attributs HTML.
+var chatPartnerInfo={};
 let selectedServices=[],multiFlow={active:false,queue:[],current:0,results:[]};
 let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisId=null;
 let isSubmittingPhotos=false;
@@ -1121,6 +1127,7 @@ function renderDevisClientCards(){
       var badge,actions='';
       var cardStyle='';
       var safeDemandeId=escAttr(v.demande_id),safeVId=escAttr(v.id),safeSocieteId=escAttr(v.societe_id),safeProName=escAttr(proNameRaw);
+      chatPartnerInfo[v.demande_id]={photo:v.pro&&v.pro.photo,note:v.pro&&v.pro.note_moyenne};
 
       if(v.statut==='accepte'&&v.demande_statut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
@@ -1886,6 +1893,7 @@ function renderConvList(container,data){
     termine.forEach(function(c){
       var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
       var photo=c.autre_partie&&c.autre_partie.photo;
+      chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne};
       html+='<div class="conv-row fade-in-item" style="animation-delay:'+(idx++*0.04)+'s;opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
         '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
         '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
@@ -1901,6 +1909,7 @@ function convRowHtml(c,idx){
   var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
   var unread=isConvUnread(c);
   var photo=c.autre_partie&&c.autre_partie.photo;
+  chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne};
   return'<div class="conv-row fade-in-item" style="animation-delay:'+((idx||0)*0.04)+'s" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(nameRaw)+'\')">'+
     '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
     '<div class="conv-body"><div class="conv-name">'+escapeHtml(nameRaw)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div><div class="conv-preview">'+escapeHtml(preview)+'</div></div>'+
@@ -1911,6 +1920,17 @@ function convRowHtml(c,idx){
 function goToChat(demandeId,otherName){
   currentChatDemandeId=demandeId;
   document.getElementById('chat-title').textContent=otherName||'Conversation';
+  var info=chatPartnerInfo[demandeId]||{};
+  var avatarEl=document.getElementById('chat-avatar');
+  if(avatarEl){
+    if(info.photo){avatarEl.innerHTML='<img class="avatar-photo" src="'+info.photo+'" alt="">'}
+    else{avatarEl.textContent=(otherName||'?').trim().charAt(0).toUpperCase()||'?'}
+  }
+  var subEl=document.getElementById('chat-subtitle');
+  if(subEl){
+    if(info.note){subEl.style.display='block';subEl.innerHTML='<i data-lucide="star" style="width:11px;height:11px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(info.note)+' / 5';if(window.lucide)lucide.createIcons()}
+    else{subEl.style.display='none';subEl.textContent=''}
+  }
   document.getElementById('chat-messages').innerHTML='';
   show('s-chat');
   loadChatMessages();
