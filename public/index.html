@@ -63,6 +63,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .greeting p{color:var(--gray);font-size:14px;margin-bottom:18px}
 .section-title{font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text)}
 .filter-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:4px;-webkit-overflow-scrolling:touch}
+.adresse-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;margin-top:4px;max-height:220px;overflow-y:auto;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.12);display:none}
+.adresse-suggestions.show{display:block}
+.adresse-suggestion-item{padding:11px 14px;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.adresse-suggestion-item:last-child{border-bottom:none}
+.adresse-suggestion-item:active{background:var(--light)}
 .filter-chips::-webkit-scrollbar{display:none}
 .filter-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:12.5px;font-weight:700;white-space:nowrap;cursor:pointer;flex-shrink:0;transition:.15s}
 .filter-chip.active{background:var(--p);border-color:var(--p);color:#fff}
@@ -2349,7 +2354,7 @@ function dateTimeBlock(isLast){
     '<div class="datetime-row"><input type="date" id="f-date" min="'+today+'" value="'+today+'"><select id="f-time">'+opts+'</select></div>'+
     '<label style="margin-top:12px">Flexibilité <span class="optional">(optionnel)</span></label>'+
     '<div class="flex-opts">'+flexBtns+'</div></div>'+
-    '<div class="field-group"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="address-line1"></div>'+
+    '<div class="field-group" style="position:relative"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="off" oninput="chercherAdresse(this.value)"><div id="adresse-suggestions" class="adresse-suggestions"></div></div>'+
     '<div class="field-group" style="margin-top:10px"><label>🏙️ Ville *</label><input type="text" id="f-ville" placeholder="Paris" autocomplete="address-level2"></div>'+
     '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel, max 5)</span></label>'+
     '<div class="photo-zone" onclick="document.getElementById(\'photo-input\').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>'+
@@ -2396,6 +2401,50 @@ function etatBlock(){
     '</div><div id="prix-estime-box" style="margin-top:10px"></div></div>';
 }
 
+// Autocomplétion d'adresse via l'API Adresse officielle du gouvernement français
+// (service de géocodage de la Géoplateforme/IGN, qui a remplacé l'ancienne API Adresse) — gratuite,
+// sans clé, sans limite d'usage raisonnable, et bien plus précise que des solutions génériques puisque Gleam ne sert que des adresses françaises.
+var adresseSearchTimer=null,adresseSearchController=null;
+function chercherAdresse(valeur){
+  clearTimeout(adresseSearchTimer);
+  var box=document.getElementById('adresse-suggestions');
+  if(!valeur||valeur.trim().length<3){if(box){box.classList.remove('show');box.innerHTML=''}return}
+  adresseSearchTimer=setTimeout(function(){
+    if(adresseSearchController)adresseSearchController.abort();
+    adresseSearchController=new AbortController();
+    fetch('https://data.geopf.fr/geocodage/search?q='+encodeURIComponent(valeur)+'&limit=5&type=housenumber',{signal:adresseSearchController.signal})
+      .then(function(r){return r.ok?r.json():null})
+      .then(function(data){
+        if(!data||!data.features||!data.features.length){if(box){box.classList.remove('show');box.innerHTML=''}return}
+        if(!box)return;
+        box.innerHTML=data.features.map(function(f){
+          var p=f.properties;
+          var rue=escapeHtml(p.name||'');
+          var villeEtCp=escapeHtml((p.postcode||'')+' '+(p.city||''));
+          return '<div class="adresse-suggestion-item" onclick="choisirAdresse(\''+escAttr(p.name||'')+'\',\''+escAttr(p.city||'')+'\')">'+
+            '<i data-lucide="map-pin" style="width:14px;height:14px;color:var(--gray);flex-shrink:0"></i>'+
+            '<div><div style="font-weight:600">'+rue+'</div><div style="font-size:11px;color:var(--gray)">'+villeEtCp+'</div></div>'+
+          '</div>';
+        }).join('');
+        box.classList.add('show');
+        if(window.lucide)lucide.createIcons();
+      }).catch(function(){});
+  },300);
+}
+function choisirAdresse(rue,ville){
+  var addrEl=document.getElementById('f-addr'),villeEl=document.getElementById('f-ville');
+  if(addrEl)addrEl.value=rue;
+  if(villeEl)villeEl.value=ville;
+  var box=document.getElementById('adresse-suggestions');
+  if(box){box.classList.remove('show');box.innerHTML=''}
+}
+// Ferme la liste de suggestions si l'utilisateur clique ailleurs sur la page
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#f-addr')&&!e.target.closest('#adresse-suggestions')){
+    var box=document.getElementById('adresse-suggestions');
+    if(box)box.classList.remove('show');
+  }
+});
 function quantiteBlock(label,placeholder){
   return '<div class="field-group"><label>'+label+'</label>'+
     '<input type="number" inputmode="numeric" min="1" id="f-quantite" placeholder="'+placeholder+'" oninput="updateEstimation()"></div>';
