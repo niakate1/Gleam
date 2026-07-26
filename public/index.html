@@ -1138,8 +1138,12 @@ function renderDevisClientCards(){
           '<button class="btn-accept" style="width:100%;margin-bottom:8px" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
           (v.code_validation?(
             '<div style="background:#fff;border:2px dashed var(--green);border-radius:12px;padding:14px;text-align:center">'+
-              '<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">Code à donner au prestataire à la fin</div>'+
+              '<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">Votre code de fin de prestation</div>'+
               '<div style="font-size:28px;font-weight:800;letter-spacing:4px;color:var(--text)">'+escapeHtml(v.code_validation)+'</div>'+
+              '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:#B45309;font-weight:700;display:flex;align-items:center;gap:6px;text-align:left">'+
+                '<i data-lucide="alert-triangle" style="width:16px;height:16px;flex-shrink:0"></i>'+
+                '<span>Ne donnez ce code qu\'une fois le travail entièrement terminé et vérifié — jamais avant.</span>'+
+              '</div>'+
             '</div>'
           ):'')+
         '</div>';
