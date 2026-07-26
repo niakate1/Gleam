@@ -507,6 +507,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="logo-sm" id="chat-title" style="font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Conversation</div>
       <div id="chat-subtitle" style="font-size:11px;color:var(--gray);display:none"></div>
     </div>
+    <button onclick="ouvrirSignalement()" aria-label="Signaler un problème" style="background:none;border:none;color:var(--gray);cursor:pointer;padding:6px;flex-shrink:0"><i data-lucide="flag" style="width:18px;height:18px"></i></button>
   </div>
   <div class="chat-screen">
     <div class="chat-messages" id="chat-messages"></div>
@@ -538,6 +539,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-menu">
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="heart" style="width:20px;height:20px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
@@ -1132,7 +1134,7 @@ function renderDevisClientCards(){
       var badge,actions='';
       var cardStyle='';
       var safeDemandeId=escAttr(v.demande_id),safeVId=escAttr(v.id),safeSocieteId=escAttr(v.societe_id),safeProName=escAttr(proNameRaw);
-      chatPartnerInfo[v.demande_id]={photo:v.pro&&v.pro.photo,note:v.pro&&v.pro.note_moyenne};
+      chatPartnerInfo[v.demande_id]={photo:v.pro&&v.pro.photo,note:v.pro&&v.pro.note_moyenne,id:v.societe_id};
 
       if(v.statut==='accepte'&&v.demande_statut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
@@ -1153,7 +1155,8 @@ function renderDevisClientCards(){
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         cardStyle='opacity:0.7;';
-        actions='<button class="btn-accept" style="background:var(--p);width:100%;margin-top:12px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>';
+        actions='<button class="btn-accept" style="background:var(--p);width:100%;margin-top:12px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>'+
+          '<button class="btn-accept" style="background:none;border:1.5px solid var(--gold);color:#B45309;width:100%;margin-top:8px" onclick="ajouterFavori(\''+safeSocieteId+'\',\''+safeProName+'\',this)"><i data-lucide="heart" style="width:14px;height:14px;vertical-align:-2px"></i> Ajouter à mes favoris</button>';
         if(notesDonnees.indexOf(v.demande_id)>=0){
           actions+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
         }else{
@@ -1898,7 +1901,7 @@ function renderConvList(container,data){
     termine.forEach(function(c){
       var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
       var photo=c.autre_partie&&c.autre_partie.photo;
-      chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne};
+      chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne,id:c.autre_partie&&c.autre_partie.id};
       html+='<div class="conv-row fade-in-item" style="animation-delay:'+(idx++*0.04)+'s;opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
         '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
         '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
@@ -1914,7 +1917,7 @@ function convRowHtml(c,idx){
   var time=c.dernier_message_date?new Date(c.dernier_message_date).toLocaleDateString('fr-FR'):'';
   var unread=isConvUnread(c);
   var photo=c.autre_partie&&c.autre_partie.photo;
-  chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne};
+  chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne,id:c.autre_partie&&c.autre_partie.id};
   return'<div class="conv-row fade-in-item" style="animation-delay:'+((idx||0)*0.04)+'s" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(nameRaw)+'\')">'+
     '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
     '<div class="conv-body"><div class="conv-name">'+escapeHtml(nameRaw)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div><div class="conv-preview">'+escapeHtml(preview)+'</div></div>'+
@@ -1951,6 +1954,37 @@ function goToChat(demandeId,otherName){
         if(bar)bar.innerHTML='<div style="text-align:center;padding:12px;color:var(--gray);font-size:13px;width:100%">🏁 Cette prestation est terminée. La messagerie est fermée.</div>';
       }
     }).catch(function(){});
+}
+function ouvrirSignalement(){
+  var info=chatPartnerInfo[currentChatDemandeId]||{};
+  if(!info.id){toast('Impossible de signaler pour l\u2019instant.');return}
+  var html='<div class="modal-title"><i data-lucide="flag" style="width:20px;height:20px;vertical-align:-4px;color:var(--red)"></i> Signaler un problème</div>'+
+    '<div class="modal-sub">Votre signalement sera examiné par l\'équipe Gleam.</div>'+
+    '<div class="field-group"><label>Motif</label><div class="options-grid">'+
+      '<button class="opt-btn" data-group="signal-motif" data-coef-key="motif" data-coef-val="coordonnees" onclick="selOpt(this)">Demande de coordonnées</button>'+
+      '<button class="opt-btn" data-group="signal-motif" data-coef-key="motif" data-coef-val="comportement" onclick="selOpt(this)">Comportement inapproprié</button>'+
+      '<button class="opt-btn" data-group="signal-motif" data-coef-key="motif" data-coef-val="absence" onclick="selOpt(this)">Absence / non-présentation</button>'+
+      '<button class="opt-btn full" data-group="signal-motif" data-coef-key="motif" data-coef-val="autre" onclick="selOpt(this)">Autre</button>'+
+    '</div></div>'+
+    '<div class="field-group"><label>Description <span class="optional">(optionnel)</span></label><textarea id="signal-desc" rows="3" placeholder="Décrivez la situation..." style="resize:none"></textarea></div>'+
+    '<button class="modal-send-btn" id="signal-btn" onclick="envoyerSignalement(\''+escAttr(info.id)+'\')">Envoyer le signalement</button>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+async function envoyerSignalement(signaleId){
+  var motifEl=document.querySelector('[data-group="signal-motif"].sel');
+  if(!motifEl){toast('❌ Merci de choisir un motif.');return}
+  var motif=motifEl.getAttribute('data-coef-val');
+  var desc=document.getElementById('signal-desc').value.trim();
+  var btn=document.getElementById('signal-btn');
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(API+'/api/signalements',{method:'POST',headers:authHeaders(),body:JSON.stringify({signale_id:signaleId,demande_id:currentChatDemandeId,motif:motif,description:desc})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
+    closeModalForce();
+    toast('🚩 Signalement envoyé. Notre équipe va l\u2019examiner.',5000);
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 function backFromChat(){
   stopChatPoll();
@@ -2230,6 +2264,46 @@ async function checkConnectStatut(){
 }
 // Ouvre la facture (client/entreprise) ou le relevé (pro) dans un nouvel onglet, prêt à imprimer
 // ou enregistrer en PDF via la fonction native du navigateur — pas besoin de générateur de PDF côté serveur.
+async function ajouterFavori(proId,proName,btn){
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(API+'/api/favoris',{method:'POST',headers:authHeaders(),body:JSON.stringify({pro_id:proId})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
+    toast('❤️ '+escapeHtml(proName)+' ajouté à vos favoris !');
+    if(btn){btn.innerHTML='<i data-lucide="heart" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
+}
+async function showMesFavoris(){
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="heart" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes favoris</div><div class="modal-sub">Vos prestataires préférés, à recontacter en un clic</div><div id="favoris-list">'+skeletonCards(2)+'</div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  try{
+    const r=await fetch(API+'/api/favoris',{headers:authHeaders()});
+    const d=await safeJson(r);
+    var c=document.getElementById('favoris-list');
+    if(!c)return;
+    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>❤️</span><p>Aucun favori pour l\u2019instant.<br>Ajoutez un prestataire depuis une prestation terminée !</p></div>';return}
+    c.innerHTML=d.map(function(p,i){
+      var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
+      var note=p.note_moyenne?'<i data-lucide="star" style="width:12px;height:12px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(p.note_moyenne)+' / 5':'';
+      return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s;display:flex;align-items:center;gap:12px">'+
+        miniAvatarHtml(p.photo,nom)+
+        '<div style="flex:1;min-width:0"><div style="font-weight:700">'+escapeHtml(nom)+'</div>'+
+        (note?'<div style="font-size:12px;color:var(--gold);font-weight:700">'+note+'</div>':'')+
+        (p.disponible===false?'<div style="font-size:11px;color:var(--gray)">Actuellement indisponible</div>':'')+'</div>'+
+        '<button class="btn-refuse" style="width:auto;padding:8px 10px" onclick="retirerFavori(\''+escAttr(p.id)+'\',this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>'+
+      '</div>';
+    }).join('');
+  }catch(e){var c2=document.getElementById('favoris-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
+}
+async function retirerFavori(proId,btn){
+  if(btn)btn.disabled=true;
+  try{
+    await fetch(API+'/api/favoris/'+proId,{method:'DELETE',headers:authHeaders()});
+    toast('Retiré de vos favoris.');
+    showMesFavoris();
+  }catch(e){toast(friendlyNetworkError(e))}
+}
 async function showFacture(demandeId){
   try{
     const r=await fetch(API+'/api/demandes/'+demandeId+'/facture',{headers:authHeaders()});
@@ -2332,6 +2406,7 @@ function openServiceForm(type){
   document.getElementById('modal-overlay').classList.add('open');
   renderPhotoInput();
   if(document.getElementById('prix-estime-box'))updateEstimation();
+  if(document.getElementById('favori-cible-block'))chargerFavoriCible(type);
 }
 function closeModal(e){if(e.target===document.getElementById('modal-overlay')){closeModalForce()}}
 function closeModalForce(){
@@ -2340,9 +2415,36 @@ function closeModalForce(){
   document.getElementById('modal-overlay').classList.remove('open');
   multiFlow={active:false,queue:[],current:0,results:[]};
   photos=[];
+  proPrefereChoisi=null;
 }
 function isLastInFlow(){return!multiFlow.active||multiFlow.current===multiFlow.queue.length-1}
 
+var proPrefereChoisi=null;
+async function chargerFavoriCible(type){
+  var box=document.getElementById('favori-cible-block');
+  if(!box)return;
+  proPrefereChoisi=null;
+  try{
+    const r=await fetch(API+'/api/favoris',{headers:authHeaders()});
+    if(!r.ok)return;
+    const favoris=await safeJson(r);
+    var compatibles=(favoris||[]).filter(function(p){return Array.isArray(p.prestations_proposees)&&p.prestations_proposees.indexOf(type)>=0});
+    if(!compatibles.length){box.innerHTML='';return}
+    box.innerHTML='<div class="field-group"><label>❤️ Adresser en priorité à un favori <span class="optional">(optionnel)</span></label>'+
+      '<div class="options-grid">'+
+      compatibles.map(function(p){
+        var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
+        return '<button class="opt-btn" data-group="favori-cible" onclick="choisirProPrefere(\''+escAttr(p.id)+'\',this)">'+escapeHtml(nom)+(p.disponible===false?' (indisponible)':'')+'</button>';
+      }).join('')+
+      '</div><div style="font-size:11px;color:var(--gray);margin-top:6px">Si non disponible, vous pourrez toujours rouvrir la demande à tous les prestataires.</div></div>';
+  }catch(e){}
+}
+function choisirProPrefere(proId,btn){
+  var deja=btn.classList.contains('sel');
+  document.querySelectorAll('[data-group="favori-cible"]').forEach(function(b){b.classList.remove('sel')});
+  if(deja){proPrefereChoisi=null}
+  else{btn.classList.add('sel');proPrefereChoisi=proId}
+}
 function dateTimeBlock(isLast){
   var today=localDateISO(new Date());
   if(multiFlow.active&&!isLast)return '<div class="divider"></div><div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">📅 La date, l\'heure et l\'adresse seront demandées à la dernière étape.</div>';
@@ -2356,6 +2458,7 @@ function dateTimeBlock(isLast){
     '<div class="flex-opts">'+flexBtns+'</div></div>'+
     '<div class="field-group" style="position:relative"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="off" oninput="chercherAdresse(this.value)"><div id="adresse-suggestions" class="adresse-suggestions"></div></div>'+
     '<div class="field-group" style="margin-top:10px"><label>🏙️ Ville *</label><input type="text" id="f-ville" placeholder="Paris" autocomplete="address-level2"></div>'+
+    '<div id="favori-cible-block"></div>'+
     '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel, max 5)</span></label>'+
     '<div class="photo-zone" onclick="document.getElementById(\'photo-input\').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>'+
     '<div class="upload-progress" id="upload-progress">Compression des photos...</div>'+
@@ -2725,7 +2828,7 @@ async function sendDemand(type){
     var isEdit=multiFlow.editMode&&multiFlow.editId;
     var url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
     var method=isEdit?'PATCH':'POST';
-    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5)})});
+    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5),pro_prefere_id:proPrefereChoisi})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
