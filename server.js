@@ -401,7 +401,7 @@ app.post('/api/users/me/supprimer', auth, async (req, res) => {
 
 app.post('/api/demandes', auth, async (req, res) => {
   try {
-    const { type, prestations, address, date, time, flexibility, description, details, photos } = req.body;
+    const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id } = req.body;
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
@@ -415,6 +415,14 @@ app.post('/api/demandes', auth, async (req, res) => {
           return res.status(400).json({ error: 'Une photo est trop volumineuse. Réessayez avec une photo plus légère.' });
         }
       }
+    }
+
+    // Si le client cible un prestataire favori, on vérifie que c'est bien un pro existant —
+    // la demande ne sera alors visible que pour lui (voir /api/demandes/all).
+    let proPrefereValide = null;
+    if (pro_prefere_id) {
+      const { data: proCible } = await supabase.from('users').select('id, type').eq('id', pro_prefere_id).single();
+      if (proCible && isProType(proCible.type)) proPrefereValide = proCible.id;
     }
 
     const numero = 'Client #' + Math.floor(1000 + Math.random() * 9000);
@@ -435,6 +443,7 @@ app.post('/api/demandes', auth, async (req, res) => {
       creneau: creneau,
       notes: notes,
       numero_anonyme: numero,
+      pro_prefere_id: proPrefereValide,
       statut: 'en_attente'
     }).select().single();
 
@@ -495,6 +504,10 @@ app.get('/api/demandes/all', auth, async (req, res) => {
         return typesDemande.some(t => prestationsProSet.has(t));
       });
     }
+
+    // Une demande adressée en priorité à un prestataire favori n'est visible que pour lui —
+    // les autres pros ne la voient pas tant que le client ne l'a pas rouverte à tout le monde.
+    filtered = filtered.filter(d => !d.pro_prefere_id || d.pro_prefere_id === req.user.id);
 
     res.json(filtered);
   } catch (e) {
@@ -1381,6 +1394,75 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
       commission_gleam: commission,
       montant_pro: montantPro
     });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ══════════════ FAVORIS ══════════════
+// Permet au client de retravailler facilement avec un prestataire déjà apprécié — fonctionnalité
+// standard des marketplaces de service (Wecasa, TaskRabbit), jusqu'ici absente de Gleam.
+
+app.post('/api/favoris', auth, async (req, res) => {
+  try {
+    const { pro_id } = req.body;
+    if (!pro_id) return res.status(400).json({ error: 'Prestataire requis.' });
+    const { data: pro } = await supabase.from('users').select('type').eq('id', pro_id).single();
+    if (!pro || !isProType(pro.type)) return res.status(400).json({ error: 'Ce compte n\'est pas un prestataire.' });
+
+    const { data: dejaFavori } = await supabase.from('favoris').select('id').eq('client_id', req.user.id).eq('pro_id', pro_id).maybeSingle();
+    if (dejaFavori) return res.json({ message: 'Déjà dans vos favoris.' });
+
+    const { error } = await supabase.from('favoris').insert({ client_id: req.user.id, pro_id: pro_id });
+    if (error) return res.status(400).json({ error: error.message });
+    res.status(201).json({ message: 'Ajouté à vos favoris ✨' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.delete('/api/favoris/:proId', auth, async (req, res) => {
+  try {
+    await supabase.from('favoris').delete().eq('client_id', req.user.id).eq('pro_id', req.params.proId);
+    res.json({ message: 'Retiré de vos favoris.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.get('/api/favoris', auth, async (req, res) => {
+  try {
+    const { data: favoris } = await supabase.from('favoris').select('pro_id, created_at').eq('client_id', req.user.id).order('created_at', { ascending: false });
+    if (!favoris || !favoris.length) return res.json([]);
+    const proIds = favoris.map(f => f.pro_id);
+    const { data: pros } = await supabase.from('users').select('id, prenom, nom, photo, note_moyenne, prestations_proposees, disponible').in('id', proIds);
+    const proMap = {};
+    (pros || []).forEach(p => proMap[p.id] = p);
+    res.json(favoris.map(f => proMap[f.pro_id]).filter(Boolean));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ══════════════ SIGNALEMENTS ══════════════
+// Recueille les signalements de comportement inapproprié — le mécanisme de recueil est en place
+// dès maintenant ; leur traitement se fera pour l'instant manuellement (consultation directe en
+// base), en attendant un vrai tableau de bord de modération.
+
+app.post('/api/signalements', auth, async (req, res) => {
+  try {
+    const { signale_id, demande_id, motif, description } = req.body;
+    if (!signale_id || !motif) return res.status(400).json({ error: 'Motif requis.' });
+    const { error } = await supabase.from('signalements').insert({
+      reporter_id: req.user.id,
+      signale_id: signale_id,
+      demande_id: demande_id || null,
+      motif: motif,
+      description: description || null,
+      statut: 'nouveau'
+    });
+    if (error) return res.status(400).json({ error: error.message });
+    res.status(201).json({ message: 'Signalement envoyé. Notre équipe va l\'examiner.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
