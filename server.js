@@ -53,7 +53,7 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false });
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 900, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 app.use('/api/', globalLimiter);
 
@@ -730,7 +730,51 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
   res.json(enriched);
 });
 
-// Tous les devis envoyés par le pro connecté
+// Tous les devis reçus par le client connecté, pour toutes ses demandes, en une seule requête —
+// remplace l'ancien fonctionnement qui faisait une requête réseau séparée par demande (un vrai
+// problème de performance et de volume de requêtes une fois combiné au rafraîchissement automatique).
+app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
+  try {
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, statut')
+      .eq('client_id', req.user.id).in('statut', ['devis_recus', 'acceptee', 'en_cours', 'terminee']);
+    if (!demandes || !demandes.length) return res.json([]);
+
+    const demandeIds = demandes.map(d => d.id);
+    const demandeMap = {};
+    demandes.forEach(d => demandeMap[d.id] = d);
+
+    const { data: devis } = await supabase.from('devis').select('*').in('demande_id', demandeIds);
+    if (!devis || !devis.length) return res.json([]);
+
+    const proIds = [...new Set(devis.map(d => d.societe_id))];
+    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite, photo').in('id', proIds);
+    const proMap = {};
+    (pros || []).forEach(p => proMap[p.id] = p);
+
+    // Codes de validation des demandes en cours, récupérés en une seule requête groupée
+    const demandeIdsEnCours = demandes.filter(d => d.statut === 'en_cours').map(d => d.id);
+    const codeMap = {};
+    if (demandeIdsEnCours.length) {
+      const { data: paiementsEnCours } = await supabase.from('paiements').select('demande_id, code_validation').in('demande_id', demandeIdsEnCours).eq('statut', 'paye');
+      (paiementsEnCours || []).forEach(p => codeMap[p.demande_id] = p.code_validation);
+    }
+
+    const enriched = devis.map(d => {
+      const demandeInfo = demandeMap[d.demande_id];
+      return {
+        ...d,
+        pro: proMap[d.societe_id] || null,
+        prestation: demandeInfo ? demandeInfo.prestation : null,
+        demande_statut: demandeInfo ? demandeInfo.statut : null,
+        code_validation: d.statut === 'accepte' ? (codeMap[d.demande_id] || null) : null
+      };
+    });
+
+    res.json(enriched);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
 app.get('/api/devis/mes-devis', auth, async (req, res) => {
   try {
     const { data: devis } = await supabase.from('devis').select('*').eq('societe_id', req.user.id).order('created_at', { ascending: false });
