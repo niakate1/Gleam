@@ -201,7 +201,12 @@ function extractPrestationTypes(demande) {
 }
 // Détecte un numéro de téléphone français (mobile ou fixe), même écrit avec espaces/points/tirets
 // entre les groupes de chiffres (ex: "06 12 34 56 78", "06.12.34.56.78"), pas seulement collé.
-const BLOCK_REGEX = /(\b0[1-9](?:[\s.-]?\d{2}){4}\b|[\w.+-]+@[\w-]+\.[a-z]{2,}|whatsapp|telegram|instagram)/i;
+// Détecte une tentative de partage de coordonnées avant paiement : numéro français (fixe/mobile,
+// collé ou avec séparateurs), numéro au format international (+33/0033), email (y compris légèrement
+// déguisé avec "at"/"point"), ou mention d'une messagerie externe couramment utilisée pour contourner
+// la plateforme. Reste volontairement prudent sur les mots ambigus (ex: "signal", "snap") pour éviter
+// de bloquer des messages innocents.
+const BLOCK_REGEX = /(\b0[1-9](?:[\s.-]?\d{2}){4}\b|(?:\+33|0033)[\s.-]?[1-9](?:[\s.-]?\d{2}){4}\b|[\w.+-]+\s?(?:@|\(at\)|arobase)\s?[\w-]+\s?(?:\.|\(dot\)|\bpoint\b)\s?[a-z]{2,}|whatsapp|telegram|instagram|messenger|snapchat|tiktok|facebook|viber|\bsms\b)/i;
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', app: 'Gleam API', version: '2.2.0', timestamp: new Date().toISOString() });
