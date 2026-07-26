@@ -656,7 +656,7 @@ app.post('/api/devis', auth, async (req, res) => {
 
 // Devis reçus par un client pour une demande (avec infos pro)
 app.get('/api/devis/demande/:id', auth, async (req, res) => {
-  const { data: demande } = await supabase.from('demandes').select('client_id').eq('id', req.params.id).single();
+  const { data: demande } = await supabase.from('demandes').select('client_id, statut').eq('id', req.params.id).single();
   if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
   if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
 
@@ -668,7 +668,15 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
   const proMap = {};
   (pros || []).forEach(p => proMap[p.id] = p);
 
-  const enriched = devis.map(d => ({ ...d, pro: proMap[d.societe_id] || null }));
+  // Le code de validation (à donner au prestataire à la fin) n'est attaché qu'au devis accepté
+  // d'une prestation en cours — jamais avant le paiement, jamais une fois terminée.
+  let codeValidation = null;
+  if (demande.statut === 'en_cours') {
+    const { data: paiement } = await supabase.from('paiements').select('code_validation').eq('demande_id', req.params.id).eq('statut', 'paye').maybeSingle();
+    if (paiement) codeValidation = paiement.code_validation;
+  }
+
+  const enriched = devis.map(d => ({ ...d, pro: proMap[d.societe_id] || null, code_validation: d.statut === 'accepte' ? codeValidation : null }));
   // Trie : les pros avec un taux de fiabilité < 80% passent en dernier
   enriched.sort((a, b) => {
     const tauxA = a.pro?.taux_fiabilite ?? 100;
@@ -1029,7 +1037,11 @@ app.post('/api/paiements/confirmer', auth, async (req, res) => {
     if (intent.status !== 'succeeded')
       return res.status(400).json({ error: 'Paiement non confirmé par Stripe.' });
 
-    await supabase.from('paiements').update({ statut: 'paye' }).eq('stripe_payment_intent_id', payment_intent_id);
+    // Génère le code à 6 chiffres que le client devra donner au prestataire à la fin de la
+    // prestation (comme un code de livraison Uber Eats) — preuve que les deux parties étaient
+    // bien en contact au moment de la finalisation, plutôt qu'une simple confirmation unilatérale.
+    const codeValidation = String(Math.floor(100000 + Math.random() * 900000));
+    await supabase.from('paiements').update({ statut: 'paye', code_validation: codeValidation }).eq('stripe_payment_intent_id', payment_intent_id);
     const { data: paiement } = await supabase.from('paiements').select('*').eq('stripe_payment_intent_id', payment_intent_id).single();
 
     if (paiement) {
@@ -1056,57 +1068,63 @@ app.post('/api/paiements/confirmer', auth, async (req, res) => {
   }
 });
 
-app.post('/api/paiements/liberer', auth, async (req, res) => {
+// Finalise une prestation : déclenche le vrai virement Stripe vers le pro, met à jour les statuts,
+// et notifie les deux parties par email. Partagée entre la validation par code (le pro saisit le
+// code donné par le client) et toute finalisation manuelle éventuelle.
+async function finaliserPrestation(paiement) {
+  const { data: pro } = await supabase.from('users').select('email, prenom, stripe_account_id').eq('id', paiement.societe_id).single();
+  if (!pro || !pro.stripe_account_id) {
+    return { erreur: 'Le prestataire n\'a pas encore configuré ses paiements. Le virement ne peut pas être effectué pour l\'instant — contactez le support Gleam.' };
+  }
+
   try {
-    const { paiement_id, demande_id } = req.body;
-    let paiement;
+    await stripe.transfers.create({
+      amount: Math.round(parseFloat(paiement.montant_societe) * 100),
+      currency: 'eur',
+      destination: pro.stripe_account_id,
+      transfer_group: `demande_${paiement.demande_id}`
+    });
+  } catch (stripeErr) {
+    console.error('Virement Stripe échoué:', stripeErr);
+    return { erreur: 'Le virement vers le prestataire a échoué (' + (stripeErr.message || 'compte Stripe non prêt') + '). Réessayez plus tard ou contactez le support.' };
+  }
 
-    if(paiement_id){
-      const { data } = await supabase.from('paiements').select('*').eq('id', paiement_id).single();
-      paiement = data;
-    } else if(demande_id){
-      const { data } = await supabase.from('paiements').select('*').eq('demande_id', demande_id).eq('statut', 'paye').single();
-      paiement = data;
-    }
+  await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id);
+  await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
 
-    if (!paiement) return res.status(404).json({ error: 'Paiement introuvable.' });
-    if (paiement.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+  const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
+  const { data: client } = await supabase.from('users').select('email, prenom').eq('id', paiement.client_id).single();
+  if (client) {
+    sendEmail('prestation_confirmee', client.email, {
+      prenom: client.prenom, role: 'client', prestation: demandeInfo ? demandeInfo.prestation : '', demandeId: paiement.demande_id
+    }).catch(e => console.error('Email prestation_confirmee client:', e));
+  }
+  if (pro) {
+    sendEmail('prestation_confirmee', pro.email, {
+      prenom: pro.prenom, role: 'pro', prestation: demandeInfo ? demandeInfo.prestation : '', montantPro: paiement.montant_societe, demandeId: paiement.demande_id
+    }).catch(e => console.error('Email prestation_confirmee pro:', e));
+  }
 
-    const { data: pro } = await supabase.from('users').select('email, prenom, stripe_account_id').eq('id', paiement.societe_id).single();
-    if (!pro || !pro.stripe_account_id) {
-      return res.status(400).json({ error: 'Le prestataire n\'a pas encore configuré ses paiements. Le virement ne peut pas être effectué pour l\'instant — contactez le support Gleam.' });
-    }
+  return { ok: true };
+}
 
-    // Déclenche le vrai virement Stripe vers le compte Connect du pro (montant net, commission déjà déduite)
-    try {
-      await stripe.transfers.create({
-        amount: Math.round(parseFloat(paiement.montant_societe) * 100),
-        currency: 'eur',
-        destination: pro.stripe_account_id,
-        transfer_group: `demande_${paiement.demande_id}`
-      });
-    } catch (stripeErr) {
-      console.error('Virement Stripe échoué:', stripeErr);
-      return res.status(400).json({ error: 'Le virement vers le prestataire a échoué (' + (stripeErr.message || 'compte Stripe non prêt') + '). Réessayez plus tard ou contactez le support.' });
-    }
+// Le PRESTATAIRE saisit le code à 6 chiffres que le client lui a donné en personne, à la fin de
+// la prestation (même logique qu'un code de livraison Uber Eats) — remplace la confirmation
+// unilatérale par le client seul, et prouve que les deux parties étaient bien en contact.
+app.post('/api/paiements/valider-code', auth, async (req, res) => {
+  try {
+    const { demande_id, code } = req.body;
+    if (!demande_id || !code) return res.status(400).json({ error: 'Code requis.' });
 
-    await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id);
-    await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
+    const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demande_id).eq('statut', 'paye').maybeSingle();
+    if (!paiement) return res.status(404).json({ error: 'Aucun paiement en attente pour cette prestation.' });
+    if (paiement.societe_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (String(code).trim() !== paiement.code_validation) return res.status(400).json({ error: 'Code incorrect. Vérifiez le code donné par le client.' });
 
-    const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
-    const { data: client } = await supabase.from('users').select('email, prenom').eq('id', paiement.client_id).single();
-    if (client) {
-      sendEmail('prestation_confirmee', client.email, {
-        prenom: client.prenom, role: 'client', prestation: demandeInfo ? demandeInfo.prestation : '', demandeId: paiement.demande_id
-      }).catch(e => console.error('Email prestation_confirmee client:', e));
-    }
-    if (pro) {
-      sendEmail('prestation_confirmee', pro.email, {
-        prenom: pro.prenom, role: 'pro', prestation: demandeInfo ? demandeInfo.prestation : '', montantPro: paiement.montant_societe, demandeId: paiement.demande_id
-      }).catch(e => console.error('Email prestation_confirmee pro:', e));
-    }
+    const resultat = await finaliserPrestation(paiement);
+    if (resultat.erreur) return res.status(400).json({ error: resultat.erreur });
 
-    res.json({ message: 'Paiement Gleam libéré ✨' });
+    res.json({ message: 'Prestation validée, paiement transféré ✨' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
