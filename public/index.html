@@ -1070,23 +1070,14 @@ async function loadDevis(silent){
   var c0=document.getElementById('devis-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
-    const rd=await fetch(API+'/api/demandes',{headers:authHeaders()});
-    if(rd.status===401){return doLogout()}
-    if(!rd.ok)return;
-    const demandes=await safeJson(rd);
+    const r=await fetch(API+'/api/devis/mes-devis-recus',{headers:authHeaders()});
+    if(r.status===401){return doLogout()}
+    if(!r.ok)return;
     const c=document.getElementById('devis-list');
     var notesDonnees=[];
     try{const rn=await fetch(API+'/api/evaluations/mes-notes-donnees',{headers:authHeaders()});if(rn.ok)notesDonnees=await safeJson(rn)}catch(e){}
-    const avecDevis=demandes.filter(function(d){return d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee'});
-    if(!avecDevis.length){devisClientCache={all:[],notesDonnees:notesDonnees};renderDevisClientCards();return}
-    var all=[];
-    for(var i=0;i<avecDevis.length;i++){
-      try{
-        const r=await fetch(API+'/api/devis/demande/'+avecDevis[i].id,{headers:authHeaders()});
-        if(r.ok){const dv=await safeJson(r);dv.forEach(function(v){all.push(Object.assign({},v,{prestation:avecDevis[i].prestation,demande_statut:avecDevis[i].statut}))})}
-      }catch(e){}
-    }
-    if(!all.length){devisClientCache={all:[],notesDonnees:notesDonnees};renderDevisClientCards();return}
+    var all=await safeJson(r);
+    if(!all||!all.length){devisClientCache={all:[],notesDonnees:notesDonnees};renderDevisClientCards();return}
 
     // Tri logique explicite : En cours (action requise) > Accepté-paiement requis (action requise) > En attente > Terminé (historique) > Refusé/Annulé
     function clientDevisScore(v){
