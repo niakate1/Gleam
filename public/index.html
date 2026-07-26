@@ -1135,9 +1135,14 @@ function renderDevisClientCards(){
       if(v.statut==='accepte'&&v.demande_statut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
         cardStyle='border-color:var(--green);background:#F0FDF4;';
-        actions='<div style="margin-top:12px;display:flex;gap:8px">'+
-          '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
-          '<button class="btn-accept" style="background:var(--green)" onclick="libererPaiement(\''+safeDemandeId+'\')">✅ Confirmer la prestation</button>'+
+        actions='<div style="margin-top:12px">'+
+          '<button class="btn-accept" style="width:100%;margin-bottom:8px" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
+          (v.code_validation?(
+            '<div style="background:#fff;border:2px dashed var(--green);border-radius:12px;padding:14px;text-align:center">'+
+              '<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">Code à donner au prestataire à la fin</div>'+
+              '<div style="font-size:28px;font-weight:800;letter-spacing:4px;color:var(--text)">'+escapeHtml(v.code_validation)+'</div>'+
+            '</div>'
+          ):'')+
         '</div>';
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
@@ -1546,8 +1551,13 @@ function renderProDevisCards(){
         }
       }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
-        extra='<div style="display:flex;gap:8px;margin-top:10px">'+
-          '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
+        extra='<div style="margin-top:10px">'+
+          '<button class="btn-accept" style="width:100%;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
+          '<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">Code donné par le client, à la fin de la prestation</label>'+
+          '<div style="display:flex;gap:8px;margin-top:6px">'+
+            '<input type="text" id="code-input-'+safeDemandeId+'" placeholder="123456" inputmode="numeric" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:3px;font-weight:700">'+
+            '<button class="btn-accept" style="width:auto;padding:0 18px;flex-shrink:0" onclick="validerCodePro(\''+safeDemandeId+'\',this)">Valider</button>'+
+          '</div>'+
         '</div>';
       }else if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement en attente</span>';
@@ -2079,15 +2089,18 @@ async function confirmPayment(){
     loadDevis();
   }
 }
-async function libererPaiement(demandeId){
-  if(!confirm('Confirmez-vous que la prestation a bien été réalisée ? Le paiement sera libéré au prestataire.'))return;
+async function validerCodePro(demandeId,btn){
+  var input=document.getElementById('code-input-'+demandeId);
+  var code=input?input.value.trim():'';
+  if(!/^\d{6}$/.test(code)){toast('❌ Entrez le code à 6 chiffres donné par le client.');return}
+  if(btn)btn.disabled=true;
   try{
-    const r=await fetch(API+'/api/paiements/liberer',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId})});
+    const r=await fetch(API+'/api/paiements/valider-code',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,code:code})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
-    toast('✅ Prestation confirmée ! Le prestataire a été payé.',5000);
-    loadDevis();loadDemandes();
-  }catch(e){toast(friendlyNetworkError(e))}
+    if(!r.ok){toast('❌ '+(d.error||''));if(btn)btn.disabled=false;return}
+    toast('✅ Prestation validée ! Le virement a été effectué.',5000);
+    loadProDevis();loadProDemandes();
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
 // ── SERVICES ──
