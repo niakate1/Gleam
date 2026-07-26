@@ -921,12 +921,30 @@ async function peutAccederConversation(demandeId, userId) {
   return !!(devisAccepte && devisAccepte.societe_id === userId);
 }
 
+// Détecte un numéro de téléphone français reconstitué en ne gardant que les chiffres d'un texte
+// (ex: "0633" + "233367" mis bout à bout donne bien "0633233367", un numéro valide, même si
+// chaque message pris séparément semblait innocent).
+function contientNumeroReconstitue(texte) {
+  const chiffresSeuls = texte.replace(/\D/g, '');
+  return /0[1-9]\d{8}/.test(chiffresSeuls);
+}
+
 app.post('/api/messages', auth, async (req, res) => {
   try {
     const { demande_id, contenu } = req.body;
     if (!demande_id || !contenu || !contenu.trim())
       return res.status(400).json({ error: 'Message vide.' });
-    if (BLOCK_REGEX.test(contenu))
+
+    // Vérifie non seulement CE message, mais aussi les derniers messages envoyés par la même
+    // personne dans cette conversation, sur une courte période — pour attraper une tentative de
+    // partager un numéro en plusieurs étapes (un message avec "0633", un autre avec "233367").
+    const cinqMinutesAvant = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: messagesRecents } = await supabase.from('messages').select('contenu')
+      .eq('demande_id', demande_id).eq('expediteur_id', req.user.id)
+      .gte('created_at', cinqMinutesAvant).order('created_at', { ascending: true }).limit(5);
+    const contenuRecent = (messagesRecents || []).map(m => m.contenu).join(' ') + ' ' + contenu;
+
+    if (BLOCK_REGEX.test(contenu) || contientNumeroReconstitue(contenuRecent))
       return res.status(400).json({ error: 'Gleam bloque les coordonnées avant paiement.', blocked: true });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
