@@ -1088,13 +1088,12 @@ async function loadDevis(silent){
     }
     if(!all.length){devisClientCache={all:[],notesDonnees:notesDonnees};renderDevisClientCards();return}
 
-    // Tri logique explicite (indépendant du statut de la demande associée à d'autres devis) :
-    // En cours > Terminé (à noter) > Accepté-paiement requis > En attente > Refusé > Annulé par le pro
+    // Tri logique explicite : En cours (action requise) > Accepté-paiement requis (action requise) > En attente > Terminé (historique) > Refusé/Annulé
     function clientDevisScore(v){
       if(v.statut==='accepte'&&v.demande_statut==='en_cours')return 0;
-      if(v.statut==='accepte'&&v.demande_statut==='terminee')return 1;
-      if(v.statut==='accepte')return 2;
-      if(v.statut==='envoye')return 3;
+      if(v.statut==='accepte'&&v.demande_statut!=='terminee')return 1;
+      if(v.statut==='envoye')return 2;
+      if(v.statut==='accepte'&&v.demande_statut==='terminee')return 3;
       if(v.statut==='refuse')return 4;
       return 5; // annule_pro
     }
@@ -1288,7 +1287,8 @@ async function annulerDemandeAcceptee(){
     const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id+'/annuler-client',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
-    toast(d.tardive?'🚫 Prestation annulée (annulation tardive signalée).':'🚫 Prestation annulée.');
+    var msg=d.rembourse?'🚫 Prestation annulée. Vous serez intégralement remboursé.':(d.tardive?'🚫 Prestation annulée (annulation tardive signalée).':'🚫 Prestation annulée.');
+    toast(msg,5000);
     goTab('home');loadDemandes();
   }catch(e){toast(friendlyNetworkError(e))}
 }
@@ -1765,7 +1765,8 @@ async function annulerProDevis(devisId,btn){
     const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
-    toast(d.tardive?'🚫 Devis annulé (annulation tardive signalée).':'🚫 Devis annulé.');loadProDevis();
+    var msg=d.rembourse?'🚫 Devis annulé. Le client a été intégralement remboursé.':(d.tardive?'🚫 Devis annulé (annulation tardive signalée).':'🚫 Devis annulé.');
+    toast(msg,5000);loadProDevis();
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
@@ -2175,7 +2176,7 @@ async function showMesPaiements(){
     var c=document.getElementById('paiements-list');
     if(!c)return;
     if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>💳</span><p>Aucun paiement pour l\u2019instant.</p></div>';return}
-    var statutLabels={paye:['Payé — en attente de confirmation','var(--gold)'],libere:['Confirmé','var(--mint)'],bloque:['Bloqué',' var(--red)']};
+    var statutLabels={paye:['Payé — en attente de confirmation','var(--gold)'],libere:['Confirmé','var(--mint)'],bloque:['Bloqué',' var(--red)'],rembourse:['Remboursé','var(--gray)']};
     c.innerHTML=d.map(function(p,i){
       var st=statutLabels[p.statut]||['',''];
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
@@ -2701,7 +2702,17 @@ var tok=localStorage.getItem('gleam_token');
 if(tok){
   fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
     .then(function(r){return r.ok?safeJson(r):null})
-    .then(function(u){if(u&&u.id){currentUser=u;enterApp()}else localStorage.removeItem('gleam_token')})
+    .then(function(u){
+      if(u&&u.id){
+        currentUser=u;enterApp();
+        // Retour depuis la configuration Stripe Connect (paiements du pro) : message de confirmation
+        if(window.location.hash==='#paiements-retour'){
+          toast('✅ Configuration des paiements enregistrée !',4000);
+          setTimeout(checkConnectStatut,1500);
+          history.replaceState(null,'',window.location.pathname);
+        }
+      }else localStorage.removeItem('gleam_token');
+    })
     .catch(function(){});
 }
 </script>
