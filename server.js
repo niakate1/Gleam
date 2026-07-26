@@ -267,7 +267,12 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       cgu_acceptees_le: new Date().toISOString()
     }).select().single();
 
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      // Le compte de connexion a été créé mais le profil a échoué : on annule tout plutôt que
+      // de laisser un compte "orphelin" (connexion possible, mais aucune donnée de profil).
+      await supabase.auth.admin.deleteUser(authData.user.id).catch(e => console.error('Rollback inscription:', e));
+      return res.status(400).json({ error: error.message });
+    }
 
     const token = jwt.sign({ id: data.id, email: data.email, type: data.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ message: 'Compte Gleam créé !', token, user: { ...data, firstName: data.prenom, lastName: data.nom } });
@@ -350,6 +355,22 @@ app.patch('/api/users/photo', auth, async (req, res) => {
 // que supprimer" déjà retenue ailleurs dans l'app.
 app.post('/api/users/me/supprimer', auth, async (req, res) => {
   try {
+    // Bloque la suppression tant qu'une prestation active (payée, en cours, ou en attente de
+    // paiement) existe pour ce compte — que ce soit en tant que client ou en tant que prestataire.
+    // Sans ce garde-fou, un pro pourrait disparaître en plein milieu d'une prestation payée.
+    const { data: demandesActivesClient } = await supabase.from('demandes').select('id').eq('client_id', req.user.id).in('statut', ['acceptee', 'en_cours']);
+    if (demandesActivesClient && demandesActivesClient.length) {
+      return res.status(400).json({ error: 'Vous avez une prestation en cours ou en attente de paiement. Terminez-la ou annulez-la avant de supprimer votre compte.' });
+    }
+    const { data: devisActifsProResult } = await supabase.from('devis').select('demande_id').eq('societe_id', req.user.id).eq('statut', 'accepte');
+    if (devisActifsProResult && devisActifsProResult.length) {
+      const demandeIdsActifs = devisActifsProResult.map(d => d.demande_id);
+      const { data: demandesActivesPro } = await supabase.from('demandes').select('id').in('id', demandeIdsActifs).in('statut', ['acceptee', 'en_cours']);
+      if (demandesActivesPro && demandesActivesPro.length) {
+        return res.status(400).json({ error: 'Vous avez une prestation en cours chez un client. Terminez-la ou annulez-la avant de supprimer votre compte.' });
+      }
+    }
+
     const anonEmail = `compte-supprime-${req.user.id}@gleam-deleted.local`;
     const { error } = await supabase.from('users').update({
       email: anonEmail,
@@ -522,6 +543,23 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
 });
 
 // Annuler une demande déjà acceptée/en cours (jamais bloqué totalement — juste un avertissement si tardif)
+// Rembourse automatiquement le client si la prestation avait déjà été payée au moment de
+// l'annulation (par le client ou par le pro) — sans ça, l'argent restait bloqué chez Gleam
+// sans aucune résolution, ce qui n'est acceptable pour personne.
+async function rembourserPaiementSiPaye(demandeId) {
+  const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demandeId).eq('statut', 'paye').maybeSingle();
+  if (!paiement) return { rembourse: false };
+
+  try {
+    await stripe.refunds.create({ payment_intent: paiement.stripe_payment_intent_id });
+    await supabase.from('paiements').update({ statut: 'rembourse' }).eq('id', paiement.id);
+    return { rembourse: true, montant: paiement.montant_ttc };
+  } catch (e) {
+    console.error('Remboursement Stripe échoué:', e);
+    return { rembourse: false, erreur: true };
+  }
+}
+
 app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
@@ -545,6 +583,9 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
 
     const { data: devisAccepte } = await supabase.from('devis').select('*').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
 
+    // Si la prestation était déjà payée (en cours), rembourse automatiquement avant d'annuler
+    const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id) : { rembourse: false };
+
     await supabase.from('demandes').update({ statut: 'annulee_client' }).eq('id', demande.id);
     if (devisAccepte) await supabase.from('devis').update({ statut: 'annule_client' }).eq('id', devisAccepte.id);
 
@@ -559,7 +600,7 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
       }
     }
 
-    res.json({ message: 'Prestation annulée.', tardive });
+    res.json({ message: 'Prestation annulée.', tardive, rembourse: remboursement.rembourse });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -793,6 +834,10 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
       }
     }
 
+    // Si la prestation était déjà payée (en cours), rembourse automatiquement le client avant
+    // de remettre la demande en circulation pour d'autres pros
+    const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id) : { rembourse: false };
+
     // Annule le devis et remet la demande disponible pour d'autres pros
     await supabase.from('devis').update({ statut: 'annule_pro' }).eq('id', req.params.id);
     await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', devis.demande_id);
@@ -808,7 +853,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
       });
     }
 
-    res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.', tardive });
+    res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.', tardive, rembourse: remboursement.rembourse });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1133,10 +1178,10 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
 // Historique des paiements du client (rubrique "Paiements" du profil)
 app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
   try {
-    // On n'affiche que les paiements réellement effectués (payé ou libéré) — un paiement "en_attente"
-    // (intention de paiement créée mais jamais finalisée, souvent parce que la demande a été annulée
-    // avant que la carte ne soit validée) ne représente aucune transaction réelle et n'a rien à faire ici.
-    const { data: paiements } = await supabase.from('paiements').select('*').eq('client_id', req.user.id).in('statut', ['paye', 'libere']).order('created_at', { ascending: false });
+    // On n'affiche que les paiements réellement effectués (payé, libéré, ou remboursé) — un paiement
+    // "en_attente" (intention de paiement créée mais jamais finalisée) ne représente aucune transaction
+    // réelle. Le remboursement, lui, doit rester visible pour la transparence du client.
+    const { data: paiements } = await supabase.from('paiements').select('*').eq('client_id', req.user.id).in('statut', ['paye', 'libere', 'rembourse']).order('created_at', { ascending: false });
     if (!paiements || !paiements.length) return res.json([]);
     const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
     const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
