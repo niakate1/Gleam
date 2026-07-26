@@ -992,25 +992,35 @@ app.get('/api/conversations', auth, async (req, res) => {
     if (!demandeIds.length) return res.json([]);
 
     const { data: demandes } = await supabase.from('demandes').select('*').in('id', demandeIds);
-    const conversations = [];
 
-    for (const d of (demandes || [])) {
-      const { data: msgs } = await supabase.from('messages').select('*').eq('demande_id', d.id).order('created_at', { ascending: false }).limit(1);
-      const lastMsg = msgs && msgs[0] ? msgs[0] : null;
+    // Tout ce qui suit se fait en requêtes groupées (une poignée au total, quel que soit le nombre
+    // de conversations) — plutôt qu'une requête séparée par conversation, qui devenait un vrai
+    // problème de volume une fois combiné au rafraîchissement automatique.
+    const { data: tousMessages } = await supabase.from('messages').select('*').in('demande_id', demandeIds).order('created_at', { ascending: false });
+    const dernierMessageParDemande = {};
+    (tousMessages || []).forEach(m => { if (!dernierMessageParDemande[m.demande_id]) dernierMessageParDemande[m.demande_id] = m; });
 
-      let autrePartie = null;
-      if (isProType(user?.type)) {
-        const { data: client } = await supabase.from('users').select('prenom, nom, photo').eq('id', d.client_id).single();
-        autrePartie = client;
-      } else {
-        const { data: devisAcceptes } = await supabase.from('devis').select('societe_id').eq('demande_id', d.id).eq('statut', 'accepte').maybeSingle();
-        if (devisAcceptes) {
-          const { data: pro } = await supabase.from('users').select('prenom, nom, photo').eq('id', devisAcceptes.societe_id).single();
-          autrePartie = pro;
-        }
-      }
+    let autrePartieParDemande = {};
+    if (isProType(user?.type)) {
+      const clientIds = [...new Set((demandes || []).map(d => d.client_id))];
+      const { data: clients } = await supabase.from('users').select('id, prenom, nom, photo, note_moyenne').in('id', clientIds);
+      const clientMap = {};
+      (clients || []).forEach(c => clientMap[c.id] = c);
+      (demandes || []).forEach(d => { autrePartieParDemande[d.id] = clientMap[d.client_id] || null; });
+    } else {
+      const { data: devisAcceptes } = await supabase.from('devis').select('demande_id, societe_id').in('demande_id', demandeIds).eq('statut', 'accepte');
+      const proIdParDemande = {};
+      (devisAcceptes || []).forEach(dv => { proIdParDemande[dv.demande_id] = dv.societe_id; });
+      const proIds = [...new Set(Object.values(proIdParDemande))];
+      const { data: pros } = await supabase.from('users').select('id, prenom, nom, photo, note_moyenne').in('id', proIds);
+      const proMap = {};
+      (pros || []).forEach(p => proMap[p.id] = p);
+      Object.keys(proIdParDemande).forEach(demId => { autrePartieParDemande[demId] = proMap[proIdParDemande[demId]] || null; });
+    }
 
-      conversations.push({
+    const conversations = (demandes || []).map(d => {
+      const lastMsg = dernierMessageParDemande[d.id] || null;
+      return {
         demande_id: d.id,
         prestation: d.prestation,
         statut: d.statut,
@@ -1018,9 +1028,9 @@ app.get('/api/conversations', auth, async (req, res) => {
         dernier_message: lastMsg ? lastMsg.contenu : null,
         dernier_message_date: lastMsg ? lastMsg.created_at : d.created_at,
         dernier_message_expediteur_id: lastMsg ? lastMsg.expediteur_id : null,
-        autre_partie: autrePartie
-      });
-    }
+        autre_partie: autrePartieParDemande[d.id] || null
+      };
+    });
 
     conversations.sort((a, b) => new Date(b.dernier_message_date) - new Date(a.dernier_message_date));
     res.json(conversations);
@@ -1250,7 +1260,12 @@ app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
     const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
     const demandesMap = {};
     (demandes || []).forEach(d => { demandesMap[d.id] = d; });
-    res.json(paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null })));
+    // Tri logique : payé (en attente de confirmation, encore "actif") avant libéré (réglé, historique),
+    // remboursé en dernier — cohérent avec la priorité "actionnable avant historique" du reste de l'app.
+    const prioritePaiement = { paye: 0, libere: 1, rembourse: 2 };
+    const enrichis = paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }));
+    enrichis.sort((a, b) => (prioritePaiement[a.statut] ?? 9) - (prioritePaiement[b.statut] ?? 9));
+    res.json(enrichis);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
@@ -1269,10 +1284,14 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
     (demandes || []).forEach(d => { demandesMap[d.id] = d; });
     const totalLibere = paiements.filter(p => p.statut === 'libere').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
     const totalEnAttente = paiements.filter(p => p.statut === 'paye').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
+    // Tri logique : en attente de confirmation client (encore "actif") avant reçu (déjà réglé, historique)
+    const prioriteGain = { paye: 0, libere: 1 };
+    const enrichis = paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }));
+    enrichis.sort((a, b) => (prioriteGain[a.statut] ?? 9) - (prioriteGain[b.statut] ?? 9));
     res.json({
       total_libere: Math.round(totalLibere * 100) / 100,
       total_en_attente: Math.round(totalEnAttente * 100) / 100,
-      paiements: paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }))
+      paiements: enrichis
     });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
