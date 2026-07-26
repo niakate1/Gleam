@@ -1051,11 +1051,24 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
     const montant = Math.round(devis.prix_ttc * 100);
     const commission = Math.round(montant * 0.15); // 15% commission Gleam
 
-    const intent = await stripe.paymentIntents.create({
+    // Si le pro a déjà configuré ses paiements, on utilise une "destination charge" Stripe :
+    // l'argent se répartit automatiquement à la source (commission Gleam + part du pro), sans
+    // jamais passer par un virement séparé après coup — ce qui évite le blocage classique de
+    // "solde disponible insuffisant" que l'on aurait avec un virement fait après le paiement.
+    const { data: proPourPaiement } = await supabase.from('users').select('stripe_account_id').eq('id', devis.societe_id).single();
+    const proConfigure = Boolean(proPourPaiement && proPourPaiement.stripe_account_id);
+
+    const paramsIntent = {
       amount: montant,
       currency: 'eur',
       metadata: { devis_id: devis_id, gleam: 'true' }
-    });
+    };
+    if (proConfigure) {
+      paramsIntent.application_fee_amount = commission;
+      paramsIntent.transfer_data = { destination: proPourPaiement.stripe_account_id };
+    }
+
+    const intent = await stripe.paymentIntents.create(paramsIntent);
 
     await supabase.from('paiements').insert({
       demande_id: devis.demande_id,
@@ -1066,6 +1079,7 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
       commission: devis.prix_ttc * 0.15,
       montant_societe: devis.prix_ttc * 0.85,
       stripe_payment_intent_id: intent.id,
+      transfert_automatique: proConfigure,
       statut: 'en_attente'
     });
 
@@ -1122,16 +1136,21 @@ async function finaliserPrestation(paiement) {
     return { erreur: 'Le prestataire n\'a pas encore configuré ses paiements. Le virement ne peut pas être effectué pour l\'instant — contactez le support Gleam.' };
   }
 
-  try {
-    await stripe.transfers.create({
-      amount: Math.round(parseFloat(paiement.montant_societe) * 100),
-      currency: 'eur',
-      destination: pro.stripe_account_id,
-      transfer_group: `demande_${paiement.demande_id}`
-    });
-  } catch (stripeErr) {
-    console.error('Virement Stripe échoué:', stripeErr);
-    return { erreur: 'Le virement vers le prestataire a échoué (' + (stripeErr.message || 'compte Stripe non prêt') + '). Réessayez plus tard ou contactez le support.' };
+  // Si l'argent a déjà été réparti automatiquement au moment du paiement (destination charge),
+  // il n'y a rien de plus à transférer ici — un virement séparé serait en trop et échouerait de
+  // toute façon (le solde de la plateforme ne contient jamais la part du pro dans ce cas).
+  if (!paiement.transfert_automatique) {
+    try {
+      await stripe.transfers.create({
+        amount: Math.round(parseFloat(paiement.montant_societe) * 100),
+        currency: 'eur',
+        destination: pro.stripe_account_id,
+        transfer_group: `demande_${paiement.demande_id}`
+      });
+    } catch (stripeErr) {
+      console.error('Virement Stripe échoué:', stripeErr);
+      return { erreur: 'Le virement vers le prestataire a échoué (' + (stripeErr.message || 'compte Stripe non prêt') + '). Réessayez plus tard ou contactez le support.' };
+    }
   }
 
   await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id);
