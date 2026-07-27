@@ -488,9 +488,36 @@ app.post('/api/demandes', auth, async (req, res) => {
   }
 });
 
+// Marque automatiquement comme "expirée" toute demande dont le créneau prévu est dépassé depuis
+// plus de 3h, sans qu'aucun devis n'ait été accepté (ni payé) entre-temps — plutôt que de laisser
+// une demande "en attente" ou "devis reçus" indéfiniment pour une date déjà passée, ce qui n'a plus
+// aucun sens. Une marge de 3h est laissée pour ne pas être trop agressif (retard, confirmation
+// tardive...). Fonctionne par lecture (pas de tâche planifiée à gérer) : vérifiée à chaque fois que
+// les demandes sont consultées, sur le lot concerné uniquement — reste donc très léger.
+async function expirerDemandesEnRetard(demandes) {
+  const maintenant = new Date();
+  const aExpirer = [];
+  for (const d of (demandes || [])) {
+    if ((d.statut === 'en_attente' || d.statut === 'devis_recus') && d.creneau) {
+      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(d.creneau);
+      if (match) {
+        const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
+        const heuresDepassement = (maintenant - dateCreneau) / (1000 * 60 * 60);
+        if (heuresDepassement > 3) aExpirer.push(d.id);
+      }
+    }
+  }
+  if (aExpirer.length) {
+    await supabase.from('demandes').update({ statut: 'expiree' }).in('id', aExpirer);
+    demandes.forEach(d => { if (aExpirer.includes(d.id)) d.statut = 'expiree'; });
+  }
+  return demandes;
+}
+
 app.get('/api/demandes', auth, async (req, res) => {
   const { data } = await supabase.from('demandes').select('*').eq('client_id', req.user.id).order('created_at', { ascending: false });
-  res.json(data || []);
+  const dataAJour = await expirerDemandesEnRetard(data || []);
+  res.json(dataAJour);
 });
 
 // Demandes disponibles pour les pros (en attente, pas encore acceptées) — DOIT être déclarée avant /api/demandes/:id
@@ -509,9 +536,14 @@ app.get('/api/demandes/all', auth, async (req, res) => {
 
     if (demErr) return res.status(500).json({ error: 'Erreur demandes: ' + demErr.message });
 
+    // Marque les demandes en retard comme expirées, puis les exclut immédiatement de la liste —
+    // un pro ne doit jamais voir une demande dont le créneau est déjà largement dépassé.
+    const demandesAJour = await expirerDemandesEnRetard(demandes || []);
+    const demandesEncoreValides = demandesAJour.filter(d => d.statut !== 'expiree');
+
     const { data: mesDevis } = await supabase.from('devis').select('demande_id, statut').eq('societe_id', req.user.id);
     const idsRepondues = new Set((mesDevis || []).filter(d => d.statut === 'envoye' || d.statut === 'accepte').map(d => d.demande_id));
-    let filtered = (demandes || []).filter(d => !idsRepondues.has(d.id));
+    let filtered = demandesEncoreValides.filter(d => !idsRepondues.has(d.id));
 
     // Ne montrer que les demandes correspondant aux prestations que le pro a déclaré savoir faire
     // (si le pro n'a configuré aucune préférence dans "Mes tarifs", on continue à tout lui montrer
