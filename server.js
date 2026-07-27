@@ -776,7 +776,7 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
 // problème de performance et de volume de requêtes une fois combiné au rafraîchissement automatique).
 app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
   try {
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, statut')
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, statut, photos_avant, photos_apres, prestation_demarree_le')
       .eq('client_id', req.user.id).in('statut', ['devis_recus', 'acceptee', 'en_cours', 'terminee']);
     if (!demandes || !demandes.length) return res.json([]);
 
@@ -807,7 +807,10 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
         pro: proMap[d.societe_id] || null,
         prestation: demandeInfo ? demandeInfo.prestation : null,
         demande_statut: demandeInfo ? demandeInfo.statut : null,
-        code_validation: d.statut === 'accepte' ? (codeMap[d.demande_id] || null) : null
+        code_validation: d.statut === 'accepte' ? (codeMap[d.demande_id] || null) : null,
+        photos_avant: demandeInfo && demandeInfo.photos_avant ? JSON.parse(demandeInfo.photos_avant) : [],
+        photos_apres: demandeInfo && demandeInfo.photos_apres ? JSON.parse(demandeInfo.photos_apres) : [],
+        prestation_demarree: demandeInfo ? Boolean(demandeInfo.prestation_demarree_le) : false
       };
     });
 
@@ -822,11 +825,20 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
     if (!devis || !devis.length) return res.json([]);
 
     const demandeIds = [...new Set(devis.map(d => d.demande_id))];
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme, client_id, notes, creneau').in('id', demandeIds);
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme, client_id, notes, creneau, photos_avant, photos_apres, prestation_demarree_le').in('id', demandeIds);
     const demandeMap = {};
     (demandes || []).forEach(d => demandeMap[d.id] = d);
 
-    const enriched = devis.map(d => ({ ...d, demande: demandeMap[d.demande_id] || null }));
+    const enriched = devis.map(d => {
+      const demandeInfo = demandeMap[d.demande_id];
+      const demandeAvecPhotos = demandeInfo ? {
+        ...demandeInfo,
+        photos_avant: demandeInfo.photos_avant ? JSON.parse(demandeInfo.photos_avant) : [],
+        photos_apres: demandeInfo.photos_apres ? JSON.parse(demandeInfo.photos_apres) : [],
+        prestation_demarree: Boolean(demandeInfo.prestation_demarree_le)
+      } : null;
+      return { ...d, demande: demandeAvecPhotos };
+    });
     res.json(enriched);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1319,18 +1331,67 @@ async function finaliserPrestation(paiement) {
   return { ok: true };
 }
 
+// Fonction utilitaire de validation d'un tableau de photos (format, taille, quantité) —
+// réutilisée pour les photos "avant" et "après" de la prestation.
+function validerPhotos(photos, max) {
+  if (!photos || !Array.isArray(photos)) return null;
+  if (photos.length > max) return `Maximum ${max} photos.`;
+  for (const p of photos) {
+    if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
+      return 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).';
+    }
+    if (p.length > 3 * 1024 * 1024) {
+      return 'Une photo est trop volumineuse. Réessayez avec une photo plus légère.';
+    }
+  }
+  return null;
+}
+
+// Le PRESTATAIRE confirme son arrivée chez le client et prend une photo de l'état initial,
+// avant de commencer le travail — première étape logique, avant la validation de fin de
+// prestation. Rien ne change de statut ici, c'est purement informatif et rassurant pour le client.
+app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
+  try {
+    const { photos_avant } = req.body;
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.statut !== 'en_cours') return res.status(400).json({ error: 'Cette prestation n\'est pas en cours.' });
+
+    const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', req.params.id).eq('statut', 'accepte').maybeSingle();
+    if (!devisAccepte || devisAccepte.societe_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+
+    const erreurPhotos = validerPhotos(photos_avant, 5);
+    if (erreurPhotos) return res.status(400).json({ error: erreurPhotos });
+
+    await supabase.from('demandes').update({
+      photos_avant: photos_avant && photos_avant.length ? JSON.stringify(photos_avant) : null,
+      prestation_demarree_le: new Date().toISOString()
+    }).eq('id', req.params.id);
+
+    res.json({ message: 'Arrivée confirmée. Bonne prestation !' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // Le PRESTATAIRE saisit le code à 6 chiffres que le client lui a donné en personne, à la fin de
 // la prestation (même logique qu'un code de livraison Uber Eats) — remplace la confirmation
 // unilatérale par le client seul, et prouve que les deux parties étaient bien en contact.
 app.post('/api/paiements/valider-code', auth, async (req, res) => {
   try {
-    const { demande_id, code } = req.body;
+    const { demande_id, code, photos_apres } = req.body;
     if (!demande_id || !code) return res.status(400).json({ error: 'Code requis.' });
 
     const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demande_id).eq('statut', 'paye').maybeSingle();
     if (!paiement) return res.status(404).json({ error: 'Aucun paiement en attente pour cette prestation.' });
     if (paiement.societe_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
     if (String(code).trim() !== paiement.code_validation) return res.status(400).json({ error: 'Code incorrect. Vérifiez le code donné par le client.' });
+
+    const erreurPhotos = validerPhotos(photos_apres, 5);
+    if (erreurPhotos) return res.status(400).json({ error: erreurPhotos });
+    if (photos_apres && photos_apres.length) {
+      await supabase.from('demandes').update({ photos_apres: JSON.stringify(photos_apres) }).eq('id', demande_id);
+    }
 
     const resultat = await finaliserPrestation(paiement);
     if (resultat.erreur) return res.status(400).json({ error: resultat.erreur });
