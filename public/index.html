@@ -336,6 +336,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
             <span>J'atteste disposer d'une assurance responsabilité civile professionnelle en cours de validité, couvrant les dommages pouvant survenir dans le cadre de mes prestations.</span>
           </label>
         </div>
+        <label style="margin-top:14px">🎁 Code de parrainage <span class="optional">(optionnel)</span></label>
+        <input type="text" id="r-code-parrainage" placeholder="Ex: MADY1234" style="text-transform:uppercase">
         <label style="display:flex;align-items:flex-start;gap:8px;margin-top:16px;cursor:pointer;font-weight:400;font-size:13px">
           <input type="checkbox" id="r-cgu-accept" style="width:auto;margin-top:2px">
           <span>J'accepte les <a href="cgu.html" target="_blank" style="color:var(--p);font-weight:600">Conditions Générales d'Utilisation</a> et la <a href="confidentialite.html" target="_blank" style="color:var(--p);font-weight:600">Politique de Confidentialité</a> de Gleam.</span>
@@ -451,6 +453,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="configurerPaiementsPro()"><span class="pi-icon"><i data-lucide="landmark" style="width:20px;height:20px"></i></span><span class="pi-text">Configurer mes paiements</span><span class="pi-arrow" id="connect-statut-badge"></span></div>
       <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
@@ -540,6 +543,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="heart" style="width:20px;height:20px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
@@ -655,6 +659,11 @@ function switchTab(t){
   document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(t==='login'&&i===0)||(t==='register'&&i===1)));
   document.getElementById('form-login').style.display=t==='login'?'block':'none';
   document.getElementById('form-register').style.display=t==='register'?'block':'none';
+  if(t==='register'){
+    var match=/[?&#]parrain=([^&]+)/.exec(window.location.href);
+    var champ=document.getElementById('r-code-parrainage');
+    if(match&&champ&&!champ.value)champ.value=decodeURIComponent(match[1]).toUpperCase();
+  }
 }
 function isPro(){const t=(currentUser&&currentUser.type||'').toLowerCase().trim();return t==='pro'||t==='societe'||t==='professionnel'}
 function authHeaders(){const t=localStorage.getItem('gleam_token');return{'Content-Type':'application/json','Authorization':'Bearer '+t}}
@@ -760,7 +769,7 @@ async function doRegister(){
     const r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({firstName:fn,lastName:ln,prenom:fn,nom:ln,email,phone,telephone:phone,password:pw,role:userRole,type:userRole,
         assurance_rc_pro:assuranceAtteste,assurance_compagnie:assuranceCompagnie,assurance_police:assurancePolice,siret:siret,
-        raison_sociale:raisonSociale,tva_intracom:tva,adresse_facturation:adresseFacturation,cgu_accepte:true})});
+        raison_sociale:raisonSociale,tva_intracom:tva,adresse_facturation:adresseFacturation,code_parrainage:document.getElementById('r-code-parrainage').value.trim(),cgu_accepte:true})});
     const d=await safeJson(r);
     if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
@@ -2090,6 +2099,10 @@ async function openPayment(devisId,montant){
     const d=await safeJson(r);
     if(!r.ok){document.getElementById('payment-error').textContent=d.error||'Erreur';document.getElementById('payment-error').classList.add('show');return}
     if(!d.client_secret||!d.publishable_key){document.getElementById('payment-error').textContent='Réponse de paiement invalide.';document.getElementById('payment-error').classList.add('show');return}
+    if(d.reduction_parrainage){
+      var montantReduit=(montant*0.9).toFixed(2);
+      document.getElementById('payment-sub').innerHTML='<span style="text-decoration:line-through;color:var(--gray)">'+montant+' €</span> <strong style="color:var(--green)">'+montantReduit+' € TTC</strong> — 🎁 réduction de parrainage appliquée !';
+    }
     currentPaymentIntent=d.client_secret;
     if(!stripeInstance)stripeInstance=Stripe(d.publishable_key);
     var elements=stripeInstance.elements();
@@ -2273,6 +2286,33 @@ async function ajouterFavori(proId,proName,btn){
     toast('❤️ '+escapeHtml(proName)+' ajouté à vos favoris !');
     if(btn){btn.innerHTML='<i data-lucide="heart" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
+}
+function showParrainage(){
+  var code=currentUser&&currentUser.code_parrainage||'';
+  var aReduction=currentUser&&currentUser.reduction_parrainage_disponible;
+  var lien='https://gleam-app.fr/#inscription?parrain='+encodeURIComponent(code);
+  var html='<div class="modal-title"><i data-lucide="gift" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Parrainage</div>'+
+    '<div class="modal-sub">Invitez vos proches, profitez tous les deux d\'une réduction</div>'+
+    '<div style="background:linear-gradient(135deg,var(--p),var(--p2));border-radius:14px;padding:20px;text-align:center;color:#fff;margin-bottom:16px">'+
+      '<div style="font-size:12px;opacity:.85;margin-bottom:6px">Votre code de parrainage</div>'+
+      '<div style="font-size:28px;font-weight:800;letter-spacing:3px">'+escapeHtml(code)+'</div>'+
+    '</div>'+
+    '<button class="btn" onclick="partagerParrainage(\''+escAttr(code)+'\')"><i data-lucide="share-2" style="width:16px;height:16px;vertical-align:-2px"></i> Partager mon code</button>'+
+    '<div style="margin-top:16px;font-size:13px;color:var(--text-secondary);line-height:1.6">'+
+      '<strong>Comment ça marche :</strong><br>'+
+      '1. Votre invité entre votre code à son inscription<br>'+
+      '2. Dès sa première prestation payée, vous recevez chacun <strong>10% de réduction</strong> sur votre prochaine prestation'+
+    '</div>'+
+    (aReduction?'<div style="margin-top:14px;background:#F0FDF4;border:1px solid var(--green);border-radius:10px;padding:12px;font-size:13px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:8px"><i data-lucide="check-circle" style="width:16px;height:16px"></i> Réduction disponible sur votre prochaine prestation !</div>':'');
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function partagerParrainage(code){
+  var texte='Rejoins Gleam avec mon code de parrainage "'+code+'" et profite d\'une réduction sur ta première prestation ! https://gleam-app.fr';
+  if(navigator.share){navigator.share({text:texte}).catch(function(){})}
+  else{
+    navigator.clipboard.writeText(texte).then(function(){toast('📋 Message copié, à coller où vous voulez !')}).catch(function(){toast('Code : '+code)});
+  }
 }
 async function showMesFavoris(){
   document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="heart" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes favoris</div><div class="modal-sub">Vos prestataires préférés, à recontacter en un clic</div><div id="favoris-list">'+skeletonCards(2)+'</div>';
@@ -2881,6 +2921,8 @@ if(tok){
       }else localStorage.removeItem('gleam_token');
     })
     .catch(function(){});
+}else if(/[?&#]parrain=/.test(window.location.href)){
+  switchTab('register');
 }
 </script>
 </body>
