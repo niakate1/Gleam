@@ -336,34 +336,50 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
+// Notre propre système de réinitialisation de mot de passe, plutôt que de dépendre du lien
+// automatique de Supabase (dont le format exact — jeton dans le fragment d'URL, ou code dans les
+// paramètres — s'est révélé peu fiable à détecter côté navigateur). Un code à 6 chiffres, envoyé
+// par notre propre système d'email, saisi directement dans l'app : plus simple, plus prévisible,
+// et cohérent avec le code de validation de fin de prestation déjà utilisé ailleurs dans Gleam.
 app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email requis.' });
-    await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
-      redirectTo: (process.env.FRONTEND_URL || 'https://gleam-app.fr/') + '#nouveau-mot-de-passe'
-    });
-    res.json({ message: 'Email de réinitialisation envoyé !' });
+
+    const { data: user } = await supabase.from('users').select('id, prenom, email').eq('email', email.toLowerCase().trim()).maybeSingle();
+    // Réponse identique que le compte existe ou non, pour ne jamais révéler si un email est
+    // inscrit chez Gleam (bonne pratique de sécurité classique).
+    if (!user) return res.json({ message: 'Si ce compte existe, un email a été envoyé.' });
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiration = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // valable 30 minutes
+    await supabase.from('users').update({ reset_code: code, reset_code_expire: expiration }).eq('id', user.id);
+
+    sendEmail('reinitialisation_mot_de_passe', user.email, { prenom: user.prenom || '', code }).catch(e => console.error('Email réinitialisation:', e));
+
+    res.json({ message: 'Si ce compte existe, un email a été envoyé.' });
   } catch (e) {
+    console.error('Erreur mot de passe oublié:', e);
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
 
-// Finalise la réinitialisation : reçoit le jeton de récupération envoyé par email (contenu dans
-// le lien cliqué) et le nouveau mot de passe choisi. Sans cette route, l'email de réinitialisation
-// ne servait à rien de concret — il fallait un vrai moyen de saisir et d'enregistrer le nouveau
-// mot de passe une fois le lien ouvert.
 app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
   try {
-    const { access_token, new_password } = req.body;
-    if (!access_token || !new_password) return res.status(400).json({ error: 'Informations manquantes.' });
+    const { email, code, new_password } = req.body;
+    if (!email || !code || !new_password) return res.status(400).json({ error: 'Informations manquantes.' });
     if (new_password.length < 8) return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
 
-    const { data: { user }, error: erreurToken } = await supabase.auth.getUser(access_token);
-    if (erreurToken || !user) return res.status(400).json({ error: 'Ce lien de réinitialisation a expiré ou est invalide. Refaites une demande de "mot de passe oublié".' });
+    const { data: user } = await supabase.from('users').select('id, reset_code, reset_code_expire').eq('email', email.toLowerCase().trim()).maybeSingle();
+    if (!user || !user.reset_code || user.reset_code !== String(code).trim())
+      return res.status(400).json({ error: 'Code incorrect.' });
+    if (!user.reset_code_expire || new Date(user.reset_code_expire) < new Date())
+      return res.status(400).json({ error: 'Ce code a expiré. Refaites une demande de "mot de passe oublié".' });
 
     const { error: erreurMaj } = await supabase.auth.admin.updateUserById(user.id, { password: new_password });
     if (erreurMaj) return res.status(400).json({ error: erreurMaj.message });
+
+    await supabase.from('users').update({ reset_code: null, reset_code_expire: null }).eq('id', user.id);
 
     res.json({ message: 'Mot de passe mis à jour avec succès !' });
   } catch (e) {
