@@ -3113,16 +3113,21 @@ if(window.lucide){
 
 // ── INIT ──
 // Détecte un lien de réinitialisation de mot de passe (envoyé par email) dès l'arrivée sur la
-// page — prioritaire sur tout le reste, que la personne soit déjà connectée ou non.
+// page — prioritaire sur tout le reste. Si ce lien est présent, on n'exécute jamais la
+// reconnexion automatique ci-dessous, même si un compte est déjà connecté sur cet appareil :
+// sinon les deux s'exécutaient en même temps, et la reconnexion automatique reprenait la main
+// sur l'écran, donnant l'impression que la réinitialisation ne s'affichait jamais.
+var enModeRecuperation=false;
 if(window.location.hash.indexOf('type=recovery')>=0){
   var recoveryParams=new URLSearchParams(window.location.hash.substring(1));
   var recoveryToken=recoveryParams.get('access_token');
   if(recoveryToken){
+    enModeRecuperation=true;
     ouvrirNouveauMotDePasse(recoveryToken);
     history.replaceState(null,'',window.location.pathname);
   }
 }
-var tok=localStorage.getItem('gleam_token');
+var tok=enModeRecuperation?null:localStorage.getItem('gleam_token');
 if(tok){
   fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
     .then(function(r){return r.ok?safeJson(r):null})
