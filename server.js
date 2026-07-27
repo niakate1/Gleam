@@ -716,6 +716,19 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
 //   - Moins de 2h avant : aucun remboursement (le pro reçoit l'intégralité, comme prévu)
 // Si `heuresRestantes` n'est pas fourni (annulation à l'initiative du PRO), remboursement toujours
 // intégral — ce n'est jamais au client de payer les frais d'une annulation qu'il n'a pas décidée.
+// Rembourse automatiquement le client si la prestation avait déjà été payée au moment de
+// l'annulation — sans ça, l'argent restait bloqué chez Gleam sans aucune résolution.
+// Si `heuresRestantes` est fourni (annulation à l'initiative du CLIENT), applique le barème de
+// frais à 3 paliers :
+//   - 24h ou plus avant : remboursement intégral, gratuit
+//   - Entre 2h et 24h avant : remboursement de 70% — les 30% retenus se répartissent
+//     PROPORTIONNELLEMENT entre le pro et la commission Gleam (le pro garde donc sa part
+//     habituelle sur ce qui est retenu, pas sur la totalité — sinon le total distribué dépasserait
+//     ce que le client a réellement payé, ce qui n'est évidemment pas possible)
+//   - Moins de 2h avant : aucun remboursement (le pro et Gleam gardent leurs parts complètes,
+//     comme si la prestation avait eu lieu normalement)
+// Si `heuresRestantes` n'est pas fourni (annulation à l'initiative du PRO), remboursement toujours
+// intégral — ce n'est jamais au client de payer les frais d'une annulation qu'il n'a pas décidée.
 async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
   const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demandeId).eq('statut', 'paye').maybeSingle();
   if (!paiement) return { rembourse: false };
@@ -732,16 +745,24 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
   }
 
   try {
+    // Remboursement proportionnel par défaut (reverse_transfer reste à sa valeur par défaut,
+    // "true") : Stripe reprend automatiquement, au prorata du montant remboursé, à la fois sur la
+    // part déjà transférée au pro et sur la commission Gleam — c'est la seule façon de garantir
+    // que le total redistribué (client remboursé + pro + Gleam) ne dépasse jamais ce qui a été payé.
     const paramsRemboursement = { payment_intent: paiement.stripe_payment_intent_id };
     if (pourcentage < 1) {
       paramsRemboursement.amount = Math.round(paiement.montant_ttc * pourcentage * 100);
-      paramsRemboursement.reverse_transfer = false; // le pro garde sa part déjà transférée
     }
     await stripe.refunds.create(paramsRemboursement);
     const montantEffectivementRembourse = Math.round(paiement.montant_ttc * pourcentage * 100) / 100;
+    // Le montant que le pro garde réellement doit lui aussi être corrigé au prorata — sinon
+    // "Mes gains" continuerait d'afficher l'ancien montant complet, jamais mis à jour après le
+    // remboursement partiel, ce qui afficherait un montant supérieur à ce qu'il a vraiment reçu.
+    const montantProCorrige = pourcentage < 1 ? Math.round(paiement.montant_societe * pourcentage * 100) / 100 : paiement.montant_societe;
     await supabase.from('paiements').update({
       statut: pourcentage < 1 ? 'rembourse_partiel' : 'rembourse',
-      montant_rembourse: montantEffectivementRembourse
+      montant_rembourse: montantEffectivementRembourse,
+      montant_societe: montantProCorrige
     }).eq('id', paiement.id);
     return {
       rembourse: true,
