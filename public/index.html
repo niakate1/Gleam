@@ -2308,10 +2308,29 @@ async function handlePhotosApres(input,demandeId){
   photosApresParDemande[demandeId]=existantes;
   renderPhotoPreviews(existantes,'photos-apres-previews-'+demandeId);
 }
+// Récupère la position GPS de l'appareil si l'utilisateur l'autorise, sans jamais bloquer si elle
+// est indisponible, refusée, ou trop longue à obtenir (délai de 5 secondes maximum).
+function obtenirPositionGPS(){
+  return new Promise(function(resolve){
+    if(!navigator.geolocation){resolve(null);return}
+    var termine=false;
+    var minuteur=setTimeout(function(){if(!termine){termine=true;resolve(null)}},5000);
+    navigator.geolocation.getCurrentPosition(
+      function(pos){if(!termine){termine=true;clearTimeout(minuteur);resolve({lat:pos.coords.latitude,lng:pos.coords.longitude})}},
+      function(){if(!termine){termine=true;clearTimeout(minuteur);resolve(null)}},
+      {timeout:5000,maximumAge:60000}
+    );
+  });
+}
 async function demarrerPrestation(demandeId,btn){
   if(btn)btn.disabled=true;
+  var position=await obtenirPositionGPS();
   try{
-    const r=await fetch(API+'/api/demandes/'+demandeId+'/demarrer-prestation',{method:'POST',headers:authHeaders(),body:JSON.stringify({photos_avant:photosAvantParDemande[demandeId]||[]})});
+    const r=await fetch(API+'/api/demandes/'+demandeId+'/demarrer-prestation',{method:'POST',headers:authHeaders(),body:JSON.stringify({
+      photos_avant:photosAvantParDemande[demandeId]||[],
+      latitude_pro:position?position.lat:null,
+      longitude_pro:position?position.lng:null
+    })});
     const d=await safeJson(r);
     if(!r.ok){toast('❌ '+(d.error||''));if(btn)btn.disabled=false;return}
     delete photosAvantParDemande[demandeId];
@@ -2678,6 +2697,8 @@ function closeModalForce(){
   multiFlow={active:false,queue:[],current:0,results:[]};
   photos=[];
   proPrefereChoisi=null;
+  adresseChoisieLat=null;
+  adresseChoisieLng=null;
 }
 function isLastInFlow(){return!multiFlow.active||multiFlow.current===multiFlow.queue.length-1}
 
@@ -2786,7 +2807,11 @@ function chercherAdresse(valeur){
           var p=f.properties;
           var rue=escapeHtml(p.name||'');
           var villeEtCp=escapeHtml((p.postcode||'')+' '+(p.city||''));
-          return '<div class="adresse-suggestion-item" onclick="choisirAdresse(\''+escAttr(p.name||'')+'\',\''+escAttr(p.city||'')+'\')">'+
+          // Les coordonnées GPS de l'adresse (déjà fournies par l'API) sont conservées pour
+          // permettre, plus tard, de vérifier que le prestataire est bien arrivé au bon endroit.
+          var lng=f.geometry&&f.geometry.coordinates?f.geometry.coordinates[0]:'';
+          var lat=f.geometry&&f.geometry.coordinates?f.geometry.coordinates[1]:'';
+          return '<div class="adresse-suggestion-item" onclick="choisirAdresse(\''+escAttr(p.name||'')+'\',\''+escAttr(p.city||'')+'\','+lat+','+lng+')">'+
             '<i data-lucide="map-pin" style="width:14px;height:14px;color:var(--gray);flex-shrink:0"></i>'+
             '<div><div style="font-weight:600">'+rue+'</div><div style="font-size:11px;color:var(--gray)">'+villeEtCp+'</div></div>'+
           '</div>';
@@ -2796,10 +2821,13 @@ function chercherAdresse(valeur){
       }).catch(function(){});
   },300);
 }
-function choisirAdresse(rue,ville){
+var adresseChoisieLat=null,adresseChoisieLng=null;
+function choisirAdresse(rue,ville,lat,lng){
   var addrEl=document.getElementById('f-addr'),villeEl=document.getElementById('f-ville');
   if(addrEl)addrEl.value=rue;
   if(villeEl)villeEl.value=ville;
+  adresseChoisieLat=(typeof lat==='number'&&!isNaN(lat))?lat:null;
+  adresseChoisieLng=(typeof lng==='number'&&!isNaN(lng))?lng:null;
   var box=document.getElementById('adresse-suggestions');
   if(box){box.classList.remove('show');box.innerHTML=''}
 }
@@ -3090,11 +3118,12 @@ async function sendDemand(type){
     var isEdit=multiFlow.editMode&&multiFlow.editId;
     var url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
     var method=isEdit?'PATCH':'POST';
-    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5),pro_prefere_id:proPrefereChoisi})});
+    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5),pro_prefere_id:proPrefereChoisi,latitude:adresseChoisieLat,longitude:adresseChoisieLng})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
     photos=[];selectedServices=[];
+    adresseChoisieLat=null;adresseChoisieLng=null;
     var wasEdit=isEdit,editedId=multiFlow.editId;
     multiFlow={active:false,queue:[],current:0,results:[]};
     document.querySelectorAll('.svc-card').forEach(function(c){c.classList.remove('selected')});
