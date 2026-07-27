@@ -162,6 +162,21 @@ const templates = {
     }),
   }),
 
+  // Notification immédiate à l'équipe Gleam dès qu'un signalement ou une demande de contact
+  // est soumis — sans email, un signalement resterait invisible tant que personne n'irait
+  // consulter la base manuellement.
+  nouveau_signalement: (d) => ({
+    subject: `🚩 Nouveau signalement Gleam — ${d.motif}`,
+    html: wrapTemplate({
+      title: `Nouveau signalement reçu`,
+      body: `<p><strong>De :</strong> ${d.reporterNom}</p>
+             <p><strong>Concernant :</strong> ${d.signaleNom}</p>
+             <p><strong>Motif :</strong> ${d.motif}</p>
+             <p><strong>Description :</strong><br>${d.description}</p>
+             <p style="font-size:12px;color:#6B7280">Identifiant du signalement : ${d.signalementId}</p>`,
+    }),
+  }),
+
   // 7bis. Annulation client → Pro (après acceptation du devis)
   annulation_client: (d) => ({
     subject: `Le client a annulé la prestation`,
