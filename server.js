@@ -761,7 +761,10 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
     // Le montant que le pro garde réellement doit lui aussi être corrigé au prorata — sinon
     // "Mes gains" continuerait d'afficher l'ancien montant complet, jamais mis à jour après le
     // remboursement partiel, ce qui afficherait un montant supérieur à ce qu'il a vraiment reçu.
-    const montantProCorrige = pourcentage < 1 ? Math.round(paiement.montant_societe * pourcentage * 100) / 100 : paiement.montant_societe;
+    // ATTENTION au sens : "pourcentage" est la part REMBOURSÉE AU CLIENT — le pro garde donc
+    // (1 - pourcentage) de sa part habituelle, jamais "pourcentage" directement (erreur trouvée
+    // et corrigée ici : 85€ × 0,7 donnait 59,50€, qui est le montant REPRIS, pas celui gardé).
+    const montantProCorrige = pourcentage < 1 ? Math.round(paiement.montant_societe * (1 - pourcentage) * 100) / 100 : paiement.montant_societe;
     await supabase.from('paiements').update({
       statut: pourcentage < 1 ? 'rembourse_partiel' : 'rembourse',
       montant_rembourse: montantEffectivementRembourse,
