@@ -230,6 +230,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const tvaIntracom = req.body.tva_intracom || null;
     const adresseFacturation = req.body.adresse_facturation || null;
     const cguAcceptees = Boolean(req.body.cgu_accepte);
+    const codeParrainageSaisi = (req.body.code_parrainage || '').trim().toUpperCase();
 
     if (!email || !password || !prenom || !nom)
       return res.status(400).json({ error: 'Tous les champs sont requis.' });
@@ -247,12 +248,29 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       if (!adresseFacturation) return res.status(400).json({ error: 'Adresse de facturation requise.' });
     }
 
+    // Vérifie le code de parrainage éventuellement saisi (silencieusement ignoré s'il est invalide,
+    // pour ne jamais bloquer une inscription à cause d'une faute de frappe sur ce champ optionnel)
+    let parrainId = null;
+    if (codeParrainageSaisi) {
+      const { data: parrain } = await supabase.from('users').select('id').eq('code_parrainage', codeParrainageSaisi).maybeSingle();
+      if (parrain) parrainId = parrain.id;
+    }
+
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: email.toLowerCase().trim(),
       password: password,
       email_confirm: true
     });
     if (authError) return res.status(400).json({ error: authError.message });
+
+    // Génère un code de parrainage unique pour ce nouveau compte (quelques essais suffisent presque
+    // toujours vu le grand nombre de combinaisons possibles)
+    let codeParrainage = null;
+    for (let essai = 0; essai < 5 && !codeParrainage; essai++) {
+      const candidat = (prenom.trim().slice(0, 4) + Math.floor(1000 + Math.random() * 9000)).toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const { data: dejaUtilise } = await supabase.from('users').select('id').eq('code_parrainage', candidat).maybeSingle();
+      if (!dejaUtilise) codeParrainage = candidat;
+    }
 
     const { data, error } = await supabase.from('users').insert({
       id: authData.user.id,
@@ -269,7 +287,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       raison_sociale: type === 'entreprise' ? raisonSociale : null,
       tva_intracom: type === 'entreprise' ? tvaIntracom : null,
       adresse_facturation: type === 'entreprise' ? adresseFacturation : null,
-      cgu_acceptees_le: new Date().toISOString()
+      cgu_acceptees_le: new Date().toISOString(),
+      code_parrainage: codeParrainage,
+      parraine_par: parrainId
     }).select().single();
 
     if (error) {
@@ -681,8 +701,11 @@ app.post('/api/devis', auth, async (req, res) => {
     if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Cette demande n\'est plus disponible.' });
 
-    const { data: existing } = await supabase.from('devis').select('id').eq('demande_id', demande_id).eq('societe_id', req.user.id).maybeSingle();
-    if (existing) return res.status(400).json({ error: 'Vous avez déjà envoyé un devis pour cette demande.' });
+    // Ne bloque que si un devis encore ACTIF existe déjà pour ce pro sur cette demande — un devis
+    // qu'il a lui-même annulé, ou que le client a refusé, ne doit jamais l'empêcher de renvoyer
+    // un nouveau devis (par exemple avec un prix différent) tant que la demande reste ouverte.
+    const { data: existing } = await supabase.from('devis').select('id').eq('demande_id', demande_id).eq('societe_id', req.user.id).eq('statut', 'envoye').maybeSingle();
+    if (existing) return res.status(400).json({ error: 'Vous avez déjà un devis en attente pour cette demande.' });
 
     const { data, error } = await supabase.from('devis').insert({
       demande_id: demande_id,
@@ -900,9 +923,13 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     // de remettre la demande en circulation pour d'autres pros
     const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id) : { rembourse: false };
 
-    // Annule le devis et remet la demande disponible pour d'autres pros
+    // Annule le devis, puis vérifie s'il reste d'autres devis actifs pour cette demande : s'il n'y
+    // en a plus aucun, la demande redevient "en attente" (comme neuve) ; sinon elle reste
+    // "devis_recus" puisque le client a encore d'autres offres à consulter.
     await supabase.from('devis').update({ statut: 'annule_pro' }).eq('id', req.params.id);
-    await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', devis.demande_id);
+    const { data: autresDevisActifs } = await supabase.from('devis').select('id').eq('demande_id', devis.demande_id).eq('statut', 'envoye');
+    const nouveauStatut = (autresDevisActifs && autresDevisActifs.length) ? 'devis_recus' : 'en_attente';
+    await supabase.from('demandes').update({ statut: nouveauStatut }).eq('id', devis.demande_id);
 
     // 📧 Email 7/8 : annulation pro → client
     const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
@@ -1138,8 +1165,18 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
     if (!demandePourPaiement || demandePourPaiement.client_id !== req.user.id)
       return res.status(403).json({ error: 'Accès refusé.' });
 
-    const montant = Math.round(devis.prix_ttc * 100);
-    const commission = Math.round(montant * 0.15); // 15% commission Gleam
+    // Récompense de parrainage éventuellement disponible : le client paie 10% de moins, le pro
+    // reçoit toujours sa part pleine (85% du prix du devis) — c'est la commission Gleam, et
+    // seulement elle, qui absorbe l'intégralité de la réduction. Jamais d'argent sorti de la poche
+    // de Gleam ni du pro, uniquement un manque à gagner sur une transaction qui a réellement lieu.
+    const { data: clientPourReduction } = await supabase.from('users').select('reduction_parrainage_disponible').eq('id', req.user.id).single();
+    const parrainageApplique = Boolean(clientPourReduction && clientPourReduction.reduction_parrainage_disponible);
+
+    const montantPro = devis.prix_ttc * 0.85;
+    const montantFacture = parrainageApplique ? devis.prix_ttc * 0.90 : devis.prix_ttc;
+    const commissionGleam = montantFacture - montantPro;
+    const montant = Math.round(montantFacture * 100);
+    const commission = Math.round(commissionGleam * 100);
 
     // Si le pro a déjà configuré ses paiements, on utilise une "destination charge" Stripe :
     // l'argent se répartit automatiquement à la source (commission Gleam + part du pro), sans
@@ -1165,15 +1202,16 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
       devis_id: devis_id,
       client_id: req.user.id,
       societe_id: devis.societe_id,
-      montant_ttc: devis.prix_ttc,
-      commission: devis.prix_ttc * 0.15,
-      montant_societe: devis.prix_ttc * 0.85,
+      montant_ttc: montantFacture,
+      commission: commissionGleam,
+      montant_societe: montantPro,
       stripe_payment_intent_id: intent.id,
       transfert_automatique: proConfigure,
+      parrainage_applique: parrainageApplique,
       statut: 'en_attente'
     });
 
-    res.json({ client_secret: intent.client_secret, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY });
+    res.json({ client_secret: intent.client_secret, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY, reduction_parrainage: parrainageApplique });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -1195,6 +1233,25 @@ app.post('/api/paiements/confirmer', auth, async (req, res) => {
 
     if (paiement) {
       await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
+
+      // Consomme le crédit de réduction s'il vient d'être utilisé sur ce paiement
+      if (paiement.parrainage_applique) {
+        await supabase.from('users').update({ reduction_parrainage_disponible: false }).eq('id', paiement.client_id);
+      }
+
+      // Si c'est le tout premier paiement réussi de ce client ET qu'il a été parrainé, on
+      // récompense le parrain ET le filleul avec une réduction sur leur prochaine prestation —
+      // financée uniquement par la commission Gleam (jamais d'argent réel versé), et seulement
+      // au moment d'une vraie transaction. Ne se déclenche qu'une seule fois par filleul.
+      const { data: clientPaye } = await supabase.from('users').select('parraine_par, parrainage_recompense_donnee').eq('id', paiement.client_id).single();
+      if (clientPaye && clientPaye.parraine_par && !clientPaye.parrainage_recompense_donnee) {
+        const { count: nbPaiementsAnterieurs } = await supabase.from('paiements').select('id', { count: 'exact', head: true })
+          .eq('client_id', paiement.client_id).in('statut', ['paye', 'libere']);
+        if (nbPaiementsAnterieurs === 1) { // celui-ci est bien le tout premier
+          await supabase.from('users').update({ reduction_parrainage_disponible: true, parrainage_recompense_donnee: true }).eq('id', paiement.client_id);
+          await supabase.from('users').update({ reduction_parrainage_disponible: true }).eq('id', clientPaye.parraine_par);
+        }
+      }
 
       // 📧 Email 5/8 : paiement confirmé → pro
       const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', paiement.societe_id).single();
