@@ -1167,6 +1167,7 @@ function renderDevisClientCards(){
               '</div>'+
             '</div>'
           ):'')+
+          creneauBlockHtml(v.demande_id,v.creneau,v.creneau_propose,v.creneau_propose_par)+
         '</div>';
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
@@ -1319,13 +1320,17 @@ function renderDetail(d){
 }
 async function annulerDemandeAcceptee(){
   if(!currentDetailDemande)return;
-  if(!confirm('Confirmer l\'annulation de cette prestation ? Le prestataire sera prévenu immédiatement.'))return;
+  if(!confirm('Confirmer l\'annulation de cette prestation ?\n\nRappel du barème : gratuite plus de 24h avant, 70% remboursé entre 2h et 24h avant, aucun remboursement moins de 2h avant. Le prestataire sera prévenu immédiatement.'))return;
   try{
     const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id+'/annuler-client',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
-    var msg=d.rembourse?'🚫 Prestation annulée. Vous serez intégralement remboursé.':(d.tardive?'🚫 Prestation annulée (annulation tardive signalée).':'🚫 Prestation annulée.');
-    toast(msg,5000);
+    var msg;
+    if(d.frais_retenus&&d.rembourse){msg='🚫 Prestation annulée. Remboursé : '+d.montant_rembourse+'€ (frais de '+d.montant_retenu+'€ retenus, annulation tardive).'}
+    else if(d.frais_retenus&&!d.rembourse){msg='🚫 Prestation annulée. Aucun remboursement (annulation à moins de 2h du créneau).'}
+    else if(d.rembourse){msg='🚫 Prestation annulée. Vous serez intégralement remboursé.'}
+    else{msg=d.tardive?'🚫 Prestation annulée (annulation tardive signalée).':'🚫 Prestation annulée.'}
+    toast(msg,6000);
     goTab('home');loadDemandes();
   }catch(e){toast(friendlyNetworkError(e))}
 }
@@ -1610,7 +1615,8 @@ function renderProDevisCards(){
             '<div style="display:flex;gap:8px;margin-top:6px">'+
               '<input type="text" id="code-input-'+safeDemandeId+'" placeholder="123456" inputmode="numeric" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:3px;font-weight:700">'+
               '<button class="btn-accept" style="width:auto;padding:0 18px;flex-shrink:0" onclick="validerCodePro(\''+safeDemandeId+'\',this)">Valider</button>'+
-            '</div>';
+            '</div>'+
+            creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par);
         }
         extra+='</div>';
       }else if(v.statut==='accepte'){
@@ -1819,8 +1825,11 @@ async function annulerProDevis(devisId,btn){
     const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
-    var msg=d.rembourse?'🚫 Devis annulé. Le client a été intégralement remboursé.':(d.tardive?'🚫 Devis annulé (annulation tardive signalée).':'🚫 Devis annulé.');
-    toast(msg,5000);loadProDevis();
+    var msg;
+    if(d.suspendu){msg='🚫 Devis annulé. ⚠️ Votre compte a été suspendu suite à plusieurs annulations — contactez le support Gleam pour être réactivé.'}
+    else if(typeof d.taux_fiabilite==='number'){msg='🚫 Devis annulé. Le client a été '+(d.rembourse?'intégralement remboursé':'notifié')+'. Votre taux de fiabilité est maintenant de '+d.taux_fiabilite+'%.'}
+    else{msg=d.rembourse?'🚫 Devis annulé. Le client a été intégralement remboursé.':(d.tardive?'🚫 Devis annulé (annulation tardive signalée).':'🚫 Devis annulé.')}
+    toast(msg,7000);loadProDevis();
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
@@ -2345,6 +2354,57 @@ async function checkConnectStatut(){
 }
 // Ouvre la facture (client/entreprise) ou le relevé (pro) dans un nouvel onglet, prêt à imprimer
 // ou enregistrer en PDF via la fonction native du navigateur — pas besoin de générateur de PDF côté serveur.
+// Construit le bloc "reprogrammer" pour une carte de devis acceptée/en cours : bouton de
+// proposition, ou bannière d'acceptation/refus si l'autre partie a déjà proposé un nouveau créneau.
+function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposePar){
+  var safeId=escAttr(demandeId);
+  if(creneauPropose){
+    if(creneauProposePar===currentUser.id){
+      return '<div style="margin-top:8px;font-size:12px;color:var(--gold);background:#FFFBEB;border-radius:8px;padding:8px 10px">⏳ Nouveau créneau proposé ('+formatCreneau(creneauPropose)+'), en attente de confirmation.</div>';
+    }
+    return '<div style="margin-top:8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px">'+
+      '<div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:6px">📅 Nouveau créneau proposé : '+formatCreneau(creneauPropose)+'</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn-accept" style="padding:8px" onclick="repondreCreneau(\''+safeId+'\',true,this)">✅ Accepter</button>'+
+        '<button class="btn-refuse" style="padding:8px" onclick="repondreCreneau(\''+safeId+'\',false,this)">❌ Refuser</button>'+
+      '</div></div>';
+  }
+  return '<button class="btn-accept" style="background:none;border:1.5px solid var(--border);color:var(--text-secondary);width:100%;margin-top:8px;font-size:13px" onclick="ouvrirReprogrammer(\''+safeId+'\')"><i data-lucide="calendar-clock" style="width:14px;height:14px;vertical-align:-2px"></i> Reprogrammer</button>';
+}
+function ouvrirReprogrammer(demandeId){
+  var today=localDateISO(new Date());
+  var opts='';
+  for(var i=0;i<27;i++){var h=Math.floor(i/2)+7,m=i%2?'30':'00';opts+='<option>'+h+'h'+m+'</option>'}
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="calendar-clock" style="width:20px;height:20px;vertical-align:-4px"></i> Reprogrammer</div>'+
+    '<div class="modal-sub">L\'autre partie devra confirmer ce nouveau créneau.</div>'+
+    '<div class="field-group"><label>Nouvelle date et heure</label>'+
+    '<div class="datetime-row"><input type="date" id="reprog-date" min="'+today+'" value="'+today+'"><select id="reprog-time">'+opts+'</select></div></div>'+
+    '<button class="modal-send-btn" id="reprog-btn" onclick="proposerCreneau(\''+escAttr(demandeId)+'\')">Envoyer la proposition</button>';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+async function proposerCreneau(demandeId){
+  var date=document.getElementById('reprog-date').value,time=document.getElementById('reprog-time').value;
+  var btn=document.getElementById('reprog-btn');
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(API+'/api/demandes/'+demandeId+'/proposer-creneau',{method:'POST',headers:authHeaders(),body:JSON.stringify({date:date,time:time})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('❌ '+(d.error||''));if(btn)btn.disabled=false;return}
+    closeModalForce();
+    toast('📅 Proposition envoyée, en attente de confirmation.',4000);
+    if(isPro())loadProDevis();else loadDevis();
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
+}
+async function repondreCreneau(demandeId,accepter,btn){
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(API+'/api/demandes/'+demandeId+'/repondre-creneau',{method:'POST',headers:authHeaders(),body:JSON.stringify({accepter:accepter})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('❌ '+(d.error||''));if(btn)btn.disabled=false;return}
+    toast(accepter?'✅ Nouveau créneau confirmé !':'Proposition refusée.',4000);
+    if(isPro())loadProDevis();else loadDevis();
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
+}
 async function ajouterFavori(proId,proName,btn){
   if(btn)btn.disabled=true;
   try{
