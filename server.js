@@ -1332,8 +1332,13 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
     // reçoit toujours sa part pleine (85% du prix du devis) — c'est la commission Gleam, et
     // seulement elle, qui absorbe l'intégralité de la réduction. Jamais d'argent sorti de la poche
     // de Gleam ni du pro, uniquement un manque à gagner sur une transaction qui a réellement lieu.
-    const { data: clientPourReduction } = await supabase.from('users').select('reduction_parrainage_disponible').eq('id', req.user.id).single();
-    const parrainageApplique = Boolean(clientPourReduction && clientPourReduction.reduction_parrainage_disponible);
+    // Protégé par un try/catch : si cette vérification échoue pour une raison quelconque, le
+    // paiement continue normalement sans réduction, plutôt que de bloquer tout le paiement.
+    let parrainageApplique = false;
+    try {
+      const { data: clientPourReduction } = await supabase.from('users').select('reduction_parrainage_disponible').eq('id', req.user.id).single();
+      parrainageApplique = Boolean(clientPourReduction && clientPourReduction.reduction_parrainage_disponible);
+    } catch (e) { console.error('Vérification parrainage ignorée:', e.message); }
 
     const montantPro = devis.prix_ttc * 0.85;
     const montantFacture = parrainageApplique ? devis.prix_ttc * 0.90 : devis.prix_ttc;
@@ -1345,8 +1350,14 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
     // l'argent se répartit automatiquement à la source (commission Gleam + part du pro), sans
     // jamais passer par un virement séparé après coup — ce qui évite le blocage classique de
     // "solde disponible insuffisant" que l'on aurait avec un virement fait après le paiement.
-    const { data: proPourPaiement } = await supabase.from('users').select('stripe_account_id').eq('id', devis.societe_id).single();
-    const proConfigure = Boolean(proPourPaiement && proPourPaiement.stripe_account_id);
+    // Protégé de la même façon : si le pro n'a pas encore configuré ses paiements (ou si la
+    // vérification échoue), le paiement se fait quand même normalement, sans répartition automatique.
+    let proConfigure = false, proPourPaiement = null;
+    try {
+      const { data } = await supabase.from('users').select('stripe_account_id').eq('id', devis.societe_id).single();
+      proPourPaiement = data;
+      proConfigure = Boolean(proPourPaiement && proPourPaiement.stripe_account_id);
+    } catch (e) { console.error('Vérification Stripe Connect ignorée:', e.message); }
 
     const paramsIntent = {
       amount: montant,
@@ -1376,7 +1387,8 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
 
     res.json({ client_secret: intent.client_secret, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY, reduction_parrainage: parrainageApplique });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('Erreur création intention de paiement:', e);
+    res.status(500).json({ error: 'Impossible de démarrer le paiement pour l\'instant. Réessayez dans un instant ou contactez le support si le problème persiste.' });
   }
 });
 
@@ -1397,23 +1409,30 @@ app.post('/api/paiements/confirmer', auth, async (req, res) => {
     if (paiement) {
       await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
 
-      // Consomme le crédit de réduction s'il vient d'être utilisé sur ce paiement
-      if (paiement.parrainage_applique) {
-        await supabase.from('users').update({ reduction_parrainage_disponible: false }).eq('id', paiement.client_id);
-      }
-
-      // Si c'est le tout premier paiement réussi de ce client ET qu'il a été parrainé, on
-      // récompense le parrain ET le filleul avec une réduction sur leur prochaine prestation —
-      // financée uniquement par la commission Gleam (jamais d'argent réel versé), et seulement
-      // au moment d'une vraie transaction. Ne se déclenche qu'une seule fois par filleul.
-      const { data: clientPaye } = await supabase.from('users').select('parraine_par, parrainage_recompense_donnee').eq('id', paiement.client_id).single();
-      if (clientPaye && clientPaye.parraine_par && !clientPaye.parrainage_recompense_donnee) {
-        const { count: nbPaiementsAnterieurs } = await supabase.from('paiements').select('id', { count: 'exact', head: true })
-          .eq('client_id', paiement.client_id).in('statut', ['paye', 'libere']);
-        if (nbPaiementsAnterieurs === 1) { // celui-ci est bien le tout premier
-          await supabase.from('users').update({ reduction_parrainage_disponible: true, parrainage_recompense_donnee: true }).eq('id', paiement.client_id);
-          await supabase.from('users').update({ reduction_parrainage_disponible: true }).eq('id', clientPaye.parraine_par);
+      // Tout ce qui touche au parrainage est protégé dans son propre bloc : une erreur ici (colonne
+      // manquante, etc.) ne doit jamais empêcher la confirmation du paiement lui-même de réussir —
+      // le client a déjà payé, la prestation doit passer en cours quoi qu'il arrive.
+      try {
+        // Consomme le crédit de réduction s'il vient d'être utilisé sur ce paiement
+        if (paiement.parrainage_applique) {
+          await supabase.from('users').update({ reduction_parrainage_disponible: false }).eq('id', paiement.client_id);
         }
+
+        // Si c'est le tout premier paiement réussi de ce client ET qu'il a été parrainé, on
+        // récompense le parrain ET le filleul avec une réduction sur leur prochaine prestation —
+        // financée uniquement par la commission Gleam (jamais d'argent réel versé), et seulement
+        // au moment d'une vraie transaction. Ne se déclenche qu'une seule fois par filleul.
+        const { data: clientPaye } = await supabase.from('users').select('parraine_par, parrainage_recompense_donnee').eq('id', paiement.client_id).single();
+        if (clientPaye && clientPaye.parraine_par && !clientPaye.parrainage_recompense_donnee) {
+          const { count: nbPaiementsAnterieurs } = await supabase.from('paiements').select('id', { count: 'exact', head: true })
+            .eq('client_id', paiement.client_id).in('statut', ['paye', 'libere']);
+          if (nbPaiementsAnterieurs === 1) { // celui-ci est bien le tout premier
+            await supabase.from('users').update({ reduction_parrainage_disponible: true, parrainage_recompense_donnee: true }).eq('id', paiement.client_id);
+            await supabase.from('users').update({ reduction_parrainage_disponible: true }).eq('id', clientPaye.parraine_par);
+          }
+        }
+      } catch (e) {
+        console.error('Logique de parrainage ignorée (paiement déjà confirmé normalement) :', e.message);
       }
 
       // 📧 Email 5/8 : paiement confirmé → pro
@@ -1433,7 +1452,8 @@ app.post('/api/paiements/confirmer', auth, async (req, res) => {
 
     res.json({ message: 'Paiement confirmé ✨' });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('Erreur confirmation de paiement:', e);
+    res.status(500).json({ error: 'Le paiement a peut-être réussi mais la confirmation a échoué. Contactez le support Gleam avec votre référence de paiement pour vérifier.' });
   }
 });
 
