@@ -580,18 +580,98 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
   }
 });
 
-// Annuler une demande déjà acceptée/en cours (jamais bloqué totalement — juste un avertissement si tardif)
+// Reprogrammer une prestation déjà acceptée, sans avoir à tout annuler — nécessite l'accord de
+// l'autre partie avant que le créneau ne change réellement, pour éviter qu'une personne décale
+// unilatéralement un rendez-vous déjà convenu.
+app.post('/api/demandes/:id/proposer-creneau', auth, async (req, res) => {
+  try {
+    const { date, time } = req.body;
+    const erreurCreneau = validerCreneauFutur(date, time);
+    if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
+
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!['acceptee', 'en_cours'].includes(demande.statut))
+      return res.status(400).json({ error: 'La reprogrammation n\'est possible que pour une prestation acceptée ou en cours.' });
+
+    const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
+    const estClient = demande.client_id === req.user.id;
+    const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Accès refusé.' });
+
+    const nouveauCreneau = date + ' à ' + time;
+    await supabase.from('demandes').update({ creneau_propose: nouveauCreneau, creneau_propose_par: req.user.id }).eq('id', req.params.id);
+
+    res.json({ message: 'Nouveau créneau proposé, en attente de confirmation de l\'autre partie.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
+  try {
+    const { accepter } = req.body;
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande.creneau_propose) return res.status(400).json({ error: 'Aucune proposition de créneau en attente.' });
+    if (demande.creneau_propose_par === req.user.id) return res.status(403).json({ error: 'Vous ne pouvez pas répondre à votre propre proposition.' });
+
+    const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
+    const estClient = demande.client_id === req.user.id;
+    const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Accès refusé.' });
+
+    if (accepter) {
+      await supabase.from('demandes').update({ creneau: demande.creneau_propose, creneau_propose: null, creneau_propose_par: null }).eq('id', req.params.id);
+      res.json({ message: 'Nouveau créneau confirmé ✨' });
+    } else {
+      await supabase.from('demandes').update({ creneau_propose: null, creneau_propose_par: null }).eq('id', req.params.id);
+      res.json({ message: 'Proposition refusée. L\'ancien créneau reste valable.' });
+    }
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // Rembourse automatiquement le client si la prestation avait déjà été payée au moment de
-// l'annulation (par le client ou par le pro) — sans ça, l'argent restait bloqué chez Gleam
-// sans aucune résolution, ce qui n'est acceptable pour personne.
-async function rembourserPaiementSiPaye(demandeId) {
+// l'annulation — sans ça, l'argent restait bloqué chez Gleam sans aucune résolution.
+// Si `heuresRestantes` est fourni (annulation à l'initiative du CLIENT), applique le barème de
+// frais à 3 paliers : le pro garde toujours ce qui lui a déjà été transféré (jamais lésé), seul
+// le remboursement au client varie selon le délai avant le créneau prévu.
+//   - 24h ou plus avant : remboursement intégral, gratuit
+//   - Entre 2h et 24h avant : remboursement de 70% (30% de frais retenus, en compensation du pro)
+//   - Moins de 2h avant : aucun remboursement (le pro reçoit l'intégralité, comme prévu)
+// Si `heuresRestantes` n'est pas fourni (annulation à l'initiative du PRO), remboursement toujours
+// intégral — ce n'est jamais au client de payer les frais d'une annulation qu'il n'a pas décidée.
+async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
   const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demandeId).eq('statut', 'paye').maybeSingle();
   if (!paiement) return { rembourse: false };
 
+  let pourcentage = 1;
+  if (typeof heuresRestantes === 'number') {
+    if (heuresRestantes < 2) pourcentage = 0;
+    else if (heuresRestantes < 24) pourcentage = 0.7;
+  }
+
+  if (pourcentage === 0) {
+    await supabase.from('paiements').update({ statut: 'rembourse_partiel' }).eq('id', paiement.id);
+    return { rembourse: false, fraisRetenus: true, montantRetenu: paiement.montant_ttc };
+  }
+
   try {
-    await stripe.refunds.create({ payment_intent: paiement.stripe_payment_intent_id });
-    await supabase.from('paiements').update({ statut: 'rembourse' }).eq('id', paiement.id);
-    return { rembourse: true, montant: paiement.montant_ttc };
+    const paramsRemboursement = { payment_intent: paiement.stripe_payment_intent_id };
+    if (pourcentage < 1) {
+      paramsRemboursement.amount = Math.round(paiement.montant_ttc * pourcentage * 100);
+      paramsRemboursement.reverse_transfer = false; // le pro garde sa part déjà transférée
+    }
+    await stripe.refunds.create(paramsRemboursement);
+    await supabase.from('paiements').update({ statut: pourcentage < 1 ? 'rembourse_partiel' : 'rembourse' }).eq('id', paiement.id);
+    return {
+      rembourse: true,
+      montant: Math.round(paiement.montant_ttc * pourcentage * 100) / 100,
+      fraisRetenus: pourcentage < 1,
+      montantRetenu: pourcentage < 1 ? Math.round(paiement.montant_ttc * (1 - pourcentage) * 100) / 100 : 0
+    };
   } catch (e) {
     console.error('Remboursement Stripe échoué:', e);
     return { rembourse: false, erreur: true };
@@ -608,21 +688,23 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
     if (demande.statut !== 'acceptee' && demande.statut !== 'en_cours')
       return res.status(400).json({ error: 'Utilisez la suppression classique pour une demande pas encore acceptée.' });
 
-    // Détermine si l'annulation est tardive (moins de 24h avant le créneau prévu)
-    let tardive = false;
+    // Calcule précisément les heures restantes avant le créneau prévu, pour déterminer le palier
+    // de frais applicable (voir rembourserPaiementSiPaye) — heuresRestantes reste `null` si aucun
+    // créneau n'est renseigné, auquel cas le remboursement intégral s'applique par défaut.
+    let heuresRestantes = null;
     if (demande.creneau) {
       const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(demande.creneau);
       if (match) {
         const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
-        const heuresRestantes = (dateCreneau - new Date()) / (1000 * 60 * 60);
-        tardive = heuresRestantes < 24;
+        heuresRestantes = (dateCreneau - new Date()) / (1000 * 60 * 60);
       }
     }
+    const tardive = heuresRestantes !== null && heuresRestantes < 24;
 
     const { data: devisAccepte } = await supabase.from('devis').select('*').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
 
-    // Si la prestation était déjà payée (en cours), rembourse automatiquement avant d'annuler
-    const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id) : { rembourse: false };
+    // Si la prestation était déjà payée (en cours), applique le barème de frais avant d'annuler
+    const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id, heuresRestantes) : { rembourse: false };
 
     await supabase.from('demandes').update({ statut: 'annulee_client' }).eq('id', demande.id);
     if (devisAccepte) await supabase.from('devis').update({ statut: 'annule_client' }).eq('id', devisAccepte.id);
@@ -638,7 +720,14 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
       }
     }
 
-    res.json({ message: 'Prestation annulée.', tardive, rembourse: remboursement.rembourse });
+    res.json({
+      message: 'Prestation annulée.',
+      tardive,
+      rembourse: remboursement.rembourse,
+      montant_rembourse: remboursement.montant || 0,
+      frais_retenus: Boolean(remboursement.fraisRetenus),
+      montant_retenu: remboursement.montantRetenu || 0
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -776,7 +865,7 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
 // problème de performance et de volume de requêtes une fois combiné au rafraîchissement automatique).
 app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
   try {
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, statut, photos_avant, photos_apres, prestation_demarree_le')
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, statut, photos_avant, photos_apres, prestation_demarree_le, creneau, creneau_propose, creneau_propose_par')
       .eq('client_id', req.user.id).in('statut', ['devis_recus', 'acceptee', 'en_cours', 'terminee']);
     if (!demandes || !demandes.length) return res.json([]);
 
@@ -810,7 +899,10 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
         code_validation: d.statut === 'accepte' ? (codeMap[d.demande_id] || null) : null,
         photos_avant: demandeInfo && demandeInfo.photos_avant ? JSON.parse(demandeInfo.photos_avant) : [],
         photos_apres: demandeInfo && demandeInfo.photos_apres ? JSON.parse(demandeInfo.photos_apres) : [],
-        prestation_demarree: demandeInfo ? Boolean(demandeInfo.prestation_demarree_le) : false
+        prestation_demarree: demandeInfo ? Boolean(demandeInfo.prestation_demarree_le) : false,
+        creneau: demandeInfo ? demandeInfo.creneau : null,
+        creneau_propose: demandeInfo ? demandeInfo.creneau_propose : null,
+        creneau_propose_par: demandeInfo ? demandeInfo.creneau_propose_par : null
       };
     });
 
@@ -825,7 +917,7 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
     if (!devis || !devis.length) return res.json([]);
 
     const demandeIds = [...new Set(devis.map(d => d.demande_id))];
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme, client_id, notes, creneau, photos_avant, photos_apres, prestation_demarree_le').in('id', demandeIds);
+    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme, client_id, notes, creneau, photos_avant, photos_apres, prestation_demarree_le, creneau_propose, creneau_propose_par').in('id', demandeIds);
     const demandeMap = {};
     (demandes || []).forEach(d => demandeMap[d.id] = d);
 
@@ -935,6 +1027,25 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     // de remettre la demande en circulation pour d'autres pros
     const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id) : { rembourse: false };
 
+    // Système de sanction progressive : chaque annulation d'un devis déjà accepté fait baisser le
+    // taux de fiabilité du pro de 20 points (déjà utilisé ailleurs pour le classement des devis).
+    // En dessous de 40% (après 3 annulations), le compte est suspendu automatiquement — il faudra
+    // contacter le support Gleam pour être réactivé. Une annulation isolée reste sans grande
+    // conséquence ; c'est la répétition qui devient pénalisante.
+    const { data: proActuel } = await supabase.from('users').select('taux_fiabilite, nombre_annulations_pro, email, prenom').eq('id', req.user.id).single();
+    const tauxActuel = (proActuel && typeof proActuel.taux_fiabilite === 'number') ? proActuel.taux_fiabilite : 100;
+    const nouveauTaux = Math.max(0, tauxActuel - 20);
+    const nombreAnnulations = ((proActuel && proActuel.nombre_annulations_pro) || 0) + 1;
+    const suspendu = nouveauTaux <= 40;
+
+    const misAJourPro = { taux_fiabilite: nouveauTaux, nombre_annulations_pro: nombreAnnulations };
+    if (suspendu) misAJourPro.disponible = false;
+    await supabase.from('users').update(misAJourPro).eq('id', req.user.id);
+
+    if (suspendu && proActuel) {
+      sendEmail('compte_suspendu', proActuel.email, { prenom: proActuel.prenom || '' }).catch(e => console.error('Email compte_suspendu:', e));
+    }
+
     // Annule le devis, puis vérifie s'il reste d'autres devis actifs pour cette demande : s'il n'y
     // en a plus aucun, la demande redevient "en attente" (comme neuve) ; sinon elle reste
     // "devis_recus" puisque le client a encore d'autres offres à consulter.
@@ -954,7 +1065,15 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
       });
     }
 
-    res.json({ message: 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.', tardive, rembourse: remboursement.rembourse });
+    res.json({
+      message: suspendu
+        ? 'Devis annulé. Votre compte a été suspendu suite à plusieurs annulations — contactez le support Gleam pour être réactivé.'
+        : 'Devis annulé. Le client a été notifié et peut recevoir d\'autres devis.',
+      tardive,
+      rembourse: remboursement.rembourse,
+      taux_fiabilite: nouveauTaux,
+      suspendu
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur.' });
