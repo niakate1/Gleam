@@ -1594,6 +1594,7 @@ function renderProDevisCards(){
       }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
         var demandeeDemarree=v.demande&&v.demande.prestation_demarree;
+        var blocReprogrammation=creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par);
         extra='<div style="margin-top:10px">'+
           '<button class="btn-accept" style="width:100%;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
         if(!demandeeDemarree){
@@ -1604,7 +1605,7 @@ function renderProDevisCards(){
             '<input type="file" id="photo-avant-input-'+safeDemandeId+'" accept="image/*" multiple style="display:none" onchange="handlePhotosAvant(this,\''+safeDemandeId+'\')">'+
             '<div class="photo-previews" id="photos-avant-previews-'+safeDemandeId+'"></div>'+
             '<button class="btn-accept" style="width:100%" onclick="demarrerPrestation(\''+safeDemandeId+'\',this)"><i data-lucide="play" style="width:14px;height:14px;vertical-align:-2px"></i> Confirmer mon arrivée et démarrer</button>'+
-          '</div>';
+          '</div>'+blocReprogrammation;
         }else{
           // Étape 2 : le travail est en cours — photo après + code de fin
           extra+='<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">📸 Photos du travail réalisé <span class="optional">(optionnel, rassure le client)</span></label>'+
@@ -1615,8 +1616,7 @@ function renderProDevisCards(){
             '<div style="display:flex;gap:8px;margin-top:6px">'+
               '<input type="text" id="code-input-'+safeDemandeId+'" placeholder="123456" inputmode="numeric" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:3px;font-weight:700">'+
               '<button class="btn-accept" style="width:auto;padding:0 18px;flex-shrink:0" onclick="validerCodePro(\''+safeDemandeId+'\',this)">Valider</button>'+
-            '</div>'+
-            creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par);
+            '</div>'+blocReprogrammation;
         }
         extra+='</div>';
       }else if(v.statut==='accepte'){
