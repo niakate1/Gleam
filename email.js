@@ -150,6 +150,18 @@ const templates = {
     }),
   }),
 
+  // Suspension de compte pro suite à des annulations répétées d'un devis déjà accepté
+  compte_suspendu: (d) => ({
+    subject: `Votre compte Gleam a été suspendu`,
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Suite à plusieurs annulations de prestations déjà acceptées, votre compte professionnel Gleam a été temporairement suspendu.</p>
+             <p>Vous ne pouvez plus recevoir de nouvelles demandes pour l'instant. Pour être réactivé, merci de contacter le support Gleam.</p>`,
+      ctaLabel: 'Contacter le support',
+      ctaUrl: `${APP_URL}#aide`,
+    }),
+  }),
+
   // 7bis. Annulation client → Pro (après acceptation du devis)
   annulation_client: (d) => ({
     subject: `Le client a annulé la prestation`,
