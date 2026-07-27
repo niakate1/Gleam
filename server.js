@@ -540,7 +540,7 @@ async function expirerDemandesEnRetard(demandes) {
   const aExpirer = [];
   for (const d of (demandes || [])) {
     if ((d.statut === 'en_attente' || d.statut === 'devis_recus') && d.creneau) {
-      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(d.creneau);
+      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(d.creneau);
       if (match) {
         const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
         const heuresDepassement = (maintenant - dateCreneau) / (1000 * 60 * 60);
@@ -770,7 +770,7 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
     // créneau n'est renseigné, auquel cas le remboursement intégral s'applique par défaut.
     let heuresRestantes = null;
     if (demande.creneau) {
-      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(demande.creneau);
+      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau);
       if (match) {
         const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
         heuresRestantes = (dateCreneau - new Date()) / (1000 * 60 * 60);
@@ -1092,7 +1092,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     // Vérifie le délai de 24h avant le créneau (signalé, mais jamais bloquant — cohérent avec l'annulation côté client)
     let tardive = false;
     if (demande.creneau) {
-      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(demande.creneau);
+      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau);
       if (match) {
         const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
         const heuresRestantes = (dateCreneau - new Date()) / (1000 * 60 * 60);
