@@ -1751,7 +1751,10 @@ app.post('/api/signalements', auth, async (req, res) => {
       description: description || null,
       statut: 'nouveau'
     }).select().single();
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) {
+      console.error('Erreur création signalement:', error);
+      return res.status(400).json({ error: 'Impossible d\'envoyer votre message pour l\'instant. Réessayez dans un instant.' });
+    }
 
     // Notifie immédiatement l'équipe Gleam par email — sans ça, un signalement resterait stocké
     // silencieusement en base sans que personne ne soit jamais prévenu qu'il existe. C'est
