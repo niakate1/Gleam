@@ -829,7 +829,7 @@ function iconHtml(name,size){
   return '<i data-lucide="'+(name||'sparkles')+'" style="width:'+size+'px;height:'+size+'px;vertical-align:-4px;display:inline-block"></i>';
 }
 function ICONS_get(key){return iconHtml(ICON_NAMES[key])}
-const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],en_cours:['🔧 En cours','s-acceptee'],terminee:['🏁 Terminée','s-terminee'],annulee_client:['🚫 Annulée','s-terminee']};
+const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],en_cours:['🔧 En cours','s-acceptee'],terminee:['🏁 Terminée','s-terminee'],annulee_client:['🚫 Annulée','s-terminee'],expiree:['⌛ Expirée','s-terminee']};
 
 // Affiche les détails d'une prestation en ajoutant l'unité claire pour la quantité/surface
 // (ex: "6 m²" plutôt que juste "6"), pour que ce soit toujours compréhensible sans ambiguïté.
@@ -1004,8 +1004,8 @@ async function loadDemandes(silent){
     var data=(dataAll||[]).filter(function(d){return!d.archivee_client});
     if(!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
 
-    var order={en_cours:0,acceptee:1,devis_recus:2,en_attente:3,terminee:4};
-    data.sort(function(a,b){return(order[a.statut]||9)-(order[b.statut]||9)});
+    var order={en_cours:0,acceptee:1,devis_recus:2,en_attente:3,terminee:4,expiree:5};
+    data.sort(function(a,b){return(order[a.statut]??9)-(order[b.statut]??9)});
 
     var html='';
     data.forEach(function(d,i){
@@ -1317,7 +1317,7 @@ function renderDetail(d){
     '<button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>'+
   '</div>';
   if(canCancel)html+='<button class="btn-delete" style="width:100%;margin-top:10px" onclick="annulerDemandeAcceptee()">🚫 Annuler cette prestation</button>';
-  var isClosed=d.statut==='terminee'||d.statut==='annulee_client';
+  var isClosed=d.statut==='terminee'||d.statut==='annulee_client'||d.statut==='expiree';
   if(isClosed&&!d.archivee_client)html+='<button class="btn-modify" style="width:100%;margin-top:10px" onclick="archiverDemande()"><i data-lucide="archive" style="width:15px;height:15px;vertical-align:-3px"></i> Archiver (la ranger de ma liste)</button>';
   if(d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours')
     html+='<button class="modal-send-btn" style="margin-top:14px" onclick="goTab(\'devis\')">📋 Voir les devis reçus</button>';
@@ -1466,6 +1466,18 @@ function renderProDemandesCards(){
   if(!c)return;
   var data=proDemandesCache;
   if(!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
+
+  // Trie par urgence (créneau le plus proche en premier) plutôt que par simple ordre de publication —
+  // avec beaucoup de demandes en attente, mieux vaut voir en premier celles dont le délai presse,
+  // pour ne jamais rater une demande urgente noyée sous des demandes plus récentes mais moins pressées.
+  // Les demandes sans créneau précis (flexibles) passent en dernier.
+  function creneauTimestamp(creneau){
+    if(!creneau)return Infinity;
+    var match=/(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(creneau);
+    if(!match)return Infinity;
+    return new Date(+match[1],+match[2]-1,+match[3],+match[4],+match[5]).getTime();
+  }
+  data=data.slice().sort(function(a,b){return creneauTimestamp(a.creneau)-creneauTimestamp(b.creneau)});
 
   // Puces construites dynamiquement à partir des catégories réellement présentes dans les demandes
   // en attente — pas de puce vide pour une prestation que le pro ne voit jamais.
