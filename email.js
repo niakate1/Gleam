@@ -177,6 +177,18 @@ const templates = {
     }),
   }),
 
+  // Code de réinitialisation du mot de passe — un code à saisir directement dans l'app, plutôt
+  // qu'un lien dont le format s'est révélé peu fiable à gérer côté navigateur.
+  reinitialisation_mot_de_passe: (d) => ({
+    subject: `Votre code de réinitialisation Gleam`,
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Voici votre code pour choisir un nouveau mot de passe :</p>
+             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#7C3AED;text-align:center;margin:20px 0">${d.code}</p>
+             <p>Ce code est valable 30 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>`,
+    }),
+  }),
+
   // 7bis. Annulation client → Pro (après acceptation du devis)
   annulation_client: (d) => ({
     subject: `Le client a annulé la prestation`,
