@@ -1148,7 +1148,14 @@ function renderDevisClientCards(){
       if(v.statut==='accepte'&&v.demande_statut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
         cardStyle='border-color:var(--green);background:#F0FDF4;';
-        actions='<div style="margin-top:12px">'+
+        var photosAvantHtml='';
+        if(v.photos_avant&&v.photos_avant.length){
+          photosAvantHtml='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">📸 Photos avant intervention</div>'+
+            '<div style="display:flex;gap:6px;overflow-x:auto">'+v.photos_avant.map(function(ph){return '<img src="'+ph+'" style="width:70px;height:70px;border-radius:8px;object-fit:cover;flex-shrink:0" onclick="window.open(this.src)">'}).join('')+'</div></div>';
+        }else if(v.prestation_demarree){
+          photosAvantHtml='<div style="font-size:12px;color:var(--mint);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Le prestataire est arrivé</div>';
+        }
+        actions=photosAvantHtml+'<div style="margin-top:0">'+
           '<button class="btn-accept" style="width:100%;margin-bottom:8px" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
           (v.code_validation?(
             '<div style="background:#fff;border:2px dashed var(--green);border-radius:12px;padding:14px;text-align:center">'+
@@ -1164,7 +1171,18 @@ function renderDevisClientCards(){
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
         cardStyle='opacity:0.7;';
-        actions='<button class="btn-accept" style="background:var(--p);width:100%;margin-top:12px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>'+
+        var photosHtml='';
+        if((v.photos_avant&&v.photos_avant.length)||(v.photos_apres&&v.photos_apres.length)){
+          photosHtml='<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">';
+          if(v.photos_avant&&v.photos_avant.length){
+            photosHtml+='<div><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Avant</div><div style="display:flex;gap:6px">'+v.photos_avant.map(function(ph){return '<img src="'+ph+'" style="width:60px;height:60px;border-radius:8px;object-fit:cover" onclick="window.open(this.src)">'}).join('')+'</div></div>';
+          }
+          if(v.photos_apres&&v.photos_apres.length){
+            photosHtml+='<div><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Après</div><div style="display:flex;gap:6px">'+v.photos_apres.map(function(ph){return '<img src="'+ph+'" style="width:60px;height:60px;border-radius:8px;object-fit:cover" onclick="window.open(this.src)">'}).join('')+'</div></div>';
+          }
+          photosHtml+='</div>';
+        }
+        actions=photosHtml+'<button class="btn-accept" style="background:var(--p);width:100%;margin-top:10px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>'+
           '<button class="btn-accept" style="background:none;border:1.5px solid var(--gold);color:#B45309;width:100%;margin-top:8px" onclick="ajouterFavori(\''+safeSocieteId+'\',\''+safeProName+'\',this)"><i data-lucide="heart" style="width:14px;height:14px;vertical-align:-2px"></i> Ajouter à mes favoris</button>';
         if(notesDonnees.indexOf(v.demande_id)>=0){
           actions+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
@@ -1570,14 +1588,31 @@ function renderProDevisCards(){
         }
       }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
+        var demandeeDemarree=v.demande&&v.demande.prestation_demarree;
         extra='<div style="margin-top:10px">'+
-          '<button class="btn-accept" style="width:100%;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
-          '<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">Code donné par le client, à la fin de la prestation</label>'+
-          '<div style="display:flex;gap:8px;margin-top:6px">'+
-            '<input type="text" id="code-input-'+safeDemandeId+'" placeholder="123456" inputmode="numeric" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:3px;font-weight:700">'+
-            '<button class="btn-accept" style="width:auto;padding:0 18px;flex-shrink:0" onclick="validerCodePro(\''+safeDemandeId+'\',this)">Valider</button>'+
-          '</div>'+
-        '</div>';
+          '<button class="btn-accept" style="width:100%;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
+        if(!demandeeDemarree){
+          // Étape 1 : le pro vient d'arriver — photo de l'état initial avant de commencer
+          extra+='<div style="background:var(--surface-alt);border-radius:10px;padding:12px">'+
+            '<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">📸 Photo avant de commencer <span class="optional">(optionnel, rassure le client)</span></label>'+
+            '<div class="photo-zone" style="margin-top:6px;margin-bottom:8px" onclick="document.getElementById(\'photo-avant-input-'+safeDemandeId+'\').click()"><span style="font-size:22px">📷</span><p style="font-size:12px">Ajouter des photos</p></div>'+
+            '<input type="file" id="photo-avant-input-'+safeDemandeId+'" accept="image/*" multiple style="display:none" onchange="handlePhotosAvant(this,\''+safeDemandeId+'\')">'+
+            '<div class="photo-previews" id="photos-avant-previews-'+safeDemandeId+'"></div>'+
+            '<button class="btn-accept" style="width:100%" onclick="demarrerPrestation(\''+safeDemandeId+'\',this)"><i data-lucide="play" style="width:14px;height:14px;vertical-align:-2px"></i> Confirmer mon arrivée et démarrer</button>'+
+          '</div>';
+        }else{
+          // Étape 2 : le travail est en cours — photo après + code de fin
+          extra+='<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">📸 Photos du travail réalisé <span class="optional">(optionnel, rassure le client)</span></label>'+
+            '<div class="photo-zone" style="margin-top:6px;margin-bottom:10px" onclick="document.getElementById(\'photo-apres-input-'+safeDemandeId+'\').click()"><span style="font-size:22px">📷</span><p style="font-size:12px">Ajouter des photos</p></div>'+
+            '<input type="file" id="photo-apres-input-'+safeDemandeId+'" accept="image/*" multiple style="display:none" onchange="handlePhotosApres(this,\''+safeDemandeId+'\')">'+
+            '<div class="photo-previews" id="photos-apres-previews-'+safeDemandeId+'"></div>'+
+            '<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">Code donné par le client, à la fin de la prestation</label>'+
+            '<div style="display:flex;gap:8px;margin-top:6px">'+
+              '<input type="text" id="code-input-'+safeDemandeId+'" placeholder="123456" inputmode="numeric" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:3px;font-weight:700">'+
+              '<button class="btn-accept" style="width:auto;padding:0 18px;flex-shrink:0" onclick="validerCodePro(\''+safeDemandeId+'\',this)">Valider</button>'+
+            '</div>';
+        }
+        extra+='</div>';
       }else if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement en attente</span>';
         extra='<div style="display:flex;gap:8px;margin-top:10px">'+
@@ -2157,15 +2192,48 @@ async function confirmPayment(){
     loadDevis();
   }
 }
+var photosAvantParDemande={},photosApresParDemande={};
+async function handlePhotosAvant(input,demandeId){
+  var fichiers=Array.from(input.files||[]).slice(0,5);
+  if(!fichiers.length)return;
+  var existantes=photosAvantParDemande[demandeId]||[];
+  for(var i=0;i<fichiers.length&&existantes.length<5;i++){
+    try{existantes.push(await compressImage(fichiers[i],1000,0.75))}catch(e){}
+  }
+  photosAvantParDemande[demandeId]=existantes;
+  renderPhotoPreviews(existantes,'photos-avant-previews-'+demandeId);
+}
+async function handlePhotosApres(input,demandeId){
+  var fichiers=Array.from(input.files||[]).slice(0,5);
+  if(!fichiers.length)return;
+  var existantes=photosApresParDemande[demandeId]||[];
+  for(var i=0;i<fichiers.length&&existantes.length<5;i++){
+    try{existantes.push(await compressImage(fichiers[i],1000,0.75))}catch(e){}
+  }
+  photosApresParDemande[demandeId]=existantes;
+  renderPhotoPreviews(existantes,'photos-apres-previews-'+demandeId);
+}
+async function demarrerPrestation(demandeId,btn){
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(API+'/api/demandes/'+demandeId+'/demarrer-prestation',{method:'POST',headers:authHeaders(),body:JSON.stringify({photos_avant:photosAvantParDemande[demandeId]||[]})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('❌ '+(d.error||''));if(btn)btn.disabled=false;return}
+    delete photosAvantParDemande[demandeId];
+    toast('✅ Arrivée confirmée. Bonne prestation !');
+    loadProDevis();
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
+}
 async function validerCodePro(demandeId,btn){
   var input=document.getElementById('code-input-'+demandeId);
   var code=input?input.value.trim():'';
   if(!/^\d{6}$/.test(code)){toast('❌ Entrez le code à 6 chiffres donné par le client.');return}
   if(btn)btn.disabled=true;
   try{
-    const r=await fetch(API+'/api/paiements/valider-code',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,code:code})});
+    const r=await fetch(API+'/api/paiements/valider-code',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,code:code,photos_apres:photosApresParDemande[demandeId]||[]})});
     const d=await safeJson(r);
     if(!r.ok){toast('❌ '+(d.error||''));if(btn)btn.disabled=false;return}
+    delete photosApresParDemande[demandeId];
     toast('✅ Prestation validée ! Le virement a été effectué.',5000);
     loadProDevis();loadProDemandes();
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
