@@ -3047,9 +3047,12 @@ function getGroupLabel(group){
 // avant d'autoriser à passer à l'étape suivante ou à envoyer la demande.
 function validateCurrentForm(type){
   var groups=[];
+  // 'favori-cible' est volontairement optionnel (choisir un prestataire préféré n'est jamais
+  // obligatoire pour envoyer une demande) — comme 'etat', qui a toujours une valeur par défaut.
+  var groupesOptionnels=['etat','favori-cible'];
   document.querySelectorAll('#modal-body [data-group]').forEach(function(el){
     var g=el.getAttribute('data-group');
-    if(g&&g!=='etat'&&groups.indexOf(g)===-1)groups.push(g);
+    if(g&&groupesOptionnels.indexOf(g)===-1&&groups.indexOf(g)===-1)groups.push(g);
   });
   for(var i=0;i<groups.length;i++){
     if(!document.querySelector('[data-group="'+groups[i]+'"].sel')){
