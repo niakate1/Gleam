@@ -1046,6 +1046,10 @@ async function renderActiveRequestBanner(data){
   }[meilleure.statut];
   var icon=ICONS_get((meilleure.prestation||'').split(' + ')[0]);
   var sousTitre=escapeHtml(meilleure.prestation);
+  // Le créneau (date et heure) est l'information la plus utile à voir d'un coup d'œil, sans avoir
+  // à ouvrir "Mes devis" pour la retrouver — surtout après une reprogrammation, où le client doit
+  // pouvoir constater immédiatement le changement depuis l'accueil.
+  var creneauSousTitre=meilleure.creneau?formatCreneau(meilleure.creneau):'';
 
   // Pour "devis à examiner", on va chercher le vrai nombre de devis reçus et le prix le plus bas,
   // pour donner une info concrète et utile plutôt qu'un simple intitulé générique.
@@ -1068,6 +1072,7 @@ async function renderActiveRequestBanner(data){
     '<div style="flex:1;min-width:0">'+
       '<div style="font-size:11px;font-weight:700;color:'+config.color+';text-transform:uppercase;letter-spacing:.03em">'+config.label+'</div>'+
       '<div style="font-weight:700;font-size:14px">'+sousTitre+'</div>'+
+      (creneauSousTitre?'<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;display:flex;align-items:center;gap:4px"><i data-lucide="calendar" style="width:12px;height:12px"></i> '+creneauSousTitre+'</div>':'')+
     '</div>'+
     '<i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--gray);flex-shrink:0"></i>'+
   '</div>';
@@ -1148,6 +1153,7 @@ function renderDevisClientCards(){
       if(v.statut==='accepte'&&v.demande_statut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
         cardStyle='border-color:var(--green);background:#F0FDF4;';
+        var creneauHtml=v.creneau?'<div style="display:flex;align-items:center;gap:6px;background:#fff;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:13px;font-weight:700;color:var(--text)"><i data-lucide="calendar" style="width:15px;height:15px;color:var(--p);flex-shrink:0"></i> '+formatCreneau(v.creneau)+'</div>':'';
         var photosAvantHtml='';
         if(v.photos_avant&&v.photos_avant.length){
           photosAvantHtml='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">📸 Photos avant intervention</div>'+
@@ -1155,7 +1161,7 @@ function renderDevisClientCards(){
         }else if(v.prestation_demarree){
           photosAvantHtml='<div style="font-size:12px;color:var(--mint);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Le prestataire est arrivé</div>';
         }
-        actions=photosAvantHtml+'<div style="margin-top:0">'+
+        actions=creneauHtml+photosAvantHtml+'<div style="margin-top:0">'+
           '<button class="btn-accept" style="width:100%;margin-bottom:8px" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
           (v.code_validation?(
             '<div style="background:#fff;border:2px dashed var(--green);border-radius:12px;padding:14px;text-align:center">'+
@@ -1595,8 +1601,9 @@ function renderProDevisCards(){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
         var demandeeDemarree=v.demande&&v.demande.prestation_demarree;
         var blocReprogrammation=creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par);
-        extra='<div style="margin-top:10px">'+
-          '<button class="btn-accept" style="width:100%;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
+        var creneauHtmlPro=(v.demande&&v.demande.creneau)?'<div style="display:flex;align-items:center;gap:6px;background:var(--surface-alt);border-radius:8px;padding:8px 10px;margin-top:10px;font-size:13px;font-weight:700;color:var(--text)"><i data-lucide="calendar" style="width:15px;height:15px;color:var(--p);flex-shrink:0"></i> '+formatCreneau(v.demande.creneau)+'</div>':'';
+        extra='<div style="margin-top:10px">'+creneauHtmlPro+
+          '<button class="btn-accept" style="width:100%;margin-top:10px;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
         if(!demandeeDemarree){
           // Étape 1 : le pro vient d'arriver — photo de l'état initial avant de commencer
           extra+='<div style="background:var(--surface-alt);border-radius:10px;padding:12px">'+
