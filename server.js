@@ -460,7 +460,7 @@ app.post('/api/users/me/supprimer', auth, async (req, res) => {
 
 app.post('/api/demandes', auth, async (req, res) => {
   try {
-    const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id } = req.body;
+    const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id, latitude, longitude } = req.body;
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
@@ -503,6 +503,8 @@ app.post('/api/demandes', auth, async (req, res) => {
       notes: notes,
       numero_anonyme: numero,
       pro_prefere_id: proPrefereValide,
+      latitude: (typeof latitude === 'number' && !isNaN(latitude)) ? latitude : null,
+      longitude: (typeof longitude === 'number' && !isNaN(longitude)) ? longitude : null,
       statut: 'en_attente'
     }).select().single();
 
@@ -1566,7 +1568,7 @@ function validerPhotos(photos, max) {
 // prestation. Rien ne change de statut ici, c'est purement informatif et rassurant pour le client.
 app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
   try {
-    const { photos_avant } = req.body;
+    const { photos_avant, latitude_pro, longitude_pro } = req.body;
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
     if (demande.statut !== 'en_cours') return res.status(400).json({ error: 'Cette prestation n\'est pas en cours.' });
@@ -1577,9 +1579,25 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
     const erreurPhotos = validerPhotos(photos_avant, 5);
     if (erreurPhotos) return res.status(400).json({ error: erreurPhotos });
 
+    // Vérifie que le prestataire est réellement sur place, en comparant sa position GPS au moment
+    // de l'arrivée à l'adresse déclarée par le client (formule de Haversine, distance à vol
+    // d'oiseau) — une preuve technique difficile à falsifier, contrairement à une simple
+    // déclaration. Ne bloque jamais la prestation (le GPS peut être imprécis ou désactivé),
+    // seulement enregistré comme preuve consultable en cas de litige.
+    let distanceGpsMetres = null;
+    if (typeof latitude_pro === 'number' && typeof longitude_pro === 'number' && demande.latitude && demande.longitude) {
+      const R = 6371000; // rayon de la Terre en mètres
+      const toRad = (deg) => deg * Math.PI / 180;
+      const dLat = toRad(latitude_pro - demande.latitude);
+      const dLon = toRad(longitude_pro - demande.longitude);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(demande.latitude)) * Math.cos(toRad(latitude_pro)) * Math.sin(dLon / 2) ** 2;
+      distanceGpsMetres = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
     await supabase.from('demandes').update({
       photos_avant: photos_avant && photos_avant.length ? JSON.stringify(photos_avant) : null,
-      prestation_demarree_le: new Date().toISOString()
+      prestation_demarree_le: new Date().toISOString(),
+      distance_gps_arrivee: distanceGpsMetres
     }).eq('id', req.params.id);
 
     res.json({ message: 'Arrivée confirmée. Bonne prestation !' });
@@ -1811,6 +1829,26 @@ app.post('/api/signalements', auth, async (req, res) => {
       const { data } = await supabase.from('users').select('prenom, nom, email').eq('id', signale_id).single();
       signaleInfo = data;
     }
+
+    // Si le signalement concerne une demande précise, on rassemble automatiquement les preuves
+    // techniques déjà disponibles — plutôt que de devoir aller les chercher manuellement en cas de
+    // litige (ex: un client prétendant que le pro n'est jamais venu, alors que l'arrivée a bien
+    // été confirmée avec une position GPS cohérente avec l'adresse déclarée).
+    let preuves = 'Aucune demande précise associée à ce signalement.';
+    if (demande_id) {
+      const { data: demandeConcernee } = await supabase.from('demandes').select('statut, prestation_demarree_le, distance_gps_arrivee, photos_avant, photos_apres').eq('id', demande_id).maybeSingle();
+      if (demandeConcernee) {
+        const aDesPhotosAvant = demandeConcernee.photos_avant ? JSON.parse(demandeConcernee.photos_avant).length : 0;
+        const aDesPhotosApres = demandeConcernee.photos_apres ? JSON.parse(demandeConcernee.photos_apres).length : 0;
+        preuves = `Statut de la demande : ${demandeConcernee.statut}. ` +
+          (demandeConcernee.prestation_demarree_le
+            ? `Le prestataire a confirmé son arrivée le ${new Date(demandeConcernee.prestation_demarree_le).toLocaleString('fr-FR')}` +
+              (demandeConcernee.distance_gps_arrivee !== null ? ` (position GPS à ${demandeConcernee.distance_gps_arrivee}m de l'adresse déclarée).` : ' (position GPS non disponible).')
+            : 'Le prestataire n\'a jamais confirmé son arrivée dans l\'app.') +
+          ` Photos avant : ${aDesPhotosAvant}. Photos après : ${aDesPhotosApres}.`;
+      }
+    }
+
     const adminEmail = process.env.ADMIN_EMAIL || process.env.FROM_EMAIL;
     if (adminEmail) {
       sendEmail('nouveau_signalement', adminEmail, {
@@ -1818,6 +1856,7 @@ app.post('/api/signalements', auth, async (req, res) => {
         signaleNom: signaleInfo ? `${signaleInfo.prenom} ${signaleInfo.nom} (${signaleInfo.email})` : 'Non spécifié (contact général)',
         motif: motif,
         description: description || 'Aucune description fournie.',
+        preuves: preuves,
         signalementId: signalement.id
       }).catch(e => console.error('Email nouveau_signalement:', e));
     }
