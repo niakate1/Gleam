@@ -1721,16 +1721,39 @@ app.get('/api/favoris', auth, async (req, res) => {
 app.post('/api/signalements', auth, async (req, res) => {
   try {
     const { signale_id, demande_id, motif, description } = req.body;
-    if (!signale_id || !motif) return res.status(400).json({ error: 'Motif requis.' });
-    const { error } = await supabase.from('signalements').insert({
+    if (!motif) return res.status(400).json({ error: 'Motif requis.' });
+
+    const { data: signalement, error } = await supabase.from('signalements').insert({
       reporter_id: req.user.id,
-      signale_id: signale_id,
+      signale_id: signale_id || null,
       demande_id: demande_id || null,
       motif: motif,
       description: description || null,
       statut: 'nouveau'
-    });
+    }).select().single();
     if (error) return res.status(400).json({ error: error.message });
+
+    // Notifie immédiatement l'équipe Gleam par email — sans ça, un signalement resterait stocké
+    // silencieusement en base sans que personne ne soit jamais prévenu qu'il existe. C'est
+    // exactement ce que font les autres plateformes (Uber, Wecasa...) : une alerte immédiate à
+    // chaque signalement, jamais un simple enregistrement passif.
+    const { data: reporter } = await supabase.from('users').select('prenom, nom, email').eq('id', req.user.id).single();
+    let signaleInfo = null;
+    if (signale_id) {
+      const { data } = await supabase.from('users').select('prenom, nom, email').eq('id', signale_id).single();
+      signaleInfo = data;
+    }
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.FROM_EMAIL;
+    if (adminEmail) {
+      sendEmail('nouveau_signalement', adminEmail, {
+        reporterNom: reporter ? `${reporter.prenom} ${reporter.nom} (${reporter.email})` : req.user.id,
+        signaleNom: signaleInfo ? `${signaleInfo.prenom} ${signaleInfo.nom} (${signaleInfo.email})` : 'Non spécifié (contact général)',
+        motif: motif,
+        description: description || 'Aucune description fournie.',
+        signalementId: signalement.id
+      }).catch(e => console.error('Email nouveau_signalement:', e));
+    }
+
     res.status(201).json({ message: 'Signalement envoyé. Notre équipe va l\'examiner.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
