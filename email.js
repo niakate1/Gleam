@@ -173,6 +173,7 @@ const templates = {
              <p><strong>Concernant :</strong> ${d.signaleNom}</p>
              <p><strong>Motif :</strong> ${d.motif}</p>
              <p><strong>Description :</strong><br>${d.description}</p>
+             <p style="background:#F5F3FF;border-radius:8px;padding:12px"><strong>🔍 Preuves disponibles :</strong><br>${d.preuves}</p>
              <p style="font-size:12px;color:#6B7280">Identifiant du signalement : ${d.signalementId}</p>`,
     }),
   }),
