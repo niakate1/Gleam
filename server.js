@@ -745,13 +745,16 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
   }
 
   try {
-    // Remboursement proportionnel par défaut (reverse_transfer reste à sa valeur par défaut,
-    // "true") : Stripe reprend automatiquement, au prorata du montant remboursé, à la fois sur la
-    // part déjà transférée au pro et sur la commission Gleam — c'est la seule façon de garantir
-    // que le total redistribué (client remboursé + pro + Gleam) ne dépasse jamais ce qui a été payé.
+    // Vérifié dans la documentation officielle de Stripe : SANS instruction explicite, Stripe ne
+    // reprend RIEN sur la part déjà transférée au pro lors d'un remboursement — le pro garderait
+    // sa part complète tout en laissant le client remboursé, ce qui ferait dépasser le total
+    // redistribué par rapport à ce qui a été réellement payé (exactement le bug identifié).
+    // Il faut donc explicitement demander la reprise proportionnelle des deux côtés.
     const paramsRemboursement = { payment_intent: paiement.stripe_payment_intent_id };
     if (pourcentage < 1) {
       paramsRemboursement.amount = Math.round(paiement.montant_ttc * pourcentage * 100);
+      paramsRemboursement.reverse_transfer = true; // reprend au prorata sur la part du pro
+      paramsRemboursement.refund_application_fee = true; // reprend au prorata sur la commission Gleam
     }
     await stripe.refunds.create(paramsRemboursement);
     const montantEffectivementRembourse = Math.round(paiement.montant_ttc * pourcentage * 100) / 100;
