@@ -717,7 +717,8 @@ async function forgotPassword(){
     const r=await fetch(API+'/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
-    toast('📧 Email de réinitialisation envoyé !',5000);
+    toast('📧 Si ce compte existe, un code a été envoyé par email.',5000);
+    ouvrirNouveauMotDePasse(email);
   }catch(e){toast(friendlyNetworkError(e))}
 }
 
@@ -2029,28 +2030,34 @@ function goToChat(demandeId,otherName){
       }
     }).catch(function(){});
 }
-// Affiche l'écran de saisie du nouveau mot de passe, après avoir cliqué sur le lien reçu par email.
-function ouvrirNouveauMotDePasse(accessToken){
-  var html='<div class="modal-title"><i data-lucide="lock" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Nouveau mot de passe</div>'+
-    '<div class="modal-sub">Choisissez un nouveau mot de passe pour votre compte Gleam.</div>'+
+// Affiche l'écran de saisie du code de réinitialisation reçu par email, avec le nouveau mot de passe.
+function ouvrirNouveauMotDePasse(emailPrerempli){
+  var html='<div class="modal-title"><i data-lucide="lock" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Réinitialiser mon mot de passe</div>'+
+    '<div class="modal-sub">Entrez le code à 6 chiffres reçu par email, puis votre nouveau mot de passe.</div>'+
+    '<div class="field-group"><label>Email</label><input type="email" id="reset-email" placeholder="votre@email.com" value="'+escapeHtml(emailPrerempli||'')+'" autocomplete="email"></div>'+
+    '<div class="field-group"><label>Code reçu par email</label><input type="text" id="reset-code" placeholder="123456" inputmode="numeric" maxlength="6" style="text-align:center;font-size:18px;letter-spacing:3px;font-weight:700"></div>'+
     '<div class="field-group"><label>Nouveau mot de passe</label><input type="password" id="nouveau-mdp" placeholder="8 caractères minimum" autocomplete="new-password"></div>'+
     '<div class="field-group"><label>Confirmez le mot de passe</label><input type="password" id="nouveau-mdp-confirm" placeholder="Retapez le mot de passe" autocomplete="new-password"></div>'+
     '<div class="err" id="nouveau-mdp-err"></div>'+
-    '<button class="modal-send-btn" id="nouveau-mdp-btn" onclick="soumettreNouveauMotDePasse(\''+escAttr(accessToken)+'\')">Enregistrer le nouveau mot de passe</button>';
+    '<button class="modal-send-btn" id="nouveau-mdp-btn" onclick="soumettreNouveauMotDePasse()">Enregistrer le nouveau mot de passe</button>';
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
 }
-async function soumettreNouveauMotDePasse(accessToken){
+async function soumettreNouveauMotDePasse(){
+  var email=document.getElementById('reset-email').value.trim();
+  var code=document.getElementById('reset-code').value.trim();
   var mdp=document.getElementById('nouveau-mdp').value;
   var confirm2=document.getElementById('nouveau-mdp-confirm').value;
   var errEl=document.getElementById('nouveau-mdp-err');
   errEl.classList.remove('show');
+  if(!email){errEl.textContent='Merci d\'indiquer votre email.';errEl.classList.add('show');return}
+  if(!/^\d{6}$/.test(code)){errEl.textContent='Entrez le code à 6 chiffres reçu par email.';errEl.classList.add('show');return}
   if(mdp.length<8){errEl.textContent='Mot de passe : 8 caractères minimum.';errEl.classList.add('show');return}
   if(mdp!==confirm2){errEl.textContent='Les deux mots de passe ne correspondent pas.';errEl.classList.add('show');return}
   var btn=document.getElementById('nouveau-mdp-btn');
   btn.disabled=true;
   try{
-    const r=await fetch(API+'/api/auth/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:accessToken,new_password:mdp})});
+    const r=await fetch(API+'/api/auth/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,code:code,new_password:mdp})});
     const d=await safeJson(r);
     if(!r.ok){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show');btn.disabled=false;return}
     closeModalForce();
@@ -3112,22 +3119,7 @@ if(window.lucide){
 }
 
 // ── INIT ──
-// Détecte un lien de réinitialisation de mot de passe (envoyé par email) dès l'arrivée sur la
-// page — prioritaire sur tout le reste. Si ce lien est présent, on n'exécute jamais la
-// reconnexion automatique ci-dessous, même si un compte est déjà connecté sur cet appareil :
-// sinon les deux s'exécutaient en même temps, et la reconnexion automatique reprenait la main
-// sur l'écran, donnant l'impression que la réinitialisation ne s'affichait jamais.
-var enModeRecuperation=false;
-if(window.location.hash.indexOf('type=recovery')>=0){
-  var recoveryParams=new URLSearchParams(window.location.hash.substring(1));
-  var recoveryToken=recoveryParams.get('access_token');
-  if(recoveryToken){
-    enModeRecuperation=true;
-    ouvrirNouveauMotDePasse(recoveryToken);
-    history.replaceState(null,'',window.location.pathname);
-  }
-}
-var tok=enModeRecuperation?null:localStorage.getItem('gleam_token');
+var tok=localStorage.getItem('gleam_token');
 if(tok){
   fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
     .then(function(r){return r.ok?safeJson(r):null})
