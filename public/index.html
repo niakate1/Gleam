@@ -459,6 +459,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:20px;height:20px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
     </div>
     <button class="btn-delete" style="width:100%;margin-top:14px" onclick="supprimerCompte()"><i data-lucide="trash-2" style="width:15px;height:15px;vertical-align:-3px"></i> Supprimer mon compte</button>
@@ -549,6 +550,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="profile-item" onclick="comingSoon('Notifications')"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="comingSoon('Sécurité')"><span class="pi-icon"><i data-lucide="lock" style="width:20px;height:20px"></i></span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:20px;height:20px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
     </div>
     <button class="btn-delete" style="width:100%;margin-top:14px" onclick="supprimerCompte()"><i data-lucide="trash-2" style="width:15px;height:15px;vertical-align:-3px"></i> Supprimer mon compte</button>
@@ -2026,6 +2028,36 @@ function goToChat(demandeId,otherName){
         if(bar)bar.innerHTML='<div style="text-align:center;padding:12px;color:var(--gray);font-size:13px;width:100%">🏁 Cette prestation est terminée. La messagerie est fermée.</div>';
       }
     }).catch(function(){});
+}
+function ouvrirContactSupport(){
+  var html='<div class="modal-title"><i data-lucide="life-buoy" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Contacter le support</div>'+
+    '<div class="modal-sub">Réclamation, problème technique, question sur un paiement... Notre équipe vous répondra par email.</div>'+
+    '<div class="field-group"><label>Motif</label><div class="options-grid">'+
+      '<button class="opt-btn" data-group="support-motif" data-coef-val="reclamation" onclick="selOpt(this)">Réclamation</button>'+
+      '<button class="opt-btn" data-group="support-motif" data-coef-val="paiement" onclick="selOpt(this)">Problème de paiement</button>'+
+      '<button class="opt-btn" data-group="support-motif" data-coef-val="bug" onclick="selOpt(this)">Bug technique</button>'+
+      '<button class="opt-btn full" data-group="support-motif" data-coef-val="autre" onclick="selOpt(this)">Autre</button>'+
+    '</div></div>'+
+    '<div class="field-group"><label>Décrivez votre demande</label><textarea id="support-desc" rows="4" placeholder="Expliquez-nous ce qui se passe, avec le plus de détails possible..." style="resize:none"></textarea></div>'+
+    '<button class="modal-send-btn" id="support-btn" onclick="envoyerContactSupport()">Envoyer</button>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+async function envoyerContactSupport(){
+  var motifEl=document.querySelector('[data-group="support-motif"].sel');
+  if(!motifEl){toast('❌ Merci de choisir un motif.');return}
+  var motif=motifEl.getAttribute('data-coef-val');
+  var desc=document.getElementById('support-desc').value.trim();
+  if(!desc){toast('❌ Merci de décrire votre demande.');return}
+  var btn=document.getElementById('support-btn');
+  if(btn)btn.disabled=true;
+  try{
+    const r=await fetch(API+'/api/signalements',{method:'POST',headers:authHeaders(),body:JSON.stringify({motif:motif,description:desc})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
+    closeModalForce();
+    toast('✅ Message envoyé. Notre équipe va vous répondre par email.',5000);
+  }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 function ouvrirSignalement(){
   var info=chatPartnerInfo[currentChatDemandeId]||{};
