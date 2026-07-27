@@ -341,10 +341,33 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email requis.' });
     await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
-      redirectTo: 'https://niakate1.github.io/Gleam/public/'
+      redirectTo: (process.env.FRONTEND_URL || 'https://gleam-app.fr/') + '#nouveau-mot-de-passe'
     });
     res.json({ message: 'Email de réinitialisation envoyé !' });
   } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Finalise la réinitialisation : reçoit le jeton de récupération envoyé par email (contenu dans
+// le lien cliqué) et le nouveau mot de passe choisi. Sans cette route, l'email de réinitialisation
+// ne servait à rien de concret — il fallait un vrai moyen de saisir et d'enregistrer le nouveau
+// mot de passe une fois le lien ouvert.
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+  try {
+    const { access_token, new_password } = req.body;
+    if (!access_token || !new_password) return res.status(400).json({ error: 'Informations manquantes.' });
+    if (new_password.length < 8) return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
+
+    const { data: { user }, error: erreurToken } = await supabase.auth.getUser(access_token);
+    if (erreurToken || !user) return res.status(400).json({ error: 'Ce lien de réinitialisation a expiré ou est invalide. Refaites une demande de "mot de passe oublié".' });
+
+    const { error: erreurMaj } = await supabase.auth.admin.updateUserById(user.id, { password: new_password });
+    if (erreurMaj) return res.status(400).json({ error: erreurMaj.message });
+
+    res.json({ message: 'Mot de passe mis à jour avec succès !' });
+  } catch (e) {
+    console.error('Erreur réinitialisation mot de passe:', e);
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
