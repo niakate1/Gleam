@@ -725,7 +725,7 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
   }
 
   if (pourcentage === 0) {
-    await supabase.from('paiements').update({ statut: 'rembourse_partiel' }).eq('id', paiement.id);
+    await supabase.from('paiements').update({ statut: 'rembourse_partiel', montant_rembourse: 0 }).eq('id', paiement.id);
     return { rembourse: false, fraisRetenus: true, montantRetenu: paiement.montant_ttc };
   }
 
@@ -736,10 +736,14 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
       paramsRemboursement.reverse_transfer = false; // le pro garde sa part déjà transférée
     }
     await stripe.refunds.create(paramsRemboursement);
-    await supabase.from('paiements').update({ statut: pourcentage < 1 ? 'rembourse_partiel' : 'rembourse' }).eq('id', paiement.id);
+    const montantEffectivementRembourse = Math.round(paiement.montant_ttc * pourcentage * 100) / 100;
+    await supabase.from('paiements').update({
+      statut: pourcentage < 1 ? 'rembourse_partiel' : 'rembourse',
+      montant_rembourse: montantEffectivementRembourse
+    }).eq('id', paiement.id);
     return {
       rembourse: true,
-      montant: Math.round(paiement.montant_ttc * pourcentage * 100) / 100,
+      montant: montantEffectivementRembourse,
       fraisRetenus: pourcentage < 1,
       montantRetenu: pourcentage < 1 ? Math.round(paiement.montant_ttc * (1 - pourcentage) * 100) / 100 : 0
     };
@@ -1618,7 +1622,7 @@ app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
     // On n'affiche que les paiements réellement effectués (payé, libéré, ou remboursé) — un paiement
     // "en_attente" (intention de paiement créée mais jamais finalisée) ne représente aucune transaction
     // réelle. Le remboursement, lui, doit rester visible pour la transparence du client.
-    const { data: paiements } = await supabase.from('paiements').select('*').eq('client_id', req.user.id).in('statut', ['paye', 'libere', 'rembourse']).order('created_at', { ascending: false });
+    const { data: paiements } = await supabase.from('paiements').select('*').eq('client_id', req.user.id).in('statut', ['paye', 'libere', 'rembourse', 'rembourse_partiel']).order('created_at', { ascending: false });
     if (!paiements || !paiements.length) return res.json([]);
     const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
     const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
@@ -1626,7 +1630,7 @@ app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
     (demandes || []).forEach(d => { demandesMap[d.id] = d; });
     // Tri logique : payé (en attente de confirmation, encore "actif") avant libéré (réglé, historique),
     // remboursé en dernier — cohérent avec la priorité "actionnable avant historique" du reste de l'app.
-    const prioritePaiement = { paye: 0, libere: 1, rembourse: 2 };
+    const prioritePaiement = { paye: 0, libere: 1, rembourse_partiel: 2, rembourse: 3 };
     const enrichis = paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }));
     enrichis.sort((a, b) => (prioritePaiement[a.statut] ?? 9) - (prioritePaiement[b.statut] ?? 9));
     res.json(enrichis);
@@ -1638,18 +1642,20 @@ app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
 // Historique des gains du pro (rubrique "Mes gains" du profil)
 app.get('/api/paiements/mes-gains', auth, async (req, res) => {
   try {
-    // Même logique : un paiement jamais finalisé ne représente aucun gain, réel ou potentiel,
-    // et n'a pas sa place dans un historique de gains — seuls "payé" et "libéré" sont montrés.
-    const { data: paiements } = await supabase.from('paiements').select('*').eq('societe_id', req.user.id).in('statut', ['paye', 'libere']).order('created_at', { ascending: false });
+    // Même logique : un paiement jamais finalisé ne représente aucun gain, réel ou potentiel.
+    // "rembourse_partiel" est inclus : dans ce cas précis (annulation tardive du client), le pro
+    // garde sa part déjà transférée en compensation — ça reste donc un vrai gain pour lui, même si
+    // le client a été partiellement ou pas remboursé de son côté.
+    const { data: paiements } = await supabase.from('paiements').select('*').eq('societe_id', req.user.id).in('statut', ['paye', 'libere', 'rembourse_partiel']).order('created_at', { ascending: false });
     if (!paiements || !paiements.length) return res.json({ total_libere: 0, total_en_attente: 0, paiements: [] });
     const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
     const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
     const demandesMap = {};
     (demandes || []).forEach(d => { demandesMap[d.id] = d; });
-    const totalLibere = paiements.filter(p => p.statut === 'libere').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
+    const totalLibere = paiements.filter(p => p.statut === 'libere' || p.statut === 'rembourse_partiel').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
     const totalEnAttente = paiements.filter(p => p.statut === 'paye').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
     // Tri logique : en attente de confirmation client (encore "actif") avant reçu (déjà réglé, historique)
-    const prioriteGain = { paye: 0, libere: 1 };
+    const prioriteGain = { paye: 0, libere: 1, rembourse_partiel: 1 };
     const enrichis = paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }));
     enrichis.sort((a, b) => (prioriteGain[a.statut] ?? 9) - (prioriteGain[b.statut] ?? 9));
     res.json({
