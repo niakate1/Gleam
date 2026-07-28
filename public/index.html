@@ -208,6 +208,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .chat-send-btn{background:var(--p);color:#fff;border:none;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0}
 .chat-send-btn:disabled{opacity:.6;cursor:not-allowed}
 .empty-state{text-align:center;padding:60px 20px;color:var(--gray);animation:fadeInUp .4s ease-out both}
+.page-header{padding:22px 16px 16px}
+.tab-pills{display:flex;background:var(--surface-alt);border-radius:12px;padding:4px;gap:4px;margin:0 16px 12px}
+.tab-pill{flex:1;padding:10px;border:none;background:none;border-radius:9px;font-size:14px;font-weight:700;color:var(--gray);cursor:pointer;transition:.15s}
+.tab-pill.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
+.page-header h1{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.empty-illustration{width:120px;height:120px;margin:0 auto 18px}
+.empty-title{font-size:17px;font-weight:800;color:var(--text);margin-bottom:6px}
+.empty-sub{font-size:13.5px;color:var(--gray);line-height:1.5;max-width:280px;margin:0 auto 18px}
+.empty-cta{display:inline-block;background:var(--p);color:#fff;font-weight:700;font-size:14px;padding:12px 24px;border-radius:12px;border:none;cursor:pointer;box-shadow:var(--shadow-md)}
 .empty-state span{font-size:40px;display:flex;align-items:center;justify-content:center;width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,var(--light),var(--surface-alt));margin:0 auto 16px;opacity:1}
 .empty-state p{font-size:15px;line-height:1.5;max-width:280px;margin:0 auto}
 .profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;text-align:center;position:relative;overflow:hidden}
@@ -437,8 +446,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- PRO MESSAGES -->
 <div class="screen" id="s-pro-messages">
-  <div class="navbar"><span class="logo-sm"><i data-lucide="message-circle" style="width:20px;height:20px;vertical-align:-4px"></i> Messages</span></div>
-  <div id="pro-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
+  <div class="page-header"><h1>Messagerie</h1></div>
+  <div class="tab-pills">
+    <button class="tab-pill active" id="msg-tab-pro-encours" onclick="switchConvTab('pro','encours')">En cours</button>
+    <button class="tab-pill" id="msg-tab-pro-archive" onclick="switchConvTab('pro','archive')">Archivées</button>
+  </div>
+  <div id="pro-conv-list" style="flex:1;overflow-y:auto;padding:0 16px 16px"></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
     <button class="bnav-item active" onclick="goProTab('pro-messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
@@ -506,8 +519,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- MESSAGES CLIENT -->
 <div class="screen" id="s-messages">
-  <div class="navbar"><span class="logo-sm"><i data-lucide="message-circle" style="width:20px;height:20px;vertical-align:-4px"></i> Messages</span></div>
-  <div id="client-conv-list" style="flex:1;overflow-y:auto;padding:16px"><div class="empty-state"><span>💬</span><p>Aucun message pour l'instant.</p></div></div>
+  <div class="page-header"><h1>Messagerie</h1></div>
+  <div class="tab-pills">
+    <button class="tab-pill active" id="msg-tab-client-encours" onclick="switchConvTab('client','encours')">En cours</button>
+    <button class="tab-pill" id="msg-tab-client-archive" onclick="switchConvTab('client','archive')">Archivées</button>
+  </div>
+  <div id="client-conv-list" style="flex:1;overflow-y:auto;padding:0 16px 16px"></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goTab('home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
     <button class="bnav-item active" onclick="goTab('messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-client" style="display:none"></span></button>
@@ -985,6 +1002,19 @@ function localDateISO(d){
 }
 
 // ── CLIENT DEMANDES ──
+// Génère un état vide soigné (illustration + titre + sous-titre + bouton d'action), plutôt
+// qu'un simple emoji — inspiré des meilleures apps du secteur (Lyft, Google Pay...).
+function emptyStateHtml(opts){
+  var svg='<svg class="empty-illustration" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">'+
+    '<circle cx="60" cy="60" r="56" fill="var(--light)"/>'+
+    '<path d="M40 42h44a8 8 0 0 1 8 8v20a8 8 0 0 1-8 8H60l-12 12v-12h-8a8 8 0 0 1-8-8V50a8 8 0 0 1 8-8z" fill="var(--p)" opacity=".18"/>'+
+    '<path d="M28 30h40a8 8 0 0 1 8 8v18a8 8 0 0 1-8 8H46l-10 10v-10h-8a8 8 0 0 1-8-8V38a8 8 0 0 1 8-8z" fill="var(--surface)" stroke="var(--p)" stroke-width="2"/>'+
+    '<rect x="34" y="42" width="26" height="5" rx="2.5" fill="var(--p)"/>'+
+    '<rect x="34" y="52" width="16" height="5" rx="2.5" fill="var(--p)" opacity=".55"/>'+
+  '</svg>';
+  var boutonHtml=opts.ctaLabel?'<button class="empty-cta" onclick="'+opts.ctaAction+'">'+opts.ctaLabel+'</button>':'';
+  return '<div class="empty-state">'+svg+'<div class="empty-title">'+opts.title+'</div><div class="empty-sub">'+opts.sub+'</div>'+boutonHtml+'</div>';
+}
 function skeletonCards(n){
   n=n||3;
   var html='';
@@ -1975,28 +2005,55 @@ async function loadConversationsPro(silent){
 function hasAnyUnreadVisible(data){
   return (data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'}).some(isConvUnread);
 }
-function renderConvList(container,data){
+var convListCache={client:[],pro:[]};
+var convTabActive={client:'encours',pro:'encours'};
+function switchConvTab(role,tab){
+  convTabActive[role]=tab;
+  document.getElementById('msg-tab-'+role+'-encours').classList.toggle('active',tab==='encours');
+  document.getElementById('msg-tab-'+role+'-archive').classList.toggle('active',tab==='archive');
+  var container=document.getElementById(role==='pro'?'pro-conv-list':'client-conv-list');
+  renderConvList(container,convListCache[role],role);
+}
+function renderConvList(container,data,role){
+  role=role||(container&&container.id==='pro-conv-list'?'pro':'client');
+  convListCache[role]=data||[];
   var active=(data||[]).filter(function(c){return c.statut==='acceptee'||c.statut==='en_cours'});
+  // Les discussions terminées basculent automatiquement dans "Archivées" — aucune action
+  // manuelle nécessaire, ça se fait tout seul dès que la prestation est marquée terminée.
   var termine=(data||[]).filter(function(c){return c.statut==='terminee'});
-  if(!active.length&&!termine.length){container.innerHTML='<div class="empty-state"><span>💬</span><p>Aucune conversation active.<br>Acceptez un devis pour démarrer !</p></div>';return}
+  if(!active.length&&!termine.length){
+    container.innerHTML=emptyStateHtml({
+      title:'Aucune discussion',
+      sub:isPro()?'Vos conversations avec les clients apparaîtront ici dès qu\'un devis sera accepté.':'Faites une demande de service pour pouvoir discuter avec votre prestataire.',
+      ctaLabel:isPro()?'':'Faire une demande',
+      ctaAction:'goTab(\'home\')'
+    });
+    return;
+  }
+  var tab=convTabActive[role];
   var html='';
   var idx=0;
-  if(active.length){
-    html+='<div class="section-title" style="padding:0 0 8px">💬 En cours</div>';
-    active.forEach(function(c){html+=convRowHtml(c,idx++)});
-  }
-  if(termine.length){
-    html+='<div class="section-title" style="padding:16px 0 8px;color:var(--gray)">🏁 Terminées</div>';
-    termine.forEach(function(c){
-      var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
-      var photo=c.autre_partie&&c.autre_partie.photo;
-      chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne,id:c.autre_partie&&c.autre_partie.id};
-      html+='<div class="conv-row fade-in-item" style="animation-delay:'+(idx++*0.04)+'s;opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
-        '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
-        '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
-        '<div class="conv-preview">Prestation terminée — consulter l\'historique</div></div>'+
-        '<div class="conv-time">🏁</div></div>';
-    });
+  if(tab==='encours'){
+    if(!active.length){
+      html=emptyStateHtml({title:'Aucune conversation en cours',sub:'Les discussions actives avec vos prestataires apparaîtront ici.',ctaLabel:'',ctaAction:''});
+    }else{
+      active.forEach(function(c){html+=convRowHtml(c,idx++)});
+    }
+  }else{
+    if(!termine.length){
+      html=emptyStateHtml({title:'Aucune discussion archivée',sub:'Les discussions liées à une prestation terminée arrivent automatiquement ici.',ctaLabel:'',ctaAction:''});
+    }else{
+      termine.forEach(function(c){
+        var name=c.autre_partie?((c.autre_partie.prenom||'')+' '+(c.autre_partie.nom||'')).trim():'Utilisateur Gleam';
+        var photo=c.autre_partie&&c.autre_partie.photo;
+        chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne,id:c.autre_partie&&c.autre_partie.id};
+        html+='<div class="conv-row fade-in-item" style="animation-delay:'+(idx++*0.04)+'s;opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
+          '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
+          '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
+          '<div class="conv-preview">Prestation terminée — consulter l\'historique</div></div>'+
+          '<div class="conv-time">🏁</div></div>';
+      });
+    }
   }
   container.innerHTML=html;
 }
