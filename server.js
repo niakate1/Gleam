@@ -758,13 +758,29 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
     }
     await stripe.refunds.create(paramsRemboursement);
     const montantEffectivementRembourse = Math.round(paiement.montant_ttc * pourcentage * 100) / 100;
-    // Le montant que le pro garde réellement doit lui aussi être corrigé au prorata — sinon
-    // "Mes gains" continuerait d'afficher l'ancien montant complet, jamais mis à jour après le
-    // remboursement partiel, ce qui afficherait un montant supérieur à ce qu'il a vraiment reçu.
-    // ATTENTION au sens : "pourcentage" est la part REMBOURSÉE AU CLIENT — le pro garde donc
-    // (1 - pourcentage) de sa part habituelle, jamais "pourcentage" directement (erreur trouvée
-    // et corrigée ici : 85€ × 0,7 donnait 59,50€, qui est le montant REPRIS, pas celui gardé).
-    const montantProCorrige = pourcentage < 1 ? Math.round(paiement.montant_societe * (1 - pourcentage) * 100) / 100 : paiement.montant_societe;
+
+    // Plutôt que de recalculer à la main ce que le pro garde réellement (la mécanique interne de
+    // Stripe pour les "destination charges" avec commission s'est révélée plus subtile que prévu —
+    // le montant brut transféré n'est pas ce qu'on pensait), on va lire directement chez Stripe le
+    // vrai montant final, une fois la reprise effectuée. Ça élimine tout risque de mauvais calcul
+    // de notre côté : on rapporte fidèlement ce que Stripe confirme, jamais une estimation.
+    let montantProCorrige = paiement.montant_societe;
+    if (pourcentage < 1 && paiement.stripe_transfer_id) {
+      try {
+        const transfert = await stripe.transfers.retrieve(paiement.stripe_transfer_id);
+        const montantTransfereNet = (transfert.amount - transfert.amount_reversed) / 100;
+        let montantFeeRetenu = 0;
+        if (paiement.stripe_application_fee_id) {
+          const fee = await stripe.applicationFees.retrieve(paiement.stripe_application_fee_id);
+          montantFeeRetenu = (fee.amount - fee.amount_refunded) / 100;
+        }
+        // Le pro garde le montant net du transfert, une fois la commission encore due déduite
+        montantProCorrige = Math.round((montantTransfereNet - montantFeeRetenu) * 100) / 100;
+      } catch (e) {
+        console.error('Lecture du montant réel chez Stripe échouée, montant non recalculé:', e.message);
+      }
+    }
+
     await supabase.from('paiements').update({
       statut: pourcentage < 1 ? 'rembourse_partiel' : 'rembourse',
       montant_rembourse: montantEffectivementRembourse,
@@ -1467,7 +1483,7 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
 app.post('/api/paiements/confirmer', auth, async (req, res) => {
   try {
     const { payment_intent_id } = req.body;
-    const intent = await stripe.paymentIntents.retrieve(payment_intent_id);
+    const intent = await stripe.paymentIntents.retrieve(payment_intent_id, { expand: ['latest_charge'] });
     if (intent.status !== 'succeeded')
       return res.status(400).json({ error: 'Paiement non confirmé par Stripe.' });
 
@@ -1475,7 +1491,19 @@ app.post('/api/paiements/confirmer', auth, async (req, res) => {
     // prestation (comme un code de livraison Uber Eats) — preuve que les deux parties étaient
     // bien en contact au moment de la finalisation, plutôt qu'une simple confirmation unilatérale.
     const codeValidation = String(Math.floor(100000 + Math.random() * 900000));
-    await supabase.from('paiements').update({ statut: 'paye', code_validation: codeValidation }).eq('stripe_payment_intent_id', payment_intent_id);
+    // Capture les identifiants du transfert et de la commission Stripe pour cette charge — permet,
+    // en cas d'annulation avec remboursement partiel, d'aller lire directement chez Stripe le
+    // montant réellement reçu par le pro, plutôt que de le recalculer à la main de notre côté
+    // (une mécanique interne à Stripe plus subtile qu'il n'y paraît, voir plus loin).
+    const charge = intent.latest_charge;
+    const stripeTransferId = charge && charge.transfer ? charge.transfer : null;
+    const stripeApplicationFeeId = charge && charge.application_fee ? charge.application_fee : null;
+    await supabase.from('paiements').update({
+      statut: 'paye',
+      code_validation: codeValidation,
+      stripe_transfer_id: stripeTransferId,
+      stripe_application_fee_id: stripeApplicationFeeId
+    }).eq('stripe_payment_intent_id', payment_intent_id);
     const { data: paiement } = await supabase.from('paiements').select('*').eq('stripe_payment_intent_id', payment_intent_id).single();
 
     if (paiement) {
