@@ -462,8 +462,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- PRO DEVIS -->
 <div class="screen" id="s-pro-devis">
-  <div class="navbar"><span class="logo-sm"><i data-lucide="wallet" style="width:20px;height:20px;vertical-align:-4px"></i> Mes devis envoyés</span></div>
-  <div class="devis-list" id="pro-devis-list"><div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div></div>
+  <div class="page-header"><h1>Mes devis</h1></div>
+  <div class="tab-pills">
+    <button class="tab-pill active" id="prodevis-tab-encours" onclick="setProDevisMainTab('encours')">En cours</button>
+    <button class="tab-pill" id="prodevis-tab-termines" onclick="setProDevisMainTab('termines')">Terminés</button>
+  </div>
+  <div class="devis-list" id="pro-devis-list"></div>
   <div class="bottom-nav">
     <button class="bnav-item" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
     <button class="bnav-item" onclick="goProTab('pro-messages')"><i data-lucide="message-circle" style="width:22px;height:22px"></i>Messages<span class="nav-badge nav-badge-pro" style="display:none"></span></button>
@@ -1175,6 +1179,10 @@ var devisMainTab='encours';
 function devisMainTabOf(v){
   if(v.statut==='accepte'&&v.demande_statut==='terminee')return 'termines';
   if(v.statut==='refuse'||v.statut==='annule_pro')return 'termines';
+  // Un devis encore "en attente" dont la demande sous-jacente a expiré (date dépassée sans
+  // réponse) ou a été annulée ne doit plus rester affiché comme actif — sinon il reste bloqué
+  // en "En attente" indéfiniment, malgré une date déjà passée.
+  if(v.demande_statut==='expiree'||v.demande_statut==='annulee_client')return 'termines';
   return 'encours';
 }
 function devisClientMatchesFilter(v,f){
@@ -1182,7 +1190,7 @@ function devisClientMatchesFilter(v,f){
   if(f==='attente')return v.statut==='envoye';
   if(f==='acceptes')return v.statut==='accepte'&&v.demande_statut!=='terminee';
   if(f==='termines')return v.statut==='accepte'&&v.demande_statut==='terminee';
-  if(f==='refuses')return v.statut==='refuse'||v.statut==='annule_pro';
+  if(f==='refuses')return v.statut==='refuse'||v.statut==='annule_pro'||v.demande_statut==='expiree'||v.demande_statut==='annulee_client';
   return true;
 }
 function setDevisMainTab(tab){
@@ -1657,14 +1665,32 @@ async function loadProDevisCount(){
 
 var proDevisCache={data:[],notesDonnees:[]};
 var proDevisFilterActive='tous';
+var proDevisMainTab='encours';
+// Même principe que côté client : "Terminés" regroupe automatiquement tout ce qui est clos
+// (prestation terminée, devis refusé/annulé, ou demande annulée par le client).
+function proDevisMainTabOf(v){
+  var demandeStatut=v.demande&&v.demande.statut;
+  if(v.statut==='accepte'&&demandeStatut==='terminee')return 'termines';
+  // Idem : un devis "en attente" dont la demande a expiré ou a été annulée ne doit plus
+  // apparaître comme actif indéfiniment, malgré une date déjà passée.
+  if(v.statut==='refuse'||v.statut==='annule_pro'||demandeStatut==='annulee_client'||demandeStatut==='expiree')return 'termines';
+  return 'encours';
+}
 function proDevisMatchesFilter(v,f){
   var demandeStatut=v.demande&&v.demande.statut;
   if(f==='tous')return true;
   if(f==='attente')return v.statut==='envoye';
   if(f==='acceptes')return v.statut==='accepte'&&demandeStatut!=='terminee';
   if(f==='termines')return v.statut==='accepte'&&demandeStatut==='terminee';
-  if(f==='refuses')return v.statut==='refuse'||v.statut==='annule_pro'||demandeStatut==='annulee_client';
+  if(f==='refuses')return v.statut==='refuse'||v.statut==='annule_pro'||demandeStatut==='annulee_client'||demandeStatut==='expiree';
   return true;
+}
+function setProDevisMainTab(tab){
+  proDevisMainTab=tab;
+  proDevisFilterActive='tous';
+  document.getElementById('prodevis-tab-encours').classList.toggle('active',tab==='encours');
+  document.getElementById('prodevis-tab-termines').classList.toggle('active',tab==='termines');
+  renderProDevisCards();
 }
 function setProDevisFilter(f){
   proDevisFilterActive=f;
@@ -1680,7 +1706,7 @@ async function loadProDevis(silent){
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div>';return}
     const data=await safeJson(r);
     document.getElementById('stat-devis').textContent=data.length||0;
-    if(!data||!data.length){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé pour l\u2019instant.</p></div>';return}
+    if(!data||!data.length){proDevisCache={data:[],notesDonnees:[]};renderProDevisCards();return}
     var notesDonnees=[];
     try{const rn=await fetch(API+'/api/evaluations/mes-notes-donnees',{headers:authHeaders()});if(rn.ok)notesDonnees=await safeJson(rn)}catch(e){}
 
@@ -1709,12 +1735,27 @@ function renderProDevisCards(){
   var c=document.getElementById('pro-devis-list');
   if(!c)return;
   var data=proDevisCache.data,notesDonnees=proDevisCache.notesDonnees;
+  if(!data||!data.length){
+    c.innerHTML=emptyStateHtml({title:'Aucun devis envoyé',sub:'Répondez à une demande client pour voir vos devis apparaître ici.',ctaLabel:'Voir les demandes',ctaAction:"goProTab('pro-home')"});
+    return;
+  }
+  // Classement automatique dans le bon grand onglet, comme côté client — jamais un tri manuel.
+  var parOnglet=data.filter(function(v){return proDevisMainTabOf(v)===proDevisMainTab});
+  var sousFiltres=proDevisMainTab==='encours'
+    ? ['tous:Tous','attente:En attente','acceptes:Acceptés']
+    : ['tous:Tous','termines:Terminés','refuses:Refusés/Annulés'];
   var chips='<div class="filter-chips">'+
-    ['tous:Tous','attente:En attente','acceptes:Acceptés','termines:Terminés','refuses:Refusés/Annulés'].map(function(f){
+    sousFiltres.map(function(f){
       var parts=f.split(':');
       return '<button class="filter-chip'+(proDevisFilterActive===parts[0]?' active':'')+'" onclick="setProDevisFilter(\''+parts[0]+'\')">'+parts[1]+'</button>';
     }).join('')+'</div>';
-  var filtered=data.filter(function(v){return proDevisMatchesFilter(v,proDevisFilterActive)});
+  if(!parOnglet.length){
+    c.innerHTML=proDevisMainTab==='encours'
+      ?emptyStateHtml({title:'Aucun devis en cours',sub:'Vos devis en attente de réponse ou acceptés apparaîtront ici.',ctaLabel:'Voir les demandes',ctaAction:"goProTab('pro-home')"})
+      :emptyStateHtml({title:'Aucune prestation terminée',sub:'Vos prestations terminées, refusées ou annulées arriveront automatiquement ici.',ctaLabel:'',ctaAction:''});
+    return;
+  }
+  var filtered=parOnglet.filter(function(v){return proDevisMatchesFilter(v,proDevisFilterActive)});
   if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span>🔍</span><p>Aucun devis dans cette catégorie.</p></div>';return}
 
   var html=chips;
