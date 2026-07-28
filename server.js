@@ -535,22 +535,37 @@ app.post('/api/demandes', auth, async (req, res) => {
 // aucun sens. Une marge de 3h est laissée pour ne pas être trop agressif (retard, confirmation
 // tardive...). Fonctionne par lecture (pas de tâche planifiée à gérer) : vérifiée à chaque fois que
 // les demandes sont consultées, sur le lot concerné uniquement — reste donc très léger.
+//
+// Couvre aussi le cas d'une demande "acceptée" (devis choisi par le client) mais jamais payée
+// (carte bancaire jamais saisie) dont le créneau est également dépassé — sans quoi elle restait
+// bloquée indéfiniment en "Accepté — Paiement requis", invisible à la fois pour le pro (qui ne
+// peut plus rien en faire) et pour le client (qui ne pouvait pas la relancer, "acceptee" étant
+// bloquée à la modification). Le devis correspondant est alors annulé pour rester cohérent.
 async function expirerDemandesEnRetard(demandes) {
   const maintenant = new Date();
   const aExpirer = [];
+  const aExpirerAcceptees = [];
   for (const d of (demandes || [])) {
-    if ((d.statut === 'en_attente' || d.statut === 'devis_recus') && d.creneau) {
+    if ((d.statut === 'en_attente' || d.statut === 'devis_recus' || d.statut === 'acceptee') && d.creneau) {
       const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(d.creneau);
       if (match) {
         const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
         const heuresDepassement = (maintenant - dateCreneau) / (1000 * 60 * 60);
-        if (heuresDepassement > 3) aExpirer.push(d.id);
+        if (heuresDepassement > 3) {
+          aExpirer.push(d.id);
+          if (d.statut === 'acceptee') aExpirerAcceptees.push(d.id);
+        }
       }
     }
   }
   if (aExpirer.length) {
     await supabase.from('demandes').update({ statut: 'expiree' }).in('id', aExpirer);
     demandes.forEach(d => { if (aExpirer.includes(d.id)) d.statut = 'expiree'; });
+  }
+  if (aExpirerAcceptees.length) {
+    // Annule le(s) devis "accepté" resté(s) sans paiement, pour ne pas laisser un devis "accepté"
+    // pointer vers une demande désormais expirée — incohérence qui perturberait l'affichage côté pro.
+    await supabase.from('devis').update({ statut: 'annule_client' }).in('demande_id', aExpirerAcceptees).eq('statut', 'accepte');
   }
   return demandes;
 }
@@ -640,6 +655,12 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
       updateData.prestation = listePrestations.map(p => p.type).join(' + ');
       updateData.notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations, modifiee: true });
     }
+    // Si la demande était expirée, la relancer avec un nouveau créneau doit bien la remettre "en
+    // attente" — sinon elle reste invisible pour les pros (leur liste n'affiche jamais les
+    // demandes expirées), même une fois modifiée. On ne le fait que si une vraie nouvelle date a
+    // été fournie (pas si l'ancien créneau, déjà passé, est resté inchangé — elle expirerait à
+    // nouveau immédiatement au prochain contrôle).
+    if (demande.statut === 'expiree' && date && time) updateData.statut = 'en_attente';
 
     const { data, error } = await supabase.from('demandes').update(updateData).eq('id', req.params.id).select().single();
     if (error) return res.status(400).json({ error: error.message });
