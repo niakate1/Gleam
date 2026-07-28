@@ -6,7 +6,7 @@
 <title>Gleam ✨</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--p:#6D28D9;--p2:#4C1D95;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151;--shadow-sm:0 1px 2px rgba(17,24,39,.06),0 1px 1px rgba(17,24,39,.04);--shadow-md:0 4px 16px rgba(17,24,39,.08),0 1px 3px rgba(17,24,39,.06);--shadow-lg:0 12px 40px rgba(17,24,39,.12),0 2px 8px rgba(17,24,39,.06)}
@@ -23,7 +23,7 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);c
 .auth-wrap::after{width:380px;height:380px;background:radial-gradient(circle,var(--mint) 0%,transparent 70%);opacity:.3;bottom:-130px;left:-130px}
 .auth-box{position:relative;z-index:1;background:var(--surface);border-radius:20px;padding:36px 32px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
 .logo{text-align:center;margin-bottom:28px}
-.logo h1{font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:600;font-style:italic;color:var(--p);letter-spacing:-.01em}
+.logo h1{font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:700;color:var(--p);letter-spacing:-.01em}
 .logo p{color:var(--gray);font-size:13.5px;margin-top:6px;letter-spacing:.01em}
 .tabs{display:flex;background:var(--surface-alt);border-radius:10px;padding:4px;margin-bottom:24px;gap:4px}
 .tab{flex:1;padding:9px;border:none;background:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;color:var(--gray)}
@@ -544,7 +544,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-menu">
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="heart" style="width:20px;height:20px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
@@ -807,7 +807,7 @@ function enterApp(){
     show('s-home');
     loadDemandes();
   }
-  toast('Bienvenue sur Gleam ✨');
+  toast('Bienvenue sur Gleam');
   startUnreadPoll();
   startDataPoll();
 }
@@ -1194,7 +1194,7 @@ function renderDevisClientCards(){
           photosHtml+='</div>';
         }
         actions=photosHtml+'<button class="btn-accept" style="background:var(--p);width:100%;margin-top:10px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>'+
-          '<button class="btn-accept" style="background:none;border:1.5px solid var(--gold);color:#B45309;width:100%;margin-top:8px" onclick="ajouterFavori(\''+safeSocieteId+'\',\''+safeProName+'\',this)"><i data-lucide="heart" style="width:14px;height:14px;vertical-align:-2px"></i> Ajouter à mes favoris</button>';
+          '<button class="btn-accept" style="background:none;border:1.5px solid var(--gold);color:#B45309;width:100%;margin-top:8px" onclick="ajouterFavori(\''+safeSocieteId+'\',\''+safeProName+'\',this)"><i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px"></i> Ajouter à mes favoris</button>';
         if(notesDonnees.indexOf(v.demande_id)>=0){
           actions+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
         }else{
@@ -1514,7 +1514,7 @@ function renderProDemandesCards(){
         '<input type="number" inputmode="decimal" id="prix-'+safeId+'" placeholder="Ex: 150" min="1">'+
         '<label>📝 Message pour le client</label>'+
         '<textarea id="msg-'+safeId+'" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>'+
-        '<button class="btn-devis" id="btn-devis-'+safeId+'" onclick="envoyerDevis(\''+safeId+'\')">✨ Envoyer mon devis</button>'+
+        '<button class="btn-devis" id="btn-devis-'+safeId+'" onclick="envoyerDevis(\''+safeId+'\')">Envoyer mon devis</button>'+
       '</div></div>';
   });
   c.innerHTML=html;
@@ -1682,10 +1682,10 @@ async function envoyerDevis(demandeId){
   try{
     const r=await fetch(API+'/api/devis',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,prix_ttc:parseFloat(prix),description:msg})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}return}
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}return}
     toast('✅ Devis envoyé au client !');
     loadProDemandes();loadProDevisCount();
-  }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer mon devis'}}
+  }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}}
 }
 
 // ── TARIFICATION (Vague 2) ──
@@ -2525,8 +2525,8 @@ async function ajouterFavori(proId,proName,btn){
     const r=await fetch(API+'/api/favoris',{method:'POST',headers:authHeaders(),body:JSON.stringify({pro_id:proId})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
-    toast('❤️ '+escapeHtml(proName)+' ajouté à vos favoris !');
-    if(btn){btn.innerHTML='<i data-lucide="heart" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
+    toast('⭐ '+escapeHtml(proName)+' ajouté à vos favoris !');
+    if(btn){btn.innerHTML='<i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 function showParrainage(){
@@ -2557,14 +2557,14 @@ function partagerParrainage(code){
   }
 }
 async function showMesFavoris(){
-  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="heart" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes favoris</div><div class="modal-sub">Vos prestataires préférés, à recontacter en un clic</div><div id="favoris-list">'+skeletonCards(2)+'</div>';
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes favoris</div><div class="modal-sub">Vos prestataires préférés, à recontacter en un clic</div><div id="favoris-list">'+skeletonCards(2)+'</div>';
   document.getElementById('modal-overlay').classList.add('open');
   try{
     const r=await fetch(API+'/api/favoris',{headers:authHeaders()});
     const d=await safeJson(r);
     var c=document.getElementById('favoris-list');
     if(!c)return;
-    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>❤️</span><p>Aucun favori pour l\u2019instant.<br>Ajoutez un prestataire depuis une prestation terminée !</p></div>';return}
+    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>⭐</span><p>Aucun favori pour l\u2019instant.<br>Ajoutez un prestataire depuis une prestation terminée !</p></div>';return}
     c.innerHTML=d.map(function(p,i){
       var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
       var note=p.note_moyenne?'<i data-lucide="star" style="width:12px;height:12px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(p.note_moyenne)+' / 5':'';
@@ -2714,7 +2714,7 @@ async function chargerFavoriCible(type){
     const favoris=await safeJson(r);
     var compatibles=(favoris||[]).filter(function(p){return Array.isArray(p.prestations_proposees)&&p.prestations_proposees.indexOf(type)>=0});
     if(!compatibles.length){box.innerHTML='';return}
-    box.innerHTML='<div class="field-group"><label>❤️ Adresser en priorité à un favori <span class="optional">(optionnel)</span></label>'+
+    box.innerHTML='<div class="field-group"><label>⭐ Adresser en priorité à un favori <span class="optional">(optionnel)</span></label>'+
       '<div class="options-grid">'+
       compatibles.map(function(p){
         var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
@@ -2751,7 +2751,7 @@ function dateTimeBlock(isLast){
 function descBlock(ph){return'<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
 function sendBtn(type){
   var isLast=isLastInFlow();
-  var label=multiFlow.active&&!isLast?'Suivant →':'✨ Envoyer ma demande';
+  var label=multiFlow.active&&!isLast?'Suivant →':'Envoyer ma demande';
   var html='';
   if(multiFlow.active&&multiFlow.current>0){
     html+='<button type="button" onclick="goToPreviousStep(\''+type+'\')" style="width:100%;padding:12px;background:none;border:2px solid var(--border);color:var(--text-secondary);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">← Étape précédente</button>';
@@ -2901,7 +2901,7 @@ async function updateEstimation(){
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this)"><span>🪑</span>Intérieur</button>'+
-  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this)"><span>✨</span>Extérieur</button>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this)"><span>🌤️</span>Extérieur</button>'+
   '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this)"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
   '<div class="field-group"><label>Type de véhicule</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
@@ -3124,7 +3124,7 @@ async function sendDemand(type){
     var method=isEdit?'PATCH':'POST';
     const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5),pro_prefere_id:proPrefereChoisi,latitude:adresseChoisieLat,longitude:adresseChoisieLng})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}return}
+    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
     photos=[];selectedServices=[];
     adresseChoisieLat=null;adresseChoisieLng=null;
@@ -3135,7 +3135,7 @@ async function sendDemand(type){
     if(wasEdit){toast('✅ Demande modifiée !');openDetail(editedId)}
     else{show('s-success')}
     loadDemandes();
-  }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='✨ Envoyer ma demande'}}
+  }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='Envoyer ma demande'}}
 }
 
 // ── ICÔNES (Lucide) ──
