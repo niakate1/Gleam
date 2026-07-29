@@ -115,8 +115,8 @@ const PRESTATION_CONFIG = {
     tierKey: 'taille', // le pro saisit un prix par nombre de places
     tiers: ['A', 'B', 'C', 'D'],
     tierLabels: { A: '2 places', B: '3 places', C: '4 places', D: '5+ places / angle' },
-    tierDefaults: { A: 80, B: 92, C: 108, D: 128 }, // tissu, propre
-    coefMatiere: { tissu: 1.0, cuir: 1.15, velours: 1.05, microfibre: 1.0 },
+    tierDefaults: { A: 45, B: 55, C: 65, D: 85 }, // tissu, propre (marché observé 2026 : 40-50€ 2 places, 60-70€ 4 places — anciens prix bien trop élevés, corrigés)
+    coefMatiere: { tissu: 1.0, cuir: 1.15, velours: 1.1, microfibre: 1.0 },
     // La forme influence le temps de travail à nombre de places égal (un angle est plus complexe qu'un droit).
     coefForme: { droit: 1.0, angle: 1.2, canape_lit: 1.15, chauffeuses: 0.85 }
   },
