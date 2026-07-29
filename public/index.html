@@ -883,6 +883,7 @@ function formatDetails(details,type){
       var unit=UNIT_CATEGORIES_LABELS[type]||'';
       return escapeHtml(val+(unit?' '+unit:''));
     }
+    if(Array.isArray(val))return val.map(function(v){return escapeHtml(v)}).join(', ');
     return escapeHtml(val);
   }).join(' • ');
 }
@@ -2969,7 +2970,17 @@ function goToPreviousStep(currentType){
   // Sauvegarde l'état actuel de l'étape en cours avant de reculer, pour ne rien perdre si l'utilisateur revient
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
-  document.querySelectorAll('.opt-btn.sel').forEach(function(b){var group=b.getAttribute('data-group');if(group)details[group]=b.textContent.trim()});
+  var groupesMultiSelect=['voit-options'];
+  document.querySelectorAll('.opt-btn.sel').forEach(function(b){
+    var group=b.getAttribute('data-group');
+    if(!group)return;
+    if(groupesMultiSelect.indexOf(group)>=0){
+      if(!details[group])details[group]=[];
+      details[group].push(b.textContent.trim());
+    }else{
+      details[group]=b.textContent.trim();
+    }
+  });
   if(UNIT_CATEGORIES_CLIENT.indexOf(currentType)>=0){
     var qEl=document.getElementById('f-quantite');
     if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
@@ -3129,6 +3140,11 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="C" onclick="selOpt(this)">7 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="D" onclick="selOpt(this)">9+ places</button></div></div>'+
+  '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" data-group="voit-options" data-option-val="poils_animaux" onclick="toggleOption(this)"><span>🐾</span>Poils d\'animaux</button>'+
+  '<button class="opt-btn" data-group="voit-options" data-option-val="desinfection_vapeur" onclick="toggleOption(this)"><span>💨</span>Désinfection vapeur</button>'+
+  '<button class="opt-btn" data-group="voit-options" data-option-val="coffre" onclick="toggleOption(this)"><span>📦</span>Coffre à nettoyer</button>'+
+  '<button class="opt-btn full" data-group="voit-options" data-option-val="tres_sale" onclick="toggleOption(this)"><span>🤢</span>Véhicule très sale / odeur forte</button></div></div>'+
   etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
@@ -3219,6 +3235,13 @@ function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><
   dateTimeBlock(isLastInFlow())+sendBtn('autre')}
 
 function selOpt(btn){var group=btn.getAttribute('data-group');document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel');if(group==='etat'||btn.hasAttribute('data-coef-key'))updateEstimation()}
+// Bascule indépendante (plusieurs choix possibles à la fois) — pour les options supplémentaires
+// comme "poils d'animaux" ou "coffre à nettoyer aussi", contrairement à selOpt() qui n'autorise
+// qu'un seul choix à la fois dans son groupe.
+function toggleOption(btn){btn.classList.toggle('sel')}
+function getOptionsSelectionnees(groupe){
+  return Array.from(document.querySelectorAll('[data-group="'+groupe+'"].sel')).map(function(b){return b.getAttribute('data-option-val')});
+}
 function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
 
 async function handlePhotos(input){
@@ -3266,7 +3289,7 @@ function validateCurrentForm(type){
   var groups=[];
   // 'favori-cible' est volontairement optionnel (choisir un prestataire préféré n'est jamais
   // obligatoire pour envoyer une demande) — comme 'etat', qui a toujours une valeur par défaut.
-  var groupesOptionnels=['etat','favori-cible'];
+  var groupesOptionnels=['etat','favori-cible','voit-options'];
   document.querySelectorAll('#modal-body [data-group]').forEach(function(el){
     var g=el.getAttribute('data-group');
     if(g&&groupesOptionnels.indexOf(g)===-1&&groups.indexOf(g)===-1)groups.push(g);
@@ -3291,7 +3314,17 @@ async function sendDemand(type){
   if(validationError){toast('❌ '+validationError);return}
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
-  document.querySelectorAll('.opt-btn.sel').forEach(function(b){var group=b.getAttribute('data-group');if(group)details[group]=b.textContent.trim()});
+  var groupesMultiSelect2=['voit-options'];
+  document.querySelectorAll('.opt-btn.sel').forEach(function(b){
+    var group=b.getAttribute('data-group');
+    if(!group)return;
+    if(groupesMultiSelect2.indexOf(group)>=0){
+      if(!details[group])details[group]=[];
+      details[group].push(b.textContent.trim());
+    }else{
+      details[group]=b.textContent.trim();
+    }
+  });
   if(type==='autre'){var t=document.getElementById('f-autre-type')&&document.getElementById('f-autre-type').value.trim();if(t)details['type-prestation']=t}
   if(UNIT_CATEGORIES_CLIENT.indexOf(type)>=0){
     var qEl=document.getElementById('f-quantite');
