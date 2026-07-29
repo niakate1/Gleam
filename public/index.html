@@ -933,7 +933,7 @@ function afficherDetailsVoiturePro(p){
 }
 // Même principe que pour la voiture : un affichage clair et labellisé plutôt qu'un texte collé,
 // avec un rappel des étapes de base et des options signalées par le client.
-var GUIDE_PRO_CANAPE_BASE=['Aspirer en profondeur (assises, dossiers, recoins)','Nettoyer à la vapeur ou par injection-extraction','Traiter les taches courantes','Laisser sécher complètement avant remise en place des coussins'];
+var GUIDE_PRO_CANAPE_BASE=['Aspirer en profondeur (assises, dossiers, recoins)','Nettoyer à la vapeur ou par injection-extraction','Traiter les taches courantes'];
 function afficherDetailsCanapePro(p){
   var d=p.details||{};
   var lignes='';
@@ -958,6 +958,31 @@ function afficherDetailsCanapePro(p){
     '</ol></div>';
   return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>'+guideHtml;
 }
+// Même principe que voiture/canapé : affichage clair et labellisé, avec rappel explicite que
+// les deux faces sont incluses d'office (pour éviter toute ambiguïté avec le pro).
+var GUIDE_PRO_MATELAS_BASE=['Aspirer en profondeur (recto)','Nettoyer à la vapeur ou par injection-extraction (recto)','Retourner le matelas','Aspirer et nettoyer le verso de la même façon','Traitement anti-acariens standard (les deux faces)'];
+function afficherDetailsMatelasPro(p){
+  var d=p.details||{};
+  var lignes='';
+  if(d['mat-t'])lignes+='<div style="margin-bottom:3px"><strong>📏 Taille :</strong> '+escapeHtml(d['mat-t'])+'</div>';
+  if(d['quantite'])lignes+='<div style="margin-bottom:3px"><strong>🔢 Quantité :</strong> '+escapeHtml(d['quantite'])+'</div>';
+  if(Array.isArray(d['matelas-options'])&&d['matelas-options'].length){
+    lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['matelas-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
+  }
+  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  var etapes=GUIDE_PRO_MATELAS_BASE.slice();
+  if(Array.isArray(d['matelas-options'])){
+    if(d['matelas-options'].some(function(o){return o.indexOf('punaises')>=0}))etapes.push('Traitement anti-punaises de lit renforcé (option choisie par le client)');
+    if(d['matelas-options'].some(function(o){return o.indexOf('Sommier')>=0}))etapes.push('Traiter aussi le sommier / tête de lit');
+    if(d['matelas-options'].some(function(o){return o.indexOf('ancienne')>=0}))etapes.push('Prétraitement renforcé sur la tache signalée');
+  }
+  var guideHtml='<div style="background:var(--light);border-radius:8px;padding:10px;margin-top:6px">'+
+    '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">📋 Étapes à suivre</div>'+
+    '<ol style="margin:0;padding-left:18px;font-size:11.5px;color:var(--text-secondary);line-height:1.6">'+
+    etapes.map(function(e){return '<li>'+escapeHtml(e)+'</li>'}).join('')+
+    '</ol></div>';
+  return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>'+guideHtml;
+}
 function tryParseNotes(notes){
   try{
     const n=JSON.parse(notes);
@@ -968,6 +993,8 @@ function tryParseNotes(notes){
           corps=afficherDetailsVoiturePro(p);
         }else if(p.type==='canape'&&p.details&&Object.keys(p.details).length){
           corps=afficherDetailsCanapePro(p);
+        }else if(p.type==='matelas'&&p.details&&Object.keys(p.details).length){
+          corps=afficherDetailsMatelasPro(p);
         }else{
           var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
           corps=(det?'<div style="font-size:12px">'+det+'</div>':'');
@@ -3037,7 +3064,7 @@ function goToPreviousStep(currentType){
   // Sauvegarde l'état actuel de l'étape en cours avant de reculer, pour ne rien perdre si l'utilisateur revient
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
-  var groupesMultiSelect=['voit-options','canape-options'];
+  var groupesMultiSelect=['voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
   document.querySelectorAll('.opt-btn.sel').forEach(function(b){
     var group=b.getAttribute('data-group');
     if(!group)return;
@@ -3225,7 +3252,7 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
 
 // Détail de ce qu'inclut une prestation canapé de base, et options facturées à part chez la
 // plupart des professionnels du secteur — recherche de marché à l'appui.
-var DETAIL_CANAPE_BASE='Aspiration approfondie • Nettoyage vapeur ou injection-extraction • Détachage courant • Séchage';
+var DETAIL_CANAPE_BASE='Aspiration approfondie • Nettoyage vapeur ou injection-extraction • Détachage courant';
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span>➡️</span>Droit</button>'+
@@ -3251,22 +3278,32 @@ function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé<
   '<button class="opt-btn" data-group="can-mat" data-coef-key="matiere" data-coef-val="microfibre" onclick="selOpt(this)">Microfibre</button></div></div>'+
   etatBlock()+descBlock('Ex: Taches de café...')+dateTimeBlock(isLastInFlow())+sendBtn('canape')}
 
+var DETAIL_MATELAS_BASE='Aspiration en profondeur • Nettoyage vapeur ou injection-extraction • <strong>Recto ET verso systématiquement traités</strong> • Traitement anti-acariens standard';
 function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
   '<div class="field-group"><label>Taille</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">90x190 cm</button>'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">140x190 cm</button>'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">160x200 cm</button>'+
-  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">180x200 cm</button></div></div>'+
+  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">180x200 cm</button></div>'+
+  '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_MATELAS_BASE+'</div></div>'+
+  '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" data-group="matelas-options" data-option-val="anti_punaises" onclick="toggleOption(this)"><span>🛏️</span>Anti-punaises de lit</button>'+
+  '<button class="opt-btn" data-group="matelas-options" data-option-val="sommier" onclick="toggleOption(this)"><span>🪵</span>Sommier / tête de lit à traiter</button>'+
+  '<button class="opt-btn full" data-group="matelas-options" data-option-val="tache_ancienne" onclick="toggleOption(this)"><span>🔴</span>Tache ancienne / tenace (urine, sang...)</button></div></div>'+
   quantiteBlock('Nombre exact de matelas','Ex: 2')+
   etatBlock()+descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
 
+var DETAIL_TERRASSE_BASE='Balayage et dégagement • Nettoyage haute pression ou brossage adapté au revêtement • Démoussage • Rinçage';
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
   quantiteBlock('Surface exacte (en m²)','Ex: 34')+
   '<div class="field-group"><label>Type de sol</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)">Carrelage</button>'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="bois_composite" onclick="selOpt(this)">Bois/composite</button>'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="beton" onclick="selOpt(this)">Béton</button>'+
-  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="pierre_naturelle" onclick="selOpt(this)">Pierre naturelle</button></div></div>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="pierre_naturelle" onclick="selOpt(this)">Pierre naturelle</button></div>'+
+  '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TERRASSE_BASE+'</div></div>'+
+  '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
+  '<button class="opt-btn full" data-group="terrasse-options" data-option-val="traitement_protecteur" onclick="toggleOption(this)"><span>🛡️</span>Traitement protecteur (dégriseur/saturateur)</button></div></div>'+
   etatBlock()+descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
 
 function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Quel type d\'intervention souhaitez-vous ?</div>'+
@@ -3295,12 +3332,16 @@ function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</d
   quantiteBlock('Surface exacte (en m²)','Ex: 90')+
   etatBlock()+descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
 
+var DETAIL_VITRES_BASE='Nettoyage des vitres, cadres et rebords • Produit anti-traces • Rez-de-chaussée et étages standards accessibles';
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
   '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this)">🏠 Maison</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this)">🏢 Appartement</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this)">🏪 Commerce</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this)">🏭 Bureaux</button></div></div>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this)">🏭 Bureaux</button></div>'+
+  '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_VITRES_BASE+'</div></div>'+
+  '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
+  '<button class="opt-btn full" data-group="vitres-options" data-option-val="acces_difficile" onclick="toggleOption(this)"><span>🪜</span>Accès difficile / hauteur (nacelle, perche télescopique)</button></div></div>'+
   quantiteBlock('Surface vitrée exacte (en m²)','Ex: 12')+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
@@ -3375,7 +3416,7 @@ function validateCurrentForm(type){
   var groups=[];
   // 'favori-cible' est volontairement optionnel (choisir un prestataire préféré n'est jamais
   // obligatoire pour envoyer une demande) — comme 'etat', qui a toujours une valeur par défaut.
-  var groupesOptionnels=['etat','favori-cible','voit-options','canape-options'];
+  var groupesOptionnels=['etat','favori-cible','voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
   document.querySelectorAll('#modal-body [data-group]').forEach(function(el){
     var g=el.getAttribute('data-group');
     if(g&&groupesOptionnels.indexOf(g)===-1&&groups.indexOf(g)===-1)groups.push(g);
@@ -3400,7 +3441,7 @@ async function sendDemand(type){
   if(validationError){toast('❌ '+validationError);return}
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
-  var groupesMultiSelect2=['voit-options','canape-options'];
+  var groupesMultiSelect2=['voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
   document.querySelectorAll('.opt-btn.sel').forEach(function(b){
     var group=b.getAttribute('data-group');
     if(!group)return;
