@@ -118,7 +118,9 @@ const PRESTATION_CONFIG = {
     tierDefaults: { A: 45, B: 55, C: 65, D: 85 }, // tissu, propre (marché observé 2026 : 40-50€ 2 places, 60-70€ 4 places — anciens prix bien trop élevés, corrigés)
     coefMatiere: { tissu: 1.0, cuir: 1.15, velours: 1.1, microfibre: 1.0 },
     // La forme influence le temps de travail à nombre de places égal (un angle est plus complexe qu'un droit).
-    coefForme: { droit: 1.0, angle: 1.2, canape_lit: 1.15, chauffeuses: 0.85 }
+    // Le "U" (panoramique, 2 retours) est nettement plus grand et complexe qu'un simple angle
+    // (souvent 6 à 10 places contre 3-5 pour un angle classique) — coefficient recherché en conséquence.
+    coefForme: { droit: 1.0, angle: 1.2, u_panoramique: 1.45, canape_lit: 1.15, chauffeuses: 0.85 }
   },
   matelas: {
     unite: true,
