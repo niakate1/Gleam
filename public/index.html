@@ -931,6 +931,33 @@ function afficherDetailsVoiturePro(p){
   }
   return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>'+guideHtml;
 }
+// Même principe que pour la voiture : un affichage clair et labellisé plutôt qu'un texte collé,
+// avec un rappel des étapes de base et des options signalées par le client.
+var GUIDE_PRO_CANAPE_BASE=['Aspirer en profondeur (assises, dossiers, recoins)','Nettoyer à la vapeur ou par injection-extraction','Traiter les taches courantes','Laisser sécher complètement avant remise en place des coussins'];
+function afficherDetailsCanapePro(p){
+  var d=p.details||{};
+  var lignes='';
+  if(d['can-type'])lignes+='<div style="margin-bottom:3px"><strong>🛋️ Forme :</strong> '+escapeHtml(d['can-type'])+'</div>';
+  if(d['can-pl'])lignes+='<div style="margin-bottom:3px"><strong>🔢 Places :</strong> '+escapeHtml(d['can-pl'])+'</div>';
+  if(d['can-mat'])lignes+='<div style="margin-bottom:3px"><strong>🧵 Matière :</strong> '+escapeHtml(d['can-mat'])+'</div>';
+  if(Array.isArray(d['canape-options'])&&d['canape-options'].length){
+    lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['canape-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
+  }
+  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  var etapes=GUIDE_PRO_CANAPE_BASE.slice();
+  if(Array.isArray(d['canape-options'])){
+    if(d['canape-options'].some(function(o){return o.indexOf('Coussins')>=0}))etapes.push('Traiter aussi les coussins amovibles (option choisie par le client)');
+    if(d['canape-options'].some(function(o){return o.indexOf('acariens')>=0}))etapes.push('Appliquer un traitement anti-acariens');
+    if(d['canape-options'].some(function(o){return o.indexOf('tenaces')>=0}))etapes.push('Prétraitement spécifique sur les taches tenaces signalées');
+    if(d['canape-options'].some(function(o){return o.indexOf('odorisation')>=0}))etapes.push('Appliquer un traitement désodorisant');
+  }
+  var guideHtml='<div style="background:var(--light);border-radius:8px;padding:10px;margin-top:6px">'+
+    '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">📋 Étapes à suivre</div>'+
+    '<ol style="margin:0;padding-left:18px;font-size:11.5px;color:var(--text-secondary);line-height:1.6">'+
+    etapes.map(function(e){return '<li>'+escapeHtml(e)+'</li>'}).join('')+
+    '</ol></div>';
+  return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>'+guideHtml;
+}
 function tryParseNotes(notes){
   try{
     const n=JSON.parse(notes);
@@ -939,6 +966,8 @@ function tryParseNotes(notes){
         var corps;
         if(p.type==='voiture'&&p.details&&Object.keys(p.details).length){
           corps=afficherDetailsVoiturePro(p);
+        }else if(p.type==='canape'&&p.details&&Object.keys(p.details).length){
+          corps=afficherDetailsCanapePro(p);
         }else{
           var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
           corps=(det?'<div style="font-size:12px">'+det+'</div>':'');
@@ -3008,7 +3037,7 @@ function goToPreviousStep(currentType){
   // Sauvegarde l'état actuel de l'étape en cours avant de reculer, pour ne rien perdre si l'utilisateur revient
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
-  var groupesMultiSelect=['voit-options'];
+  var groupesMultiSelect=['voit-options','canape-options'];
   document.querySelectorAll('.opt-btn.sel').forEach(function(b){
     var group=b.getAttribute('data-group');
     if(!group)return;
@@ -3194,12 +3223,22 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🏠</span>Garage privé</button></div></div>'+
   etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
+// Détail de ce qu'inclut une prestation canapé de base, et options facturées à part chez la
+// plupart des professionnels du secteur — recherche de marché à l'appui.
+var DETAIL_CANAPE_BASE='Aspiration approfondie • Nettoyage vapeur ou injection-extraction • Détachage courant • Séchage';
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span>➡️</span>Droit</button>'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="angle" onclick="selOpt(this)"><span>📐</span>Angle</button>'+
-  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="canape_lit" onclick="selOpt(this)"><span>🪑</span>Canapé lit</button>'+
-  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="chauffeuses" onclick="selOpt(this)"><span>🪑</span>Chauffeuses</button></div></div>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="u_panoramique" onclick="selOpt(this)"><span>🔄</span>En U / Panoramique</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="canape_lit" onclick="selOpt(this)"><span>🛌</span>Canapé lit</button>'+
+  '<button class="opt-btn full" data-group="can-type" data-coef-key="forme" data-coef-val="chauffeuses" onclick="selOpt(this)"><span>🪑</span>Chauffeuses</button></div>'+
+  '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_CANAPE_BASE+'</div></div>'+
+  '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
+  '<button class="opt-btn" data-group="canape-options" data-option-val="coussins" onclick="toggleOption(this)"><span>🛋️</span>Coussins à traiter</button>'+
+  '<button class="opt-btn" data-group="canape-options" data-option-val="anti_acariens" onclick="toggleOption(this)"><span>🦠</span>Anti-acariens</button>'+
+  '<button class="opt-btn" data-group="canape-options" data-option-val="taches_tenaces" onclick="toggleOption(this)"><span>🔴</span>Taches tenaces (encre, vin...)</button>'+
+  '<button class="opt-btn" data-group="canape-options" data-option-val="desodorisation" onclick="toggleOption(this)"><span>💨</span>Désodorisation</button></div></div>'+
   '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">3 places</button>'+
@@ -3336,7 +3375,7 @@ function validateCurrentForm(type){
   var groups=[];
   // 'favori-cible' est volontairement optionnel (choisir un prestataire préféré n'est jamais
   // obligatoire pour envoyer une demande) — comme 'etat', qui a toujours une valeur par défaut.
-  var groupesOptionnels=['etat','favori-cible','voit-options'];
+  var groupesOptionnels=['etat','favori-cible','voit-options','canape-options'];
   document.querySelectorAll('#modal-body [data-group]').forEach(function(el){
     var g=el.getAttribute('data-group');
     if(g&&groupesOptionnels.indexOf(g)===-1&&groups.indexOf(g)===-1)groups.push(g);
@@ -3361,7 +3400,7 @@ async function sendDemand(type){
   if(validationError){toast('❌ '+validationError);return}
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
-  var groupesMultiSelect2=['voit-options'];
+  var groupesMultiSelect2=['voit-options','canape-options'];
   document.querySelectorAll('.opt-btn.sel').forEach(function(b){
     var group=b.getAttribute('data-group');
     if(!group)return;
