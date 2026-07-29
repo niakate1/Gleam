@@ -903,7 +903,12 @@ function tryParseNotes(notes){
         var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
         var guide='';
         if(p.type==='voiture'&&p.details&&p.details.portee&&GUIDE_PRO_NETTOYAGE_VOITURE[p.details.portee]){
-          guide='<div style="background:var(--light);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:11.5px;color:var(--text-secondary)"><strong style="color:var(--p)">📋 À faire :</strong> '+GUIDE_PRO_NETTOYAGE_VOITURE[p.details.portee].join(' → ')+'</div>';
+          var etapes=GUIDE_PRO_NETTOYAGE_VOITURE[p.details.portee].slice();
+          var optionsChoisies=p.details['voit-options'];
+          if(Array.isArray(optionsChoisies)&&optionsChoisies.some(function(o){return o.indexOf('Shampouinage')>=0})){
+            etapes.push('Shampouinage sièges et tapis (option choisie par le client)');
+          }
+          guide='<div style="background:var(--light);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:11.5px;color:var(--text-secondary)"><strong style="color:var(--p)">📋 À faire :</strong> '+etapes.join(' → ')+'</div>';
         }
         return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+escapeHtml(p.description):'')+guide+'</div>';
       }).join('');
@@ -3115,14 +3120,17 @@ async function updateEstimation(){
 // proposées par les services comparables en France (Yoojo, Wash&Check, AutoCleans), pour rester
 // juste et concret plutôt que vague.
 var DETAIL_NETTOYAGE_VOITURE={
-  interieur:'Aspiration complète (habitacle + coffre) • Dépoussiérage plastiques et tableau de bord • Nettoyage des sièges (tissu ou cuir, produit adapté) • Nettoyage des vitres intérieures',
+  interieur:'Aspiration complète (habitacle + coffre inclus) • Dépoussiérage plastiques et tableau de bord • Nettoyage des sièges (tissu ou cuir, produit adapté) • Nettoyage des vitres intérieures',
   exterieur:'Lavage main de la carrosserie • Nettoyage jantes et pneus • Nettoyage des vitres extérieures • Application d\'une cire de finition',
   complet:'L\'intégralité du nettoyage intérieur et extérieur — généralement plus avantageux que les deux séparément'
 };
 function afficherDetailNettoyage(type){
   var box=document.getElementById('detail-nettoyage-box');
-  if(!box)return;
-  box.innerHTML='<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_NETTOYAGE_VOITURE[type]+'</div>';
+  if(box)box.innerHTML='<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_NETTOYAGE_VOITURE[type]+'</div>';
+  // Le shampouinage sièges/tapis n'a de sens que si l'intérieur est concerné — les
+  // professionnels du secteur le réservent d'ailleurs explicitement aux prestations intérieures.
+  var shampBtn=document.getElementById('opt-shampouinage');
+  if(shampBtn)shampBtn.style.display=(type==='interieur'||type==='complet')?'':'none';
 }
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
@@ -3130,6 +3138,12 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this);afficherDetailNettoyage(\'exterieur\')"><span>🌤️</span>Extérieur</button>'+
   '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this);afficherDetailNettoyage(\'complet\')"><span>🔄</span>Intérieur + Extérieur</button></div>'+
   '<div id="detail-nettoyage-box"></div></div>'+
+  '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
+  '<button class="opt-btn full" id="opt-shampouinage" style="display:none" data-group="voit-options" data-option-val="shampouinage" onclick="toggleOption(this)"><span>🧴</span>Shampouinage sièges et tapis</button>'+
+  '<button class="opt-btn" data-group="voit-options" data-option-val="poils_animaux" onclick="toggleOption(this)"><span>🐾</span>Poils d\'animaux</button>'+
+  '<button class="opt-btn" data-group="voit-options" data-option-val="tres_sale" onclick="toggleOption(this)"><span>🤢</span>Habitacle très sale / encrassé</button>'+
+  '<button class="opt-btn" data-group="voit-options" data-option-val="rangement" onclick="toggleOption(this)"><span>🧳</span>Rangement d\'effets personnels</button>'+
+  '<button class="opt-btn" data-group="voit-options" data-option-val="anti_odeur" onclick="toggleOption(this)"><span>💨</span>Traitement anti-odeur</button></div></div>'+
   '<div class="field-group"><label>Type de véhicule</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
@@ -3140,11 +3154,11 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="C" onclick="selOpt(this)">7 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="D" onclick="selOpt(this)">9+ places</button></div></div>'+
-  '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="voit-options" data-option-val="poils_animaux" onclick="toggleOption(this)"><span>🐾</span>Poils d\'animaux</button>'+
-  '<button class="opt-btn" data-group="voit-options" data-option-val="desinfection_vapeur" onclick="toggleOption(this)"><span>💨</span>Désinfection vapeur</button>'+
-  '<button class="opt-btn" data-group="voit-options" data-option-val="coffre" onclick="toggleOption(this)"><span>📦</span>Coffre à nettoyer</button>'+
-  '<button class="opt-btn full" data-group="voit-options" data-option-val="tres_sale" onclick="toggleOption(this)"><span>🤢</span>Véhicule très sale / odeur forte</button></div></div>'+
+  '<div class="field-group"><label>Emplacement du véhicule</label><div class="options-grid">'+
+  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🅿️</span>Parking souterrain</button>'+
+  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🛣️</span>Rue / voie publique</button>'+
+  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🏢</span>Parking extérieur ouvert</button>'+
+  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🏠</span>Garage privé</button></div></div>'+
   etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
