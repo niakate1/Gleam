@@ -887,30 +887,63 @@ function formatDetails(details,type){
     return escapeHtml(val);
   }).join(' • ');
 }
+// Traduit les valeurs techniques des options en un libellé clair et lisible pour le pro.
+var LABELS_OPTIONS_VOITURE={interieur:'Intérieur',exterieur:'Extérieur',complet:'Intérieur + Extérieur'};
 // Petit guide pour le pro, rappelant précisément les étapes attendues selon le type de nettoyage
-// voiture choisi par le client — basé sur les standards du marché (repris du même contenu que
-// celui montré au client), pour que les attentes soient claires avant de se déplacer.
+// voiture choisi par le client — basé sur les standards du marché, pour que les attentes soient
+// claires avant de se déplacer.
 var GUIDE_PRO_NETTOYAGE_VOITURE={
   interieur:['Aspirer entièrement l\'habitacle (sièges, moquette, coffre, recoins)','Dépoussiérer les plastiques et le tableau de bord','Nettoyer les sièges avec le produit adapté (tissu ou cuir)','Nettoyer les vitres intérieures sans traces'],
   exterieur:['Pré-laver la carrosserie','Laver à la main (shampoing auto + microfibres, jamais de brosse abrasive)','Nettoyer jantes et pneus (produit dédié)','Nettoyer les vitres extérieures','Sécher entièrement puis appliquer une cire de finition'],
   complet:['Commencer par l\'extérieur (pour ne pas salir l\'intérieur en circulant autour du véhicule)','Puis réaliser l\'intérieur complet']
 };
+// Construit un affichage clair et bien organisé pour une prestation "voiture" côté pro — plutôt
+// qu'un texte collé difficile à lire (ex: "Intérieur • Citadine • 5 places • Parking souterrain..."),
+// chaque information a son propre libellé et sa propre ligne, et la checklist est numérotée.
+function afficherDetailsVoiturePro(p){
+  var d=p.details||{};
+  var lignes='';
+  if(d['net-type'])lignes+='<div style="margin-bottom:3px"><strong>🧼 Type de nettoyage :</strong> '+escapeHtml(d['net-type'])+'</div>';
+  var vehiculeParts=[];
+  if(d['veh'])vehiculeParts.push(d['veh']);
+  if(d['seats'])vehiculeParts.push(d['seats']);
+  if(vehiculeParts.length)lignes+='<div style="margin-bottom:3px"><strong>🚗 Véhicule :</strong> '+escapeHtml(vehiculeParts.join(', '))+'</div>';
+  if(d['emplacement'])lignes+='<div style="margin-bottom:3px"><strong>📍 Emplacement :</strong> '+escapeHtml(d['emplacement'])+'</div>';
+  if(Array.isArray(d['voit-options'])&&d['voit-options'].length){
+    lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['voit-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
+  }
+  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+
+  var guideHtml='';
+  // Retrouve quel palier (intérieur/extérieur/complet) a été choisi, pour afficher le bon guide
+  var palier=null;
+  ['complet','interieur','exterieur'].forEach(function(key){if(!palier&&d['net-type']&&d['net-type'].indexOf(LABELS_OPTIONS_VOITURE[key])>=0)palier=key});
+  if(palier&&GUIDE_PRO_NETTOYAGE_VOITURE[palier]){
+    var etapes=GUIDE_PRO_NETTOYAGE_VOITURE[palier].slice();
+    if(Array.isArray(d['voit-options'])&&d['voit-options'].some(function(o){return o.indexOf('Shampouinage')>=0})){
+      etapes.push('Shampouinage sièges et tapis (option choisie par le client)');
+    }
+    guideHtml='<div style="background:var(--light);border-radius:8px;padding:10px;margin-top:6px">'+
+      '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">📋 Étapes à suivre</div>'+
+      '<ol style="margin:0;padding-left:18px;font-size:11.5px;color:var(--text-secondary);line-height:1.6">'+
+      etapes.map(function(e){return '<li>'+escapeHtml(e)+'</li>'}).join('')+
+      '</ol></div>';
+  }
+  return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>'+guideHtml;
+}
 function tryParseNotes(notes){
   try{
     const n=JSON.parse(notes);
     if(n.prestations&&Array.isArray(n.prestations)){
       return n.prestations.map(function(p){
-        var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
-        var guide='';
-        if(p.type==='voiture'&&p.details&&p.details.portee&&GUIDE_PRO_NETTOYAGE_VOITURE[p.details.portee]){
-          var etapes=GUIDE_PRO_NETTOYAGE_VOITURE[p.details.portee].slice();
-          var optionsChoisies=p.details['voit-options'];
-          if(Array.isArray(optionsChoisies)&&optionsChoisies.some(function(o){return o.indexOf('Shampouinage')>=0})){
-            etapes.push('Shampouinage sièges et tapis (option choisie par le client)');
-          }
-          guide='<div style="background:var(--light);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:11.5px;color:var(--text-secondary)"><strong style="color:var(--p)">📋 À faire :</strong> '+etapes.join(' → ')+'</div>';
+        var corps;
+        if(p.type==='voiture'&&p.details&&Object.keys(p.details).length){
+          corps=afficherDetailsVoiturePro(p);
+        }else{
+          var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
+          corps=(det?'<div style="font-size:12px">'+det+'</div>':'');
         }
-        return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+escapeHtml(p.description):'')+guide+'</div>';
+        return '<div style="margin-bottom:8px"><strong style="text-transform:capitalize">'+ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+(p.description?'<div style="font-size:12px;margin-top:2px">'+escapeHtml(p.description)+'</div>':'')+corps+'</div>';
       }).join('');
     }
     return escapeHtml(n.description||'');
