@@ -886,13 +886,25 @@ function formatDetails(details,type){
     return escapeHtml(val);
   }).join(' • ');
 }
+// Petit guide pour le pro, rappelant précisément les étapes attendues selon le type de nettoyage
+// voiture choisi par le client — basé sur les standards du marché (repris du même contenu que
+// celui montré au client), pour que les attentes soient claires avant de se déplacer.
+var GUIDE_PRO_NETTOYAGE_VOITURE={
+  interieur:['Aspirer entièrement l\'habitacle (sièges, moquette, coffre, recoins)','Dépoussiérer les plastiques et le tableau de bord','Nettoyer les sièges avec le produit adapté (tissu ou cuir)','Nettoyer les vitres intérieures sans traces'],
+  exterieur:['Pré-laver la carrosserie','Laver à la main (shampoing auto + microfibres, jamais de brosse abrasive)','Nettoyer jantes et pneus (produit dédié)','Nettoyer les vitres extérieures','Sécher entièrement puis appliquer une cire de finition'],
+  complet:['Commencer par l\'extérieur (pour ne pas salir l\'intérieur en circulant autour du véhicule)','Puis réaliser l\'intérieur complet']
+};
 function tryParseNotes(notes){
   try{
     const n=JSON.parse(notes);
     if(n.prestations&&Array.isArray(n.prestations)){
       return n.prestations.map(function(p){
         var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
-        return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+escapeHtml(p.description):'')+'</div>';
+        var guide='';
+        if(p.type==='voiture'&&p.details&&p.details.portee&&GUIDE_PRO_NETTOYAGE_VOITURE[p.details.portee]){
+          guide='<div style="background:var(--light);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:11.5px;color:var(--text-secondary)"><strong style="color:var(--p)">📋 À faire :</strong> '+GUIDE_PRO_NETTOYAGE_VOITURE[p.details.portee].join(' → ')+'</div>';
+        }
+        return '<div style="margin-bottom:6px"><strong style="text-transform:capitalize">'+ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+(det?' — '+det:'')+(p.description?'<br>'+escapeHtml(p.description):'')+guide+'</div>';
       }).join('');
     }
     return escapeHtml(n.description||'');
@@ -3088,11 +3100,25 @@ async function updateEstimation(){
   }
 }
 
+// Détail de ce qu'inclut chaque type de nettoyage voiture — basé sur les prestations réellement
+// proposées par les services comparables en France (Yoojo, Wash&Check, AutoCleans), pour rester
+// juste et concret plutôt que vague.
+var DETAIL_NETTOYAGE_VOITURE={
+  interieur:'Aspiration complète (habitacle + coffre) • Dépoussiérage plastiques et tableau de bord • Nettoyage des sièges (tissu ou cuir, produit adapté) • Nettoyage des vitres intérieures',
+  exterieur:'Lavage main de la carrosserie • Nettoyage jantes et pneus • Nettoyage des vitres extérieures • Application d\'une cire de finition',
+  complet:'L\'intégralité du nettoyage intérieur et extérieur — généralement plus avantageux que les deux séparément'
+};
+function afficherDetailNettoyage(type){
+  var box=document.getElementById('detail-nettoyage-box');
+  if(!box)return;
+  box.innerHTML='<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_NETTOYAGE_VOITURE[type]+'</div>';
+}
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this)"><span>🪑</span>Intérieur</button>'+
-  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this)"><span>🌤️</span>Extérieur</button>'+
-  '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this)"><span>🔄</span>Intérieur + Extérieur</button></div></div>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this);afficherDetailNettoyage(\'interieur\')"><span>🪑</span>Intérieur</button>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this);afficherDetailNettoyage(\'exterieur\')"><span>🌤️</span>Extérieur</button>'+
+  '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this);afficherDetailNettoyage(\'complet\')"><span>🔄</span>Intérieur + Extérieur</button></div>'+
+  '<div id="detail-nettoyage-box"></div></div>'+
   '<div class="field-group"><label>Type de véhicule</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
