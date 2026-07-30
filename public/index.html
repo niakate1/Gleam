@@ -488,6 +488,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-hero"><div class="avatar-wrap" id="pro-profile-avatar"><div class="avatar" id="pro-profile-avatar-inner">🏢</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')"></div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p><div id="pro-profile-note" style="display:none;margin-top:8px"></div></div>
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
+      <div class="profile-item" id="item-confirmer-email-pro" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="configurerPaiementsPro()"><span class="pi-icon"><i data-lucide="landmark" style="width:20px;height:20px"></i></span><span class="pi-text">Configurer mes paiements</span><span class="pi-arrow" id="connect-statut-badge"></span></div>
@@ -582,10 +583,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="screen" id="s-profile">
   <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil</span></div>
   <div class="profile-content">
-    <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p><div id="profile-note" style="display:none;margin-top:8px"></div></div>
+    <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p><div id="profile-type-badge" style="display:none;margin-top:6px"></div><div id="profile-note" style="display:none;margin-top:8px"></div></div>
     <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
@@ -832,6 +834,8 @@ function enterApp(){
     document.getElementById('pro-name-badge').textContent=name;
     document.getElementById('pro-profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
     document.getElementById('pro-profile-email').textContent=(currentUser&&currentUser.email)||'';
+    var itemConfirmerEmailP=document.getElementById('item-confirmer-email-pro');
+    if(itemConfirmerEmailP)itemConfirmerEmailP.style.display=(currentUser&&currentUser.email_verifie===false)?'flex':'none';
     renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
     renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
     checkConnectStatut();
@@ -845,6 +849,15 @@ function enterApp(){
     document.getElementById('user-name-badge').textContent=name;
     document.getElementById('profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
     document.getElementById('profile-email').textContent=(currentUser&&currentUser.email)||'';
+    var badgeType=document.getElementById('profile-type-badge');
+    if(badgeType){
+      var t=currentUser&&currentUser.type;
+      var labels={client:'',entreprise:'🏢 Compte Entreprise'};
+      if(t&&labels[t]){badgeType.style.display='inline-block';badgeType.innerHTML='<span style="background:var(--light);color:var(--p);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">'+labels[t]+'</span>'}
+      else badgeType.style.display='none';
+    }
+    var itemConfirmerEmailC=document.getElementById('item-confirmer-email-client');
+    if(itemConfirmerEmailC)itemConfirmerEmailC.style.display=(currentUser&&currentUser.email_verifie===false)?'flex':'none';
     renderProfileAvatar('profile-avatar-inner',currentUser&&currentUser.photo,'👤');
     renderNoteGlobale('profile-note',currentUser&&currentUser.note_moyenne);
     show('s-home');
@@ -2830,6 +2843,39 @@ async function ajouterFavori(proId,proName,btn){
     toast('⭐ '+escapeHtml(proName)+' ajouté à vos favoris !');
     if(btn){btn.innerHTML='<i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
+}
+function ouvrirConfirmerEmail(){
+  var html='<div class="modal-title"><i data-lucide="mail-check" style="width:20px;height:20px;vertical-align:-4px;color:var(--gold)"></i> Confirmer mon email</div>'+
+    '<div class="modal-sub">Un code à 6 chiffres vous a été envoyé à '+escapeHtml((currentUser&&currentUser.email)||'')+'</div>'+
+    '<input type="text" id="code-verif-email" placeholder="Ex: 123456" inputmode="numeric" maxlength="6" style="text-align:center;font-size:20px;letter-spacing:4px;font-weight:700">'+
+    '<button class="btn-accept" style="width:100%;margin-top:12px" onclick="validerCodeVerifEmail()">Confirmer</button>'+
+    '<button class="btn" style="width:100%;margin-top:8px" onclick="renvoyerCodeVerifEmail()">Je n\'ai pas reçu de code, renvoyer</button>'+
+    '<div class="err" id="verif-email-err"></div>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+async function validerCodeVerifEmail(){
+  var code=document.getElementById('code-verif-email').value.trim();
+  var errEl=document.getElementById('verif-email-err');
+  if(errEl)errEl.classList.remove('show');
+  if(!code){if(errEl){errEl.textContent='Entrez le code reçu par email.';errEl.classList.add('show')}return}
+  try{
+    const r=await fetch(API+'/api/auth/verifier-email',{method:'POST',headers:authHeaders(),body:JSON.stringify({code:code})});
+    const d=await safeJson(r);
+    if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
+    toast('✅ '+d.message);
+    closeModal();
+    var itemC=document.getElementById('item-confirmer-email-client');if(itemC)itemC.style.display='none';
+    var itemP=document.getElementById('item-confirmer-email-pro');if(itemP)itemP.style.display='none';
+    if(currentUser)currentUser.email_verifie=true;
+  }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
+}
+async function renvoyerCodeVerifEmail(){
+  try{
+    const r=await fetch(API+'/api/auth/renvoyer-code-verification',{method:'POST',headers:authHeaders()});
+    const d=await safeJson(r);
+    toast(r.ok?'✅ '+d.message:('❌ '+(d.error||'Erreur.')));
+  }catch(e){toast('❌ '+friendlyNetworkError(e))}
 }
 function showParrainage(){
   var code=currentUser&&currentUser.code_parrainage||'';
