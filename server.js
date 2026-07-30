@@ -126,6 +126,11 @@ function traduireErreurSupabase(messageOriginal) {
     return 'Identifiants incorrects.';
   if (m.includes('network') || m.includes('timeout') || m.includes('fetch failed'))
     return 'Problème de connexion au serveur, merci de réessayer.';
+  // Cas précis : une colonne attendue par le code n'existe pas encore dans la table (migration
+  // SQL jamais exécutée sur cette base) — message explicite plutôt que le générique du dessous,
+  // pour pouvoir corriger immédiatement en sachant exactement quoi faire.
+  if (m.includes('column') && (m.includes('does not exist') || m.includes('not find')))
+    return 'Erreur de configuration de la base de données (colonne manquante) — contactez le support technique en précisant "colonne manquante" et le message exact des journaux serveur.';
   // Message générique en dernier recours, jamais le message technique brut
   return 'Une erreur est survenue. Merci de réessayer ou de contacter le support si le problème persiste.';
 }
@@ -323,7 +328,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       password: password,
       email_confirm: true
     });
-    if (authError) return res.status(400).json({ error: traduireErreurSupabase(authError.message) });
+    if (authError) { console.error('Erreur inscription (Supabase Auth), message technique complet:', authError); return res.status(400).json({ error: traduireErreurSupabase(authError.message) }); }
 
     // Génère un code de parrainage unique pour ce nouveau compte (quelques essais suffisent presque
     // toujours vu le grand nombre de combinaisons possibles)
@@ -357,6 +362,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (error) {
       // Le compte de connexion a été créé mais le profil a échoué : on annule tout plutôt que
       // de laisser un compte "orphelin" (connexion possible, mais aucune donnée de profil).
+      console.error('Erreur inscription (insertion profil), message technique complet:', error);
       await supabase.auth.admin.deleteUser(authData.user.id).catch(e => console.error('Rollback inscription:', e));
       return res.status(400).json({ error: traduireErreurSupabase(error.message) });
     }
@@ -496,7 +502,7 @@ app.patch('/api/users/photo', auth, async (req, res) => {
       return res.status(413).json({ error: 'Photo trop volumineuse. Réessayez avec une image plus légère.' });
     }
     const { error } = await supabase.from('users').update({ photo }).eq('id', req.user.id);
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
     res.json({ message: 'Photo mise à jour.', photo });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -536,7 +542,7 @@ app.post('/api/users/me/supprimer', auth, async (req, res) => {
       disponible: false,
       compte_supprime: true
     }).eq('id', req.user.id);
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
 
     // Révoque l'accès de connexion (best-effort : n'empêche pas la suppression si ça échoue)
     try { await supabase.auth.admin.deleteUser(req.user.id); } catch (e) { console.error('Suppression auth:', e); }
@@ -599,7 +605,7 @@ app.post('/api/demandes', auth, async (req, res) => {
       statut: 'en_attente'
     }).select().single();
 
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
 
     // 📧 Email "nouvelle demande" désactivé pour l'instant (risque de spam pour les pros).
     // Pour le réactiver, décommentez le bloc ci-dessous :
@@ -754,7 +760,7 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
     if (demande.statut === 'expiree' && date && time) updateData.statut = 'en_attente';
 
     const { data, error } = await supabase.from('demandes').update(updateData).eq('id', req.params.id).select().single();
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
 
     await supabase.from('devis').update({ demande_modifiee: true }).eq('demande_id', req.params.id).eq('statut', 'envoye');
 
@@ -1000,7 +1006,7 @@ app.patch('/api/demandes/:id/archiver', auth, async (req, res) => {
     if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
 
     const { error } = await supabase.from('demandes').update({ archivee_client: true }).eq('id', req.params.id);
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
     res.json({ message: 'Demande archivée.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1022,7 +1028,7 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
     await supabase.from('paiements').delete().eq('demande_id', req.params.id);
     await supabase.from('evaluations').delete().eq('demande_id', req.params.id);
     const { error } = await supabase.from('demandes').delete().eq('id', req.params.id);
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
 
     res.json({ message: 'Demande supprimée.' });
   } catch (e) {
@@ -1060,7 +1066,7 @@ app.post('/api/devis', auth, async (req, res) => {
       statut: 'envoye'
     }).select().single();
 
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
     await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', demande_id);
 
     // 📧 Email 2/8 : nouveau devis reçu → client
@@ -1385,7 +1391,7 @@ app.post('/api/messages', auth, async (req, res) => {
       type: 'texte'
     }).select().single();
 
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
 
     // 📧 Email 8/8 : nouveau message → destinataire (client ou pro selon l'expéditeur)
     const { data: expediteur } = await supabase.from('users').select('prenom, type').eq('id', req.user.id).single();
@@ -1965,7 +1971,7 @@ app.post('/api/favoris', auth, async (req, res) => {
     if (dejaFavori) return res.json({ message: 'Déjà dans vos favoris.' });
 
     const { error } = await supabase.from('favoris').insert({ client_id: req.user.id, pro_id: pro_id });
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
     res.status(201).json({ message: 'Ajouté à vos favoris ✨' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -2099,7 +2105,7 @@ app.post('/api/evaluations', auth, async (req, res) => {
       note: parseInt(note),
       commentaire: commentaire || null
     }).select().single();
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
 
     const { data: notes } = await supabase.from('evaluations').select('note').eq('evalue_id', evalue_id);
     const moyenne = notes.reduce(function(a, b) { return a + b.note; }, 0) / notes.length;
@@ -2216,7 +2222,7 @@ app.patch('/api/societes/tarifs', auth, async (req, res) => {
       tarifs_unitaires: tarifsUnitairesPropres,
       prestations_proposees: prestationsPropres
     }).eq('id', req.user.id);
-    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
     res.json({ message: 'Tarifs mis à jour.', tarifs: tarifsPropres, tarifs_unitaires: tarifsUnitairesPropres, prestations: prestationsPropres });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
