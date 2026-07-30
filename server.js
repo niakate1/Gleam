@@ -339,6 +339,14 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       if (!dejaUtilise) codeParrainage = candidat;
     }
 
+    // Code de vérification email à 6 chiffres, envoyé après l'inscription — sur le modèle des
+    // meilleures pratiques actuelles (recherche à l'appui) : vérifier l'email par un code plutôt
+    // qu'un lien, mais SANS bloquer l'accès à l'application en attendant (l'utilisateur peut
+    // utiliser Gleam normalement dès l'inscription, la confirmation se fait en tâche de fond,
+    // avec un simple rappel non-bloquant dans l'app tant qu'elle n'est pas faite).
+    const codeVerifEmail = String(Math.floor(100000 + Math.random() * 900000));
+    const codeVerifExpire = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // valable 24h
+
     const { data, error } = await supabase.from('users').insert({
       id: authData.user.id,
       email: email.toLowerCase().trim(),
@@ -356,7 +364,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       adresse_facturation: type === 'entreprise' ? adresseFacturation : null,
       cgu_acceptees_le: new Date().toISOString(),
       code_parrainage: codeParrainage,
-      parraine_par: parrainId
+      parraine_par: parrainId,
+      email_verifie: false,
+      email_verif_code: codeVerifEmail,
+      email_verif_expire: codeVerifExpire
     }).select().single();
 
     if (error) {
@@ -365,6 +376,15 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       console.error('Erreur inscription (insertion profil), message technique complet:', error);
       await supabase.auth.admin.deleteUser(authData.user.id).catch(e => console.error('Rollback inscription:', e));
       return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    }
+
+    // Envoie le code de vérification par email — protégé dans son propre bloc : un souci d'envoi
+    // (SendGrid indisponible, etc.) ne doit jamais empêcher la création du compte de réussir,
+    // l'utilisateur pourra toujours redemander un nouveau code plus tard depuis son profil.
+    try {
+      sendEmail('verification_email', data.email, { prenom: data.prenom, code: codeVerifEmail });
+    } catch (e) {
+      console.error('Envoi email de vérification échoué (compte créé normalement):', e.message);
     }
 
     const token = jwt.sign({ id: data.id, email: data.email, type: data.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -491,7 +511,45 @@ app.post('/api/parrainage/renseigner-code', auth, async (req, res) => {
   }
 });
 
-// Met à jour la photo de profil (client ou pro) — reçoit une image compressée en base64 (data URL)
+// Vérifie le code de confirmation d'email — n'importe qui de connecté peut confirmer son propre
+// compte, à tout moment (pas de blocage d'accès en attendant, conformément aux bonnes pratiques
+// actuelles : la vérification email se fait en tâche de fond, jamais en barrage à l'entrée).
+app.post('/api/auth/verifier-email', auth, async (req, res) => {
+  try {
+    const code = (req.body.code || '').trim();
+    if (!code) return res.status(400).json({ error: 'Code requis.' });
+
+    const { data: moi } = await supabase.from('users').select('email_verifie, email_verif_code, email_verif_expire').eq('id', req.user.id).single();
+    if (!moi) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (moi.email_verifie) return res.json({ message: 'Votre email est déjà confirmé.' });
+    if (!moi.email_verif_code || moi.email_verif_code !== code)
+      return res.status(400).json({ error: 'Code incorrect.' });
+    if (moi.email_verif_expire && new Date(moi.email_verif_expire) < new Date())
+      return res.status(400).json({ error: 'Ce code a expiré, demandez-en un nouveau.' });
+
+    await supabase.from('users').update({ email_verifie: true, email_verif_code: null }).eq('id', req.user.id);
+    res.json({ message: 'Email confirmé, merci !' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Renvoie un nouveau code si l'ancien a expiré ou n'a jamais été reçu
+app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
+  try {
+    const { data: moi } = await supabase.from('users').select('email, prenom, email_verifie').eq('id', req.user.id).single();
+    if (!moi) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (moi.email_verifie) return res.json({ message: 'Votre email est déjà confirmé.' });
+
+    const nouveauCode = String(Math.floor(100000 + Math.random() * 900000));
+    const nouvelleExpiration = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from('users').update({ email_verif_code: nouveauCode, email_verif_expire: nouvelleExpiration }).eq('id', req.user.id);
+    sendEmail('verification_email', moi.email, { prenom: moi.prenom, code: nouveauCode });
+    res.json({ message: 'Un nouveau code vous a été envoyé par email.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
 app.patch('/api/users/photo', auth, async (req, res) => {
   try {
     const { photo } = req.body;
