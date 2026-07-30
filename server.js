@@ -17,8 +17,23 @@ const supabase = createClient(
 );
 
 app.use(helmet());
-app.use(cors());
-app.options('*', cors());
+// CORS restreint au(x) domaine(s) réel(s) de Gleam plutôt qu'ouvert à n'importe quelle origine —
+// la variable CORS_ORIGIN existe déjà sur Railway mais n'était jusqu'ici jamais utilisée par le
+// code, laissant CORS grand ouvert par défaut (app.use(cors()) sans option = toutes origines
+// acceptées). Accepte une liste séparée par des virgules si plusieurs domaines sont nécessaires
+// (ex: production + preview), avec repli sur les domaines Gleam connus si la variable est absente.
+const originsAutorisees = (process.env.CORS_ORIGIN || 'https://gleam-app.fr,https://niakate1.github.io')
+  .split(',').map(o => o.trim()).filter(Boolean);
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Autorise aussi les requêtes sans origine (apps mobiles Capacitor, curl, Postman) — seules
+    // les requêtes provenant explicitement d'un navigateur avec une origine non listée sont refusées.
+    if (!origin || originsAutorisees.includes(origin)) return callback(null, true);
+    return callback(new Error('Origine non autorisée par CORS.'));
+  }
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -29,7 +44,17 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
     return res.status(400).send('Webhook Error: ' + e.message);
   }
   if (event.type === 'payment_intent.succeeded') {
-    await supabase.from('paiements').update({ statut: 'bloque' }).eq('stripe_payment_intent_id', event.data.object.id);
+    // Filet de sécurité uniquement : si le navigateur du client s'est fermé avant que sa propre
+    // confirmation n'ait eu le temps de s'exécuter, ce webhook la déclenche à sa place. La fonction
+    // vérifie elle-même que le paiement n'a pas déjà été confirmé, pour ne jamais rien faire deux
+    // fois (auparavant, ce webhook écrasait le statut avec une valeur "bloque" orpheline, jamais
+    // utilisée ailleurs dans le code — un vrai risque d'écraser silencieusement une confirmation
+    // déjà faite normalement par le client).
+    try {
+      await finaliserConfirmationPaiement(event.data.object.id);
+    } catch (e) {
+      console.error('Erreur webhook Stripe (finalisation paiement):', e);
+    }
   }
   res.json({ received: true });
 });
@@ -1503,76 +1528,85 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
   }
 });
 
+// Logique de confirmation d'un paiement, partagée entre la route appelée par le client juste
+// après le paiement, et le webhook Stripe (utilisé uniquement en filet de sécurité, si jamais le
+// navigateur du client se ferme avant que sa propre confirmation n'ait eu le temps de s'exécuter).
+// Protégée contre toute double exécution : si le paiement est déjà confirmé, ne fait rien.
+async function finaliserConfirmationPaiement(payment_intent_id) {
+  const { data: paiementActuel } = await supabase.from('paiements').select('statut').eq('stripe_payment_intent_id', payment_intent_id).maybeSingle();
+  if (!paiementActuel || paiementActuel.statut !== 'en_attente') return; // déjà confirmé (ou introuvable) : rien à refaire
+
+  const intent = await stripe.paymentIntents.retrieve(payment_intent_id, { expand: ['latest_charge'] });
+  if (intent.status !== 'succeeded') return;
+
+  // Génère le code à 6 chiffres que le client devra donner au prestataire à la fin de la
+  // prestation (comme un code de livraison Uber Eats) — preuve que les deux parties étaient
+  // bien en contact au moment de la finalisation, plutôt qu'une simple confirmation unilatérale.
+  const codeValidation = String(Math.floor(100000 + Math.random() * 900000));
+  // Capture les identifiants du transfert et de la commission Stripe pour cette charge — permet,
+  // en cas d'annulation avec remboursement partiel, d'aller lire directement chez Stripe le
+  // montant réellement reçu par le pro, plutôt que de le recalculer à la main de notre côté
+  // (une mécanique interne à Stripe plus subtile qu'il n'y paraît, voir plus loin).
+  const charge = intent.latest_charge;
+  const stripeTransferId = charge && charge.transfer ? charge.transfer : null;
+  const stripeApplicationFeeId = charge && charge.application_fee ? charge.application_fee : null;
+  await supabase.from('paiements').update({
+    statut: 'paye',
+    code_validation: codeValidation,
+    stripe_transfer_id: stripeTransferId,
+    stripe_application_fee_id: stripeApplicationFeeId
+  }).eq('stripe_payment_intent_id', payment_intent_id);
+  const { data: paiement } = await supabase.from('paiements').select('*').eq('stripe_payment_intent_id', payment_intent_id).single();
+
+  if (paiement) {
+    await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
+
+    // Tout ce qui touche au parrainage est protégé dans son propre bloc : une erreur ici (colonne
+    // manquante, etc.) ne doit jamais empêcher la confirmation du paiement lui-même de réussir —
+    // le client a déjà payé, la prestation doit passer en cours quoi qu'il arrive.
+    try {
+      // Consomme le crédit de réduction s'il vient d'être utilisé sur ce paiement
+      if (paiement.parrainage_applique) {
+        await supabase.from('users').update({ reduction_parrainage_disponible: false }).eq('id', paiement.client_id);
+      }
+
+      // Si c'est le tout premier paiement réussi de ce client ET qu'il a été parrainé, on
+      // récompense le parrain ET le filleul avec une réduction sur leur prochaine prestation —
+      // financée uniquement par la commission Gleam (jamais d'argent réel versé), et seulement
+      // au moment d'une vraie transaction. Ne se déclenche qu'une seule fois par filleul.
+      const { data: clientPaye } = await supabase.from('users').select('parraine_par, parrainage_recompense_donnee').eq('id', paiement.client_id).single();
+      if (clientPaye && clientPaye.parraine_par && !clientPaye.parrainage_recompense_donnee) {
+        const { count: nbPaiementsAnterieurs } = await supabase.from('paiements').select('id', { count: 'exact', head: true })
+          .eq('client_id', paiement.client_id).in('statut', ['paye', 'libere']);
+        if (nbPaiementsAnterieurs === 1) { // celui-ci est bien le tout premier
+          await supabase.from('users').update({ reduction_parrainage_disponible: true, parrainage_recompense_donnee: true }).eq('id', paiement.client_id);
+          await supabase.from('users').update({ reduction_parrainage_disponible: true }).eq('id', clientPaye.parraine_par);
+        }
+      }
+    } catch (e) {
+      console.error('Logique de parrainage ignorée (paiement déjà confirmé normalement) :', e.message);
+    }
+
+    // 📧 Email 5/8 : paiement confirmé → pro
+    const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', paiement.societe_id).single();
+    const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
+    if (pro) {
+      sendEmail('paiement_confirme', pro.email, {
+        prenom: pro.prenom,
+        prestation: demandeInfo ? demandeInfo.prestation : '',
+        montantTotal: paiement.montant_ttc,
+        commission: paiement.commission,
+        montantPro: paiement.montant_societe,
+        demandeId: paiement.demande_id
+      });
+    }
+  }
+}
+
 app.post('/api/paiements/confirmer', auth, async (req, res) => {
   try {
     const { payment_intent_id } = req.body;
-    const intent = await stripe.paymentIntents.retrieve(payment_intent_id, { expand: ['latest_charge'] });
-    if (intent.status !== 'succeeded')
-      return res.status(400).json({ error: 'Paiement non confirmé par Stripe.' });
-
-    // Génère le code à 6 chiffres que le client devra donner au prestataire à la fin de la
-    // prestation (comme un code de livraison Uber Eats) — preuve que les deux parties étaient
-    // bien en contact au moment de la finalisation, plutôt qu'une simple confirmation unilatérale.
-    const codeValidation = String(Math.floor(100000 + Math.random() * 900000));
-    // Capture les identifiants du transfert et de la commission Stripe pour cette charge — permet,
-    // en cas d'annulation avec remboursement partiel, d'aller lire directement chez Stripe le
-    // montant réellement reçu par le pro, plutôt que de le recalculer à la main de notre côté
-    // (une mécanique interne à Stripe plus subtile qu'il n'y paraît, voir plus loin).
-    const charge = intent.latest_charge;
-    const stripeTransferId = charge && charge.transfer ? charge.transfer : null;
-    const stripeApplicationFeeId = charge && charge.application_fee ? charge.application_fee : null;
-    await supabase.from('paiements').update({
-      statut: 'paye',
-      code_validation: codeValidation,
-      stripe_transfer_id: stripeTransferId,
-      stripe_application_fee_id: stripeApplicationFeeId
-    }).eq('stripe_payment_intent_id', payment_intent_id);
-    const { data: paiement } = await supabase.from('paiements').select('*').eq('stripe_payment_intent_id', payment_intent_id).single();
-
-    if (paiement) {
-      await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
-
-      // Tout ce qui touche au parrainage est protégé dans son propre bloc : une erreur ici (colonne
-      // manquante, etc.) ne doit jamais empêcher la confirmation du paiement lui-même de réussir —
-      // le client a déjà payé, la prestation doit passer en cours quoi qu'il arrive.
-      try {
-        // Consomme le crédit de réduction s'il vient d'être utilisé sur ce paiement
-        if (paiement.parrainage_applique) {
-          await supabase.from('users').update({ reduction_parrainage_disponible: false }).eq('id', paiement.client_id);
-        }
-
-        // Si c'est le tout premier paiement réussi de ce client ET qu'il a été parrainé, on
-        // récompense le parrain ET le filleul avec une réduction sur leur prochaine prestation —
-        // financée uniquement par la commission Gleam (jamais d'argent réel versé), et seulement
-        // au moment d'une vraie transaction. Ne se déclenche qu'une seule fois par filleul.
-        const { data: clientPaye } = await supabase.from('users').select('parraine_par, parrainage_recompense_donnee').eq('id', paiement.client_id).single();
-        if (clientPaye && clientPaye.parraine_par && !clientPaye.parrainage_recompense_donnee) {
-          const { count: nbPaiementsAnterieurs } = await supabase.from('paiements').select('id', { count: 'exact', head: true })
-            .eq('client_id', paiement.client_id).in('statut', ['paye', 'libere']);
-          if (nbPaiementsAnterieurs === 1) { // celui-ci est bien le tout premier
-            await supabase.from('users').update({ reduction_parrainage_disponible: true, parrainage_recompense_donnee: true }).eq('id', paiement.client_id);
-            await supabase.from('users').update({ reduction_parrainage_disponible: true }).eq('id', clientPaye.parraine_par);
-          }
-        }
-      } catch (e) {
-        console.error('Logique de parrainage ignorée (paiement déjà confirmé normalement) :', e.message);
-      }
-
-      // 📧 Email 5/8 : paiement confirmé → pro
-      const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', paiement.societe_id).single();
-      const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
-      if (pro) {
-        sendEmail('paiement_confirme', pro.email, {
-          prenom: pro.prenom,
-          prestation: demandeInfo ? demandeInfo.prestation : '',
-          montantTotal: paiement.montant_ttc,
-          commission: paiement.commission,
-          montantPro: paiement.montant_societe,
-          demandeId: paiement.demande_id
-        });
-      }
-    }
-
+    await finaliserConfirmationPaiement(payment_intent_id);
     res.json({ message: 'Paiement confirmé ✨' });
   } catch (e) {
     console.error('Erreur confirmation de paiement:', e);
