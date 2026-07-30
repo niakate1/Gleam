@@ -422,17 +422,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 
 <!-- HOME PRO -->
 <div class="screen" id="s-pro-home">
-  <div class="navbar"><span class="logo-sm">✨ Gleam Pro</span><span class="pro-badge" id="pro-name-badge">Pro</span></div>
-  <div class="pro-content">
-    <div class="greeting"><h2 id="pro-greeting">Bonjour 👋</h2><p>Voici les demandes disponibles</p></div>
-    <div class="pro-stats">
+  <div class="home-hero">
+    <div class="home-hero-top"><span class="logo-sm">✨ Gleam Pro</span><span class="user-badge" id="pro-name-badge">Pro</span></div>
+    <h2 id="pro-greeting">Bonjour 👋</h2>
+    <p>Voici les demandes disponibles</p>
+  </div>
+  <div class="home-hero-card">
+    <div class="pro-stats" style="margin-bottom:0">
       <div class="stat-card stat-card-p"><div class="stat-num" id="stat-demandes">0</div><div class="stat-label">Demandes disponibles</div></div>
       <div class="stat-card stat-card-gold"><div class="stat-num" id="stat-devis">0</div><div class="stat-label">Devis envoyés</div></div>
     </div>
-    <div class="dispo-toggle">
+    <div class="dispo-toggle" style="margin-top:12px;border:none;background:var(--surface-alt)">
       <div><div class="dispo-text">Disponibilité</div><div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div></div>
       <button class="toggle-switch on" id="dispo-toggle" onclick="toggleDispo()"></button>
     </div>
+  </div>
+  <div class="pro-content" style="padding-top:0">
     <div class="section-title">📋 Demandes clients</div>
     <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Chargement...</p></div></div>
   </div>
@@ -3079,6 +3084,8 @@ function goToPreviousStep(currentType){
     var qEl=document.getElementById('f-quantite');
     if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
   }
+  var nbVitresEl1=document.getElementById('f-nb-vitres');
+  if(nbVitresEl1&&nbVitresEl1.value.trim())details['nb_vitres']=nbVitresEl1.value.trim();
   multiFlow.results[multiFlow.current]={type:currentType,description:desc,details:details};
   multiFlow.current--;
   openServiceForm(multiFlow.queue[multiFlow.current]);
@@ -3343,8 +3350,10 @@ function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
   '<button class="opt-btn full" data-group="vitres-options" data-option-val="acces_difficile" onclick="toggleOption(this)"><span>🪜</span>Accès difficile / hauteur (nacelle, perche télescopique)</button></div></div>'+
   quantiteBlock('Surface vitrée exacte (en m²)','Ex: 12')+
+  '<div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel, aide le pro à estimer le temps)</span></label><input type="number" id="f-nb-vitres" placeholder="Ex: 8" inputmode="numeric" min="1"></div>'+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
+var DETAIL_TAPIS_BASE='Dépoussiérage en profondeur • Shampoing ou nettoyage à sec adapté à la matière • Détachage courant • Désodorisation légère';
 function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><div class="modal-sub">Matière et surface</div>'+
   '<div class="field-group"><label>Matière du tapis</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="synthetique" onclick="selOpt(this)">Synthétique</button>'+
@@ -3352,7 +3361,8 @@ function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="jute_sisal" onclick="selOpt(this)">Jute / Sisal</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="berbere" onclick="selOpt(this)">Berbère</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="laine" onclick="selOpt(this)">Laine</button>'+
-  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="soie" onclick="selOpt(this)">Soie / Tapis d\'Orient</button></div></div>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="soie" onclick="selOpt(this)">Soie / Tapis d\'Orient</button></div>'+
+  '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TAPIS_BASE+'</div></div>'+
   quantiteBlock('Surface exacte (en m²)','Ex: 6')+
   etatBlock()+descBlock('Ex: Taches, poils d\'animaux...')+dateTimeBlock(isLastInFlow())+sendBtn('tapis')}
 
@@ -3457,6 +3467,8 @@ async function sendDemand(type){
     var qEl=document.getElementById('f-quantite');
     if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
   }
+  var nbVitresEl2=document.getElementById('f-nb-vitres');
+  if(nbVitresEl2&&nbVitresEl2.value.trim())details['nb_vitres']=nbVitresEl2.value.trim();
 
   if(multiFlow.active&&multiFlow.current<multiFlow.queue.length-1){
     multiFlow.results[multiFlow.current]={type:type,description:desc,details:details};
