@@ -2834,6 +2834,7 @@ async function ajouterFavori(proId,proName,btn){
 function showParrainage(){
   var code=currentUser&&currentUser.code_parrainage||'';
   var aReduction=currentUser&&currentUser.reduction_parrainage_disponible;
+  var aDejaParrain=currentUser&&currentUser.parraine_par;
   var lien='https://gleam-app.fr/#inscription?parrain='+encodeURIComponent(code);
   var html='<div class="modal-title"><i data-lucide="gift" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Parrainage</div>'+
     '<div class="modal-sub">Invitez vos proches, profitez tous les deux d\'une réduction</div>'+
@@ -2847,9 +2848,36 @@ function showParrainage(){
       '1. Votre invité entre votre code à son inscription<br>'+
       '2. Dès sa première prestation payée, vous recevez chacun <strong>10% de réduction</strong> sur votre prochaine prestation'+
     '</div>'+
-    (aReduction?'<div style="margin-top:14px;background:#F0FDF4;border:1px solid var(--green);border-radius:10px;padding:12px;font-size:13px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:8px"><i data-lucide="check-circle" style="width:16px;height:16px"></i> Réduction disponible sur votre prochaine prestation !</div>':'');
+    (aReduction?'<div style="margin-top:14px;background:#F0FDF4;border:1px solid var(--green);border-radius:10px;padding:12px;font-size:13px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:8px"><i data-lucide="check-circle" style="width:16px;height:16px"></i> Réduction disponible sur votre prochaine prestation !</div>':'')+
+    (!aDejaParrain?(
+      '<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">'+
+        '<label style="font-size:13px;font-weight:700;display:block;margin-bottom:8px">On vous a donné un code ?</label>'+
+        '<div style="display:flex;gap:8px">'+
+          '<input type="text" id="code-parrain-recu" placeholder="Ex: MADY1234" style="text-transform:uppercase;flex:1">'+
+          '<button class="btn-accept" style="width:auto;padding:0 16px;flex-shrink:0" onclick="renseignerCodeParrainage()">Valider</button>'+
+        '</div>'+
+        '<div style="font-size:11px;color:var(--gray);margin-top:6px">Possible uniquement avant votre première prestation payée.</div>'+
+        '<div class="err" id="code-parrain-err"></div>'+
+      '</div>'
+    ):'');
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
+}
+async function renseignerCodeParrainage(){
+  var input=document.getElementById('code-parrain-recu');
+  var code=input?input.value.trim():'';
+  var errEl=document.getElementById('code-parrain-err');
+  if(errEl)errEl.classList.remove('show');
+  if(!code){if(errEl){errEl.textContent='Entrez un code.';errEl.classList.add('show')}return}
+  try{
+    const r=await fetch(API+'/api/parrainage/renseigner-code',{method:'POST',headers:authHeaders(),body:JSON.stringify({code:code})});
+    const d=await safeJson(r);
+    if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
+    toast('✅ '+d.message,5000);
+    const rMe=await fetch(API+'/api/auth/me',{headers:authHeaders()});
+    if(rMe.ok)currentUser=await safeJson(rMe);
+    showParrainage();
+  }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
 }
 function partagerParrainage(code){
   var texte='Rejoins Gleam avec mon code de parrainage "'+code+'" et profite d\'une réduction sur ta première prestation ! https://gleam-app.fr';
