@@ -190,6 +190,18 @@ const templates = {
     }),
   }),
 
+  // Confirmation d'email à l'inscription — envoyé automatiquement, sans jamais bloquer l'accès à
+  // l'application en attendant : l'utilisateur peut confirmer à son rythme depuis son profil.
+  verification_email: (d) => ({
+    subject: `Confirmez votre adresse email Gleam`,
+    html: wrapTemplate({
+      title: `Bienvenue ${d.prenom} !`,
+      body: `<p>Merci de vous être inscrit sur Gleam. Voici votre code pour confirmer votre adresse email :</p>
+             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#7C3AED;text-align:center;margin:20px 0">${d.code}</p>
+             <p>Ce code est valable 24 heures. Vous pouvez le saisir depuis votre profil, dans la rubrique "Confirmer mon email" — pas d'urgence, vous pouvez continuer à utiliser Gleam normalement en attendant.</p>`,
+    }),
+  }),
+
   // 7bis. Annulation client → Pro (après acceptation du devis)
   annulation_client: (d) => ({
     subject: `Le client a annulé la prestation`,
