@@ -421,6 +421,35 @@ app.get('/api/auth/me', auth, async (req, res) => {
   res.json({ ...data, firstName: data.prenom, lastName: data.nom });
 });
 
+// Permet de renseigner un code de parrainage après l'inscription (par exemple si on a reçu le
+// code d'un ami après coup) — uniquement possible tant qu'aucun parrain n'est déjà renseigné, et
+// tant qu'aucun paiement n'a encore été effectué (la récompense se déclenche au premier paiement,
+// ce serait donc déjà trop tard si un paiement a déjà eu lieu sans code de parrainage).
+app.post('/api/parrainage/renseigner-code', auth, async (req, res) => {
+  try {
+    const code = (req.body.code || '').trim().toUpperCase();
+    if (!code) return res.status(400).json({ error: 'Code requis.' });
+
+    const { data: moi } = await supabase.from('users').select('parraine_par, code_parrainage').eq('id', req.user.id).single();
+    if (!moi) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (moi.parraine_par) return res.status(400).json({ error: 'Un parrain est déjà associé à votre compte.' });
+    if (moi.code_parrainage === code) return res.status(400).json({ error: 'Vous ne pouvez pas utiliser votre propre code.' });
+
+    const { count: nbPaiements } = await supabase.from('paiements').select('id', { count: 'exact', head: true })
+      .eq('client_id', req.user.id).in('statut', ['paye', 'libere', 'rembourse_partiel']);
+    if (nbPaiements && nbPaiements > 0)
+      return res.status(400).json({ error: 'Un code de parrainage doit être renseigné avant votre premier paiement.' });
+
+    const { data: parrain } = await supabase.from('users').select('id').eq('code_parrainage', code).maybeSingle();
+    if (!parrain) return res.status(404).json({ error: 'Code de parrainage introuvable.' });
+
+    await supabase.from('users').update({ parraine_par: parrain.id }).eq('id', req.user.id);
+    res.json({ message: 'Code de parrainage enregistré ! La réduction s\'appliquera dès votre première prestation payée.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // Met à jour la photo de profil (client ou pro) — reçoit une image compressée en base64 (data URL)
 app.patch('/api/users/photo', auth, async (req, res) => {
   try {
@@ -834,6 +863,29 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
       montant_rembourse: montantEffectivementRembourse,
       montant_societe: montantProCorrige
     }).eq('id', paiement.id);
+
+    // Si ce paiement était le tout premier du client (celui qui avait déclenché sa récompense de
+    // parrainage) et qu'il est intégralement remboursé, la récompense doit être reprise si elle
+    // n'a pas encore été utilisée — sinon le client garderait un avantage gagné sur une prestation
+    // qui, finalement, n'a jamais eu lieu. On ne touche jamais à la récompense si elle a déjà été
+    // utilisée sur une autre transaction légitime entre-temps (trop tard pour la reprendre).
+    if (pourcentage === 1) {
+      try {
+        const { data: clientConcerne } = await supabase.from('users').select('parrainage_recompense_donnee, reduction_parrainage_disponible').eq('id', paiement.client_id).single();
+        if (clientConcerne && clientConcerne.parrainage_recompense_donnee && clientConcerne.reduction_parrainage_disponible) {
+          const { count: nbPaiementsValides } = await supabase.from('paiements').select('id', { count: 'exact', head: true })
+            .eq('client_id', paiement.client_id).in('statut', ['paye', 'libere']);
+          if (!nbPaiementsValides || nbPaiementsValides === 0) {
+            // Plus aucun paiement valide pour ce client : celui-ci était bien le seul et unique
+            // déclencheur de la récompense, encore jamais utilisée — on la reprend proprement,
+            // le client pourra légitimement se requalifier avec un futur vrai paiement.
+            await supabase.from('users').update({ reduction_parrainage_disponible: false, parrainage_recompense_donnee: false }).eq('id', paiement.client_id);
+          }
+        }
+      } catch (e) {
+        console.error('Vérification de reprise de récompense de parrainage ignorée:', e.message);
+      }
+    }
     return {
       rembourse: true,
       montant: montantEffectivementRembourse,
