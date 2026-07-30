@@ -18,12 +18,21 @@ const supabase = createClient(
 
 app.use(helmet());
 // CORS restreint au(x) domaine(s) réel(s) de Gleam plutôt qu'ouvert à n'importe quelle origine.
-// Correction critique : la première version comparait l'origine à une liste de chaînes EXACTES,
-// ce qui bloquait tout (y compris la connexion) au moindre écart (ex: "www.gleam-app.fr" au lieu
-// de "gleam-app.fr", ou une variante non prévue) — la comparaison se fait maintenant sur le nom
-// d'hôte uniquement, en ignorant le "www." et la casse, bien plus tolérant aux variations réelles.
-const hotesAutorises = (process.env.CORS_ORIGIN || 'gleam-app.fr,niakate1.github.io')
-  .split(',').map(o => o.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '')).filter(Boolean);
+//
+// Deuxième correction, plus radicale que la première : la version précédente utilisait
+// `process.env.CORS_ORIGIN || 'valeurs par défaut'` — si CORS_ORIGIN était déjà défini sur Railway
+// (même avec une valeur ancienne, incomplète, ou erronée datant d'avant ce projet), il REMPLAÇAIT
+// intégralement les domaines de secours, qui n'étaient alors jamais pris en compte. C'est très
+// probablement ce qui a provoqué le blocage persistant, même après la première correction.
+//
+// Cette fois, les domaines connus de Gleam sont TOUJOURS inclus dans tous les cas, sans aucune
+// condition — CORS_ORIGIN, s'il est défini, vient s'AJOUTER à cette liste plutôt que la remplacer.
+// Il est donc impossible qu'une valeur oubliée ou incorrecte sur Railway bloque à nouveau la connexion.
+const DOMAINES_GLEAM_CONNUS = ['gleam-app.fr', 'niakate1.github.io'];
+const hotesAutorises = DOMAINES_GLEAM_CONNUS.concat(
+  (process.env.CORS_ORIGIN || '').split(',')
+).map(o => o.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '')).filter(Boolean);
+console.log('CORS — hôtes autorisés au démarrage:', hotesAutorises);
 const corsOptions = {
   origin: function (origin, callback) {
     // Autorise toujours les requêtes sans origine (apps mobiles Capacitor, curl, Postman, requêtes
