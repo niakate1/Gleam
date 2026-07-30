@@ -17,18 +17,23 @@ const supabase = createClient(
 );
 
 app.use(helmet());
-// CORS restreint au(x) domaine(s) réel(s) de Gleam plutôt qu'ouvert à n'importe quelle origine —
-// la variable CORS_ORIGIN existe déjà sur Railway mais n'était jusqu'ici jamais utilisée par le
-// code, laissant CORS grand ouvert par défaut (app.use(cors()) sans option = toutes origines
-// acceptées). Accepte une liste séparée par des virgules si plusieurs domaines sont nécessaires
-// (ex: production + preview), avec repli sur les domaines Gleam connus si la variable est absente.
-const originsAutorisees = (process.env.CORS_ORIGIN || 'https://gleam-app.fr,https://niakate1.github.io')
-  .split(',').map(o => o.trim()).filter(Boolean);
+// CORS restreint au(x) domaine(s) réel(s) de Gleam plutôt qu'ouvert à n'importe quelle origine.
+// Correction critique : la première version comparait l'origine à une liste de chaînes EXACTES,
+// ce qui bloquait tout (y compris la connexion) au moindre écart (ex: "www.gleam-app.fr" au lieu
+// de "gleam-app.fr", ou une variante non prévue) — la comparaison se fait maintenant sur le nom
+// d'hôte uniquement, en ignorant le "www." et la casse, bien plus tolérant aux variations réelles.
+const hotesAutorises = (process.env.CORS_ORIGIN || 'gleam-app.fr,niakate1.github.io')
+  .split(',').map(o => o.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '')).filter(Boolean);
 const corsOptions = {
   origin: function (origin, callback) {
-    // Autorise aussi les requêtes sans origine (apps mobiles Capacitor, curl, Postman) — seules
-    // les requêtes provenant explicitement d'un navigateur avec une origine non listée sont refusées.
-    if (!origin || originsAutorisees.includes(origin)) return callback(null, true);
+    // Autorise toujours les requêtes sans origine (apps mobiles Capacitor, curl, Postman, requêtes
+    // serveur-à-serveur) — seules les requêtes d'un navigateur avec une origine non reconnue sont refusées.
+    if (!origin) return callback(null, true);
+    try {
+      const hote = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
+      if (hotesAutorises.includes(hote)) return callback(null, true);
+    } catch (e) { /* origine malformée, refusée ci-dessous */ }
+    console.error('CORS refusé pour origine:', origin, '— autorisées:', hotesAutorises);
     return callback(new Error('Origine non autorisée par CORS.'));
   }
 };
