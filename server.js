@@ -7,14 +7,25 @@ const { createClient } = require('@supabase/supabase-js');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const webpush = require('web-push');
 // Notifications push (technologie Web Push, standard des navigateurs — gratuite, sans service
-// tiers payant). Protégé : si les clés VAPID ne sont pas encore configurées sur Railway, les
-// notifications sont simplement désactivées plutôt que de faire planter le serveur au démarrage.
+// tiers payant). Protection renforcée : ce code s'exécute au tout début, avant même que le
+// serveur ne démarre — si les clés VAPID sont mal formées (espace superflu copié par erreur,
+// mauvaise longueur...), l'appel peut lever une erreur immédiate qui ferait planter tout le
+// serveur avant même qu'il ait pu démarrer. Le try/catch garantit que ça n'arrive plus jamais :
+// au pire, les notifications restent simplement désactivées, mais le reste de l'application
+// (connexion, paiements, tout le reste) continue de fonctionner normalement.
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    'mailto:' + (process.env.FROM_EMAIL || 'contact@gleam-app.fr'),
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
+  try {
+    webpush.setVapidDetails(
+      'mailto:' + (process.env.FROM_EMAIL || 'contact@gleam-app.fr'),
+      process.env.VAPID_PUBLIC_KEY.trim(),
+      process.env.VAPID_PRIVATE_KEY.trim()
+    );
+    console.log('✅ Notifications push configurées.');
+  } catch (e) {
+    console.error('⚠️ Configuration des notifications push échouée (le reste de l\'application fonctionne normalement) :', e.message);
+  }
+} else {
+  console.log('ℹ️ Notifications push non configurées (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY absents).');
 }
 const jwt = require('jsonwebtoken');
 const { sendEmail } = require('./email');
