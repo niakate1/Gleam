@@ -5,8 +5,46 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const webpush = require('web-push');
+// Notifications push (technologie Web Push, standard des navigateurs — gratuite, sans service
+// tiers payant). Protégé : si les clés VAPID ne sont pas encore configurées sur Railway, les
+// notifications sont simplement désactivées plutôt que de faire planter le serveur au démarrage.
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:' + (process.env.FROM_EMAIL || 'contact@gleam-app.fr'),
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
 const jwt = require('jsonwebtoken');
 const { sendEmail } = require('./email');
+
+// Envoie une notification push à toutes les inscriptions actives d'un utilisateur (un par
+// appareil/navigateur) — nettoie automatiquement les abonnements devenus invalides (l'utilisateur
+// a désinstallé l'app, changé de navigateur, etc.), sans jamais faire planter l'appel qui déclenche
+// la notification si l'envoi échoue (le mail reste toujours envoyé en parallèle, indépendamment).
+async function envoyerNotificationPush(userId, { titre, corps, url }) {
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return; // notifications désactivées, pas de clés configurées
+  try {
+    const { data: abonnements } = await supabase.from('push_subscriptions').select('*').eq('user_id', userId);
+    if (!abonnements || !abonnements.length) return;
+    const payload = JSON.stringify({ title: titre, body: corps, url: url || '/' });
+    await Promise.all(abonnements.map(async (a) => {
+      try {
+        await webpush.sendNotification({ endpoint: a.endpoint, keys: { p256dh: a.keys_p256dh, auth: a.keys_auth } }, payload);
+      } catch (e) {
+        // 410/404 = l'abonnement n'existe plus côté navigateur (désinstallé, expiré) — on le retire
+        if (e.statusCode === 410 || e.statusCode === 404) {
+          await supabase.from('push_subscriptions').delete().eq('id', a.id);
+        } else {
+          console.error('Erreur envoi notification push:', e.message);
+        }
+      }
+    }));
+  } catch (e) {
+    console.error('Erreur notification push (ignorée):', e.message);
+  }
+}
 
 const app = express();
 app.set('trust proxy', 1);
@@ -495,6 +533,38 @@ app.get('/api/auth/me', auth, async (req, res) => {
   const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
   if (!data) return res.status(404).json({ error: 'Utilisateur introuvable.' });
   res.json({ ...data, firstName: data.prenom, lastName: data.nom });
+});
+
+// Fournit la clé publique VAPID au frontend, nécessaire pour s'abonner aux notifications push —
+// cette clé est publique par nature (contrairement à la clé privée), aucun risque à la partager.
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || null });
+});
+
+// Enregistre un nouvel abonnement aux notifications (un par appareil/navigateur) — remplace
+// silencieusement un abonnement existant avec le même endpoint plutôt que d'en créer un doublon.
+app.post('/api/push/subscribe', auth, async (req, res) => {
+  try {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys || !keys.p256dh || !keys.auth) return res.status(400).json({ error: 'Abonnement invalide.' });
+    await supabase.from('push_subscriptions').upsert({
+      user_id: req.user.id, endpoint, keys_p256dh: keys.p256dh, keys_auth: keys.auth
+    }, { onConflict: 'endpoint' });
+    res.json({ message: 'Notifications activées.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Retire un abonnement (désactivation depuis le profil, ou déconnexion)
+app.post('/api/push/unsubscribe', auth, async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (endpoint) await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint).eq('user_id', req.user.id);
+    res.json({ message: 'Notifications désactivées.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
 });
 
 // Permet de renseigner un code de parrainage après l'inscription (par exemple si on a reçu le
@@ -1225,6 +1295,11 @@ app.post('/api/devis', auth, async (req, res) => {
         prix: parseFloat(prix_ttc),
         demandeId: demande_id
       });
+      envoyerNotificationPush(demande.client_id, {
+        titre: 'Nouveau devis reçu',
+        corps: 'Un devis de ' + parseFloat(prix_ttc) + '€ pour ' + demande.prestation,
+        url: '/'
+      });
     }
 
     res.status(201).json(data);
@@ -1367,6 +1442,11 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
         creneau: devis.creneau_propose || demande.creneau,
         demandeId: devis.demande_id
       });
+      envoyerNotificationPush(devis.societe_id, {
+        titre: 'Devis accepté ! 🎉',
+        corps: 'Votre devis pour ' + demande.prestation + ' a été accepté',
+        url: '/'
+      });
     }
 
     // 📧 Email "devis refusé" désactivé pour l'instant (peu actionnable, peut être mal vécu par les pros).
@@ -1500,6 +1580,67 @@ async function peutAccederConversation(demandeId, userId) {
   return !!(devisAccepte && devisAccepte.societe_id === userId);
 }
 
+// ══════════════ APPEL MASQUÉ (Twilio Voice) ══════════════
+// Permet au client et au pro de s'appeler par téléphone sans jamais se voir le numéro l'un de
+// l'autre — le même principe que Uber, Deliveroo, Airbnb (numéro intermédiaire qui relaie l'appel).
+// Nécessite un compte Twilio configuré (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
+// TWILIO_PHONE_NUMBER) — tant que ces variables ne sont pas renseignées, la fonctionnalité
+// répond simplement "non disponible" plutôt que de planter.
+const twilioConfigure = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER);
+const twilioClient = twilioConfigure ? require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN) : null;
+
+// Déclenche un appel masqué pour une demande donnée : appelle d'abord celui qui a fait la demande
+// (l'appelant), et une fois qu'il décroche, le relie à l'autre partie — sans qu'aucun des deux ne
+// voie jamais le vrai numéro de l'autre (seul le numéro Twilio partagé s'affiche des deux côtés).
+app.post('/api/appels/demarrer', auth, async (req, res) => {
+  try {
+    if (!twilioConfigure)
+      return res.status(503).json({ error: 'L\'appel depuis l\'application n\'est pas encore configuré. Contactez le support Gleam.' });
+
+    const { demande_id } = req.body;
+    if (!demande_id) return res.status(400).json({ error: 'Demande requise.' });
+    const peutAcceder = await peutAccederConversation(demande_id, req.user.id);
+    if (!peutAcceder) return res.status(403).json({ error: 'Accès refusé à cette conversation.' });
+
+    const { data: demande } = await supabase.from('demandes').select('client_id').eq('id', demande_id).single();
+    const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande_id).eq('statut', 'accepte').maybeSingle();
+    if (!devisAccepte) return res.status(400).json({ error: 'Aucun prestataire encore associé à cette demande.' });
+
+    const autrePartieId = req.user.id === demande.client_id ? devisAccepte.societe_id : demande.client_id;
+    const { data: autrePartie } = await supabase.from('users').select('telephone, prenom').eq('id', autrePartieId).single();
+    const { data: appelant } = await supabase.from('users').select('telephone').eq('id', req.user.id).single();
+    if (!autrePartie || !autrePartie.telephone) return res.status(400).json({ error: 'Le numéro de l\'autre partie n\'est pas renseigné.' });
+    if (!appelant || !appelant.telephone) return res.status(400).json({ error: 'Renseignez votre numéro de téléphone dans votre profil pour pouvoir appeler.' });
+
+    // Appelle d'abord l'appelant (celui qui vient de cliquer sur "Appeler") — une fois qu'il
+    // décroche, Twilio suit les instructions du webhook /api/appels/twiml, qui le relie à l'autre
+    // numéro. Le numéro affiché des deux côtés est celui de Twilio (callerId), jamais le vrai.
+    const call = await twilioClient.calls.create({
+      to: appelant.telephone,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      url: (process.env.FRONTEND_API_URL || '') + '/api/appels/twiml?numero_a_relier=' + encodeURIComponent(autrePartie.telephone)
+    });
+
+    res.json({ message: 'Appel en cours, décrochez votre téléphone.', callSid: call.sid });
+  } catch (e) {
+    console.error('Erreur démarrage appel masqué:', e.message);
+    res.status(500).json({ error: 'Impossible de démarrer l\'appel pour le moment.' });
+  }
+});
+
+// Webhook appelé par Twilio une fois que l'appelant a décroché — répond avec les instructions
+// TwiML qui relient l'appel au numéro de l'autre partie, en masquant le numéro de l'appelant.
+app.post('/api/appels/twiml', (req, res) => {
+  const numeroARelier = req.query.numero_a_relier;
+  res.type('text/xml');
+  res.send(
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<Response><Say language="fr-FR">Mise en relation avec votre correspondant Gleam.</Say>' +
+    '<Dial callerId="' + (process.env.TWILIO_PHONE_NUMBER || '') + '">' + escapeXml(numeroARelier || '') + '</Dial></Response>'
+  );
+});
+function escapeXml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
 // Détecte un numéro de téléphone français reconstitué en ne gardant que les chiffres d'un texte
 // (ex: "0633" + "233367" mis bout à bout donne bien "0633233367", un numéro valide, même si
 // chaque message pris séparément semblait innocent).
@@ -1560,6 +1701,11 @@ app.post('/api/messages', auth, async (req, res) => {
           prestation: demande.prestation,
           apercu: contenu.trim().slice(0, 100),
           demandeId: demande_id
+        });
+        envoyerNotificationPush(destinataireId, {
+          titre: 'Nouveau message',
+          corps: ((expediteur && expediteur.prenom) || 'Un utilisateur') + ' : ' + contenu.trim().slice(0, 80),
+          url: '/'
         });
       }
     }
@@ -1838,6 +1984,11 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
         commission: paiement.commission,
         montantPro: paiement.montant_societe,
         demandeId: paiement.demande_id
+      });
+      envoyerNotificationPush(paiement.societe_id, {
+        titre: 'Paiement confirmé 💰',
+        corps: 'Le client a payé pour ' + (demandeInfo ? demandeInfo.prestation : 'votre prestation'),
+        url: '/'
       });
     }
   }
