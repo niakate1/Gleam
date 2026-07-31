@@ -2919,12 +2919,19 @@ async function toggleNotificationsPush(){
   }
   var dejaAbonne=await estAbonneAuxNotifications();
   if(dejaAbonne){
-    // Désactivation
+    // Désactivation — le désabonnement côté navigateur (celui qui compte vraiment pour arrêter
+    // de recevoir des notifications) se fait toujours, même si l'appel au serveur échoue :
+    // sinon un simple problème réseau ponctuel laisserait l'utilisateur bloqué indéfiniment,
+    // incapable de désactiver quoi que ce soit depuis son téléphone.
     try{
       const reg=await navigator.serviceWorker.getRegistration();
       const sub=reg&&await reg.pushManager.getSubscription();
       if(sub){
-        await fetch(API+'/api/push/unsubscribe',{method:'POST',headers:authHeaders(),body:JSON.stringify({endpoint:sub.endpoint})});
+        try{
+          await fetch(API+'/api/push/unsubscribe',{method:'POST',headers:authHeaders(),body:JSON.stringify({endpoint:sub.endpoint})});
+        }catch(eServeur){
+          console.error('Désabonnement côté serveur ignoré (problème réseau), désabonnement local effectué quand même:',eServeur);
+        }
         await sub.unsubscribe();
       }
       toast('🔕 Notifications désactivées.');
