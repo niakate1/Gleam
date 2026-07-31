@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gleam — Administration</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+:root{--p:#6D28D9;--p2:#4C1D95;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--border:#E5E7EB;--text:#111827;--text-secondary:#374151;--gray:#6B7280;--red:#EF4444;--green:#059669;--gold:#F5B942;--shadow-sm:0 1px 2px rgba(17,24,39,.06);--shadow-md:0 4px 16px rgba(17,24,39,.08)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.hidden{display:none!important}
+
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#6D28D9,#3B1878 65%,#2A1150)}
+.login-box{background:var(--surface);border-radius:16px;padding:36px 32px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-box h1{font-family:'Fraunces',Georgia,serif;font-size:26px;font-weight:700;color:var(--p);margin-bottom:4px}
+.login-box p{color:var(--gray);font-size:13px;margin-bottom:20px}
+.login-box input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;margin-bottom:12px;font-family:inherit}
+.login-box input:focus{outline:none;border-color:var(--p)}
+.login-box button{width:100%;padding:12px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
+.login-box button:hover{background:var(--p2)}
+.login-err{color:var(--red);font-size:13px;margin-top:10px;display:none}
+.login-err.show{display:block}
+
+#admin-app{display:none}
+#admin-app.show{display:block}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.topbar h1{font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:700;color:var(--p)}
+.topbar button{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.topbar button:hover{background:var(--surface-alt)}
+.tabs{display:flex;gap:4px;padding:14px 24px 0;max-width:1100px;margin:0 auto}
+.tab-btn{padding:10px 18px;border:none;background:none;color:var(--gray);font-size:14px;font-weight:700;cursor:pointer;border-bottom:2.5px solid transparent;font-family:inherit}
+.tab-btn.active{color:var(--p);border-bottom-color:var(--p)}
+.content{max-width:1100px;margin:0 auto;padding:20px 24px 60px}
+
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--surface);border-radius:14px;padding:18px;box-shadow:var(--shadow-sm);border:1px solid var(--border)}
+.stat-num{font-size:26px;font-weight:800;color:var(--p)}
+.stat-label{font-size:12.5px;color:var(--gray);margin-top:4px;font-weight:600}
+
+.search-row{display:flex;gap:10px;margin-bottom:16px}
+.search-row input{flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit}
+
+table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-sm)}
+thead td{background:var(--surface-alt);font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray);font-weight:700;padding:10px 14px}
+tbody td{padding:12px 14px;border-top:1px solid var(--border);font-size:13.5px;vertical-align:top}
+tbody tr:hover{background:var(--surface-alt)}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700}
+.badge-nouveau{background:#FEF3C7;color:#B45309}
+.badge-traite{background:#D1FAE5;color:#047857}
+.badge-client{background:#E0E7FF;color:#4338CA}
+.badge-pro{background:#D1FAE5;color:#047857}
+.badge-entreprise{background:#FCE7F3;color:#BE185D}
+.btn-sm{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-sm:hover{background:var(--surface-alt)}
+.btn-sm.danger{color:var(--red);border-color:var(--red)}
+.btn-sm.success{color:var(--green);border-color:var(--green)}
+.empty{text-align:center;padding:50px;color:var(--gray);font-size:14px}
+.loading{text-align:center;padding:50px;color:var(--gray);font-size:14px}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <h1>✨ Gleam</h1>
+    <p>Espace administration</p>
+    <input type="password" id="admin-password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')adminLogin()">
+    <button onclick="adminLogin()">Se connecter</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<div id="admin-app">
+  <div class="topbar">
+    <h1>✨ Gleam — Administration</h1>
+    <button onclick="adminLogout()">Se déconnecter</button>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">Vue d'ensemble</button>
+    <button class="tab-btn" id="tab-btn-signalements" onclick="switchTab('signalements')">Signalements</button>
+    <button class="tab-btn" id="tab-btn-users" onclick="switchTab('users')">Utilisateurs</button>
+  </div>
+
+  <div class="content">
+    <div id="panel-dashboard">
+      <div class="stats-grid" id="stats-grid"><div class="loading">Chargement...</div></div>
+    </div>
+
+    <div id="panel-signalements" class="hidden">
+      <div id="signalements-list"><div class="loading">Chargement...</div></div>
+    </div>
+
+    <div id="panel-users" class="hidden">
+      <div class="search-row">
+        <input type="text" id="users-search" placeholder="Rechercher par email ou nom..." oninput="debounceUsersSearch()">
+      </div>
+      <div id="users-list"><div class="loading">Chargement...</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://gleam-production-9b95.up.railway.app';
+let adminToken = localStorage.getItem('gleam_admin_token') || '';
+
+function escapeHtml(s){return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function adminHeaders(){return {'Content-Type':'application/json', 'Authorization':'Bearer '+adminToken};}
+
+async function adminLogin(){
+  const pass = document.getElementById('admin-password').value;
+  const errEl = document.getElementById('login-err');
+  errEl.classList.remove('show');
+  try{
+    const r = await fetch(API+'/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pass})});
+    const d = await r.json();
+    if(!r.ok){ errEl.textContent = d.error || 'Erreur de connexion.'; errEl.classList.add('show'); return; }
+    adminToken = d.token;
+    localStorage.setItem('gleam_admin_token', adminToken);
+    entrerDansAdmin();
+  }catch(e){ errEl.textContent = 'Erreur réseau, vérifiez votre connexion.'; errEl.classList.add('show'); }
+}
+function adminLogout(){
+  localStorage.removeItem('gleam_admin_token');
+  adminToken = '';
+  document.getElementById('admin-app').classList.remove('show');
+  document.getElementById('login-screen').style.display = 'flex';
+}
+function entrerDansAdmin(){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-app').classList.add('show');
+  loadStats();
+}
+
+function switchTab(tab){
+  ['dashboard','signalements','users'].forEach(t => {
+    document.getElementById('panel-'+t).classList.toggle('hidden', t !== tab);
+    document.getElementById('tab-btn-'+t).classList.toggle('active', t === tab);
+  });
+  if(tab === 'signalements') loadSignalements();
+  if(tab === 'users') loadUsers('');
+}
+
+async function loadStats(){
+  const grid = document.getElementById('stats-grid');
+  try{
+    const r = await fetch(API+'/api/admin/stats', {headers: adminHeaders()});
+    if(r.status === 401){ adminLogout(); return; }
+    const d = await r.json();
+    if(!r.ok){ grid.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
+    grid.innerHTML = [
+      ['Clients particuliers', d.nb_clients],
+      ['Clients entreprises', d.nb_entreprises],
+      ['Prestataires', d.nb_pros],
+      ['Demandes actives', d.nb_demandes_actives],
+      ['Signalements en attente', d.nb_signalements_ouverts],
+      ['Revenu total (TTC)', d.revenu_total + ' €'],
+      ['Commission Gleam cumulée', d.commission_totale + ' €']
+    ].map(function(pair){ return '<div class="stat-card"><div class="stat-num">'+pair[1]+'</div><div class="stat-label">'+pair[0]+'</div></div>'; }).join('');
+  }catch(e){ grid.innerHTML = '<div class="empty">Erreur réseau.</div>'; }
+}
+
+async function loadSignalements(){
+  const list = document.getElementById('signalements-list');
+  list.innerHTML = '<div class="loading">Chargement...</div>';
+  try{
+    const r = await fetch(API+'/api/admin/signalements', {headers: adminHeaders()});
+    if(r.status === 401){ adminLogout(); return; }
+    const d = await r.json();
+    if(!r.ok){ list.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
+    if(!d.length){ list.innerHTML = '<div class="empty">Aucun signalement.</div>'; return; }
+    list.innerHTML = '<table><thead><tr><td>Date</td><td>Motif</td><td>Rapporteur</td><td>Concerné</td><td>Description</td><td>Statut</td><td></td></tr></thead><tbody>' +
+      d.map(function(s){
+        var rap = s.rapporteur ? escapeHtml((s.rapporteur.prenom||'')+' '+(s.rapporteur.nom||'')+' ('+s.rapporteur.email+')') : '—';
+        var sig = s.signale ? escapeHtml((s.signale.prenom||'')+' '+(s.signale.nom||'')+' ('+s.signale.email+')') : '—';
+        var badge = s.statut === 'traite' ? '<span class="badge badge-traite">Traité</span>' : '<span class="badge badge-nouveau">Nouveau</span>';
+        var action = s.statut === 'traite'
+          ? '<button class="btn-sm" onclick="toggleSignalement(\''+s.id+'\',\'nouveau\')">Rouvrir</button>'
+          : '<button class="btn-sm success" onclick="toggleSignalement(\''+s.id+'\',\'traite\')">Marquer traité</button>';
+        return '<tr><td>'+new Date(s.created_at).toLocaleDateString('fr-FR')+'</td><td>'+escapeHtml(s.motif)+'</td><td>'+rap+'</td><td>'+sig+'</td><td style="max-width:260px">'+escapeHtml(s.description||'—')+'</td><td>'+badge+'</td><td>'+action+'</td></tr>';
+      }).join('') + '</tbody></table>';
+  }catch(e){ list.innerHTML = '<div class="empty">Erreur réseau.</div>'; }
+}
+async function toggleSignalement(id, statut){
+  await fetch(API+'/api/admin/signalements/'+id, {method:'PATCH', headers: adminHeaders(), body: JSON.stringify({statut:statut})});
+  loadSignalements();
+}
+
+var usersSearchTimeout;
+function debounceUsersSearch(){
+  clearTimeout(usersSearchTimeout);
+  usersSearchTimeout = setTimeout(function(){ loadUsers(document.getElementById('users-search').value); }, 350);
+}
+async function loadUsers(q){
+  const list = document.getElementById('users-list');
+  list.innerHTML = '<div class="loading">Chargement...</div>';
+  try{
+    const r = await fetch(API+'/api/admin/users?q='+encodeURIComponent(q||''), {headers: adminHeaders()});
+    if(r.status === 401){ adminLogout(); return; }
+    const d = await r.json();
+    if(!r.ok){ list.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
+    if(!d.length){ list.innerHTML = '<div class="empty">Aucun utilisateur trouvé.</div>'; return; }
+    function typeBadge(t){
+      if(t === 'entreprise') return '<span class="badge badge-entreprise">Entreprise</span>';
+      if(['pro','societe','professionnel'].indexOf(t) >= 0) return '<span class="badge badge-pro">Pro</span>';
+      return '<span class="badge badge-client">Client</span>';
+    }
+    list.innerHTML = '<table><thead><tr><td>Nom</td><td>Email</td><td>Type</td><td>Inscrit le</td><td>Statut</td><td></td></tr></thead><tbody>' +
+      d.map(function(u){
+        var estPro = ['pro','societe','professionnel'].indexOf(u.type) >= 0;
+        var action = estPro
+          ? (u.disponible === false
+            ? '<button class="btn-sm success" onclick="toggleDispo(\''+u.id+'\',true)">Réactiver</button>'
+            : '<button class="btn-sm danger" onclick="toggleDispo(\''+u.id+'\',false)">Suspendre</button>')
+          : '—';
+        var statut = u.compte_supprime ? '<span class="badge badge-nouveau">Supprimé</span>' : (u.disponible === false ? '<span class="badge" style="background:#FEE2E2;color:#B91C1C">Suspendu</span>' : '<span class="badge badge-traite">Actif</span>');
+        return '<tr><td>'+escapeHtml((u.prenom||'')+' '+(u.nom||''))+'</td><td>'+escapeHtml(u.email)+'</td><td>'+typeBadge(u.type)+'</td><td>'+new Date(u.created_at).toLocaleDateString('fr-FR')+'</td><td>'+statut+'</td><td>'+action+'</td></tr>';
+      }).join('') + '</tbody></table>';
+  }catch(e){ list.innerHTML = '<div class="empty">Erreur réseau.</div>'; }
+}
+async function toggleDispo(id, disponible){
+  await fetch(API+'/api/admin/users/'+id+'/disponibilite', {method:'PATCH', headers: adminHeaders(), body: JSON.stringify({disponible:disponible})});
+  loadUsers(document.getElementById('users-search').value);
+}
+
+if(adminToken){ entrerDansAdmin(); }
+</script>
+</body>
+</html>
