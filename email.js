@@ -180,6 +180,18 @@ const templates = {
 
   // Code de réinitialisation du mot de passe — un code à saisir directement dans l'app, plutôt
   // qu'un lien dont le format s'est révélé peu fiable à gérer côté navigateur.
+  // Notifie le client qu'une nouvelle occurrence de sa prestation récurrente a été programmée
+  // automatiquement — il peut la modifier ou l'annuler comme n'importe quelle autre demande.
+  prochaine_prestation_recurrente: (d) => ({
+    subject: `Votre prochaine prestation récurrente est programmée`,
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Votre prestation récurrente (${d.prestation}) a bien été réalisée — la prochaine est déjà programmée automatiquement :</p>
+             <p style="font-size:18px;font-weight:700;color:#7C3AED;text-align:center;margin:20px 0">${d.date} à ${d.heure}</p>
+             <p>Vous pouvez la modifier, la mettre en pause, ou l'annuler à tout moment depuis l'application.</p>`,
+    }),
+  }),
+
   reinitialisation_mot_de_passe: (d) => ({
     subject: `Votre code de réinitialisation Gleam`,
     html: wrapTemplate({
