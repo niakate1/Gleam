@@ -107,6 +107,21 @@ const auth = async (req, res, next) => {
   }
 };
 
+// Authentification admin totalement séparée du système client/pro — pas de rôle "admin" dans la
+// table users (qui aurait demandé d'ouvrir à nouveau la contrainte de vérification sur le type),
+// mais un token distinct, signé avec sa propre clé, vérifié par ce middleware dédié.
+const adminAuth = async (req, res, next) => {
+  const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Non autorisé' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET + '_admin');
+    if (!decoded.admin) return res.status(403).json({ error: 'Accès refusé.' });
+    next();
+  } catch (e) {
+    res.status(401).json({ error: 'Session admin invalide, reconnectez-vous.' });
+  }
+};
+
 const isProType = (t) => t === 'pro' || t === 'societe' || t === 'professionnel';
 
 // Traduit les messages d'erreur techniques renvoyés par Supabase (souvent en anglais) en un
