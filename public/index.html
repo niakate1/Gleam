@@ -489,6 +489,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" id="item-confirmer-email-pro" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="toggleNotificationsPush()"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow" id="notif-statut-pro">Activer</span></div>
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="configurerPaiementsPro()"><span class="pi-icon"><i data-lucide="landmark" style="width:20px;height:20px"></i></span><span class="pi-text">Configurer mes paiements</span><span class="pi-arrow" id="connect-statut-badge"></span></div>
@@ -552,6 +553,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="logo-sm" id="chat-title" style="font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Conversation</div>
       <div id="chat-subtitle" style="font-size:11px;color:var(--gray);display:none"></div>
     </div>
+    <button onclick="demarrerAppelMasque()" aria-label="Appeler" style="background:none;border:none;color:var(--green);cursor:pointer;padding:6px;flex-shrink:0"><i data-lucide="phone" style="width:19px;height:19px"></i></button>
     <button onclick="ouvrirSignalement()" aria-label="Signaler un problème" style="background:none;border:none;color:var(--gray);cursor:pointer;padding:6px;flex-shrink:0"><i data-lucide="flag" style="width:18px;height:18px"></i></button>
   </div>
   <div class="chat-screen">
@@ -588,6 +590,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-menu">
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="toggleNotificationsPush()"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow" id="notif-statut-client">Activer</span></div>
       <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
@@ -858,6 +861,7 @@ function enterApp(){
     }
     var itemConfirmerEmailC=document.getElementById('item-confirmer-email-client');
     if(itemConfirmerEmailC)itemConfirmerEmailC.style.display=(currentUser&&currentUser.email_verifie===false)?'flex':'none';
+    majAffichageNotifications();
     renderProfileAvatar('profile-avatar-inner',currentUser&&currentUser.photo,'👤');
     renderNoteGlobale('profile-note',currentUser&&currentUser.note_moyenne);
     show('s-home');
@@ -2410,6 +2414,16 @@ async function envoyerContactSupport(){
     toast('✅ Message envoyé. Notre équipe va vous répondre par email.',5000);
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
+async function demarrerAppelMasque(){
+  if(!currentChatDemandeId)return;
+  toast('📞 Démarrage de l\'appel...');
+  try{
+    const r=await fetch(API+'/api/appels/demarrer',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:currentChatDemandeId})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('❌ '+(d.error||'Impossible de démarrer l\'appel.'));return}
+    toast('✅ '+d.message,5000);
+  }catch(e){toast('❌ '+friendlyNetworkError(e))}
+}
 function ouvrirSignalement(){
   var info=chatPartnerInfo[currentChatDemandeId]||{};
   if(!info.id){toast('Impossible de signaler pour l\u2019instant.');return}
@@ -2800,6 +2814,25 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
   }
   return '<button class="btn-accept" style="background:none;border:1.5px solid var(--border);color:var(--text-secondary);width:100%;margin-top:8px;font-size:13px" onclick="ouvrirReprogrammer(\''+safeId+'\')"><i data-lucide="calendar-clock" style="width:14px;height:14px;vertical-align:-2px"></i> Reprogrammer</button>';
 }
+function ouvrirGererRecurrence(demandeId,active){
+  var html='<div class="modal-title">🔁 Prestation récurrente</div><div class="modal-sub">Gérez la répétition automatique de cette demande</div>'+
+    (active
+      ?'<button class="btn" style="width:100%" onclick="actionRecurrence(\''+escAttr(demandeId)+'\',\'pause\')">⏸️ Mettre en pause</button>'
+      :'<button class="btn-accept" style="width:100%" onclick="actionRecurrence(\''+escAttr(demandeId)+'\',\'reprendre\')">▶️ Reprendre la récurrence</button>')+
+    '<button class="btn" style="width:100%;margin-top:10px;color:var(--red);border-color:var(--red)" onclick="actionRecurrence(\''+escAttr(demandeId)+'\',\'arreter\')">⛔ Arrêter définitivement</button>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+async function actionRecurrence(demandeId,action){
+  try{
+    const r=await fetch(API+'/api/demandes/'+demandeId+'/recurrence',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({action:action})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('❌ '+(d.error||'Erreur.'));return}
+    toast('✅ '+d.message);
+    closeModal();
+    loadDemandes();
+  }catch(e){toast(friendlyNetworkError(e))}
+}
 function ouvrirReprogrammer(demandeId){
   var today=localDateISO(new Date());
   var opts='';
@@ -2843,6 +2876,79 @@ async function ajouterFavori(proId,proName,btn){
     toast('⭐ '+escapeHtml(proName)+' ajouté à vos favoris !');
     if(btn){btn.innerHTML='<i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
+}
+// Convertit la clé VAPID publique (base64url) au format attendu par l'API PushManager (un
+// tableau d'octets Uint8Array) — une conversion technique standard, la même chez tous les sites
+// qui utilisent les notifications Web Push.
+function urlBase64ToUint8Array(base64String){
+  var padding='='.repeat((4-base64String.length%4)%4);
+  var base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  var rawData=atob(base64);
+  var outputArray=new Uint8Array(rawData.length);
+  for(var i=0;i<rawData.length;++i)outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
+}
+async function estAbonneAuxNotifications(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return false;
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(!reg)return false;
+    const sub=await reg.pushManager.getSubscription();
+    return !!sub;
+  }catch(e){return false}
+}
+async function majAffichageNotifications(){
+  var abonne=await estAbonneAuxNotifications();
+  ['notif-statut-client','notif-statut-pro'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.textContent=abonne?'Activées ✓':'Activer';
+  });
+}
+async function toggleNotificationsPush(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){
+    toast('❌ Les notifications ne sont pas disponibles sur ce navigateur.');
+    return;
+  }
+  var dejaAbonne=await estAbonneAuxNotifications();
+  if(dejaAbonne){
+    // Désactivation
+    try{
+      const reg=await navigator.serviceWorker.getRegistration();
+      const sub=reg&&await reg.pushManager.getSubscription();
+      if(sub){
+        await fetch(API+'/api/push/unsubscribe',{method:'POST',headers:authHeaders(),body:JSON.stringify({endpoint:sub.endpoint})});
+        await sub.unsubscribe();
+      }
+      toast('🔕 Notifications désactivées.');
+    }catch(e){toast('❌ '+friendlyNetworkError(e))}
+    majAffichageNotifications();
+    return;
+  }
+  // Activation
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission!=='granted'){toast('❌ Autorisation refusée par le navigateur.');return}
+    const reg=await navigator.serviceWorker.register('/sw.js');
+    const rVapid=await fetch(API+'/api/push/vapid-public-key');
+    const dVapid=await safeJson(rVapid);
+    if(!dVapid.publicKey){toast('❌ Notifications non configurées côté serveur.');return}
+    const sub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(dVapid.publicKey)
+    });
+    await fetch(API+'/api/push/subscribe',{method:'POST',headers:authHeaders(),body:JSON.stringify({
+      endpoint:sub.endpoint,
+      keys:{p256dh:arrayBufferToBase64Url(sub.getKey('p256dh')),auth:arrayBufferToBase64Url(sub.getKey('auth'))}
+    })});
+    toast('🔔 Notifications activées !');
+  }catch(e){toast('❌ '+friendlyNetworkError(e))}
+  majAffichageNotifications();
+}
+function arrayBufferToBase64Url(buffer){
+  var bytes=new Uint8Array(buffer);
+  var binary='';
+  for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
 function ouvrirConfirmerEmail(){
   var html='<div class="modal-title"><i data-lucide="mail-check" style="width:20px;height:20px;vertical-align:-4px;color:var(--gold)"></i> Confirmer mon email</div>'+
@@ -3161,6 +3267,28 @@ function choisirProPrefere(proId,btn){
   document.querySelectorAll('[data-group="favori-cible"]').forEach(function(b){b.classList.remove('sel')});
   if(deja){proPrefereChoisi=null}
   else{btn.classList.add('sel');proPrefereChoisi=proId}
+  afficherBlocRecurrence();
+}
+var recurrenceChoisie=null;
+// La récurrence n'a de sens que si un favori précis est ciblé — sinon, à qui la prochaine
+// occurrence serait-elle adressée ? Le bloc n'apparaît donc que dans ce cas précis.
+function afficherBlocRecurrence(){
+  var box=document.getElementById('recurrence-block');
+  if(!box)return;
+  recurrenceChoisie=null;
+  if(!proPrefereChoisi){box.innerHTML='';return}
+  box.innerHTML='<div class="field-group"><label>🔁 Répéter cette demande <span class="optional">(optionnel)</span></label>'+
+    '<div class="options-grid">'+
+    '<button class="opt-btn" data-group="recurrence" data-freq="hebdomadaire" onclick="choisirRecurrence(this)">Chaque semaine</button>'+
+    '<button class="opt-btn" data-group="recurrence" data-freq="bimensuel" onclick="choisirRecurrence(this)">Tous les 15 jours</button>'+
+    '<button class="opt-btn" data-group="recurrence" data-freq="mensuel" onclick="choisirRecurrence(this)">Chaque mois</button>'+
+    '</div><div style="font-size:11px;color:var(--gray);margin-top:6px">La prochaine demande sera créée automatiquement une fois celle-ci terminée — modifiable ou annulable à tout moment.</div></div>';
+}
+function choisirRecurrence(btn){
+  var deja=btn.classList.contains('sel');
+  document.querySelectorAll('[data-group="recurrence"]').forEach(function(b){b.classList.remove('sel')});
+  if(deja){recurrenceChoisie=null}
+  else{btn.classList.add('sel');recurrenceChoisie=btn.getAttribute('data-freq')}
 }
 function dateTimeBlock(isLast){
   var today=localDateISO(new Date());
@@ -3176,6 +3304,7 @@ function dateTimeBlock(isLast){
     '<div class="field-group" style="position:relative"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="off" oninput="chercherAdresse(this.value)"><div id="adresse-suggestions" class="adresse-suggestions"></div></div>'+
     '<div class="field-group" style="margin-top:10px"><label>🏙️ Ville *</label><input type="text" id="f-ville" placeholder="Paris" autocomplete="address-level2"></div>'+
     '<div id="favori-cible-block"></div>'+
+    '<div id="recurrence-block"></div>'+
     '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel, max 5)</span></label>'+
     '<div class="photo-zone" onclick="document.getElementById(\'photo-input\').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>'+
     '<div class="upload-progress" id="upload-progress">Compression des photos...</div>'+
@@ -3557,7 +3686,7 @@ function validateCurrentForm(type){
   var groups=[];
   // 'favori-cible' est volontairement optionnel (choisir un prestataire préféré n'est jamais
   // obligatoire pour envoyer une demande) — comme 'etat', qui a toujours une valeur par défaut.
-  var groupesOptionnels=['etat','favori-cible','voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
+  var groupesOptionnels=['etat','favori-cible','recurrence','voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
   document.querySelectorAll('#modal-body [data-group]').forEach(function(el){
     var g=el.getAttribute('data-group');
     if(g&&groupesOptionnels.indexOf(g)===-1&&groups.indexOf(g)===-1)groups.push(g);
@@ -3641,7 +3770,7 @@ async function sendDemand(type){
     var isEdit=multiFlow.editMode&&multiFlow.editId;
     var url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
     var method=isEdit?'PATCH':'POST';
-    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5),pro_prefere_id:proPrefereChoisi,latitude:adresseChoisieLat,longitude:adresseChoisieLng})});
+    const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5),pro_prefere_id:proPrefereChoisi,recurrence:recurrenceChoisie,latitude:adresseChoisieLat,longitude:adresseChoisieLng})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
