@@ -615,10 +615,15 @@ app.post('/api/users/me/supprimer', auth, async (req, res) => {
 
 app.post('/api/demandes', auth, async (req, res) => {
   try {
-    const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id, latitude, longitude } = req.body;
+    const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id, latitude, longitude, recurrence } = req.body;
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
+    // La récurrence n'a de sens que si le client cible un pro précis (favori) — sinon, à qui la
+    // prochaine occurrence serait-elle adressée ? On l'exige explicitement plutôt que de deviner.
+    const recurrenceValide = ['hebdomadaire', 'bimensuel', 'mensuel'].includes(recurrence) ? recurrence : null;
+    if (recurrenceValide && !pro_prefere_id)
+      return res.status(400).json({ error: 'Une prestation récurrente doit être adressée à un prestataire favori précis.' });
     if (photos && Array.isArray(photos)) {
       if (photos.length > 5) return res.status(400).json({ error: 'Maximum 5 photos par demande.' });
       for (const p of photos) {
@@ -660,7 +665,10 @@ app.post('/api/demandes', auth, async (req, res) => {
       pro_prefere_id: proPrefereValide,
       latitude: (typeof latitude === 'number' && !isNaN(latitude)) ? latitude : null,
       longitude: (typeof longitude === 'number' && !isNaN(longitude)) ? longitude : null,
-      statut: 'en_attente'
+      statut: 'en_attente',
+      recurrence: recurrenceValide,
+      recurrence_active: recurrenceValide ? true : null,
+      recurrence_prochaine_creee: false
     }).select().single();
 
     if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
@@ -696,6 +704,53 @@ app.post('/api/demandes', auth, async (req, res) => {
 // bloquée indéfiniment en "Accepté — Paiement requis", invisible à la fois pour le pro (qui ne
 // peut plus rien en faire) et pour le client (qui ne pouvait pas la relancer, "acceptee" étant
 // bloquée à la modification). Le devis correspondant est alors annulé pour rester cohérent.
+// Quand une prestation récurrente est marquée terminée, recrée automatiquement la demande
+// suivante à la bonne date, adressée au même prestataire favori — pas un abonnement prélevé à
+// l'avance, juste un créneau qui se répète, payé prestation par prestation (même principe que
+// le "ménage régulier" chez Wecasa, en plus simple : rien à gérer côté paiement à l'avance).
+async function creerProchaineOccurrenceRecurrente(demandeId) {
+  try {
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', demandeId).single();
+    if (!demande || !demande.recurrence || !demande.recurrence_active || demande.recurrence_prochaine_creee) return;
+
+    const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau || '');
+    if (!match) return;
+    const dateActuelle = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
+    const joursAAjouter = { hebdomadaire: 7, bimensuel: 14, mensuel: 30 }[demande.recurrence] || 7;
+    const prochaineDate = new Date(dateActuelle.getTime() + joursAAjouter * 24 * 60 * 60 * 1000);
+    const pad = n => String(n).padStart(2, '0');
+    const dateStr = prochaineDate.getFullYear() + '-' + pad(prochaineDate.getMonth() + 1) + '-' + pad(prochaineDate.getDate());
+    const heureStr = pad(prochaineDate.getHours()) + 'h' + pad(prochaineDate.getMinutes());
+
+    await supabase.from('demandes').insert({
+      client_id: demande.client_id,
+      prestation: demande.prestation,
+      adresse: demande.adresse,
+      creneau: dateStr + ' à ' + heureStr,
+      notes: demande.notes,
+      numero_anonyme: 'Client #' + Math.floor(1000 + Math.random() * 9000),
+      pro_prefere_id: demande.pro_prefere_id,
+      latitude: demande.latitude,
+      longitude: demande.longitude,
+      statut: 'en_attente',
+      recurrence: demande.recurrence,
+      recurrence_active: true,
+      recurrence_prochaine_creee: false
+    });
+
+    await supabase.from('demandes').update({ recurrence_prochaine_creee: true }).eq('id', demandeId);
+
+    const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
+    if (client) {
+      sendEmail('prochaine_prestation_recurrente', client.email, {
+        prenom: client.prenom, prestation: demande.prestation, date: dateStr, heure: heureStr
+      }).catch(e => console.error('Email récurrence:', e));
+    }
+  } catch (e) {
+    console.error('Erreur création occurrence récurrente:', e.message);
+  }
+}
+
 async function expirerDemandesEnRetard(demandes) {
   const maintenant = new Date();
   const aExpirer = [];
@@ -829,7 +884,26 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
   }
 });
 
-// Reprogrammer une prestation déjà acceptée, sans avoir à tout annuler — nécessite l'accord de
+// Met en pause, reprend, ou arrête définitivement la récurrence d'une demande — à tout moment,
+// sans pénalité (contrairement à certains concurrents qui imposent un préavis ou des frais).
+app.patch('/api/demandes/:id/recurrence', auth, async (req, res) => {
+  try {
+    const { action } = req.body; // 'pause' | 'reprendre' | 'arreter'
+    const { data: demande } = await supabase.from('demandes').select('client_id, recurrence').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande.recurrence) return res.status(400).json({ error: 'Cette demande n\'est pas récurrente.' });
+
+    if (action === 'pause') await supabase.from('demandes').update({ recurrence_active: false }).eq('id', req.params.id);
+    else if (action === 'reprendre') await supabase.from('demandes').update({ recurrence_active: true }).eq('id', req.params.id);
+    else if (action === 'arreter') await supabase.from('demandes').update({ recurrence: null, recurrence_active: false }).eq('id', req.params.id);
+    else return res.status(400).json({ error: 'Action inconnue.' });
+
+    res.json({ message: 'Récurrence mise à jour.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
 // l'autre partie avant que le créneau ne change réellement, pour éviter qu'une personne décale
 // unilatéralement un rendez-vous déjà convenu.
 app.post('/api/demandes/:id/proposer-creneau', auth, async (req, res) => {
@@ -1793,6 +1867,7 @@ async function finaliserPrestation(paiement) {
 
   await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id);
   await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
+  creerProchaineOccurrenceRecurrente(paiement.demande_id).catch(e => console.error('Récurrence non créée:', e.message));
 
   const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
   const { data: client } = await supabase.from('users').select('email, prenom').eq('id', paiement.client_id).single();
@@ -2368,6 +2443,108 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
       base_sur_donnees_reelles: reel,
       nombre_pros_reference: nbPros
     });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ══════════════ ADMINISTRATION ══════════════
+// Espace séparé et sécurisé, avec sa propre authentification (voir adminAuth ci-dessus) — ne
+// touche jamais aux comptes client/pro, ni à leurs rôles ou permissions.
+
+// Connexion admin — un seul mot de passe partagé (variable d'environnement ADMIN_PASSWORD),
+// volontairement simple pour un usage à une seule personne à ce stade. Le token émis est signé
+// avec une clé dérivée mais distincte de celle des comptes utilisateurs.
+app.post('/api/admin/login', authLimiter, async (req, res) => {
+  const { password } = req.body;
+  if (!process.env.ADMIN_PASSWORD) return res.status(500).json({ error: 'Accès admin non configuré (ADMIN_PASSWORD manquant côté serveur).' });
+  if (!password || password !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: 'Mot de passe incorrect.' });
+  const token = jwt.sign({ admin: true }, process.env.JWT_SECRET + '_admin', { expiresIn: '12h' });
+  res.json({ token });
+});
+
+// Vue d'ensemble : les chiffres essentiels pour superviser l'activité en un coup d'œil.
+app.get('/api/admin/stats', adminAuth, async (req, res) => {
+  try {
+    const { count: nbClients } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('type', 'client');
+    const { count: nbEntreprises } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('type', 'entreprise');
+    const { count: nbPros } = await supabase.from('users').select('id', { count: 'exact', head: true }).in('type', ['pro', 'societe', 'professionnel']);
+    const { count: nbDemandesActives } = await supabase.from('demandes').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'devis_recus', 'acceptee', 'en_cours']);
+    const { count: nbSignalementsOuverts } = await supabase.from('signalements').select('id', { count: 'exact', head: true }).eq('statut', 'nouveau');
+    const { data: paiementsLiberes } = await supabase.from('paiements').select('montant_ttc, commission').in('statut', ['libere', 'paye']);
+    const revenuTotal = (paiementsLiberes || []).reduce((s, p) => s + parseFloat(p.montant_ttc || 0), 0);
+    const commissionTotale = (paiementsLiberes || []).reduce((s, p) => s + parseFloat(p.commission || 0), 0);
+
+    res.json({
+      nb_clients: nbClients || 0,
+      nb_entreprises: nbEntreprises || 0,
+      nb_pros: nbPros || 0,
+      nb_demandes_actives: nbDemandesActives || 0,
+      nb_signalements_ouverts: nbSignalementsOuverts || 0,
+      revenu_total: Math.round(revenuTotal * 100) / 100,
+      commission_totale: Math.round(commissionTotale * 100) / 100
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Liste des signalements, du plus récent au plus ancien, avec les infos essentielles pour traiter
+// chaque cas sans avoir à ouvrir Supabase manuellement.
+app.get('/api/admin/signalements', adminAuth, async (req, res) => {
+  try {
+    const { data } = await supabase.from('signalements').select('*').order('created_at', { ascending: false }).limit(200);
+    const signalements = data || [];
+    const idsUtilisateurs = [...new Set(signalements.flatMap(s => [s.reporter_id, s.signale_id].filter(Boolean)))];
+    const { data: usersInfo } = idsUtilisateurs.length
+      ? await supabase.from('users').select('id, prenom, nom, email').in('id', idsUtilisateurs)
+      : { data: [] };
+    const usersMap = Object.fromEntries((usersInfo || []).map(u => [u.id, u]));
+    res.json(signalements.map(s => ({
+      ...s,
+      rapporteur: usersMap[s.reporter_id] || null,
+      signale: usersMap[s.signale_id] || null
+    })));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Marque un signalement comme traité — simple bascule de statut, l'essentiel pour ne plus le voir
+// remonter dans la liste des cas encore ouverts.
+app.patch('/api/admin/signalements/:id', adminAuth, async (req, res) => {
+  try {
+    const { statut } = req.body; // 'nouveau' | 'traite'
+    if (!['nouveau', 'traite'].includes(statut)) return res.status(400).json({ error: 'Statut invalide.' });
+    await supabase.from('signalements').update({ statut }).eq('id', req.params.id);
+    res.json({ message: 'Signalement mis à jour.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Liste des utilisateurs, avec recherche simple par email/nom — pour retrouver rapidement un
+// compte à superviser sans avoir à ouvrir Supabase.
+app.get('/api/admin/users', adminAuth, async (req, res) => {
+  try {
+    const recherche = (req.query.q || '').trim();
+    let requete = supabase.from('users').select('id, prenom, nom, email, type, disponible, compte_supprime, created_at, note_moyenne, taux_fiabilite').order('created_at', { ascending: false }).limit(100);
+    if (recherche) requete = requete.or(`email.ilike.%${recherche}%,prenom.ilike.%${recherche}%,nom.ilike.%${recherche}%`);
+    const { data } = await requete;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Suspend ou réactive un compte pro (bascule sa disponibilité à false, comme le fait déjà le
+// système anti-fraude automatique en cas d'annulations répétées) — n'affecte jamais les comptes
+// client, qui n'ont pas cette notion de disponibilité.
+app.patch('/api/admin/users/:id/disponibilite', adminAuth, async (req, res) => {
+  try {
+    const { disponible } = req.body;
+    await supabase.from('users').update({ disponible: !!disponible }).eq('id', req.params.id);
+    res.json({ message: disponible ? 'Compte réactivé.' : 'Compte suspendu.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
