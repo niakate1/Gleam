@@ -2935,7 +2935,10 @@ async function toggleNotificationsPush(){
         await sub.unsubscribe();
       }
       toast('🔕 Notifications désactivées.');
-    }catch(e){toast('❌ '+friendlyNetworkError(e))}
+    }catch(e){
+      console.error('Erreur désactivation notifications, détail complet:',e);
+      toast('❌ '+(e&&e.message?e.message:'Erreur inconnue')+' ('+(e&&e.name||'?')+')');
+    }
     majAffichageNotifications();
     return;
   }
@@ -2951,12 +2954,22 @@ async function toggleNotificationsPush(){
       userVisibleOnly:true,
       applicationServerKey:urlBase64ToUint8Array(dVapid.publicKey)
     });
-    await fetch(API+'/api/push/subscribe',{method:'POST',headers:authHeaders(),body:JSON.stringify({
-      endpoint:sub.endpoint,
-      keys:{p256dh:arrayBufferToBase64Url(sub.getKey('p256dh')),auth:arrayBufferToBase64Url(sub.getKey('auth'))}
-    })});
+    // Idem qu'à la désactivation : l'abonnement côté navigateur est déjà fait à ce stade (ligne
+    // ci-dessus) — un échec de cet appel serveur ne doit pas empêcher d'informer l'utilisateur
+    // que ça a fonctionné localement, quitte à resynchroniser plus tard.
+    try{
+      await fetch(API+'/api/push/subscribe',{method:'POST',headers:authHeaders(),body:JSON.stringify({
+        endpoint:sub.endpoint,
+        keys:{p256dh:arrayBufferToBase64Url(sub.getKey('p256dh')),auth:arrayBufferToBase64Url(sub.getKey('auth'))}
+      })});
+    }catch(eServeur){
+      console.error('Enregistrement serveur de l\'abonnement échoué (abonnement navigateur réussi quand même):',eServeur);
+    }
     toast('🔔 Notifications activées !');
-  }catch(e){toast('❌ '+friendlyNetworkError(e))}
+  }catch(e){
+    console.error('Erreur activation notifications, détail complet:',e);
+    toast('❌ '+(e&&e.message?e.message:'Erreur inconnue')+' ('+(e&&e.name||'?')+')');
+  }
   majAffichageNotifications();
 }
 function arrayBufferToBase64Url(buffer){
