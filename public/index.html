@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gleam ✨</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#6D28D9">
+<!-- Balises spécifiques à Safari/iOS — sans elles, "Ajouter à l'écran d'accueil" crée un simple
+     raccourci plutôt qu'une vraie app installée, et les notifications restent indisponibles même
+     après l'ajout à l'écran d'accueil. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gleam">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="icon" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
@@ -3824,6 +3834,14 @@ if(tok){
     .catch(function(){});
 }else if(/[?&#]parrain=/.test(window.location.href)){
   switchTab('register');
+}
+
+// Enregistre le service worker dès le chargement de la page (pas seulement au moment d'activer
+// les notifications) — aide le navigateur, et surtout iOS, à reconnaître Gleam comme une vraie
+// application installable dès l'ajout à l'écran d'accueil, condition indispensable aux
+// notifications sur iPhone.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(function(e){console.error('Service worker non enregistré:',e)});
 }
 </script>
 </body>
