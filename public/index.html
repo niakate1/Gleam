@@ -2976,32 +2976,89 @@ async function showFacture(demandeId){
 function buildFactureHtml(d,vuePro){
   var estEntreprise=d.client&&d.client.est_entreprise;
   var titre=vuePro?'Relevé de prestation':'Facture';
-  var lignes='<tr><td>Adresse d\'intervention</td><td style="text-align:right">'+escapeHtml(d.adresse||'')+'</td></tr>';
-  if(vuePro){
-    lignes+='<tr><td>Montant total payé par le client (TTC)</td><td style="text-align:right">'+d.montant_ttc+' €</td></tr>'+
-      '<tr><td>Commission Gleam (15%)</td><td style="text-align:right">- '+d.commission_gleam+' €</td></tr>'+
-      '<tr><td class="total">Montant net reçu</td><td class="total" style="text-align:right">'+d.montant_pro+' €</td></tr>';
-  }else{
-    lignes+='<tr><td class="total">Montant total TTC</td><td class="total" style="text-align:right">'+d.montant_ttc+' €</td></tr>';
-  }
+  var dateDoc=new Date(d.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+
+  // Tableau des prestations façon facture professionnelle (Description / Détail / Montant),
+  // plutôt qu'une simple liste à deux colonnes — c'est la structure attendue d'un vrai document
+  // comptable, que ce soit pour le client ou pour un usage de déclaration côté pro.
+  var ligneMontant=vuePro?d.montant_pro:d.montant_ttc;
+  var ligneLabel=vuePro?'Rémunération nette pour cette prestation':'Prestation de nettoyage';
+  var lignesTableau=
+    '<tr><td class="desc"><strong>'+escapeHtml(ligneLabel)+'</strong><div class="sub-desc">'+escapeHtml(d.prestation||'')+'</div></td>'+
+    '<td class="qte">1</td><td class="montant">'+(vuePro?d.montant_pro:d.montant_ttc).toFixed(2)+' €</td></tr>';
+
+  var blocRepartition=vuePro?
+    '<div class="repartition">'+
+      '<div class="repartition-titre">Détail de la répartition</div>'+
+      '<div class="repartition-ligne"><span>Montant payé par le client (TTC)</span><span>'+d.montant_ttc.toFixed(2)+' €</span></div>'+
+      '<div class="repartition-ligne"><span>Commission de la plateforme Gleam</span><span>− '+d.commission_gleam.toFixed(2)+' €</span></div>'+
+      '<div class="repartition-ligne repartition-net"><span>Montant net vous revenant</span><span>'+d.montant_pro.toFixed(2)+' €</span></div>'+
+    '</div>':'';
+
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>'+titre+' '+escapeHtml(d.numero)+'</title>'+
-    '<style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;padding:0 20px;color:#111827}'+
-    'h1{font-size:22px;color:#7C3AED;margin:0}table{width:100%;border-collapse:collapse;margin-top:20px}'+
-    'td{padding:9px 0;border-bottom:1px solid #E5E7EB;font-size:14px}.total{font-size:19px;font-weight:800;color:#7C3AED}'+
-    '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:2px solid #7C3AED;padding-bottom:16px}'+
-    '.presta-box{background:#F5F3FF;border-radius:8px;padding:12px 14px;margin-top:14px}'+
-    'p{font-size:13px;line-height:1.6}</style></head><body>'+
-    '<div class="header"><div><h1>✨ Gleam</h1><div style="font-size:11px;color:#6B7280;margin-top:4px">Plateforme de mise en relation — [Raison sociale à compléter]</div></div>'+
-    '<div style="text-align:right;font-size:13px"><strong>'+titre+' '+escapeHtml(d.numero)+'</strong><br>'+new Date(d.date).toLocaleDateString('fr-FR')+'</div></div>'+
-    '<p><strong>Prestataire :</strong> '+escapeHtml(d.pro?d.pro.nom_affiche:'')+(d.pro&&d.pro.siret?' — SIRET '+escapeHtml(d.pro.siret):'')+'</p>'+
-    '<p><strong>'+(estEntreprise?'Entreprise cliente':'Client')+' :</strong> '+escapeHtml(d.client?d.client.nom_affiche:'')+
-      (estEntreprise&&d.client.siret?'<br>SIRET '+escapeHtml(d.client.siret):'')+
-      (estEntreprise&&d.client.tva_intracom?'<br>TVA '+escapeHtml(d.client.tva_intracom):'')+
-      (estEntreprise&&d.client.adresse_facturation?'<br>'+escapeHtml(d.client.adresse_facturation):'')+'</p>'+
-    '<div class="presta-box"><strong>Prestation réalisée</strong><br>'+escapeHtml(d.prestation||'')+'</div>'+
-    '<table>'+lignes+'</table>'+
-    '<p style="color:#6B7280;margin-top:30px">Document généré automatiquement par Gleam. TVA non applicable, article 293B du CGI, sauf mention contraire du prestataire.</p>'+
-    '<p style="color:#6B7280;font-size:11px">Ce document ne constitue pas une attestation fiscale au titre des services à la personne, sauf déclaration spécifique du prestataire auprès des autorités compétentes.</p>'+
+    '<style>'+
+    '@page{size:A4;margin:18mm 16mm}'+
+    '*{box-sizing:border-box}'+
+    'body{font-family:\'Segoe UI\',Helvetica,Arial,sans-serif;max-width:760px;margin:0 auto;padding:30px 24px;color:#1F2937;font-size:14px;line-height:1.5}'+
+    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #6D28D9}'+
+    '.marque{font-size:26px;font-weight:800;color:#6D28D9;letter-spacing:-0.3px}'+
+    '.marque-sub{font-size:11.5px;color:#6B7280;margin-top:4px;max-width:280px}'+
+    '.doc-info{text-align:right}'+
+    '.doc-titre{font-size:19px;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.5px}'+
+    '.doc-numero{font-size:13px;color:#6B7280;margin-top:3px}'+
+    '.doc-date{font-size:13px;color:#6B7280;margin-top:2px}'+
+    '.parties{display:flex;gap:20px;margin-bottom:26px}'+
+    '.partie-box{flex:1;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px}'+
+    '.partie-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;color:#9CA3AF;font-weight:700;margin-bottom:6px}'+
+    '.partie-nom{font-size:15px;font-weight:700;color:#111827;margin-bottom:3px}'+
+    '.partie-detail{font-size:12.5px;color:#4B5563;line-height:1.5}'+
+    'table{width:100%;border-collapse:collapse;margin-bottom:8px}'+
+    'thead td{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:#9CA3AF;font-weight:700;padding:0 0 8px;border-bottom:2px solid #E5E7EB}'+
+    'tbody td{padding:16px 0;border-bottom:1px solid #E5E7EB;vertical-align:top}'+
+    '.desc{font-size:14px}.sub-desc{font-size:12px;color:#6B7280;margin-top:3px}'+
+    '.qte{text-align:center;color:#6B7280;width:60px}'+
+    '.montant{text-align:right;font-weight:700;width:110px;white-space:nowrap}'+
+    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#6D28D9;border-top:2px solid #111827;margin-top:4px}'+
+    '.repartition{background:#F5F3FF;border-radius:10px;padding:16px 18px;margin-top:18px}'+
+    '.repartition-titre{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6D28D9;font-weight:700;margin-bottom:10px}'+
+    '.repartition-ligne{display:flex;justify-content:space-between;font-size:13px;color:#4B5563;padding:4px 0}'+
+    '.repartition-net{font-weight:800;color:#111827;font-size:15px;border-top:1px solid #D1D5DB;margin-top:6px;padding-top:10px}'+
+    '.pied{margin-top:44px;padding-top:18px;border-top:1px solid #E5E7EB}'+
+    '.pied p{font-size:11px;color:#9CA3AF;line-height:1.7;margin:0 0 6px}'+
+    '.paiement-info{font-size:12px;color:#4B5563;margin-top:22px;display:flex;gap:8px;align-items:center}'+
+    '@media print{body{padding:0}}'+
+    '</style></head><body>'+
+
+    '<div class="entete">'+
+      '<div><div class="marque">✨ Gleam</div><div class="marque-sub">Plateforme de mise en relation pour des services de nettoyage à domicile</div></div>'+
+      '<div class="doc-info"><div class="doc-titre">'+titre+'</div><div class="doc-numero">N° '+escapeHtml(d.numero)+'</div><div class="doc-date">'+dateDoc+'</div></div>'+
+    '</div>'+
+
+    '<div class="parties">'+
+      '<div class="partie-box"><div class="partie-label">Prestataire</div><div class="partie-nom">'+escapeHtml(d.pro?d.pro.nom_affiche:'')+'</div>'+
+        (d.pro&&d.pro.siret?'<div class="partie-detail">SIRET '+escapeHtml(d.pro.siret)+'</div>':'<div class="partie-detail">Prestataire indépendant Gleam</div>')+
+      '</div>'+
+      '<div class="partie-box"><div class="partie-label">'+(estEntreprise?'Entreprise cliente':'Client')+'</div><div class="partie-nom">'+escapeHtml(d.client?d.client.nom_affiche:'')+'</div>'+
+        '<div class="partie-detail">'+escapeHtml((estEntreprise&&d.client.adresse_facturation)?d.client.adresse_facturation:(d.adresse||''))+
+        (estEntreprise&&d.client.siret?'<br>SIRET '+escapeHtml(d.client.siret):'')+
+        (estEntreprise&&d.client.tva_intracom?'<br>TVA intracom. '+escapeHtml(d.client.tva_intracom):'')+
+        '</div></div>'+
+    '</div>'+
+    (estEntreprise&&d.client.adresse_facturation?'<div style="font-size:11.5px;color:#9CA3AF;margin:-16px 0 20px 2px">📍 Intervention réalisée à : '+escapeHtml(d.adresse||'')+'</div>':'')+
+
+    '<table><thead><tr><td class="desc">Description</td><td class="qte">Qté</td><td class="montant">Montant</td></tr></thead>'+
+    '<tbody>'+lignesTableau+'</tbody></table>'+
+    '<div class="total-ligne"><span>Total '+(vuePro?'net':'TTC')+'</span><span>'+ligneMontant.toFixed(2)+' €</span></div>'+
+    blocRepartition+
+
+    (!vuePro?'<div class="paiement-info">💳 Réglé par carte bancaire via Stripe, à la validation de la prestation</div>':'')+
+
+    '<div class="pied">'+
+      '<p>Document généré automatiquement par la plateforme Gleam. TVA non applicable — article 293B du CGI, sauf mention contraire explicite du prestataire.</p>'+
+      '<p>Ce document ne constitue pas une attestation fiscale au titre des services à la personne, sauf déclaration spécifique du prestataire auprès des autorités compétentes.</p>'+
+      '<p style="margin-top:12px;color:#D1D5DB">Gleam — gleam-app.fr</p>'+
+    '</div>'+
+
     '<script>window.onload=function(){window.print()}<\/script>'+
     '</body></html>';
 }
