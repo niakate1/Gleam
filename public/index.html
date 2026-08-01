@@ -2847,11 +2847,19 @@ async function actionRecurrence(demandeId,action){
 // que d'exiger d'y penser dès la création initiale.
 function ouvrirRelancerRecurrence(demandeId,nomPro){
   var html='<div class="modal-title">🔁 Refaire cette prestation régulièrement ?</div>'+
-    '<div class="modal-sub">Choisissez la fréquence souhaitée</div>'+
-    '<div class="options-grid" style="margin-bottom:14px">'+
-    '<button class="opt-btn" data-group="relance-freq" data-freq="hebdomadaire" onclick="choisirFreqRelance(this)">Chaque semaine</button>'+
-    '<button class="opt-btn" data-group="relance-freq" data-freq="bimensuel" onclick="choisirFreqRelance(this)">Tous les 15 jours</button>'+
-    '<button class="opt-btn" data-group="relance-freq" data-freq="mensuel" onclick="choisirFreqRelance(this)">Chaque mois</button>'+
+    '<div class="modal-sub">Choisissez le rythme souhaité</div>'+
+    '<div class="options-grid" style="margin-bottom:10px">'+
+    '<button class="opt-btn" data-group="relance-freq" data-jours="7" onclick="choisirFreqRelance(this)">Chaque semaine</button>'+
+    '<button class="opt-btn" data-group="relance-freq" data-jours="14" onclick="choisirFreqRelance(this)">Tous les 15 jours</button>'+
+    '<button class="opt-btn" data-group="relance-freq" data-jours="30" onclick="choisirFreqRelance(this)">Chaque mois</button>'+
+    '<button class="opt-btn" data-group="relance-freq" data-jours="60" onclick="choisirFreqRelance(this)">Tous les 2 mois</button>'+
+    '<button class="opt-btn" data-group="relance-freq" data-jours="90" onclick="choisirFreqRelance(this)">Tous les 3 mois</button>'+
+    '<button class="opt-btn" data-group="relance-freq" data-jours="180" onclick="choisirFreqRelance(this)">Tous les 6 mois</button>'+
+    '<button class="opt-btn full" data-group="relance-freq" data-jours="perso" onclick="choisirFreqRelance(this)">Personnalisé</button>'+
+    '</div>'+
+    '<div id="relance-perso-box" style="display:none;margin-bottom:14px">'+
+      '<label style="font-size:12.5px">Tous les combien de jours ?</label>'+
+      '<input type="number" id="relance-jours-perso" placeholder="Ex: 45" min="3" max="365" inputmode="numeric" oninput="freqRelanceChoisie=parseInt(this.value,10)||null">'+
     '</div>'+
     (nomPro?'<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px"><input type="checkbox" id="relance-meme-pro" checked style="width:18px;height:18px"> Adresser en priorité à '+escapeHtml(nomPro)+'</label>':'')+
     '<button class="btn-accept" style="width:100%" onclick="confirmerRelanceRecurrente(\''+escAttr(demandeId)+'\')">Programmer</button>'+
@@ -2863,7 +2871,16 @@ var freqRelanceChoisie=null;
 function choisirFreqRelance(btn){
   document.querySelectorAll('[data-group="relance-freq"]').forEach(function(b){b.classList.remove('sel')});
   btn.classList.add('sel');
-  freqRelanceChoisie=btn.getAttribute('data-freq');
+  var persoBox=document.getElementById('relance-perso-box');
+  var jours=btn.getAttribute('data-jours');
+  if(jours==='perso'){
+    if(persoBox)persoBox.style.display='block';
+    var champPerso=document.getElementById('relance-jours-perso');
+    freqRelanceChoisie=champPerso&&champPerso.value?parseInt(champPerso.value,10):null;
+  }else{
+    if(persoBox)persoBox.style.display='none';
+    freqRelanceChoisie=parseInt(jours,10);
+  }
 }
 async function confirmerRelanceRecurrente(demandeId){
   var errEl=document.getElementById('relance-err');
@@ -3350,17 +3367,37 @@ function afficherBlocRecurrence(){
     ?'La prochaine demande sera adressée en priorité à ce prestataire favori.'
     :'La prochaine demande restera ouverte à tous les prestataires disponibles, comme celle-ci.';
   box.innerHTML='<div class="field-group"><label>🔁 Répéter cette demande <span class="optional">(optionnel)</span></label>'+
+    '<div style="font-size:11.5px;color:var(--gray);margin-bottom:8px">Le bon rythme dépend de la prestation — un ménage classique peut se faire chaque semaine, une voiture ou des vitres plutôt tous les 2-3 mois. À vous de choisir.</div>'+
     '<div class="options-grid">'+
-    '<button class="opt-btn" data-group="recurrence" data-freq="hebdomadaire" onclick="choisirRecurrence(this)">Chaque semaine</button>'+
-    '<button class="opt-btn" data-group="recurrence" data-freq="bimensuel" onclick="choisirRecurrence(this)">Tous les 15 jours</button>'+
-    '<button class="opt-btn" data-group="recurrence" data-freq="mensuel" onclick="choisirRecurrence(this)">Chaque mois</button>'+
-    '</div><div style="font-size:11px;color:var(--gray);margin-top:6px">'+messageExplicatif+' Modifiable ou annulable à tout moment.</div></div>';
+    '<button class="opt-btn" data-group="recurrence" data-jours="7" onclick="choisirRecurrence(this)">Chaque semaine</button>'+
+    '<button class="opt-btn" data-group="recurrence" data-jours="14" onclick="choisirRecurrence(this)">Tous les 15 jours</button>'+
+    '<button class="opt-btn" data-group="recurrence" data-jours="30" onclick="choisirRecurrence(this)">Chaque mois</button>'+
+    '<button class="opt-btn" data-group="recurrence" data-jours="60" onclick="choisirRecurrence(this)">Tous les 2 mois</button>'+
+    '<button class="opt-btn" data-group="recurrence" data-jours="90" onclick="choisirRecurrence(this)">Tous les 3 mois</button>'+
+    '<button class="opt-btn" data-group="recurrence" data-jours="180" onclick="choisirRecurrence(this)">Tous les 6 mois</button>'+
+    '<button class="opt-btn full" data-group="recurrence" data-jours="perso" onclick="choisirRecurrence(this)">Personnalisé</button>'+
+    '</div>'+
+    '<div id="recurrence-perso-box" style="display:none;margin-top:8px">'+
+      '<label style="font-size:12.5px">Tous les combien de jours ?</label>'+
+      '<input type="number" id="recurrence-jours-perso" placeholder="Ex: 45" min="3" max="365" inputmode="numeric" oninput="recurrenceChoisie=parseInt(this.value,10)||null">'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--gray);margin-top:6px">'+messageExplicatif+' Modifiable ou annulable à tout moment.</div></div>';
 }
 function choisirRecurrence(btn){
   var deja=btn.classList.contains('sel');
   document.querySelectorAll('[data-group="recurrence"]').forEach(function(b){b.classList.remove('sel')});
-  if(deja){recurrenceChoisie=null}
-  else{btn.classList.add('sel');recurrenceChoisie=btn.getAttribute('data-freq')}
+  var persoBox=document.getElementById('recurrence-perso-box');
+  if(deja){recurrenceChoisie=null;if(persoBox)persoBox.style.display='none';return}
+  btn.classList.add('sel');
+  var jours=btn.getAttribute('data-jours');
+  if(jours==='perso'){
+    if(persoBox)persoBox.style.display='block';
+    var champPerso=document.getElementById('recurrence-jours-perso');
+    recurrenceChoisie=champPerso&&champPerso.value?parseInt(champPerso.value,10):null;
+  }else{
+    if(persoBox)persoBox.style.display='none';
+    recurrenceChoisie=parseInt(jours,10);
+  }
 }
 function dateTimeBlock(isLast){
   var today=localDateISO(new Date());
