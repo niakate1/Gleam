@@ -3032,8 +3032,14 @@ function arrayBufferToBase64Url(buffer){
 var carteZoneIntervention=null,markerZoneIntervention=null,cercleZoneIntervention=null;
 function ouvrirZoneIntervention(){
   var html='<div class="modal-title"><i data-lucide="map-pin" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Zone d\'intervention</div>'+
-    '<div class="modal-sub">Déplacez le repère sur votre position de référence, et réglez le rayon souhaité</div>'+
+    '<div class="modal-sub">Indiquez votre position de référence, et réglez le rayon souhaité</div>'+
+    '<div style="position:relative;margin-bottom:8px">'+
+      '<input type="text" id="zone-adresse-recherche" placeholder="Tapez votre adresse..." autocomplete="off" oninput="chercherAdresseZoneIntervention(this.value)">'+
+      '<div id="zone-adresse-suggestions" class="adresse-suggestions"></div>'+
+    '</div>'+
+    '<button class="btn" style="width:100%;margin-bottom:14px" onclick="geolocaliserZoneIntervention()"><i data-lucide="locate-fixed" style="width:16px;height:16px;vertical-align:-3px"></i> Utiliser ma position actuelle</button>'+
     '<div id="carte-zone-intervention" style="height:280px;border-radius:14px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border)"></div>'+
+    '<div style="font-size:11.5px;color:var(--gray);margin:-10px 0 14px">Vous pouvez aussi déplacer le repère directement sur la carte, ou cliquer ailleurs dessus.</div>'+
     '<label style="font-size:13px;font-weight:700">Rayon d\'intervention : <span id="valeur-rayon">20</span> km</label>'+
     '<input type="range" id="curseur-rayon" min="1" max="100" value="20" style="width:100%;margin:8px 0 16px" oninput="majRayonZoneIntervention(this.value)">'+
     '<button class="btn-accept" style="width:100%" onclick="enregistrerZoneIntervention()">Enregistrer</button>'+
@@ -3041,6 +3047,63 @@ function ouvrirZoneIntervention(){
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
   setTimeout(initCarteZoneIntervention,50); // laisse le temps au conteneur de s'afficher avant d'initialiser Leaflet
+}
+var zoneAdresseSearchTimer=null,zoneAdresseSearchController=null;
+// Réutilise la même API d'adresse gratuite (Base Adresse Nationale) déjà utilisée pour l'adresse
+// d'intervention du client — pas besoin de chercher une position sur la carte à l'aveugle.
+function chercherAdresseZoneIntervention(valeur){
+  clearTimeout(zoneAdresseSearchTimer);
+  var box=document.getElementById('zone-adresse-suggestions');
+  if(!valeur||valeur.trim().length<3){if(box){box.classList.remove('show');box.innerHTML=''}return}
+  zoneAdresseSearchTimer=setTimeout(function(){
+    if(zoneAdresseSearchController)zoneAdresseSearchController.abort();
+    zoneAdresseSearchController=new AbortController();
+    fetch('https://data.geopf.fr/geocodage/search?q='+encodeURIComponent(valeur)+'&limit=5',{signal:zoneAdresseSearchController.signal})
+      .then(function(r){return r.ok?r.json():null})
+      .then(function(data){
+        if(!data||!data.features||!data.features.length){if(box){box.classList.remove('show');box.innerHTML=''}return}
+        if(!box)return;
+        box.innerHTML=data.features.map(function(f){
+          var p=f.properties;
+          var label=escapeHtml(p.label||'');
+          var lng=f.geometry&&f.geometry.coordinates?f.geometry.coordinates[0]:'';
+          var lat=f.geometry&&f.geometry.coordinates?f.geometry.coordinates[1]:'';
+          return '<div class="adresse-suggestion-item" onclick="choisirAdresseZoneIntervention('+lat+','+lng+',\''+escAttr(p.label||'')+'\')">'+
+            '<i data-lucide="map-pin" style="width:14px;height:14px;color:var(--gray);flex-shrink:0"></i>'+
+            '<div style="font-weight:600">'+label+'</div>'+
+          '</div>';
+        }).join('');
+        box.classList.add('show');
+        if(window.lucide)lucide.createIcons();
+      }).catch(function(){});
+  },300);
+}
+function choisirAdresseZoneIntervention(lat,lng,label){
+  var champ=document.getElementById('zone-adresse-recherche');
+  if(champ)champ.value=label;
+  var box=document.getElementById('zone-adresse-suggestions');
+  if(box){box.classList.remove('show');box.innerHTML=''}
+  deplacerZoneIntervention(lat,lng,14);
+}
+// Géolocalisation automatique — gratuite, fournie nativement par le navigateur, aucun service
+// payant nécessaire. Demande simplement l'autorisation au pro, comme n'importe quel site.
+function geolocaliserZoneIntervention(){
+  if(!navigator.geolocation){toast('❌ La géolocalisation n\'est pas disponible sur cet appareil.');return}
+  toast('📍 Recherche de votre position...');
+  navigator.geolocation.getCurrentPosition(function(position){
+    deplacerZoneIntervention(position.coords.latitude,position.coords.longitude,14);
+    var champ=document.getElementById('zone-adresse-recherche');
+    if(champ)champ.value='Position actuelle';
+  },function(){
+    toast('❌ Position refusée ou indisponible. Vous pouvez taper votre adresse à la place.');
+  },{enableHighAccuracy:true,timeout:8000});
+}
+function deplacerZoneIntervention(lat,lng,zoom){
+  if(!carteZoneIntervention||!markerZoneIntervention)return;
+  var pos=[lat,lng];
+  carteZoneIntervention.setView(pos,zoom||carteZoneIntervention.getZoom());
+  markerZoneIntervention.setLatLng(pos);
+  if(cercleZoneIntervention)cercleZoneIntervention.setLatLng(pos);
 }
 function initCarteZoneIntervention(){
   var positionDepart=[48.8566,2.3522]; // Paris par défaut, si le pro n'a encore rien configuré
@@ -3771,6 +3834,10 @@ document.addEventListener('click',function(e){
   if(!e.target.closest('#f-addr')&&!e.target.closest('#adresse-suggestions')){
     var box=document.getElementById('adresse-suggestions');
     if(box)box.classList.remove('show');
+  }
+  if(!e.target.closest('#zone-adresse-recherche')&&!e.target.closest('#zone-adresse-suggestions')){
+    var box2=document.getElementById('zone-adresse-suggestions');
+    if(box2)box2.classList.remove('show');
   }
 });
 function quantiteBlock(label,placeholder){
