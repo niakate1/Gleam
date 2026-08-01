@@ -257,11 +257,19 @@ const ETAT_COEF = { propre: 1.0, moyen: 1.15, sale: 1.3, tres_sale: 1.5 };
 // de plus pourrait faire BASCULER tout le calcul dans une tranche inférieure et donner un total
 // final plus bas qu'une surface légèrement plus petite — un effet de seuil injuste, repéré et
 // corrigé avant livraison.
+// Barème revu à la hausse en agressivité, après une recherche de marché ciblée sur les grandes
+// surfaces cumulées (proches d'une moquette professionnelle) : les tarifs réels chutent bien plus
+// fort que les -22% initiaux au-delà de 50 m² — jusqu'à -50% à -65% pour une moquette de taille
+// moyenne à grande, et même -70% à -80% pour les très grandes surfaces professionnelles. Un cas
+// concret signalé (6 tapis + un tapis sur-mesure de 45 m², soit 76 m² au total) donnait un total de
+// 1699€ avec l'ancien barème — bien au-dessus de ce que factureraient les professionnels réels à
+// cette échelle, confirmé par plusieurs sources (Nova Hélios, WeCleaned, L'Atelier du Nettoyeur).
 const PALIERS_DEGRESSIFS_SURFACE = [
   { jusqua: 10, coef: 1.0 },
-  { jusqua: 25, coef: 0.92 },
-  { jusqua: 50, coef: 0.85 },
-  { jusqua: Infinity, coef: 0.78 }
+  { jusqua: 25, coef: 0.85 },
+  { jusqua: 50, coef: 0.60 },
+  { jusqua: 100, coef: 0.40 },
+  { jusqua: Infinity, coef: 0.28 }
 ];
 function surfaceEquivalentePonderee(quantite) {
   var restant = quantite, borneBasse = 0, total = 0;
