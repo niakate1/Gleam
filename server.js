@@ -318,9 +318,12 @@ const PRESTATION_CONFIG = {
   matelas: {
     unite: true,
     tierKey: 'taille', // le pro saisit un prix unitaire par taille de matelas
-    tiers: ['A', 'B', 'C', 'D'],
-    tierLabels: { A: '90x190 cm', B: '140x190 cm', C: '160x200 cm', D: '180x200 cm+' },
-    tierDefaults: { A: 45, B: 60, C: 72, D: 90 } // propre
+    tiers: ['A', 'B', 'C', 'D', 'E'],
+    // 200x200 ("Empereur" / King Size XL) manquait — une vraie taille standard en France, plus
+    // grande que le 180x200 (King Size), confirmée par la recherche de marché (IKEA, Epéda,
+    // La Maison Senso...). Prix extrapolé en suivant la progression déjà établie entre les paliers.
+    tierLabels: { A: '90x190 cm', B: '140x190 cm', C: '160x200 cm', D: '180x200 cm', E: '200x200 cm (Empereur)' },
+    tierDefaults: { A: 45, B: 60, C: 72, D: 90, E: 105 } // propre
   },
   terrasse: {
     unite: true,
