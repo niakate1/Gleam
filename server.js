@@ -253,6 +253,18 @@ function surfaceEquivalentePonderee(quantite) {
   return total; // une "surface équivalente" à multiplier par le prix/m² plein tarif
 }
 
+// Distance à vol d'oiseau entre deux points GPS (formule de Haversine), en kilomètres — reprise
+// et factorisée depuis le calcul déjà utilisé pour vérifier la position d'un pro à l'arrivée,
+// réutilisée ici pour filtrer les demandes par zone d'intervention.
+function distanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // rayon de la Terre en kilomètres
+  const toRad = (deg) => deg * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // Configuration complète par prestation. Chaque catégorie a une "dimension principale" (tierKey)
 // pour laquelle le PRO SAISIT DIRECTEMENT UN PRIX PAR CAS CONCRET (ex: un prix pour "Citadine",
 // un autre pour "SUV/4x4"...), plutôt qu'un coefficient invisible appliqué à un prix unique.
@@ -919,7 +931,7 @@ app.get('/api/demandes', auth, async (req, res) => {
 // Demandes disponibles pour les pros (en attente, pas encore acceptées) — DOIT être déclarée avant /api/demandes/:id
 app.get('/api/demandes/all', auth, async (req, res) => {
   try {
-    const { data: user, error: userErr } = await supabase.from('users').select('type, prestations_proposees').eq('id', req.user.id).single();
+    const { data: user, error: userErr } = await supabase.from('users').select('type, prestations_proposees, latitude, longitude, rayon_intervention_km').eq('id', req.user.id).single();
     if (userErr) return res.status(500).json({ error: 'Erreur utilisateur: ' + userErr.message });
     if (!user || !isProType(user.type))
       return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
@@ -957,10 +969,45 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     // les autres pros ne la voient pas tant que le client ne l'a pas rouverte à tout le monde.
     filtered = filtered.filter(d => !d.pro_prefere_id || d.pro_prefere_id === req.user.id);
 
+    // Filtre par zone d'intervention — uniquement si le pro a configuré sa position ET un rayon.
+    // Sans configuration, aucun filtrage n'est appliqué : un pro qui n'a pas encore réglé sa zone
+    // continue de tout voir, exactement comme avant l'ajout de cette fonctionnalité.
+    const proAConfigureZone = typeof user.latitude === 'number' && typeof user.longitude === 'number' && typeof user.rayon_intervention_km === 'number';
+    filtered = filtered.map(d => {
+      if (typeof d.latitude === 'number' && typeof d.longitude === 'number' && proAConfigureZone) {
+        return { ...d, distance_km: Math.round(distanceKm(user.latitude, user.longitude, d.latitude, d.longitude) * 10) / 10 };
+      }
+      return { ...d, distance_km: null };
+    });
+    if (proAConfigureZone) {
+      filtered = filtered.filter(d => d.distance_km === null || d.distance_km <= user.rayon_intervention_km);
+    }
+
     res.json(filtered);
   } catch (e) {
     console.error('Erreur /api/demandes/all:', e);
     res.status(500).json({ error: 'Erreur serveur: ' + e.message });
+  }
+});
+
+// Enregistre la position de référence et le rayon d'intervention souhaité d'un pro — utilisé pour
+// filtrer les demandes qu'il voit (voir /api/demandes/all). Réservé aux comptes pro.
+app.post('/api/pro/zone-intervention', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+
+    const { latitude, longitude, rayon_km } = req.body;
+    if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude))
+      return res.status(400).json({ error: 'Position invalide.' });
+    const rayon = Number.isInteger(rayon_km) ? rayon_km : parseInt(rayon_km, 10);
+    if (!Number.isInteger(rayon) || rayon < 1 || rayon > 200)
+      return res.status(400).json({ error: 'Le rayon doit être compris entre 1 et 200 km.' });
+
+    await supabase.from('users').update({ latitude, longitude, rayon_intervention_km: rayon }).eq('id', req.user.id);
+    res.json({ message: 'Zone d\'intervention enregistrée.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
 
