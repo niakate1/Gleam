@@ -677,6 +677,25 @@ app.post('/api/parrainage/renseigner-code', auth, async (req, res) => {
   }
 });
 
+// Mémorise l'adresse d'intervention préférée d'un client, pour pré-remplir ses prochaines
+// demandes — une seule adresse mémorisée à la fois, volontairement simple. Le client garde
+// toujours la possibilité de saisir une adresse différente à tout moment, jamais verrouillée.
+app.post('/api/client/adresse-memorisee', auth, async (req, res) => {
+  try {
+    const { adresse, ville, latitude, longitude } = req.body;
+    if (!adresse || !ville) return res.status(400).json({ error: 'Adresse et ville requises.' });
+    await supabase.from('users').update({
+      adresse_memorisee: adresse,
+      ville_memorisee: ville,
+      latitude_memorisee: (typeof latitude === 'number' && !isNaN(latitude)) ? latitude : null,
+      longitude_memorisee: (typeof longitude === 'number' && !isNaN(longitude)) ? longitude : null
+    }).eq('id', req.user.id);
+    res.json({ message: 'Adresse mémorisée.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // Vérifie le code de confirmation d'email — n'importe qui de connecté peut confirmer son propre
 // compte, à tout moment (pas de blocage d'accès en attendant, conformément aux bonnes pratiques
 // actuelles : la vérification email se fait en tâche de fond, jamais en barrage à l'entrée).
