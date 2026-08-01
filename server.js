@@ -223,6 +223,36 @@ function validerCreneauFutur(date, time) {
 // Coefficient d'état, universel à toutes les prestations
 const ETAT_COEF = { propre: 1.0, moyen: 1.15, sale: 1.3, tres_sale: 1.5 };
 
+// Tarif dégressif selon la surface — plus la surface est grande, plus le prix au m² baisse, comme
+// c'est l'usage réel du marché (confirmé par la recherche : les vitreries appliquent ce même
+// principe pour les grandes vitrines commerciales). Les coûts fixes d'une intervention
+// (déplacement, installation du matériel, mise en route) s'amortissent sur davantage de mètres
+// carrés quand le chantier est plus grand, justifiant un tarif unitaire réduit au-delà de certains
+// seuils.
+//
+// Calculé de façon PROGRESSIVE, comme un barème d'impôt — chaque tranche de surface garde son
+// propre tarif, plutôt qu'un simple palier appliqué à la surface entière. Sans ça, un mètre carré
+// de plus pourrait faire BASCULER tout le calcul dans une tranche inférieure et donner un total
+// final plus bas qu'une surface légèrement plus petite — un effet de seuil injuste, repéré et
+// corrigé avant livraison.
+const PALIERS_DEGRESSIFS_SURFACE = [
+  { jusqua: 10, coef: 1.0 },
+  { jusqua: 25, coef: 0.92 },
+  { jusqua: 50, coef: 0.85 },
+  { jusqua: Infinity, coef: 0.78 }
+];
+function surfaceEquivalentePonderee(quantite) {
+  var restant = quantite, borneBasse = 0, total = 0;
+  for (var i = 0; i < PALIERS_DEGRESSIFS_SURFACE.length && restant > 0; i++) {
+    var palier = PALIERS_DEGRESSIFS_SURFACE[i];
+    var largeurPalier = Math.min(restant, palier.jusqua - borneBasse);
+    total += largeurPalier * palier.coef;
+    restant -= largeurPalier;
+    borneBasse = palier.jusqua;
+  }
+  return total; // une "surface équivalente" à multiplier par le prix/m² plein tarif
+}
+
 // Configuration complète par prestation. Chaque catégorie a une "dimension principale" (tierKey)
 // pour laquelle le PRO SAISIT DIRECTEMENT UN PRIX PAR CAS CONCRET (ex: un prix pour "Citadine",
 // un autre pour "SUV/4x4"...), plutôt qu'un coefficient invisible appliqué à un prix unique.
@@ -269,7 +299,10 @@ const PRESTATION_CONFIG = {
     tiers: ['entretien', 'complet', 'eau_verte'],
     tierLabels: { entretien: 'Entretien simple', complet: 'Nettoyage complet', eau_verte: 'Eau verte / remise en état' },
     tierDefaults: { entretien: 65, complet: 130, eau_verte: 585 }, // bassin moyen, propre
-    coefTaille: { A: 0.7, B: 1.0, C: 1.4, D: 1.9 },
+    // Coefficient revu à la baisse : l'ancien 1.9 pour les plus grands bassins, combiné au tarif
+    // eau verte (585€), donnait un pire cas à 1111€ — bien au-delà des 300 à 800€ observés sur le
+    // marché réel pour ce type d'intervention, même sur un grand bassin très encrassé.
+    coefTaille: { A: 0.8, B: 1.0, C: 1.25, D: 1.5 },
     // Un spa/jacuzzi est nettement plus petit qu'un bassin classique ; le hors-sol est aussi souvent plus simple.
     coefTypeBassin: { enterree: 1.0, semi_enterree: 0.95, hors_sol: 0.8, spa_jacuzzi: 0.35 }
   },
@@ -2635,13 +2668,15 @@ app.get('/api/tarifs/estimation', auth, async (req, res) => {
 
       const coefMatiereUnite = (config.tierKey !== 'matiere' && config.coefMatiere && matiere && config.coefMatiere.hasOwnProperty(matiere)) ? config.coefMatiere[matiere] : 1.0;
       const coefTailleUnite = (config.tierKey !== 'taille' && config.coefTaille && taille && config.coefTaille.hasOwnProperty(taille)) ? config.coefTaille[taille] : 1.0;
-      const prixMoyen = Math.round(prixUnitaire * quantite * coefEtat * coefMatiereUnite * coefTailleUnite);
+      const surfaceEquivalente = surfaceEquivalentePonderee(quantite);
+      const prixMoyen = Math.round(prixUnitaire * surfaceEquivalente * coefEtat * coefMatiereUnite * coefTailleUnite);
       const prixMin = Math.round(prixMoyen * 0.85);
       const prixMax = Math.round(prixMoyen * 1.15);
 
       return res.json({
         prestation, etat, quantite, taille: taille || null, matiere: matiere || null, type_bien: typeBien || null,
         prix_unitaire: Math.round(prixUnitaire * 100) / 100,
+        reduction_surface_pourcent: quantite > 0 ? Math.round((1 - surfaceEquivalente / quantite) * 100) : 0,
         prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
         base_sur_donnees_reelles: reel, nombre_pros_reference: nbPros
       });
