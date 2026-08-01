@@ -3293,7 +3293,7 @@ function showHowItWorks(){
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
 }
-function openServiceForm(type){
+async function openServiceForm(type){
   currentFormType=type;
   var bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,tapis:tapisForm,autre:autreForm};
   var html=(bodies[type]||autreForm)();
@@ -3313,7 +3313,10 @@ function openServiceForm(type){
   document.getElementById('modal-overlay').classList.add('open');
   renderPhotoInput();
   if(document.getElementById('prix-estime-box'))updateEstimation();
-  if(document.getElementById('favori-cible-block'))chargerFavoriCible(type);
+  // On attend que le favori (s'il y en a) soit chargé AVANT de découper en étapes — sinon,
+  // pour un client qui n'a encore aucun favori compatible, la case resterait vide un court instant
+  // puis figée comme une étape blanche dans l'assistant, sans jamais rien à y afficher.
+  if(document.getElementById('favori-cible-block'))await chargerFavoriCible(type);
   if(document.getElementById('recurrence-block'))afficherBlocRecurrence();
   activerAssistantEtapes();
 }
@@ -3337,11 +3340,23 @@ function activerAssistantEtapes(){
     enteteHtml+=enfants[i].outerHTML;
     i++;
   }
-  var idsToujoursEtape={'favori-cible-block':true,'recurrence-block':true};
+  // Adresse et Ville forment naturellement une seule question ("où intervenir ?") — Ville rejoint
+  // toujours l'étape de l'Adresse plutôt que d'ouvrir sa propre étape séparée.
+  function estChampVille(tag){
+    return tag.tagName==='DIV'&&tag.querySelector('#f-ville');
+  }
+  // Le favori et la récurrence forment aussi une seule question logique ("avec qui, et à quel
+  // rythme ?") — regroupés dans une même étape. Si l'un des deux (ou les deux) est vide au moment
+  // du découpage — un client sans favori compatible, par exemple — il ne doit jamais créer une
+  // étape vide à part : soit il rejoint l'autre s'il a du contenu, soit il disparaît complètement.
+  function estBlocFavoriOuRecurrence(tag){
+    return tag.id==='favori-cible-block'||tag.id==='recurrence-block';
+  }
   function estDecoratif(tag){
     if(tag.tagName!=='DIV')return false;
+    if(estChampVille(tag))return true;
+    if(estBlocFavoriOuRecurrence(tag))return tag.children.length===0;
     if(tag.classList.contains('field-group'))return false;
-    if(idsToujoursEtape[tag.id])return false;
     if(tag.querySelector('label'))return false;
     return true;
   }
@@ -3349,7 +3364,10 @@ function activerAssistantEtapes(){
   var etapeCourante=[];
   for(;i<enfants.length;i++){
     var tag=enfants[i];
-    var nouvelle=(tag.tagName==='DIV'&&!estDecoratif(tag));
+    // Le second des deux blocs (favori/récurrence) rejoint toujours l'étape de l'autre s'il en a
+    // une, même si celui-ci a du contenu — ils ne doivent jamais former deux étapes séparées.
+    var rejointBlocPrecedent=estBlocFavoriOuRecurrence(tag)&&tag.children.length>0&&etapeCourante.length&&estBlocFavoriOuRecurrence(etapeCourante[0]);
+    var nouvelle=(tag.tagName==='DIV'&&!estDecoratif(tag)&&!rejointBlocPrecedent);
     if(nouvelle){
       if(etapeCourante.length)etapes.push(etapeCourante);
       etapeCourante=[tag];
