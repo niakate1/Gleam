@@ -3298,16 +3298,27 @@ async function openServiceForm(type){
       '<span style="font-size:11px;color:var(--gray);font-weight:700">Prestation '+(multiFlow.current+1)+' sur '+multiFlow.queue.length+'</span>'+
     '</div>';
   }
-  document.getElementById('modal-body').innerHTML=dotsMultiService+html;
+  var modalBody=document.getElementById('modal-body');
+  modalBody.innerHTML=dotsMultiService+html;
+  // Masqué le temps de préparer les étapes (le chargement du favori, notamment, prend un court
+  // instant) — sans ça, la longue liste complète apparaît brièvement avant de se réduire d'un
+  // coup à la première question, un effet de clignotement gênant à l'œil.
+  modalBody.style.visibility='hidden';
   document.getElementById('modal-overlay').classList.add('open');
   renderPhotoInput();
   if(document.getElementById('prix-estime-box'))updateEstimation();
-  // On attend que le favori (s'il y en a) soit chargé AVANT de découper en étapes — sinon,
-  // pour un client qui n'a encore aucun favori compatible, la case resterait vide un court instant
-  // puis figée comme une étape blanche dans l'assistant, sans jamais rien à y afficher.
-  if(document.getElementById('favori-cible-block'))await chargerFavoriCible(type);
-  if(document.getElementById('recurrence-block'))afficherBlocRecurrence();
-  activerAssistantEtapes();
+  // Le try/finally garantit que le contenu redevient toujours visible, même si une erreur
+  // imprévue survenait pendant la préparation — jamais de modal qui reste caché indéfiniment.
+  try{
+    // On attend que le favori (s'il y en a) soit chargé AVANT de découper en étapes — sinon,
+    // pour un client qui n'a encore aucun favori compatible, la case resterait vide un court
+    // instant puis figée comme une étape blanche dans l'assistant, sans jamais rien à y afficher.
+    if(document.getElementById('favori-cible-block'))await chargerFavoriCible(type);
+    if(document.getElementById('recurrence-block'))afficherBlocRecurrence();
+    activerAssistantEtapes();
+  }finally{
+    modalBody.style.visibility='visible';
+  }
 }
 // Découpe un long formulaire en une série de questions présentées une par une, façon "slides" —
 // plutôt qu'une seule page à faire défiler. Le titre, le sous-titre, et les points de progression
