@@ -1017,6 +1017,43 @@ function afficherDetailsMatelasPro(p){
     '</ol></div>';
   return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>'+guideHtml;
 }
+// Affichage vitres côté pro — distingue clairement ce qui vient d'une estimation de notre part
+// (comptage par catégorie, converti via des moyennes) de ce que le client a lui-même déclaré en
+// chiffre exact (pergola, véranda, ou surface directe pour un commerce/bureau) : jamais présenté
+// comme un fait certain si ça n'en est pas un.
+function afficherDetailsVitresPro(p){
+  var d=p.details||{};
+  var lignes='';
+  if(d['vitr-b'])lignes+='<div style="margin-bottom:3px"><strong>🏠 Type de bien :</strong> '+escapeHtml(d['vitr-b'])+'</div>';
+  if(d['quantite'])lignes+='<div style="margin-bottom:3px"><strong>📐 Surface indiquée par le client :</strong> '+escapeHtml(d['quantite'])+' m²</div>';
+  if(Array.isArray(d['vitres_estime'])&&d['vitres_estime'].length){
+    lignes+='<div style="margin-bottom:3px"><strong>🪟 Fenêtres (estimation du client) :</strong> '+d['vitres_estime'].map(function(v){return escapeHtml(v)}).join(', ')+
+      '<div style="font-size:10.5px;color:var(--gray);font-style:italic">Comptage approximatif, pas une mesure exacte — à confirmer sur place.</div></div>';
+  }
+  if(Array.isArray(d['vitres_indique_client'])&&d['vitres_indique_client'].length){
+    lignes+='<div style="margin-bottom:3px"><strong>📏 Indiqué par le client :</strong> '+d['vitres_indique_client'].map(function(v){return escapeHtml(v)}).join(', ')+'</div>';
+  }
+  if(Array.isArray(d['vitres-options'])&&d['vitres-options'].length){
+    lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['vitres-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
+  }
+  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>';
+}
+// Affichage tapis côté pro — même principe de distinction.
+function afficherDetailsTapisPro(p){
+  var d=p.details||{};
+  var lignes='';
+  if(d['tapis-mat'])lignes+='<div style="margin-bottom:3px"><strong>🧶 Matière :</strong> '+escapeHtml(d['tapis-mat'])+'</div>';
+  if(Array.isArray(d['tapis_estime'])&&d['tapis_estime'].length){
+    lignes+='<div style="margin-bottom:3px"><strong>📐 Tapis (estimation du client) :</strong> '+d['tapis_estime'].map(function(v){return escapeHtml(v)}).join(', ')+
+      '<div style="font-size:10.5px;color:var(--gray);font-style:italic">Taille approximative, pas une mesure exacte — à confirmer sur place.</div></div>';
+  }
+  if(Array.isArray(d['tapis_indique_client'])&&d['tapis_indique_client'].length){
+    lignes+='<div style="margin-bottom:3px"><strong>📏 Indiqué par le client :</strong> '+d['tapis_indique_client'].map(function(v){return escapeHtml(v)}).join(', ')+'</div>';
+  }
+  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>';
+}
 function tryParseNotes(notes){
   try{
     const n=JSON.parse(notes);
@@ -1029,6 +1066,10 @@ function tryParseNotes(notes){
           corps=afficherDetailsCanapePro(p);
         }else if(p.type==='matelas'&&p.details&&Object.keys(p.details).length){
           corps=afficherDetailsMatelasPro(p);
+        }else if(p.type==='vitres'&&p.details&&Object.keys(p.details).length){
+          corps=afficherDetailsVitresPro(p);
+        }else if(p.type==='tapis'&&p.details&&Object.keys(p.details).length){
+          corps=afficherDetailsTapisPro(p);
         }else{
           var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
           corps=(det?'<div style="font-size:12px">'+det+'</div>':'');
@@ -1777,6 +1818,10 @@ function renderProDemandesCards(){
     html+='<div class="demande-card fade-in-item" style="animation-delay:'+(di*0.04)+'s">'+
       '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
       '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
+      // La récurrence ne s'affiche que si CE pro précis est le favori ciblé — sinon, la prochaine
+      // occurrence sera de nouveau ouverte à tous les pros, rien ne lui garantit de la récupérer.
+      // L'annoncer dans ce cas créerait une fausse attente de business répété, sans rien assurer.
+      (d.recurrence&&d.pro_prefere_id===currentUser.id?'<div style="background:var(--light);color:var(--p);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;display:inline-block;margin-bottom:6px">🔁 Prestation récurrente qui vous est adressée en priorité</div>':'')+
       '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+(typeof d.distance_km==='number'?' <strong style="color:var(--p)">— à '+d.distance_km+' km</strong>':'')+'</div>'+
       (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
       (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
@@ -4155,10 +4200,10 @@ function ajouterAutreFenetre(){
   if(info.surfaceVariable){
     var surface=parseFloat(qteEl.value);
     if(!qteEl.value||isNaN(surface)||surface<=0){toast('❌ Indiquez la surface réelle de votre '+info.label.toLowerCase()+' en m².');return}
-    fenetresAutresListe.push({label:info.label+' ('+surface+' m²)',m2Total:Math.round(surface*10)/10});
+    fenetresAutresListe.push({label:info.label+' ('+surface+' m²)',m2Total:Math.round(surface*10)/10,declareParClient:true});
   }else{
     var qte=parseInt(qteEl.value,10)||1;
-    fenetresAutresListe.push({label:qte+'x '+info.label,m2Total:Math.round(info.m2*qte*10)/10});
+    fenetresAutresListe.push({label:qte+'x '+info.label,m2Total:Math.round(info.m2*qte*10)/10,declareParClient:false});
   }
   majChampAutreFenetre();
   afficherListeAutresFenetres();
@@ -4383,6 +4428,36 @@ async function sendDemand(type){
     if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
   }
   if(window.nbVitresCalcule)details['nb_vitres']=String(window.nbVitresCalcule);
+  // Vitres et tapis : on transmet le détail du comptage au pro, en distinguant bien ce qui vient
+  // d'une estimation de notre part (moyennes par catégorie) de ce que le client a lui-même
+  // déclaré en chiffre exact — jamais présenté comme un fait certain si ça n'en est pas un.
+  if(type==='vitres'){
+    var estimeVitres=[];
+    var LABELS_COMPTEUR_VITRES={petite:'petite(s) fenêtre(s)',standard:'fenêtre(s) standard',portefenetre:'porte(s)-fenêtre(s)',baie:'baie(s) vitrée(s)'};
+    Object.keys(LABELS_COMPTEUR_VITRES).forEach(function(cle){
+      var champ=document.getElementById('f-vitres-'+cle);
+      var n=champ?parseInt(champ.value,10)||0:0;
+      if(n>0)estimeVitres.push(n+' '+LABELS_COMPTEUR_VITRES[cle]);
+    });
+    var indiqueClientVitres=[];
+    (typeof fenetresAutresListe!=='undefined'?fenetresAutresListe:[]).forEach(function(item){
+      if(item.declareParClient){indiqueClientVitres.push(item.label)}
+      else{estimeVitres.push(item.label)}
+    });
+    if(estimeVitres.length)details['vitres_estime']=estimeVitres;
+    if(indiqueClientVitres.length)details['vitres_indique_client']=indiqueClientVitres;
+  }
+  if(type==='tapis'){
+    var estimeTapis=[];
+    var LABELS_COMPTEUR_TAPIS={petit:'petit(s) tapis',moyen:'tapis moyen(s)',grand:'grand(s) tapis'};
+    Object.keys(LABELS_COMPTEUR_TAPIS).forEach(function(cle){
+      var champ=document.getElementById('f-tapis-'+cle);
+      var n=champ?parseInt(champ.value,10)||0:0;
+      if(n>0)estimeTapis.push(n+' '+LABELS_COMPTEUR_TAPIS[cle]);
+    });
+    if(estimeTapis.length)details['tapis_estime']=estimeTapis;
+    if(typeof tapisPersoListe!=='undefined'&&tapisPersoListe.length)details['tapis_indique_client']=tapisPersoListe.map(function(item){return item.label});
+  }
 
   if(multiFlow.active&&multiFlow.current<multiFlow.queue.length-1){
     multiFlow.results[multiFlow.current]={type:type,description:desc,details:details};
