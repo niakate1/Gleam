@@ -1025,13 +1025,18 @@ function afficherDetailsVitresPro(p){
   var d=p.details||{};
   var lignes='';
   if(d['vitr-b'])lignes+='<div style="margin-bottom:3px"><strong>🏠 Type de bien :</strong> '+escapeHtml(d['vitr-b'])+'</div>';
-  if(d['quantite'])lignes+='<div style="margin-bottom:3px"><strong>📐 Surface indiquée par le client :</strong> '+escapeHtml(d['quantite'])+' m²</div>';
+  if(d['quantite']&&!(Array.isArray(d['vitres_estime'])&&d['vitres_estime'].length)&&!(Array.isArray(d['vitres_indique_client'])&&d['vitres_indique_client'].length)){
+    // Cas Commerce/Bureaux : uniquement une surface directe, sans comptage détaillé par ailleurs.
+    lignes+='<div style="margin-bottom:3px"><strong>📐 Surface indiquée par le client :</strong> '+escapeHtml(d['quantite'])+' m²</div>';
+  }
   if(Array.isArray(d['vitres_estime'])&&d['vitres_estime'].length){
-    lignes+='<div style="margin-bottom:3px"><strong>🪟 Fenêtres (estimation du client) :</strong> '+d['vitres_estime'].map(function(v){return escapeHtml(v)}).join(', ')+
+    lignes+='<div style="margin-bottom:4px"><strong>🪟 Fenêtres (estimation du client) :</strong>'+
+      '<ul style="margin:4px 0 2px;padding-left:18px">'+d['vitres_estime'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul>'+
       '<div style="font-size:10.5px;color:var(--gray);font-style:italic">Comptage approximatif, pas une mesure exacte — à confirmer sur place.</div></div>';
   }
   if(Array.isArray(d['vitres_indique_client'])&&d['vitres_indique_client'].length){
-    lignes+='<div style="margin-bottom:3px"><strong>📏 Indiqué par le client :</strong> '+d['vitres_indique_client'].map(function(v){return escapeHtml(v)}).join(', ')+'</div>';
+    lignes+='<div style="margin-bottom:4px"><strong>📏 Indiqué par le client (surface exacte) :</strong>'+
+      '<ul style="margin:4px 0 2px;padding-left:18px">'+d['vitres_indique_client'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul></div>';
   }
   if(Array.isArray(d['vitres-options'])&&d['vitres-options'].length){
     lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['vitres-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
@@ -1039,17 +1044,19 @@ function afficherDetailsVitresPro(p){
   if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
   return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>';
 }
-// Affichage tapis côté pro — même principe de distinction.
+// Affichage tapis côté pro — même principe : une ligne par élément, avec sa quantité explicite.
 function afficherDetailsTapisPro(p){
   var d=p.details||{};
   var lignes='';
   if(d['tapis-mat'])lignes+='<div style="margin-bottom:3px"><strong>🧶 Matière :</strong> '+escapeHtml(d['tapis-mat'])+'</div>';
   if(Array.isArray(d['tapis_estime'])&&d['tapis_estime'].length){
-    lignes+='<div style="margin-bottom:3px"><strong>📐 Tapis (estimation du client) :</strong> '+d['tapis_estime'].map(function(v){return escapeHtml(v)}).join(', ')+
+    lignes+='<div style="margin-bottom:4px"><strong>📐 Tapis (estimation du client) :</strong>'+
+      '<ul style="margin:4px 0 2px;padding-left:18px">'+d['tapis_estime'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul>'+
       '<div style="font-size:10.5px;color:var(--gray);font-style:italic">Taille approximative, pas une mesure exacte — à confirmer sur place.</div></div>';
   }
   if(Array.isArray(d['tapis_indique_client'])&&d['tapis_indique_client'].length){
-    lignes+='<div style="margin-bottom:3px"><strong>📏 Indiqué par le client :</strong> '+d['tapis_indique_client'].map(function(v){return escapeHtml(v)}).join(', ')+'</div>';
+    lignes+='<div style="margin-bottom:4px"><strong>📏 Indiqué par le client (surface exacte) :</strong>'+
+      '<ul style="margin:4px 0 2px;padding-left:18px">'+d['tapis_indique_client'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul></div>';
   }
   if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
   return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>';
@@ -4200,10 +4207,10 @@ function ajouterAutreFenetre(){
   if(info.surfaceVariable){
     var surface=parseFloat(qteEl.value);
     if(!qteEl.value||isNaN(surface)||surface<=0){toast('❌ Indiquez la surface réelle de votre '+info.label.toLowerCase()+' en m².');return}
-    fenetresAutresListe.push({label:info.label+' ('+surface+' m²)',m2Total:Math.round(surface*10)/10,declareParClient:true});
+    fenetresAutresListe.push({label:info.label+' — surface : '+surface+' m²',m2Total:Math.round(surface*10)/10,declareParClient:true});
   }else{
     var qte=parseInt(qteEl.value,10)||1;
-    fenetresAutresListe.push({label:qte+'x '+info.label,m2Total:Math.round(info.m2*qte*10)/10,declareParClient:false});
+    fenetresAutresListe.push({label:info.label+' — quantité : '+qte,m2Total:Math.round(info.m2*qte*10)/10,declareParClient:false});
   }
   majChampAutreFenetre();
   afficherListeAutresFenetres();
@@ -4292,7 +4299,7 @@ function ajouterTapisPerso(){
   var champ=document.getElementById('f-tapis-perso-m2');
   var surface=parseFloat(champ.value);
   if(!champ.value||isNaN(surface)||surface<=0){toast('❌ Indiquez une surface valide en m².');return}
-  tapisPersoListe.push({label:'Tapis sur-mesure ('+surface+' m²)',m2Total:Math.round(surface*10)/10});
+  tapisPersoListe.push({label:'Tapis sur-mesure — surface : '+surface+' m²',m2Total:Math.round(surface*10)/10});
   champ.value='';
   afficherListeTapisPerso();
   calculerSurfaceTapisDepuisCompteur();
@@ -4431,13 +4438,15 @@ async function sendDemand(type){
   // Vitres et tapis : on transmet le détail du comptage au pro, en distinguant bien ce qui vient
   // d'une estimation de notre part (moyennes par catégorie) de ce que le client a lui-même
   // déclaré en chiffre exact — jamais présenté comme un fait certain si ça n'en est pas un.
+  // Format explicite "Type — quantité : N" plutôt qu'une formulation condensée, pour que le pro
+  // ait vraiment tout le détail d'un coup d'œil, sans avoir à décoder une phrase.
   if(type==='vitres'){
     var estimeVitres=[];
-    var LABELS_COMPTEUR_VITRES={petite:'petite(s) fenêtre(s)',standard:'fenêtre(s) standard',portefenetre:'porte(s)-fenêtre(s)',baie:'baie(s) vitrée(s)'};
+    var LABELS_COMPTEUR_VITRES={petite:'Petite fenêtre',standard:'Fenêtre standard',portefenetre:'Porte-fenêtre',baie:'Baie vitrée'};
     Object.keys(LABELS_COMPTEUR_VITRES).forEach(function(cle){
       var champ=document.getElementById('f-vitres-'+cle);
       var n=champ?parseInt(champ.value,10)||0:0;
-      if(n>0)estimeVitres.push(n+' '+LABELS_COMPTEUR_VITRES[cle]);
+      if(n>0)estimeVitres.push(LABELS_COMPTEUR_VITRES[cle]+' — quantité : '+n);
     });
     var indiqueClientVitres=[];
     (typeof fenetresAutresListe!=='undefined'?fenetresAutresListe:[]).forEach(function(item){
@@ -4449,11 +4458,11 @@ async function sendDemand(type){
   }
   if(type==='tapis'){
     var estimeTapis=[];
-    var LABELS_COMPTEUR_TAPIS={petit:'petit(s) tapis',moyen:'tapis moyen(s)',grand:'grand(s) tapis'};
+    var LABELS_COMPTEUR_TAPIS={petit:'Petit tapis',moyen:'Tapis moyen',grand:'Grand tapis'};
     Object.keys(LABELS_COMPTEUR_TAPIS).forEach(function(cle){
       var champ=document.getElementById('f-tapis-'+cle);
       var n=champ?parseInt(champ.value,10)||0:0;
-      if(n>0)estimeTapis.push(n+' '+LABELS_COMPTEUR_TAPIS[cle]);
+      if(n>0)estimeTapis.push(LABELS_COMPTEUR_TAPIS[cle]+' — quantité : '+n);
     });
     if(estimeTapis.length)details['tapis_estime']=estimeTapis;
     if(typeof tapisPersoListe!=='undefined'&&tapisPersoListe.length)details['tapis_indique_client']=tapisPersoListe.map(function(item){return item.label});
