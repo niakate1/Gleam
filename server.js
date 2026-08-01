@@ -715,11 +715,12 @@ app.post('/api/demandes', auth, async (req, res) => {
     if (!address) return res.status(400).json({ error: 'Adresse requise.' });
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
-    // La récurrence n'a de sens que si le client cible un pro précis (favori) — sinon, à qui la
-    // prochaine occurrence serait-elle adressée ? On l'exige explicitement plutôt que de deviner.
+    // La récurrence ne nécessite plus un favori précis : sans favori choisi, la prochaine
+    // occurrence sera simplement recréée comme une demande ouverte (n'importe quel pro disponible
+    // peut y répondre) — accessible dès la toute première demande, sans avoir à d'abord "essayer"
+    // un pro pour pouvoir le mettre en favori. Si un favori est choisi, il est ciblé en priorité,
+    // mais ce n'est plus qu'une option, jamais un prérequis.
     const recurrenceValide = ['hebdomadaire', 'bimensuel', 'mensuel'].includes(recurrence) ? recurrence : null;
-    if (recurrenceValide && !pro_prefere_id)
-      return res.status(400).json({ error: 'Une prestation récurrente doit être adressée à un prestataire favori précis.' });
     if (photos && Array.isArray(photos)) {
       if (photos.length > 5) return res.status(400).json({ error: 'Maximum 5 photos par demande.' });
       for (const p of photos) {
@@ -997,6 +998,65 @@ app.patch('/api/demandes/:id/recurrence', auth, async (req, res) => {
 
     res.json({ message: 'Récurrence mise à jour.' });
   } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Transforme une prestation déjà terminée (et appréciée) en une nouvelle récurrence — le moment
+// le plus naturel pour le proposer au client, plutôt que de l'exiger dès la création initiale.
+// Le pro à cibler est optionnel : le client peut choisir de la réadresser au même prestataire
+// (celui qu'il vient d'apprécier), ou de la laisser ouverte à tous les pros disponibles.
+app.post('/api/demandes/:id/relancer-recurrente', auth, async (req, res) => {
+  try {
+    const { recurrence, cibler_meme_pro } = req.body;
+    if (!['hebdomadaire', 'bimensuel', 'mensuel'].includes(recurrence))
+      return res.status(400).json({ error: 'Fréquence invalide.' });
+
+    const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
+    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (demande.statut !== 'terminee') return res.status(400).json({ error: 'Seule une prestation terminée peut être relancée en récurrence.' });
+
+    let proPrefereId = null;
+    if (cibler_meme_pro) {
+      const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', req.params.id).eq('statut', 'accepte').maybeSingle();
+      proPrefereId = devisAccepte ? devisAccepte.societe_id : null;
+    }
+
+    const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau || '');
+    const joursAAjouter = { hebdomadaire: 7, bimensuel: 14, mensuel: 30 }[recurrence];
+    const pad = n => String(n).padStart(2, '0');
+    let dateStr, heureStr;
+    if (match) {
+      const dateBase = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
+      const prochaine = new Date(dateBase.getTime() + joursAAjouter * 24 * 60 * 60 * 1000);
+      dateStr = prochaine.getFullYear() + '-' + pad(prochaine.getMonth() + 1) + '-' + pad(prochaine.getDate());
+      heureStr = pad(prochaine.getHours()) + 'h' + pad(prochaine.getMinutes());
+    } else {
+      const prochaine = new Date(Date.now() + joursAAjouter * 24 * 60 * 60 * 1000);
+      dateStr = prochaine.getFullYear() + '-' + pad(prochaine.getMonth() + 1) + '-' + pad(prochaine.getDate());
+      heureStr = '09h00';
+    }
+
+    const { data: nouvelleDemande } = await supabase.from('demandes').insert({
+      client_id: demande.client_id,
+      prestation: demande.prestation,
+      adresse: demande.adresse,
+      creneau: dateStr + ' à ' + heureStr,
+      notes: demande.notes,
+      numero_anonyme: 'Client #' + Math.floor(1000 + Math.random() * 9000),
+      pro_prefere_id: proPrefereId,
+      latitude: demande.latitude,
+      longitude: demande.longitude,
+      statut: 'en_attente',
+      recurrence: recurrence,
+      recurrence_active: true,
+      recurrence_prochaine_creee: false
+    }).select().single();
+
+    res.status(201).json({ message: 'Prestation récurrente programmée !', demande: nouvelleDemande });
+  } catch (e) {
+    console.error('Erreur relance en récurrence:', e.message);
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
