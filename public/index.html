@@ -3434,6 +3434,15 @@ async function openServiceForm(type){
   document.getElementById('modal-overlay').classList.add('open');
   renderPhotoInput();
   if(document.getElementById('prix-estime-box'))updateEstimation();
+  // Pré-remplit l'adresse mémorisée du client, s'il en a une — uniquement pour une nouvelle
+  // demande (jamais en modification, où l'adresse déjà saisie doit être respectée telle quelle).
+  if(!multiFlow.editMode&&currentUser&&currentUser.adresse_memorisee&&document.getElementById('f-addr')){
+    var champAddr=document.getElementById('f-addr'),champVille=document.getElementById('f-ville'),champCase=document.getElementById('f-memoriser-adresse');
+    if(champAddr)champAddr.value=currentUser.adresse_memorisee;
+    if(champVille)champVille.value=currentUser.ville_memorisee||'';
+    if(champCase)champCase.checked=true;
+    if(typeof currentUser.latitude_memorisee==='number'){adresseChoisieLat=currentUser.latitude_memorisee;adresseChoisieLng=currentUser.longitude_memorisee}
+  }
   // Le try/finally garantit que le contenu redevient toujours visible, même si une erreur
   // imprévue survenait pendant la préparation — jamais de modal qui reste caché indéfiniment.
   try{
@@ -3483,6 +3492,10 @@ function activerAssistantEtapes(){
     if(tag.tagName!=='DIV')return false;
     if(estChampVille(tag))return true;
     if(estBlocFavoriOuRecurrence(tag))return tag.children.length===0;
+    // La case de comptage des fenêtres (vitres) reste vide tant que le type de bien n'a pas été
+    // choisi — elle doit malgré tout garder sa propre étape, sans quoi elle se retrouverait fondue
+    // dans l'étape précédente au moment du découpage initial.
+    if(tag.id==='vitres-quantite-box')return false;
     if(tag.classList.contains('field-group'))return false;
     if(tag.querySelector('label'))return false;
     return true;
@@ -3730,6 +3743,7 @@ function dateTimeBlock(isLast){
     '<div class="flex-opts">'+flexBtns+'</div></div>'+
     '<div class="field-group" style="position:relative"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="off" oninput="chercherAdresse(this.value)"><div id="adresse-suggestions" class="adresse-suggestions"></div><div id="carte-confirmation-adresse" style="height:140px;border-radius:10px;overflow:hidden;margin-top:8px;display:none"></div></div>'+
     '<div class="field-group" style="margin-top:10px"><label>🏙️ Ville *</label><input type="text" id="f-ville" placeholder="Paris" autocomplete="address-level2"></div>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-secondary);margin:-8px 0 12px"><input type="checkbox" id="f-memoriser-adresse" style="width:16px;height:16px;flex-shrink:0"> Mémoriser cette adresse pour mes prochaines demandes</label>'+
     '<div id="favori-cible-block"></div>'+
     '<div id="recurrence-block"></div>'+
     '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel, max 5)</span></label>'+
@@ -4049,16 +4063,69 @@ function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</d
 var DETAIL_VITRES_BASE='Nettoyage des vitres, cadres et rebords • Produit anti-traces • Rez-de-chaussée et étages standards accessibles';
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
   '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this)">🏠 Maison</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this)">🏢 Appartement</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this)">🏪 Commerce</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this)">🏭 Bureaux</button></div>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this);afficherQuantiteVitres(\'maison\')">🏠 Maison</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this);afficherQuantiteVitres(\'appartement\')">🏢 Appartement</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this);afficherQuantiteVitres(\'commerce\')">🏪 Commerce</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this);afficherQuantiteVitres(\'bureaux\')">🏭 Bureaux</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_VITRES_BASE+'</div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
   '<button class="opt-btn full" data-group="vitres-options" data-option-val="acces_difficile" onclick="toggleOption(this)"><span>🪜</span>Accès difficile / hauteur (nacelle, perche télescopique)</button></div></div>'+
-  quantiteBlock('Surface vitrée exacte (en m²)','Ex: 12')+
+  '<div id="vitres-quantite-box"></div>'+
   '<div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel, aide le pro à estimer le temps)</span></label><input type="number" id="f-nb-vitres" placeholder="Ex: 8" inputmode="numeric" min="1"></div>'+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
+
+// Un particulier ne connaît généralement pas la surface exacte de ses fenêtres — on lui demande
+// donc de compter ses fenêtres par type reconnaissable plutôt qu'un chiffre en m². Un professionnel
+// (commerce/bureaux), en revanche, connaît ou peut vérifier facilement la surface vitrée de son
+// local (bail, plans) — la saisie directe reste donc la bonne méthode dans ce cas, la variabilité
+// des vitrines commerciales étant trop grande pour rentrer dans des catégories fixes.
+var SURFACE_TYPES_FENETRES={petite:0.5,standard:1.3,portefenetre:2.8,baie:4.5};
+function afficherQuantiteVitres(typeBien){
+  var box=document.getElementById('vitres-quantite-box');
+  if(!box)return;
+  if(typeBien==='commerce'||typeBien==='bureaux'){
+    box.innerHTML=quantiteBlock('Surface vitrée exacte (en m²)','Ex: 12');
+    return;
+  }
+  box.innerHTML='<div class="field-group"><label>Vos fenêtres</label>'+
+    '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — comptez simplement combien vous en avez de chaque type.</div>'+
+    '<div style="display:flex;flex-direction:column;gap:10px">'+
+      compteurFenetreHtml('petite','Petite fenêtre','ex: salle de bain, WC')+
+      compteurFenetreHtml('standard','Fenêtre standard','ex: chambre, cuisine')+
+      compteurFenetreHtml('portefenetre','Porte-fenêtre','')+
+      compteurFenetreHtml('baie','Baie vitrée','')+
+    '</div>'+
+    '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'+
+      '<label style="font-size:12.5px">Autre fenêtre non listée ? <span class="optional">(optionnel)</span></label>'+
+      '<input type="number" id="f-vitres-autre-m2" placeholder="Indiquez sa surface en m²" inputmode="decimal" min="0" step="0.1" oninput="calculerSurfaceVitresDepuisCompteur()">'+
+    '</div>'+
+    '<input type="hidden" id="f-quantite">'+
+    '<div id="vitres-surface-calculee" style="margin-top:10px;font-size:13px;font-weight:700;color:var(--p)"></div>'+
+  '</div>';
+}
+function compteurFenetreHtml(cle,titre,exemple){
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-alt);border-radius:10px;padding:10px 12px">'+
+    '<div><div style="font-weight:700;font-size:13.5px">'+titre+'</div>'+(exemple?'<div style="font-size:11px;color:var(--gray)">'+exemple+'</div>':'')+'</div>'+
+    '<input type="number" id="f-vitres-'+cle+'" min="0" value="0" inputmode="numeric" style="width:64px;text-align:center;flex-shrink:0" oninput="calculerSurfaceVitresDepuisCompteur()">'+
+  '</div>';
+}
+function calculerSurfaceVitresDepuisCompteur(){
+  var total=0;
+  Object.keys(SURFACE_TYPES_FENETRES).forEach(function(cle){
+    var champ=document.getElementById('f-vitres-'+cle);
+    var n=champ?parseInt(champ.value,10)||0:0;
+    total+=n*SURFACE_TYPES_FENETRES[cle];
+  });
+  var autreEl=document.getElementById('f-vitres-autre-m2');
+  var autre=autreEl&&autreEl.value?parseFloat(autreEl.value):0;
+  if(!isNaN(autre))total+=autre;
+  total=Math.round(total*10)/10;
+  var quantiteEl=document.getElementById('f-quantite');
+  if(quantiteEl)quantiteEl.value=total>0?total:'';
+  var affichage=document.getElementById('vitres-surface-calculee');
+  if(affichage)affichage.textContent=total>0?('≈ '+total+' m² au total'):'';
+  updateEstimation();
+}
 
 var DETAIL_TAPIS_BASE='Dépoussiérage en profondeur • Shampoing ou nettoyage à sec adapté à la matière • Détachage courant • Désodorisation légère';
 function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><div class="modal-sub">Matière et surface</div>'+
@@ -4070,8 +4137,42 @@ function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="laine" onclick="selOpt(this)">Laine</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="soie" onclick="selOpt(this)">Soie / Tapis d\'Orient</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TAPIS_BASE+'</div></div>'+
-  quantiteBlock('Surface exacte (en m²)','Ex: 6')+
+  '<div class="field-group"><label>Taille du tapis</label>'+
+  '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — choisissez la taille qui ressemble le plus au vôtre.</div>'+
+  '<div class="options-grid">'+
+  '<button class="opt-btn" data-group="tapis-taille" data-m2="1.5" onclick="choisirTailleTapis(this)">Petit<br><span style="font-weight:400;font-size:11px">Descente de lit, couloir</span></button>'+
+  '<button class="opt-btn" data-group="tapis-taille" data-m2="5" onclick="choisirTailleTapis(this)">Moyen<br><span style="font-weight:400;font-size:11px">Devant un canapé, chambre</span></button>'+
+  '<button class="opt-btn" data-group="tapis-taille" data-m2="9" onclick="choisirTailleTapis(this)">Grand<br><span style="font-weight:400;font-size:11px">Salon, salle à manger</span></button>'+
+  '<button class="opt-btn full" data-group="tapis-taille" data-m2="perso" onclick="choisirTailleTapis(this)">Très grand / sur-mesure</button>'+
+  '</div>'+
+  '<div id="tapis-taille-perso-box" style="display:none;margin-top:8px">'+
+    '<label style="font-size:12.5px">Surface exacte (en m²)</label>'+
+    '<input type="number" id="f-tapis-perso-m2" placeholder="Ex: 15" inputmode="decimal" min="0.1" step="0.1" oninput="majTapisPerso(this.value)">'+
+  '</div>'+
+  '<input type="hidden" id="f-quantite">'+
+  '</div>'+
   etatBlock()+descBlock('Ex: Taches, poils d\'animaux...')+dateTimeBlock(isLastInFlow())+sendBtn('tapis')}
+function choisirTailleTapis(btn){
+  document.querySelectorAll('[data-group="tapis-taille"]').forEach(function(b){b.classList.remove('sel')});
+  btn.classList.add('sel');
+  var m2=btn.getAttribute('data-m2');
+  var persoBox=document.getElementById('tapis-taille-perso-box');
+  var q=document.getElementById('f-quantite');
+  if(m2==='perso'){
+    if(persoBox)persoBox.style.display='block';
+    var champPerso=document.getElementById('f-tapis-perso-m2');
+    if(q)q.value=champPerso&&champPerso.value?champPerso.value:'';
+  }else{
+    if(persoBox)persoBox.style.display='none';
+    if(q)q.value=m2;
+    updateEstimation();
+  }
+}
+function majTapisPerso(valeur){
+  var q=document.getElementById('f-quantite');
+  if(q)q.value=valeur;
+  updateEstimation();
+}
 
 function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
   '<div class="field-group"><label>De quoi s\'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: Bateau, jacuzzi..."></div>'+
@@ -4192,6 +4293,12 @@ async function sendDemand(type){
   var time=document.getElementById('f-time')&&document.getElementById('f-time').value||'';
   if(!addr){toast('❌ Merci d\'indiquer l\'adresse d\'intervention.');return}
   if(!ville){toast('❌ Merci d\'indiquer la ville — c\'est indispensable pour le prestataire.');return}
+  var caseMemoriser=document.getElementById('f-memoriser-adresse');
+  if(caseMemoriser&&caseMemoriser.checked){
+    fetch(API+'/api/client/adresse-memorisee',{method:'POST',headers:authHeaders(),body:JSON.stringify({adresse:addr,ville:ville,latitude:adresseChoisieLat,longitude:adresseChoisieLng})})
+      .then(function(){if(currentUser){currentUser.adresse_memorisee=addr;currentUser.ville_memorisee=ville}})
+      .catch(function(e){console.error('Mémorisation adresse ignorée:',e)});
+  }
   var adresseComplete=addr+', '+ville;
   if(date){
     var todayStr=localDateISO(new Date());
