@@ -2001,11 +2001,11 @@ const TARIF_CATEGORIES=[
     note:'Prix pour un nettoyage intérieur + extérieur complet, état propre. Le type de nettoyage (intérieur seul/extérieur seul) ajuste ensuite automatiquement.'},
   {key:'canape',label:'🛋️ Canapé',tiers:['A','B','C','D'],
     tierLabels:{A:'2 places',B:'3 places',C:'4 places',D:'5+ places / angle'},
-    tierPlaceholders:{A:80,B:92,C:108,D:128},
+    tierPlaceholders:{A:45,B:55,C:65,D:85},
     note:'Prix pour un canapé en tissu, état propre. Cuir/velours ajustent ensuite automatiquement le prix.'},
-  {key:'matelas',label:'🛏️ Matelas',unite:true,uniteLabel:'matelas',tiers:['A','B','C','D'],
-    tierLabels:{A:'90x190 cm',B:'140x190 cm',C:'160x200 cm',D:'180x200 cm+'},
-    tierPlaceholders:{A:45,B:60,C:72,D:90},
+  {key:'matelas',label:'🛏️ Matelas',unite:true,uniteLabel:'matelas',tiers:['A','B','C','D','E'],
+    tierLabels:{A:'90x190 cm',B:'140x190 cm',C:'160x200 cm',D:'180x200 cm',E:'200x200 cm (Empereur)'},
+    tierPlaceholders:{A:45,B:60,C:72,D:90,E:105},
     note:'Prix par matelas, état propre. Le nombre de matelas est fourni par le client.'},
   {key:'terrasse',label:'☀️ Terrasse',unite:true,uniteLabel:'m²',tiers:null,placeholder:4,
     note:'Prix par m², pour une terrasse en carrelage, état propre. Bois/béton/pierre ajustent ensuite automatiquement le prix. Le client indique la surface exacte.'},
@@ -3997,7 +3997,8 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">90x190 cm</button>'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">140x190 cm</button>'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">160x200 cm</button>'+
-  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">180x200 cm</button></div>'+
+  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">180x200 cm</button>'+
+  '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="E" onclick="selOpt(this)">200x200 cm (Empereur)</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_MATELAS_BASE+'</div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
   '<button class="opt-btn" data-group="matelas-options" data-option-val="anti_punaises" onclick="toggleOption(this)"><span>🛏️</span>Anti-punaises de lit</button>'+
