@@ -562,7 +562,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       <div class="logo-sm" id="chat-title" style="font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Conversation</div>
       <div id="chat-subtitle" style="font-size:11px;color:var(--gray);display:none"></div>
     </div>
-    <button onclick="demarrerAppelMasque()" aria-label="Appeler" style="background:none;border:none;color:var(--green);cursor:pointer;padding:6px;flex-shrink:0"><i data-lucide="phone" style="width:19px;height:19px"></i></button>
     <button onclick="ouvrirSignalement()" aria-label="Signaler un problème" style="background:none;border:none;color:var(--gray);cursor:pointer;padding:6px;flex-shrink:0"><i data-lucide="flag" style="width:18px;height:18px"></i></button>
   </div>
   <div class="chat-screen">
@@ -2422,16 +2421,6 @@ async function envoyerContactSupport(){
     closeModalForce();
     toast('✅ Message envoyé. Notre équipe va vous répondre par email.',5000);
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
-}
-async function demarrerAppelMasque(){
-  if(!currentChatDemandeId)return;
-  toast('📞 Démarrage de l\'appel...');
-  try{
-    const r=await fetch(API+'/api/appels/demarrer',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:currentChatDemandeId})});
-    const d=await safeJson(r);
-    if(!r.ok){toast('❌ '+(d.error||'Impossible de démarrer l\'appel.'));return}
-    toast('✅ '+d.message,5000);
-  }catch(e){toast('❌ '+friendlyNetworkError(e))}
 }
 function ouvrirSignalement(){
   var info=chatPartnerInfo[currentChatDemandeId]||{};
