@@ -3297,23 +3297,177 @@ function openServiceForm(type){
   currentFormType=type;
   var bodies={voiture:voitureForm,canape:canapeForm,matelas:matelasForm,terrasse:terrasseForm,piscine:piscineForm,toiture:toitureForm,vitres:vitresForm,tapis:tapisForm,autre:autreForm};
   var html=(bodies[type]||autreForm)();
+  var dotsMultiService='';
   if(multiFlow.active&&multiFlow.queue.length>1){
     var dots='';
     for(var i=0;i<multiFlow.queue.length;i++){
       var done=i<multiFlow.current,curr=i===multiFlow.current;
       dots+='<span style="width:'+(curr?'20px':'7px')+';height:7px;border-radius:4px;background:'+(done||curr?'var(--p)':'var(--border)')+';transition:.2s;display:inline-block"></span>';
     }
-    html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
+    dotsMultiService='<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
       '<div style="display:flex;gap:5px">'+dots+'</div>'+
       '<span style="font-size:11px;color:var(--gray);font-weight:700">Prestation '+(multiFlow.current+1)+' sur '+multiFlow.queue.length+'</span>'+
-    '</div>'+html;
+    '</div>';
   }
-  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-body').innerHTML=dotsMultiService+html;
   document.getElementById('modal-overlay').classList.add('open');
   renderPhotoInput();
   if(document.getElementById('prix-estime-box'))updateEstimation();
   if(document.getElementById('favori-cible-block'))chargerFavoriCible(type);
   if(document.getElementById('recurrence-block'))afficherBlocRecurrence();
+  activerAssistantEtapes();
+}
+// Découpe un long formulaire en une série de questions présentées une par une, façon "slides" —
+// plutôt qu'une seule page à faire défiler. Le titre, le sous-titre, et les points de progression
+// multi-prestations restent toujours visibles ; chaque question suivante (un champ, une option...)
+// devient sa propre étape, affichée seule, avec un bouton "Suivant" pour avancer. La dernière
+// étape garde le vrai bouton d'envoi du formulaire, inchangé.
+var assistantEtapes=[];
+var assistantIndexActuel=0;
+function activerAssistantEtapes(){
+  var body=document.getElementById('modal-body');
+  var enfants=Array.prototype.slice.call(body.children);
+  var i=0;
+  var enteteHtml='';
+  // Le titre, le sous-titre, et les points multi-prestations restent fixes, jamais paginés.
+  while(i<enfants.length&&(
+    (enfants[i].classList&&(enfants[i].classList.contains('modal-title')||enfants[i].classList.contains('modal-sub')))||
+    (enfants[i].tagName==='DIV'&&!enfants[i].className&&enfants[i].querySelector('span'))
+  )){
+    enteteHtml+=enfants[i].outerHTML;
+    i++;
+  }
+  var idsToujoursEtape={'favori-cible-block':true,'recurrence-block':true};
+  function estDecoratif(tag){
+    if(tag.tagName!=='DIV')return false;
+    if(tag.classList.contains('field-group'))return false;
+    if(idsToujoursEtape[tag.id])return false;
+    if(tag.querySelector('label'))return false;
+    return true;
+  }
+  var etapes=[];
+  var etapeCourante=[];
+  for(;i<enfants.length;i++){
+    var tag=enfants[i];
+    var nouvelle=(tag.tagName==='DIV'&&!estDecoratif(tag));
+    if(nouvelle){
+      if(etapeCourante.length)etapes.push(etapeCourante);
+      etapeCourante=[tag];
+    }else{
+      etapeCourante.push(tag);
+    }
+  }
+  if(etapeCourante.length)etapes.push(etapeCourante);
+
+  // Si le formulaire n'a qu'une seule "question" au total (rare, ex: formulaire "Autre"), pas
+  // besoin de paginer — autant tout montrer directement.
+  if(etapes.length<=1){assistantEtapes=[];return}
+
+  assistantEtapes=etapes.map(function(groupe,idx){
+    var wrapper=document.createElement('div');
+    wrapper.className='assistant-etape';
+    wrapper.dataset.etapeIndex=idx;
+    wrapper.style.display=idx===0?'block':'none';
+    groupe.forEach(function(tag){wrapper.appendChild(tag)});
+    return wrapper;
+  });
+  assistantIndexActuel=0;
+
+  var barreProgression=document.createElement('div');
+  barreProgression.id='assistant-progression';
+  barreProgression.style.cssText='margin-bottom:16px';
+  body.innerHTML=enteteHtml;
+  body.appendChild(barreProgression);
+  assistantEtapes.forEach(function(w){body.appendChild(w)});
+  majBarreProgression();
+  ajouterBoutonSuivant();
+}
+function majBarreProgression(){
+  var barre=document.getElementById('assistant-progression');
+  if(!barre||!assistantEtapes.length)return;
+  var total=assistantEtapes.length;
+  var pct=Math.round(((assistantIndexActuel+1)/total)*100);
+  barre.innerHTML=
+    '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray);font-weight:700;margin-bottom:6px">'+
+      '<span>Question '+(assistantIndexActuel+1)+' sur '+total+'</span>'+
+    '</div>'+
+    '<div style="height:5px;background:var(--surface-alt);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--p);border-radius:3px;transition:width .25s"></div></div>';
+}
+// Ajoute un bouton "Suivant" propre à l'assistant sur chaque étape qui n'est pas la dernière —
+// la dernière garde le vrai bouton d'envoi du formulaire original, jamais remplacé.
+function ajouterBoutonSuivant(){
+  assistantEtapes.forEach(function(etape,idx){
+    if(idx===assistantEtapes.length-1)return; // dernière étape : vrai bouton d'envoi déjà présent
+    if(etape.querySelector('.assistant-nav'))return; // déjà ajouté
+    var nav=document.createElement('div');
+    nav.className='assistant-nav';
+    nav.style.cssText='display:flex;gap:8px;margin-top:14px';
+    if(idx>0){
+      var btnPrec=document.createElement('button');
+      btnPrec.type='button';
+      btnPrec.textContent='← Précédent';
+      btnPrec.style.cssText='flex:0 0 auto;padding:12px 16px;background:none;border:2px solid var(--border);color:var(--text-secondary);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer';
+      btnPrec.onclick=function(){assistantEtapePrecedente()};
+      nav.appendChild(btnPrec);
+    }
+    var btnSuiv=document.createElement('button');
+    btnSuiv.type='button';
+    btnSuiv.className='modal-send-btn';
+    btnSuiv.style.flex='1';
+    btnSuiv.textContent='Suivant →';
+    btnSuiv.onclick=function(){assistantEtapeSuivante()};
+    nav.appendChild(btnSuiv);
+    etape.appendChild(nav);
+  });
+}
+function assistantEtapeSuivante(){
+  if(!assistantEtapes.length)return;
+  var etapeActuelle=assistantEtapes[assistantIndexActuel];
+  var erreur=validerEtapeAssistant(etapeActuelle);
+  if(erreur){toast('❌ '+erreur);return}
+  if(assistantIndexActuel>=assistantEtapes.length-1)return;
+  etapeActuelle.style.display='none';
+  assistantIndexActuel++;
+  assistantEtapes[assistantIndexActuel].style.display='block';
+  majBarreProgression();
+  document.getElementById('modal-body').scrollTop=0;
+}
+function assistantEtapePrecedente(){
+  if(!assistantEtapes.length||assistantIndexActuel<=0)return;
+  assistantEtapes[assistantIndexActuel].style.display='none';
+  assistantIndexActuel--;
+  assistantEtapes[assistantIndexActuel].style.display='block';
+  majBarreProgression();
+  document.getElementById('modal-body').scrollTop=0;
+}
+// Valide uniquement les champs de l'étape actuellement affichée — les groupes optionnels
+// (etat, favori-cible, récurrence, options par catégorie...) restent exemptés, comme pour la
+// validation finale complète du formulaire.
+function validerEtapeAssistant(etape){
+  var groupesOptionnels=['etat','favori-cible','recurrence','voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
+  var groupes=[];
+  etape.querySelectorAll('[data-group]').forEach(function(el){
+    var g=el.getAttribute('data-group');
+    if(g&&groupesOptionnels.indexOf(g)===-1&&groupes.indexOf(g)===-1)groupes.push(g);
+  });
+  for(var i=0;i<groupes.length;i++){
+    if(!etape.querySelector('[data-group="'+groupes[i]+'"].sel')){
+      return 'Merci de renseigner : '+getGroupLabel(groupes[i]);
+    }
+  }
+  var qEl=etape.querySelector('#f-quantite');
+  if(qEl){
+    var q=parseFloat(qEl.value);
+    if(!qEl.value.trim()||isNaN(q)||q<=0){
+      var qLabel=qEl.closest('.field-group')&&qEl.closest('.field-group').querySelector('label');
+      return 'Merci d\'indiquer '+(qLabel?qLabel.textContent.trim().toLowerCase():'la quantité exacte')+' pour continuer.';
+    }
+  }
+  var addrEl=etape.querySelector('#f-addr');
+  if(addrEl&&!addrEl.value.trim())return 'Merci de renseigner l\'adresse d\'intervention.';
+  var villeEl=etape.querySelector('#f-ville');
+  if(villeEl&&!villeEl.value.trim())return 'Merci de renseigner la ville.';
+  return null;
 }
 function closeModal(e){if(e.target===document.getElementById('modal-overlay')){closeModalForce()}}
 function closeModalForce(){
