@@ -17,6 +17,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<!-- Leaflet + OpenStreetMap : carte interactive gratuite, sans clé API et sans coût à l'usage,
+     contrairement à Google Maps — choix délibéré pour éviter une nouvelle dépense récurrente. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--p:#6D28D9;--p2:#4C1D95;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151;--shadow-sm:0 1px 2px rgba(17,24,39,.06),0 1px 1px rgba(17,24,39,.04);--shadow-md:0 4px 16px rgba(17,24,39,.08),0 1px 3px rgba(17,24,39,.06);--shadow-lg:0 12px 40px rgba(17,24,39,.12),0 2px 8px rgba(17,24,39,.06)}
@@ -499,6 +503,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" id="item-confirmer-email-pro" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="ouvrirZoneIntervention()"><span class="pi-icon"><i data-lucide="map-pin" style="width:20px;height:20px"></i></span><span class="pi-text">Zone d'intervention</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="toggleNotificationsPush()"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow" id="notif-statut-pro">Activer</span></div>
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
@@ -1772,7 +1777,7 @@ function renderProDemandesCards(){
     html+='<div class="demande-card fade-in-item" style="animation-delay:'+(di*0.04)+'s">'+
       '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
       '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
-      '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+'</div>'+
+      '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+(typeof d.distance_km==='number'?' <strong style="color:var(--p)">— à '+d.distance_km+' km</strong>':'')+'</div>'+
       (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
       (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
       (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
@@ -3024,6 +3029,65 @@ function arrayBufferToBase64Url(buffer){
   for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
   return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
+var carteZoneIntervention=null,markerZoneIntervention=null,cercleZoneIntervention=null;
+function ouvrirZoneIntervention(){
+  var html='<div class="modal-title"><i data-lucide="map-pin" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Zone d\'intervention</div>'+
+    '<div class="modal-sub">Déplacez le repère sur votre position de référence, et réglez le rayon souhaité</div>'+
+    '<div id="carte-zone-intervention" style="height:280px;border-radius:14px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border)"></div>'+
+    '<label style="font-size:13px;font-weight:700">Rayon d\'intervention : <span id="valeur-rayon">20</span> km</label>'+
+    '<input type="range" id="curseur-rayon" min="1" max="100" value="20" style="width:100%;margin:8px 0 16px" oninput="majRayonZoneIntervention(this.value)">'+
+    '<button class="btn-accept" style="width:100%" onclick="enregistrerZoneIntervention()">Enregistrer</button>'+
+    '<div class="err" id="zone-intervention-err"></div>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(initCarteZoneIntervention,50); // laisse le temps au conteneur de s'afficher avant d'initialiser Leaflet
+}
+function initCarteZoneIntervention(){
+  var positionDepart=[48.8566,2.3522]; // Paris par défaut, si le pro n'a encore rien configuré
+  if(currentUser&&typeof currentUser.latitude==='number'&&typeof currentUser.longitude==='number'){
+    positionDepart=[currentUser.latitude,currentUser.longitude];
+  }
+  var rayonDepart=(currentUser&&currentUser.rayon_intervention_km)||20;
+  document.getElementById('curseur-rayon').value=rayonDepart;
+  document.getElementById('valeur-rayon').textContent=rayonDepart;
+
+  carteZoneIntervention=L.map('carte-zone-intervention').setView(positionDepart,10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap',maxZoom:18
+  }).addTo(carteZoneIntervention);
+
+  markerZoneIntervention=L.marker(positionDepart,{draggable:true}).addTo(carteZoneIntervention);
+  cercleZoneIntervention=L.circle(positionDepart,{radius:rayonDepart*1000,color:'#6D28D9',fillColor:'#6D28D9',fillOpacity:0.12,weight:2}).addTo(carteZoneIntervention);
+
+  markerZoneIntervention.on('dragend',function(){
+    var pos=markerZoneIntervention.getLatLng();
+    cercleZoneIntervention.setLatLng(pos);
+  });
+  // Cliquer ailleurs sur la carte déplace aussi le repère, plus simple que de devoir viser précisément le marqueur
+  carteZoneIntervention.on('click',function(e){
+    markerZoneIntervention.setLatLng(e.latlng);
+    cercleZoneIntervention.setLatLng(e.latlng);
+  });
+}
+function majRayonZoneIntervention(valeur){
+  document.getElementById('valeur-rayon').textContent=valeur;
+  if(cercleZoneIntervention)cercleZoneIntervention.setRadius(valeur*1000);
+}
+async function enregistrerZoneIntervention(){
+  var errEl=document.getElementById('zone-intervention-err');
+  if(errEl)errEl.classList.remove('show');
+  if(!markerZoneIntervention){if(errEl){errEl.textContent='Carte non prête, réessayez.';errEl.classList.add('show')}return}
+  var pos=markerZoneIntervention.getLatLng();
+  var rayon=parseInt(document.getElementById('curseur-rayon').value,10);
+  try{
+    const r=await fetch(API+'/api/pro/zone-intervention',{method:'POST',headers:authHeaders(),body:JSON.stringify({latitude:pos.lat,longitude:pos.lng,rayon_km:rayon})});
+    const d=await safeJson(r);
+    if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
+    toast('✅ '+d.message);
+    if(currentUser){currentUser.latitude=pos.lat;currentUser.longitude=pos.lng;currentUser.rayon_intervention_km=rayon}
+    closeModal();
+  }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
+}
 function ouvrirConfirmerEmail(){
   var html='<div class="modal-title"><i data-lucide="mail-check" style="width:20px;height:20px;vertical-align:-4px;color:var(--gold)"></i> Confirmer mon email</div>'+
     '<div class="modal-sub">Un code à 6 chiffres vous a été envoyé à '+escapeHtml((currentUser&&currentUser.email)||'')+'</div>'+
@@ -3582,7 +3646,7 @@ function dateTimeBlock(isLast){
     '<div class="datetime-row"><input type="date" id="f-date" min="'+today+'" value="'+today+'"><select id="f-time">'+opts+'</select></div>'+
     '<label style="margin-top:12px">Flexibilité <span class="optional">(optionnel)</span></label>'+
     '<div class="flex-opts">'+flexBtns+'</div></div>'+
-    '<div class="field-group" style="position:relative"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="off" oninput="chercherAdresse(this.value)"><div id="adresse-suggestions" class="adresse-suggestions"></div></div>'+
+    '<div class="field-group" style="position:relative"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="off" oninput="chercherAdresse(this.value)"><div id="adresse-suggestions" class="adresse-suggestions"></div><div id="carte-confirmation-adresse" style="height:140px;border-radius:10px;overflow:hidden;margin-top:8px;display:none"></div></div>'+
     '<div class="field-group" style="margin-top:10px"><label>🏙️ Ville *</label><input type="text" id="f-ville" placeholder="Paris" autocomplete="address-level2"></div>'+
     '<div id="favori-cible-block"></div>'+
     '<div id="recurrence-block"></div>'+
@@ -3678,6 +3742,7 @@ function chercherAdresse(valeur){
   },300);
 }
 var adresseChoisieLat=null,adresseChoisieLng=null;
+var carteConfirmationAdresse=null,markerConfirmationAdresse=null;
 function choisirAdresse(rue,ville,lat,lng){
   var addrEl=document.getElementById('f-addr'),villeEl=document.getElementById('f-ville');
   if(addrEl)addrEl.value=rue;
@@ -3686,6 +3751,20 @@ function choisirAdresse(rue,ville,lat,lng){
   adresseChoisieLng=(typeof lng==='number'&&!isNaN(lng))?lng:null;
   var box=document.getElementById('adresse-suggestions');
   if(box){box.classList.remove('show');box.innerHTML=''}
+  // Un petit repère de confirmation visuel — pas une vraie carte à explorer, juste de quoi
+  // vérifier d'un coup d'œil que l'adresse tombe bien au bon endroit avant de continuer.
+  var carteBox=document.getElementById('carte-confirmation-adresse');
+  if(carteBox&&adresseChoisieLat&&adresseChoisieLng){
+    carteBox.style.display='block';
+    setTimeout(function(){
+      if(carteConfirmationAdresse){carteConfirmationAdresse.remove();carteConfirmationAdresse=null}
+      carteConfirmationAdresse=L.map('carte-confirmation-adresse',{zoomControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false}).setView([adresseChoisieLat,adresseChoisieLng],16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(carteConfirmationAdresse);
+      markerConfirmationAdresse=L.marker([adresseChoisieLat,adresseChoisieLng]).addTo(carteConfirmationAdresse);
+    },50);
+  }else if(carteBox){
+    carteBox.style.display='none';
+  }
 }
 // Ferme la liste de suggestions si l'utilisateur clique ailleurs sur la page
 document.addEventListener('click',function(e){
