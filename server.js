@@ -716,11 +716,11 @@ app.post('/api/demandes', auth, async (req, res) => {
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
     // La récurrence ne nécessite plus un favori précis : sans favori choisi, la prochaine
-    // occurrence sera simplement recréée comme une demande ouverte (n'importe quel pro disponible
-    // peut y répondre) — accessible dès la toute première demande, sans avoir à d'abord "essayer"
-    // un pro pour pouvoir le mettre en favori. Si un favori est choisi, il est ciblé en priorité,
-    // mais ce n'est plus qu'une option, jamais un prérequis.
-    const recurrenceValide = ['hebdomadaire', 'bimensuel', 'mensuel'].includes(recurrence) ? recurrence : null;
+    // Le délai entre deux occurrences est maintenant un nombre de jours librement choisi par le
+    // client (7, 14, 30, 90...), plutôt que 3 fréquences fixes qui ne convenaient pas à toutes
+    // les prestations (on ne nettoie pas une voiture aussi souvent qu'un ménage classique). Borné
+    // entre 3 jours et 1 an pour rester raisonnable, sans imposer de valeurs prédéfinies.
+    const recurrenceValide = (Number.isInteger(recurrence) && recurrence >= 3 && recurrence <= 365) ? recurrence : null;
     if (photos && Array.isArray(photos)) {
       if (photos.length > 5) return res.status(400).json({ error: 'Maximum 5 photos par demande.' });
       for (const p of photos) {
@@ -813,7 +813,7 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
     const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau || '');
     if (!match) return;
     const dateActuelle = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
-    const joursAAjouter = { hebdomadaire: 7, bimensuel: 14, mensuel: 30 }[demande.recurrence] || 7;
+    const joursAAjouter = parseInt(demande.recurrence, 10) || 7;
     const prochaineDate = new Date(dateActuelle.getTime() + joursAAjouter * 24 * 60 * 60 * 1000);
     const pad = n => String(n).padStart(2, '0');
     const dateStr = prochaineDate.getFullYear() + '-' + pad(prochaineDate.getMonth() + 1) + '-' + pad(prochaineDate.getDate());
@@ -1009,8 +1009,8 @@ app.patch('/api/demandes/:id/recurrence', auth, async (req, res) => {
 app.post('/api/demandes/:id/relancer-recurrente', auth, async (req, res) => {
   try {
     const { recurrence, cibler_meme_pro } = req.body;
-    if (!['hebdomadaire', 'bimensuel', 'mensuel'].includes(recurrence))
-      return res.status(400).json({ error: 'Fréquence invalide.' });
+    if (!Number.isInteger(recurrence) || recurrence < 3 || recurrence > 365)
+      return res.status(400).json({ error: 'Choisissez un délai entre 3 et 365 jours.' });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
@@ -1024,7 +1024,7 @@ app.post('/api/demandes/:id/relancer-recurrente', auth, async (req, res) => {
     }
 
     const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau || '');
-    const joursAAjouter = { hebdomadaire: 7, bimensuel: 14, mensuel: 30 }[recurrence];
+    const joursAAjouter = recurrence;
     const pad = n => String(n).padStart(2, '0');
     let dateStr, heureStr;
     if (match) {
