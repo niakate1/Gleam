@@ -3785,8 +3785,7 @@ function goToPreviousStep(currentType){
     var qEl=document.getElementById('f-quantite');
     if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
   }
-  var nbVitresEl1=document.getElementById('f-nb-vitres');
-  if(nbVitresEl1&&nbVitresEl1.value.trim())details['nb_vitres']=nbVitresEl1.value.trim();
+  if(window.nbVitresCalcule)details['nb_vitres']=String(window.nbVitresCalcule);
   multiFlow.results[multiFlow.current]={type:currentType,description:desc,details:details};
   multiFlow.current--;
   openServiceForm(multiFlow.queue[multiFlow.current]);
@@ -4071,7 +4070,6 @@ function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
   '<button class="opt-btn full" data-group="vitres-options" data-option-val="acces_difficile" onclick="toggleOption(this)"><span>🪜</span>Accès difficile / hauteur (nacelle, perche télescopique)</button></div></div>'+
   '<div id="vitres-quantite-box"></div>'+
-  '<div class="field-group"><label>Nombre de vitres <span class="optional">(optionnel, aide le pro à estimer le temps)</span></label><input type="number" id="f-nb-vitres" placeholder="Ex: 8" inputmode="numeric" min="1"></div>'+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
 // Un particulier ne connaît généralement pas la surface exacte de ses fenêtres — on lui demande
@@ -4087,21 +4085,100 @@ function afficherQuantiteVitres(typeBien){
     box.innerHTML=quantiteBlock('Surface vitrée exacte (en m²)','Ex: 12');
     return;
   }
+  fenetresAutresListe=[];
   box.innerHTML='<div class="field-group"><label>Vos fenêtres</label>'+
     '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — comptez simplement combien vous en avez de chaque type.</div>'+
     '<div style="display:flex;flex-direction:column;gap:10px">'+
       compteurFenetreHtml('petite','Petite fenêtre','ex: salle de bain, WC')+
       compteurFenetreHtml('standard','Fenêtre standard','ex: chambre, cuisine')+
-      compteurFenetreHtml('portefenetre','Porte-fenêtre','')+
-      compteurFenetreHtml('baie','Baie vitrée','')+
+      compteurFenetreHtml('portefenetre','Porte-fenêtre','ex: accès balcon, terrasse')+
+      compteurFenetreHtml('baie','Baie vitrée','ex: grande ouverture salon, véranda')+
     '</div>'+
-    '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'+
-      '<label style="font-size:12.5px">Autre fenêtre non listée ? <span class="optional">(optionnel)</span></label>'+
-      '<input type="number" id="f-vitres-autre-m2" placeholder="Indiquez sa surface en m²" inputmode="decimal" min="0" step="0.1" oninput="calculerSurfaceVitresDepuisCompteur()">'+
+    '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'+
+      '<label style="font-size:12.5px">Un autre type de fenêtre ? <span class="optional">(optionnel)</span></label>'+
+      '<div style="display:flex;gap:8px;margin-top:6px">'+
+        '<select id="f-vitres-autre-type" style="flex:1" onchange="majChampAutreFenetre()">'+
+          Object.keys(AUTRES_TYPES_FENETRES).map(function(cle){return '<option value="'+cle+'">'+AUTRES_TYPES_FENETRES[cle].label+'</option>'}).join('')+
+        '</select>'+
+        '<input type="number" id="f-vitres-autre-qte" min="1" value="1" inputmode="numeric" style="width:56px;text-align:center;flex-shrink:0">'+
+        '<button type="button" class="btn" style="width:auto;padding:0 14px;flex-shrink:0" onclick="ajouterAutreFenetre()">Ajouter</button>'+
+      '</div>'+
+      '<div id="vitres-autre-note" style="font-size:11px;color:var(--gray);margin-top:4px"></div>'+
+      '<div id="vitres-autres-liste" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>'+
     '</div>'+
     '<input type="hidden" id="f-quantite">'+
     '<div id="vitres-surface-calculee" style="margin-top:10px;font-size:13px;font-weight:700;color:var(--p)"></div>'+
   '</div>';
+  majChampAutreFenetre();
+}
+// Types de fenêtres moins courants, chacun avec sa surface représentative — le client choisit
+// dans la liste plutôt que de devoir mesurer, comme pour les 4 catégories principales. Répétable :
+// on peut ajouter autant d'entrées différentes que nécessaire (ex: 2 velux + 1 verrière).
+// Pergola et véranda sont marquées "surfaceVariable" : contrairement aux fenêtres, bien plus
+// standardisées, ces installations varient trop (15 à 45 m² selon les modèles) pour qu'une
+// moyenne fixe soit pertinente — le client saisit alors directement la surface réelle de la
+// sienne plutôt qu'une simple quantité, puisqu'il la connaît généralement (contrat, plans...).
+var AUTRES_TYPES_FENETRES={
+  velux:{label:'Velux / fenêtre de toit',m2:0.8},
+  lucarne:{label:'Lucarne',m2:1.0},
+  trois_vantaux:{label:'Fenêtre 3 vantaux (grande pièce)',m2:2.2},
+  verriere:{label:'Verrière d\'atelier ou de toit',m2:3.0},
+  vitre_porte:{label:'Vitre de porte d\'entrée',m2:0.3},
+  hublot:{label:'Fenêtre ronde / hublot',m2:0.3},
+  pergola:{label:'Pergola (toit vitré)',m2:25,surfaceVariable:true},
+  veranda:{label:'Véranda',m2:12,surfaceVariable:true},
+  marquise:{label:'Marquise / auvent vitré',m2:1.5},
+  garde_corps:{label:'Garde-corps en verre (par section ~1m)',m2:1.0}
+};
+var fenetresAutresListe=[];
+// Adapte le champ de saisie selon le type choisi : "quantité" pour les fenêtres standardisées,
+// "surface exacte" pour pergola/véranda dont la taille varie trop pour une moyenne fixe.
+function majChampAutreFenetre(){
+  var typeEl=document.getElementById('f-vitres-autre-type'),qteEl=document.getElementById('f-vitres-autre-qte'),noteEl=document.getElementById('vitres-autre-note');
+  if(!typeEl||!qteEl)return;
+  var info=AUTRES_TYPES_FENETRES[typeEl.value];
+  if(info&&info.surfaceVariable){
+    qteEl.placeholder='Surface en m²';
+    qteEl.step='0.5';
+    qteEl.value='';
+    if(noteEl)noteEl.textContent='Cette installation varie trop d\'un modèle à l\'autre — indiquez directement sa surface réelle en m² (généralement connue).';
+  }else{
+    qteEl.placeholder='';
+    qteEl.step='1';
+    qteEl.value=1;
+    if(noteEl)noteEl.textContent='';
+  }
+}
+function ajouterAutreFenetre(){
+  var typeEl=document.getElementById('f-vitres-autre-type'),qteEl=document.getElementById('f-vitres-autre-qte');
+  var cle=typeEl.value;
+  var info=AUTRES_TYPES_FENETRES[cle];
+  if(info.surfaceVariable){
+    var surface=parseFloat(qteEl.value);
+    if(!qteEl.value||isNaN(surface)||surface<=0){toast('❌ Indiquez la surface réelle de votre '+info.label.toLowerCase()+' en m².');return}
+    fenetresAutresListe.push({label:info.label+' ('+surface+' m²)',m2Total:Math.round(surface*10)/10});
+  }else{
+    var qte=parseInt(qteEl.value,10)||1;
+    fenetresAutresListe.push({label:qte+'x '+info.label,m2Total:Math.round(info.m2*qte*10)/10});
+  }
+  majChampAutreFenetre();
+  afficherListeAutresFenetres();
+  calculerSurfaceVitresDepuisCompteur();
+}
+function retirerAutreFenetre(index){
+  fenetresAutresListe.splice(index,1);
+  afficherListeAutresFenetres();
+  calculerSurfaceVitresDepuisCompteur();
+}
+function afficherListeAutresFenetres(){
+  var liste=document.getElementById('vitres-autres-liste');
+  if(!liste)return;
+  liste.innerHTML=fenetresAutresListe.map(function(item,idx){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-alt);border-radius:8px;padding:8px 10px;font-size:12.5px">'+
+      '<span>'+escapeHtml(item.label)+' <strong>('+item.m2Total+' m²)</strong></span>'+
+      '<button type="button" onclick="retirerAutreFenetre('+idx+')" style="background:none;border:none;color:var(--red);cursor:pointer;font-weight:700;padding:0 4px">✕</button>'+
+    '</div>';
+  }).join('');
 }
 function compteurFenetreHtml(cle,titre,exemple){
   return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-alt);border-radius:10px;padding:10px 12px">'+
@@ -4110,20 +4187,22 @@ function compteurFenetreHtml(cle,titre,exemple){
   '</div>';
 }
 function calculerSurfaceVitresDepuisCompteur(){
-  var total=0;
+  var total=0,nbVitresTotal=0;
   Object.keys(SURFACE_TYPES_FENETRES).forEach(function(cle){
     var champ=document.getElementById('f-vitres-'+cle);
     var n=champ?parseInt(champ.value,10)||0:0;
     total+=n*SURFACE_TYPES_FENETRES[cle];
+    nbVitresTotal+=n;
   });
-  var autreEl=document.getElementById('f-vitres-autre-m2');
-  var autre=autreEl&&autreEl.value?parseFloat(autreEl.value):0;
-  if(!isNaN(autre))total+=autre;
+  fenetresAutresListe.forEach(function(item){total+=item.m2Total});
   total=Math.round(total*10)/10;
   var quantiteEl=document.getElementById('f-quantite');
   if(quantiteEl)quantiteEl.value=total>0?total:'';
+  // Le nombre de vitres se déduit désormais automatiquement du comptage par type — plus besoin
+  // de le redemander séparément au client, ça faisait doublon avec une information déjà saisie.
+  window.nbVitresCalcule=nbVitresTotal>0?nbVitresTotal:null;
   var affichage=document.getElementById('vitres-surface-calculee');
-  if(affichage)affichage.textContent=total>0?('≈ '+total+' m² au total'):'';
+  if(affichage)affichage.textContent=total>0?('≈ '+total+' m² au total'+(nbVitresTotal>0?' — '+nbVitresTotal+' vitre'+(nbVitresTotal>1?'s':''):'')):'';
   updateEstimation();
 }
 
@@ -4275,8 +4354,7 @@ async function sendDemand(type){
     var qEl=document.getElementById('f-quantite');
     if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
   }
-  var nbVitresEl2=document.getElementById('f-nb-vitres');
-  if(nbVitresEl2&&nbVitresEl2.value.trim())details['nb_vitres']=nbVitresEl2.value.trim();
+  if(window.nbVitresCalcule)details['nb_vitres']=String(window.nbVitresCalcule);
 
   if(multiFlow.active&&multiFlow.current<multiFlow.queue.length-1){
     multiFlow.results[multiFlow.current]={type:type,description:desc,details:details};
