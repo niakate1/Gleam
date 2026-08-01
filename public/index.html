@@ -4107,7 +4107,6 @@ function afficherQuantiteVitres(typeBien){
       '<div id="vitres-autres-liste" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>'+
     '</div>'+
     '<input type="hidden" id="f-quantite">'+
-    '<div id="vitres-surface-calculee" style="margin-top:10px;font-size:13px;font-weight:700;color:var(--p)"></div>'+
   '</div>';
   majChampAutreFenetre();
 }
@@ -4201,8 +4200,10 @@ function calculerSurfaceVitresDepuisCompteur(){
   // Le nombre de vitres se déduit désormais automatiquement du comptage par type — plus besoin
   // de le redemander séparément au client, ça faisait doublon avec une information déjà saisie.
   window.nbVitresCalcule=nbVitresTotal>0?nbVitresTotal:null;
-  var affichage=document.getElementById('vitres-surface-calculee');
-  if(affichage)affichage.textContent=total>0?('≈ '+total+' m² au total'+(nbVitresTotal>0?' — '+nbVitresTotal+' vitre'+(nbVitresTotal>1?'s':''):'')):'';
+  // La surface totale n'est volontairement PAS affichée au client — ce n'est qu'une estimation
+  // interne (moyennes représentatives par type de fenêtre), pas une mesure certaine. Seul le prix
+  // estimé (déjà présenté avec une fourchette min-max) doit apparaître, pour ne jamais donner une
+  // fausse impression de précision sur un chiffre qu'on ne peut pas garantir.
   updateEstimation();
 }
 
@@ -4216,40 +4217,67 @@ function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="laine" onclick="selOpt(this)">Laine</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="soie" onclick="selOpt(this)">Soie / Tapis d\'Orient</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TAPIS_BASE+'</div></div>'+
-  '<div class="field-group"><label>Taille du tapis</label>'+
-  '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — choisissez la taille qui ressemble le plus au vôtre.</div>'+
-  '<div class="options-grid">'+
-  '<button class="opt-btn" data-group="tapis-taille" data-m2="1.5" onclick="choisirTailleTapis(this)">Petit<br><span style="font-weight:400;font-size:11px">Descente de lit, couloir</span></button>'+
-  '<button class="opt-btn" data-group="tapis-taille" data-m2="5" onclick="choisirTailleTapis(this)">Moyen<br><span style="font-weight:400;font-size:11px">Devant un canapé, chambre</span></button>'+
-  '<button class="opt-btn" data-group="tapis-taille" data-m2="9" onclick="choisirTailleTapis(this)">Grand<br><span style="font-weight:400;font-size:11px">Salon, salle à manger</span></button>'+
-  '<button class="opt-btn full" data-group="tapis-taille" data-m2="perso" onclick="choisirTailleTapis(this)">Très grand / sur-mesure</button>'+
+  '<div class="field-group"><label>Vos tapis</label>'+
+  '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — indiquez combien vous en avez de chaque taille (plusieurs tapis possibles).</div>'+
+  '<div style="display:flex;flex-direction:column;gap:10px">'+
+    compteurTapisHtml('petit','Petit','Descente de lit, couloir')+
+    compteurTapisHtml('moyen','Moyen','Devant un canapé, chambre')+
+    compteurTapisHtml('grand','Grand','Salon, salle à manger')+
   '</div>'+
-  '<div id="tapis-taille-perso-box" style="display:none;margin-top:8px">'+
-    '<label style="font-size:12.5px">Surface exacte (en m²)</label>'+
-    '<input type="number" id="f-tapis-perso-m2" placeholder="Ex: 15" inputmode="decimal" min="0.1" step="0.1" oninput="majTapisPerso(this.value)">'+
+  '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'+
+    '<label style="font-size:12.5px">Un tapis très grand ou sur-mesure ? <span class="optional">(optionnel)</span></label>'+
+    '<div style="display:flex;gap:8px;margin-top:6px">'+
+      '<input type="number" id="f-tapis-perso-m2" placeholder="Surface en m²" inputmode="decimal" min="0.1" step="0.1" style="flex:1">'+
+      '<button type="button" class="btn" style="width:auto;padding:0 14px;flex-shrink:0" onclick="ajouterTapisPerso()">Ajouter</button>'+
+    '</div>'+
+    '<div id="tapis-perso-liste" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>'+
   '</div>'+
   '<input type="hidden" id="f-quantite">'+
   '</div>'+
   etatBlock()+descBlock('Ex: Taches, poils d\'animaux...')+dateTimeBlock(isLastInFlow())+sendBtn('tapis')}
-function choisirTailleTapis(btn){
-  document.querySelectorAll('[data-group="tapis-taille"]').forEach(function(b){b.classList.remove('sel')});
-  btn.classList.add('sel');
-  var m2=btn.getAttribute('data-m2');
-  var persoBox=document.getElementById('tapis-taille-perso-box');
-  var q=document.getElementById('f-quantite');
-  if(m2==='perso'){
-    if(persoBox)persoBox.style.display='block';
-    var champPerso=document.getElementById('f-tapis-perso-m2');
-    if(q)q.value=champPerso&&champPerso.value?champPerso.value:'';
-  }else{
-    if(persoBox)persoBox.style.display='none';
-    if(q)q.value=m2;
-    updateEstimation();
-  }
+var SURFACE_TAILLES_TAPIS={petit:1.5,moyen:5,grand:9};
+var tapisPersoListe=[];
+function compteurTapisHtml(cle,titre,exemple){
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-alt);border-radius:10px;padding:10px 12px">'+
+    '<div><div style="font-weight:700;font-size:13.5px">'+titre+'</div><div style="font-size:11px;color:var(--gray)">'+exemple+'</div></div>'+
+    '<input type="number" id="f-tapis-'+cle+'" min="0" value="0" inputmode="numeric" style="width:64px;text-align:center;flex-shrink:0" oninput="calculerSurfaceTapisDepuisCompteur()">'+
+  '</div>';
 }
-function majTapisPerso(valeur){
-  var q=document.getElementById('f-quantite');
-  if(q)q.value=valeur;
+function ajouterTapisPerso(){
+  var champ=document.getElementById('f-tapis-perso-m2');
+  var surface=parseFloat(champ.value);
+  if(!champ.value||isNaN(surface)||surface<=0){toast('❌ Indiquez une surface valide en m².');return}
+  tapisPersoListe.push({label:'Tapis sur-mesure ('+surface+' m²)',m2Total:Math.round(surface*10)/10});
+  champ.value='';
+  afficherListeTapisPerso();
+  calculerSurfaceTapisDepuisCompteur();
+}
+function retirerTapisPerso(index){
+  tapisPersoListe.splice(index,1);
+  afficherListeTapisPerso();
+  calculerSurfaceTapisDepuisCompteur();
+}
+function afficherListeTapisPerso(){
+  var liste=document.getElementById('tapis-perso-liste');
+  if(!liste)return;
+  liste.innerHTML=tapisPersoListe.map(function(item,idx){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface-alt);border-radius:8px;padding:8px 10px;font-size:12.5px">'+
+      '<span>'+escapeHtml(item.label)+'</span>'+
+      '<button type="button" onclick="retirerTapisPerso('+idx+')" style="background:none;border:none;color:var(--red);cursor:pointer;font-weight:700;padding:0 4px">✕</button>'+
+    '</div>';
+  }).join('');
+}
+function calculerSurfaceTapisDepuisCompteur(){
+  var total=0;
+  Object.keys(SURFACE_TAILLES_TAPIS).forEach(function(cle){
+    var champ=document.getElementById('f-tapis-'+cle);
+    var n=champ?parseInt(champ.value,10)||0:0;
+    total+=n*SURFACE_TAILLES_TAPIS[cle];
+  });
+  tapisPersoListe.forEach(function(item){total+=item.m2Total});
+  total=Math.round(total*10)/10;
+  var quantiteEl=document.getElementById('f-quantite');
+  if(quantiteEl)quantiteEl.value=total>0?total:'';
   updateEstimation();
 }
 
