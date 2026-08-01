@@ -1461,6 +1461,7 @@ function renderDevisClientCards(){
           photosHtml+='</div>';
         }
         actions=photosHtml+'<button class="btn-accept" style="background:var(--p);width:100%;margin-top:10px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>'+
+          '<button class="btn-accept" style="background:none;border:1.5px solid var(--p);color:var(--p);width:100%;margin-top:8px" onclick="ouvrirRelancerRecurrence(\''+safeDemandeId+'\',\''+safeProName+'\')">🔁 Refaire régulièrement</button>'+
           '<button class="btn-accept" style="background:none;border:1.5px solid var(--gold);color:#B45309;width:100%;margin-top:8px" onclick="ajouterFavori(\''+safeSocieteId+'\',\''+safeProName+'\',this)"><i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px"></i> Ajouter à mes favoris</button>';
         if(notesDonnees.indexOf(v.demande_id)>=0){
           actions+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
@@ -2841,6 +2842,45 @@ async function actionRecurrence(demandeId,action){
     loadDemandes();
   }catch(e){toast(friendlyNetworkError(e))}
 }
+// Propose de refaire une prestation terminée automatiquement, à intervalle régulier — le moment
+// le plus naturel pour en parler au client, juste après qu'il ait apprécié la prestation, plutôt
+// que d'exiger d'y penser dès la création initiale.
+function ouvrirRelancerRecurrence(demandeId,nomPro){
+  var html='<div class="modal-title">🔁 Refaire cette prestation régulièrement ?</div>'+
+    '<div class="modal-sub">Choisissez la fréquence souhaitée</div>'+
+    '<div class="options-grid" style="margin-bottom:14px">'+
+    '<button class="opt-btn" data-group="relance-freq" data-freq="hebdomadaire" onclick="choisirFreqRelance(this)">Chaque semaine</button>'+
+    '<button class="opt-btn" data-group="relance-freq" data-freq="bimensuel" onclick="choisirFreqRelance(this)">Tous les 15 jours</button>'+
+    '<button class="opt-btn" data-group="relance-freq" data-freq="mensuel" onclick="choisirFreqRelance(this)">Chaque mois</button>'+
+    '</div>'+
+    (nomPro?'<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px"><input type="checkbox" id="relance-meme-pro" checked style="width:18px;height:18px"> Adresser en priorité à '+escapeHtml(nomPro)+'</label>':'')+
+    '<button class="btn-accept" style="width:100%" onclick="confirmerRelanceRecurrente(\''+escAttr(demandeId)+'\')">Programmer</button>'+
+    '<div class="err" id="relance-err"></div>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+var freqRelanceChoisie=null;
+function choisirFreqRelance(btn){
+  document.querySelectorAll('[data-group="relance-freq"]').forEach(function(b){b.classList.remove('sel')});
+  btn.classList.add('sel');
+  freqRelanceChoisie=btn.getAttribute('data-freq');
+}
+async function confirmerRelanceRecurrente(demandeId){
+  var errEl=document.getElementById('relance-err');
+  if(errEl)errEl.classList.remove('show');
+  if(!freqRelanceChoisie){if(errEl){errEl.textContent='Choisissez une fréquence.';errEl.classList.add('show')}return}
+  var cibleCheckbox=document.getElementById('relance-meme-pro');
+  var ciblerMemePro=cibleCheckbox?cibleCheckbox.checked:false;
+  try{
+    const r=await fetch(API+'/api/demandes/'+demandeId+'/relancer-recurrente',{method:'POST',headers:authHeaders(),body:JSON.stringify({recurrence:freqRelanceChoisie,cibler_meme_pro:ciblerMemePro})});
+    const d=await safeJson(r);
+    if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
+    toast('✅ '+d.message,4000);
+    closeModal();
+    freqRelanceChoisie=null;
+    loadDemandes();
+  }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
+}
 function ouvrirReprogrammer(demandeId){
   var today=localDateISO(new Date());
   var opts='';
@@ -3256,6 +3296,7 @@ function openServiceForm(type){
   renderPhotoInput();
   if(document.getElementById('prix-estime-box'))updateEstimation();
   if(document.getElementById('favori-cible-block'))chargerFavoriCible(type);
+  if(document.getElementById('recurrence-block'))afficherBlocRecurrence();
 }
 function closeModal(e){if(e.target===document.getElementById('modal-overlay')){closeModalForce()}}
 function closeModalForce(){
@@ -3298,19 +3339,22 @@ function choisirProPrefere(proId,btn){
   afficherBlocRecurrence();
 }
 var recurrenceChoisie=null;
-// La récurrence n'a de sens que si un favori précis est ciblé — sinon, à qui la prochaine
-// occurrence serait-elle adressée ? Le bloc n'apparaît donc que dans ce cas précis.
+// La récurrence est maintenant accessible à tout le monde, favori ou non — sans favori choisi,
+// la prochaine occurrence reste simplement une demande ouverte à tous les pros disponibles,
+// exactement comme la première fois. Le favori, s'il est choisi, devient une option en plus
+// (cibler en priorité le même prestataire), jamais un prérequis pour en profiter.
 function afficherBlocRecurrence(){
   var box=document.getElementById('recurrence-block');
   if(!box)return;
-  recurrenceChoisie=null;
-  if(!proPrefereChoisi){box.innerHTML='';return}
+  var messageExplicatif=proPrefereChoisi
+    ?'La prochaine demande sera adressée en priorité à ce prestataire favori.'
+    :'La prochaine demande restera ouverte à tous les prestataires disponibles, comme celle-ci.';
   box.innerHTML='<div class="field-group"><label>🔁 Répéter cette demande <span class="optional">(optionnel)</span></label>'+
     '<div class="options-grid">'+
     '<button class="opt-btn" data-group="recurrence" data-freq="hebdomadaire" onclick="choisirRecurrence(this)">Chaque semaine</button>'+
     '<button class="opt-btn" data-group="recurrence" data-freq="bimensuel" onclick="choisirRecurrence(this)">Tous les 15 jours</button>'+
     '<button class="opt-btn" data-group="recurrence" data-freq="mensuel" onclick="choisirRecurrence(this)">Chaque mois</button>'+
-    '</div><div style="font-size:11px;color:var(--gray);margin-top:6px">La prochaine demande sera créée automatiquement une fois celle-ci terminée — modifiable ou annulable à tout moment.</div></div>';
+    '</div><div style="font-size:11px;color:var(--gray);margin-top:6px">'+messageExplicatif+' Modifiable ou annulable à tout moment.</div></div>';
 }
 function choisirRecurrence(btn){
   var deja=btn.classList.contains('sel');
