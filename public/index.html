@@ -3612,6 +3612,25 @@ function validerEtapeAssistant(etape){
   if(addrEl&&!addrEl.value.trim())return 'Merci de renseigner l\'adresse d\'intervention.';
   var villeEl=etape.querySelector('#f-ville');
   if(villeEl&&!villeEl.value.trim())return 'Merci de renseigner la ville.';
+  // Vérification de la date/heure directement dans le navigateur du client — comme le navigateur
+  // tourne déjà dans le fuseau horaire réel de l'utilisateur, cette vérification est fiable par
+  // nature, sans le risque de décalage serveur/client que corrigeait le serveur. Une double
+  // protection, jamais superflue pour un créneau de rendez-vous.
+  var dateEl=etape.querySelector('#f-date'),timeEl=etape.querySelector('#f-time');
+  if(dateEl&&dateEl.value){
+    var maintenant=new Date();
+    var choisi=new Date(dateEl.value+'T00:00:00');
+    var aujourdhui=new Date(maintenant.getFullYear(),maintenant.getMonth(),maintenant.getDate());
+    if(choisi<aujourdhui)return 'La date choisie ne peut pas être dans le passé.';
+    if(choisi.getTime()===aujourdhui.getTime()&&timeEl&&timeEl.value){
+      var m=/(\d{1,2})h(\d{2})/.exec(timeEl.value);
+      if(m){
+        var heureChoisie=new Date();
+        heureChoisie.setHours(+m[1],+m[2],0,0);
+        if(heureChoisie<maintenant)return 'Cette heure est déjà passée aujourd\'hui. Choisissez un autre créneau.';
+      }
+    }
+  }
   return null;
 }
 function closeModal(e){if(e.target===document.getElementById('modal-overlay')){closeModalForce()}}
