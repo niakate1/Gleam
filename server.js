@@ -201,19 +201,41 @@ function traduireErreurSupabase(messageOriginal) {
 
 // Vérifie qu'une date (et éventuellement une heure) de créneau n'est pas dans le passé.
 // Retourne un message d'erreur (string) si invalide, ou null si tout va bien.
+// Donne l'heure actuelle EN FRANCE (Europe/Paris), peu importe le fuseau horaire réel du serveur
+// (Railway tourne en UTC) — indispensable ici : comparer une date/heure choisie par un client
+// français à l'heure système du serveur (UTC) crée une fenêtre chaque jour (au moment où Paris a
+// déjà changé de jour calendaire mais pas encore l'UTC) où une heure déjà passée en France pouvait
+// être acceptée sans le moindre blocage. Bug confirmé et corrigé.
+function maintenantEnFrance() {
+  const parts = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(new Date());
+  const get = (type) => parseInt(parts.find(p => p.type === type).value, 10);
+  return { annee: get('year'), mois: get('month'), jour: get('day'), heure: get('hour'), minute: get('minute') };
+}
+
 function validerCreneauFutur(date, time) {
   if (!date) return null;
-  const dateDemandee = new Date(date + 'T00:00:00');
-  if (isNaN(dateDemandee.getTime())) return 'Date invalide.';
-  const aujourdhui = new Date();
-  aujourdhui.setHours(0, 0, 0, 0);
-  if (dateDemandee < aujourdhui) return 'La date choisie ne peut pas être dans le passé.';
-  if (dateDemandee.getTime() === aujourdhui.getTime() && time) {
-    const match = /(\d{1,2})h(\d{2})/.exec(time);
-    if (match) {
-      const heureChoisie = new Date();
-      heureChoisie.setHours(+match[1], +match[2], 0, 0);
-      if (heureChoisie < new Date()) return 'Cette heure est déjà passée aujourd\'hui. Choisissez un autre créneau.';
+  const matchDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!matchDate) return 'Date invalide.';
+  const anneeChoisie = parseInt(matchDate[1], 10);
+  const moisChoisi = parseInt(matchDate[2], 10);
+  const jourChoisi = parseInt(matchDate[3], 10);
+  const maintenant = maintenantEnFrance();
+
+  // Comparaison purement numérique (année, mois, jour) — jamais d'objet Date implicite dont le
+  // fuseau horaire pourrait diverger de celui, français, dans lequel le client raisonne.
+  const dateChoisieNum = anneeChoisie * 10000 + moisChoisi * 100 + jourChoisi;
+  const aujourdhuiNum = maintenant.annee * 10000 + maintenant.mois * 100 + maintenant.jour;
+  if (dateChoisieNum < aujourdhuiNum) return 'La date choisie ne peut pas être dans le passé.';
+
+  if (dateChoisieNum === aujourdhuiNum && time) {
+    const matchHeure = /(\d{1,2})h(\d{2})/.exec(time);
+    if (matchHeure) {
+      const heureChoisieNum = (+matchHeure[1]) * 60 + (+matchHeure[2]);
+      const maintenantNum = maintenant.heure * 60 + maintenant.minute;
+      if (heureChoisieNum < maintenantNum) return 'Cette heure est déjà passée aujourd\'hui. Choisissez un autre créneau.';
     }
   }
   return null;
