@@ -4001,8 +4001,8 @@ function afficherDetailNettoyage(type){
 }
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this);afficherDetailNettoyage(\'interieur\')"><span>🪑</span>Intérieur</button>'+
-  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this);afficherDetailNettoyage(\'exterieur\')"><span>🌤️</span>Extérieur</button>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this);afficherDetailNettoyage(\'interieur\')"><span>💺</span>Intérieur</button>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this);afficherDetailNettoyage(\'exterieur\')"><span>🚗</span>Extérieur</button>'+
   '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this);afficherDetailNettoyage(\'complet\')"><span>🔄</span>Intérieur + Extérieur</button></div>'+
   '<div id="detail-nettoyage-box"></div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
@@ -4015,7 +4015,7 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="monospace" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
-  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚌</span>Utilitaire</button></div></div>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚚</span>Utilitaire</button></div></div>'+
   '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
@@ -4024,7 +4024,7 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<div class="field-group"><label>Emplacement du véhicule</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🅿️</span>Parking souterrain</button>'+
   '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🛣️</span>Rue / voie publique</button>'+
-  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🏢</span>Parking extérieur ouvert</button>'+
+  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>☀️</span>Parking extérieur ouvert</button>'+
   '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🏠</span>Garage privé</button></div></div>'+
   etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
@@ -4033,9 +4033,9 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
 var DETAIL_CANAPE_BASE='Aspiration approfondie • Nettoyage vapeur ou injection-extraction • Détachage courant';
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span>➡️</span>Droit</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span>➖</span>Droit</button>'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="angle" onclick="selOpt(this)"><span>📐</span>Angle</button>'+
-  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="u_panoramique" onclick="selOpt(this)"><span>🔄</span>En U / Panoramique</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="u_panoramique" onclick="selOpt(this)"><span>🧲</span>En U / Panoramique</button>'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="canape_lit" onclick="selOpt(this)"><span>🛌</span>Canapé lit</button>'+
   '<button class="opt-btn full" data-group="can-type" data-coef-key="forme" data-coef-val="chauffeuses" onclick="selOpt(this)"><span>🪑</span>Chauffeuses</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_CANAPE_BASE+'</div></div>'+
@@ -4092,7 +4092,7 @@ function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</d
   '<button class="opt-btn full" data-group="pisc-int" data-coef-key="intervention" data-coef-val="eau_verte" onclick="selOpt(this)">Eau verte / remise en état</button></div></div>'+
   '<div class="field-group"><label>Type de bassin</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="enterree" onclick="selOpt(this)"><span>🏊</span>Enterrée</button>'+
-  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="hors_sol" onclick="selOpt(this)"><span>🏖️</span>Hors-sol</button>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="hors_sol" onclick="selOpt(this)"><span>🛢️</span>Hors-sol</button>'+
   '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="semi_enterree" onclick="selOpt(this)"><span>🌊</span>Semi-enterrée</button>'+
   '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="spa_jacuzzi" onclick="selOpt(this)"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
   '<div class="field-group"><label>Surface</label><div class="options-grid">'+
@@ -4115,9 +4115,9 @@ var DETAIL_VITRES_BASE='Nettoyage des vitres, cadres et rebords • Produit anti
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
   '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this);afficherQuantiteVitres(\'maison\')">🏠 Maison</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this);afficherQuantiteVitres(\'appartement\')">🏢 Appartement</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this);afficherQuantiteVitres(\'appartement\')">🏘️ Appartement</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this);afficherQuantiteVitres(\'commerce\')">🏪 Commerce</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this);afficherQuantiteVitres(\'bureaux\')">🏭 Bureaux</button></div>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this);afficherQuantiteVitres(\'bureaux\')">🏢 Bureaux</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_VITRES_BASE+'</div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
   '<button class="opt-btn full" data-group="vitres-options" data-option-val="acces_difficile" onclick="toggleOption(this)"><span>🪜</span>Accès difficile / hauteur (nacelle, perche télescopique)</button></div></div>'+
