@@ -65,20 +65,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// Diagnostic temporaire, sûr à laisser en production : n'affiche jamais la clé complète, juste
-// de quoi vérifier avec certitude laquelle est réellement chargée par Railway au démarrage —
-// après plusieurs tentatives infructueuses de remplacement de la clé, impossible de savoir sans
-// ça si la bonne valeur est vraiment prise en compte par le processus en cours d'exécution.
-(() => {
-  const cle = process.env.SUPABASE_SERVICE_KEY || '';
-  const debut = cle.slice(0, 12);
-  const type = cle.startsWith('sb_secret_') ? 'nouvelle clé secrète (sb_secret_)'
-    : cle.startsWith('eyJ') ? 'ancienne clé JWT (service_role, commence par eyJ)'
-    : cle ? 'format non reconnu'
-    : 'ABSENTE — variable non définie !';
-  console.log('🔑 Clé Supabase chargée : ' + type + ' — longueur : ' + cle.length + ' caractères — début : "' + debut + '..."');
-})();
-
 app.use(helmet());
 // CORS restreint au(x) domaine(s) réel(s) de Gleam plutôt qu'ouvert à n'importe quelle origine.
 //
