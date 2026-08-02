@@ -1,4 +1,18 @@
 require('dotenv').config();
+// Suivi des erreurs en production (Sentry) — protégé : si la clé DSN est absente ou invalide, le
+// serveur démarre quand même normalement, exactement comme pour les autres services optionnels
+// (Twilio, web-push) déjà protégés de la même façon plus loin dans ce fichier.
+const Sentry = require('@sentry/node');
+if (process.env.SENTRY_DSN) {
+  try {
+    Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development' });
+    console.log('✅ Suivi des erreurs (Sentry) configuré.');
+  } catch (e) {
+    console.error('⚠️ Sentry non configuré (erreur ignorée, le serveur démarre quand même):', e.message);
+  }
+} else {
+  console.log('ℹ️ Suivi des erreurs (Sentry) non configuré (SENTRY_DSN absent).');
+}
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -2933,6 +2947,13 @@ app.use((err, req, res, next) => {
 app.use((req, res) => {
   res.status(404).json({ error: 'Route introuvable.' });
 });
+
+// Remonte à Sentry toute erreur non gérée survenue dans une route — doit être ajouté après toutes
+// les routes, mais avant le démarrage du serveur. Protégé de la même façon que l'initialisation :
+// si Sentry n'est pas configuré, cette ligne ne fait tout simplement rien.
+if (process.env.SENTRY_DSN && Sentry.setupExpressErrorHandler) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, function() {
