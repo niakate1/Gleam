@@ -23,11 +23,56 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#6D28D9;--p2:#4C1D95;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151;--shadow-sm:0 1px 2px rgba(17,24,39,.06),0 1px 1px rgba(17,24,39,.04);--shadow-md:0 4px 16px rgba(17,24,39,.08),0 1px 3px rgba(17,24,39,.06);--shadow-lg:0 12px 40px rgba(17,24,39,.12),0 2px 8px rgba(17,24,39,.06)}
+:root{--p:#6D28D9;--p2:#4C1D95;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151;--shadow-sm:0 1px 2px rgba(17,24,39,.06),0 1px 1px rgba(17,24,39,.04);--shadow-md:0 4px 16px rgba(17,24,39,.08),0 1px 3px rgba(17,24,39,.06);--shadow-lg:0 12px 40px rgba(17,24,39,.12),0 2px 8px rgba(17,24,39,.06);
+  /* Échelle de mouvement — deux courbes seulement, utilisées partout pour une sensation cohérente plutôt que des durées choisies au hasard écran par écran */
+  --ease-out:cubic-bezier(.16,1,.3,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);--dur-fast:150ms;--dur-base:280ms;--dur-slow:480ms;
+  /* Échelle d'élévation supplémentaire, plus fine que shadow-sm/md/lg, pour les survols et l'état pressé des cartes/boutons */
+  --shadow-xs:0 1px 2px rgba(17,24,39,.04);--shadow-xl:0 20px 60px rgba(17,24,39,.16),0 4px 12px rgba(17,24,39,.08);--ring-focus:0 0 0 3px rgba(109,40,217,.35)}
 @media (prefers-color-scheme: dark){
-  :root{--p:#A78BFA;--p2:#C4B5FD;--light:#2D2440;--gray:#9CA3AF;--border:#333846;--red:#F87171;--green:#34D399;--gold:#FBC85C;--mint:#2DD4BF;--bg:#0F1115;--surface:#1A1D23;--surface-alt:#23272F;--text:#F3F4F6;--text-secondary:#D1D5DB;--shadow-sm:0 1px 2px rgba(0,0,0,.3);--shadow-md:0 4px 16px rgba(0,0,0,.35);--shadow-lg:0 12px 40px rgba(0,0,0,.45)}
+  :root{--p:#A78BFA;--p2:#C4B5FD;--light:#2D2440;--gray:#9CA3AF;--border:#333846;--red:#F87171;--green:#34D399;--gold:#FBC85C;--mint:#2DD4BF;--bg:#0F1115;--surface:#1A1D23;--surface-alt:#23272F;--text:#F3F4F6;--text-secondary:#D1D5DB;--shadow-sm:0 1px 2px rgba(0,0,0,.3);--shadow-md:0 4px 16px rgba(0,0,0,.35);--shadow-lg:0 12px 40px rgba(0,0,0,.45);--shadow-xs:0 1px 2px rgba(0,0,0,.25);--shadow-xl:0 20px 60px rgba(0,0,0,.55);--ring-focus:0 0 0 3px rgba(167,139,250,.4)}
 }
+/* Bascule manuelle : ces deux attributs forcent explicitement un thème, quelle que soit la
+   préférence système — l'utilisateur garde toujours la main, en plus du choix automatique. */
+html[data-theme="dark"]{--p:#A78BFA;--p2:#C4B5FD;--light:#2D2440;--gray:#9CA3AF;--border:#333846;--red:#F87171;--green:#34D399;--gold:#FBC85C;--mint:#2DD4BF;--bg:#0F1115;--surface:#1A1D23;--surface-alt:#23272F;--text:#F3F4F6;--text-secondary:#D1D5DB;--shadow-sm:0 1px 2px rgba(0,0,0,.3);--shadow-md:0 4px 16px rgba(0,0,0,.35);--shadow-lg:0 12px 40px rgba(0,0,0,.45);--shadow-xs:0 1px 2px rgba(0,0,0,.25);--shadow-xl:0 20px 60px rgba(0,0,0,.55);--ring-focus:0 0 0 3px rgba(167,139,250,.4)}
+html[data-theme="light"]{--p:#6D28D9;--p2:#4C1D95;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151;--shadow-sm:0 1px 2px rgba(17,24,39,.06),0 1px 1px rgba(17,24,39,.04);--shadow-md:0 4px 16px rgba(17,24,39,.08),0 1px 3px rgba(17,24,39,.06);--shadow-lg:0 12px 40px rgba(17,24,39,.12),0 2px 8px rgba(17,24,39,.06);--shadow-xs:0 1px 2px rgba(17,24,39,.04);--shadow-xl:0 20px 60px rgba(17,24,39,.16),0 4px 12px rgba(17,24,39,.08);--ring-focus:0 0 0 3px rgba(109,40,217,.35)}
+*{transition:background-color var(--dur-base) var(--ease-out),border-color var(--dur-base) var(--ease-out)}
 body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+
+/* ===== Composants premium réutilisables ===== */
+
+/* Le "gleam" signature : un reflet lumineux qui balaie un élément une seule fois — le geste
+   visuel qui donne son nom à l'application, réservé aux moments qui le méritent (démarrage,
+   validation d'une action importante) plutôt que dispersé partout. */
+@keyframes gleam-sweep{0%{transform:translateX(-150%) skewX(-20deg)}100%{transform:translateX(250%) skewX(-20deg)}}
+.gleam-effet{position:relative;overflow:hidden}
+.gleam-effet::after{content:'';position:absolute;top:0;left:0;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:gleam-sweep 1.8s var(--ease-out)}
+
+/* Squelettes de chargement — un dégradé qui respire doucement, jamais un simple gris plat */
+@keyframes squelette-respire{0%,100%{opacity:1}50%{opacity:.55}}
+.squelette{background:linear-gradient(90deg,var(--surface-alt) 25%,var(--border) 37%,var(--surface-alt) 63%);background-size:400% 100%;border-radius:10px;animation:squelette-respire 1.4s ease-in-out infinite}
+.squelette-ligne{height:14px;margin-bottom:8px}
+.squelette-titre{height:20px;width:60%;margin-bottom:10px}
+.squelette-carte{height:96px;border-radius:16px;margin-bottom:12px}
+.squelette-avatar{width:44px;height:44px;border-radius:50%;flex-shrink:0}
+
+/* État vide illustré — jamais un écran nu : une illustration, un titre, une phrase d'action */
+.etat-vide{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 24px;animation:fondu-monte var(--dur-slow) var(--ease-out)}
+.etat-vide svg{width:150px;height:150px;margin-bottom:20px}
+.etat-vide h3{font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:600;margin-bottom:6px;color:var(--text)}
+.etat-vide p{font-size:13.5px;color:var(--gray);max-width:280px;line-height:1.5;margin-bottom:18px}
+
+@keyframes fondu-monte{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.fade-in-item{animation:fondu-monte var(--dur-base) var(--ease-out) backwards}
+
+/* Cartes premium — élévation qui répond au survol, jamais statique */
+.carte-premium{background:var(--surface);border-radius:18px;border:1px solid var(--border);box-shadow:var(--shadow-xs);transition:box-shadow var(--dur-base) var(--ease-out),transform var(--dur-base) var(--ease-out)}
+.carte-premium:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.carte-premium:active{transform:translateY(0);box-shadow:var(--shadow-sm)}
+
+/* Bouton bascule thème */
+.theme-toggle{width:40px;height:40px;border-radius:50%;background:var(--surface-alt);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform var(--dur-fast) var(--ease-spring)}
+.theme-toggle:active{transform:scale(.88)}
 .font-display{font-family:'Fraunces',Georgia,serif}
 .screen{display:none;min-height:100vh;flex-direction:column}
 .screen.active{display:flex}
@@ -310,6 +355,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 </style>
 </head>
 <body>
+<!-- Écran de démarrage — le seul endroit où l'effet "gleam" (reflet lumineux) se déclenche sur le
+     nom de l'app lui-même : le moment le plus logique pour ce clin d'œil au nom de la marque,
+     jamais répété ailleurs pour ne pas user l'effet. Se referme tout seul après une seconde (la
+     fermeture est déclenchée depuis le bloc JS principal, plus bas, pour n'en garder qu'un seul). -->
+<div id="splash-screen" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#6D28D9,#3B1878 65%,#2A1150);transition:opacity .5s var(--ease-out),visibility .5s">
+  <div class="gleam-effet" style="font-family:'Fraunces',Georgia,serif;font-size:38px;font-weight:600;color:#fff;letter-spacing:-.02em">Gleam</div>
+</div>
 <div class="toast" id="toast"></div>
 
 <!-- AUTH -->
@@ -601,6 +653,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
     <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p><div id="profile-type-badge" style="display:none;margin-top:6px"></div><div id="profile-note" style="display:none;margin-top:8px"></div></div>
     <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
     <div class="profile-menu">
+      <div class="profile-item" onclick="basculerTheme()"><span class="pi-icon"><i id="theme-toggle-icon" data-lucide="moon" style="width:20px;height:20px"></i></span><span class="pi-text">Apparence claire / sombre</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="toggleNotificationsPush()"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow" id="notif-statut-client">Activer</span></div>
@@ -672,6 +725,46 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <script src="https://unpkg.com/lucide@1.25.0/dist/umd/lucide.js"></script>
 <script>
 const API='https://gleam-production-9b95.up.railway.app';
+
+// Écran de démarrage — se referme tout seul, une seule fois par ouverture de l'app.
+setTimeout(function(){
+  var splash=document.getElementById('splash-screen');
+  if(splash){splash.style.opacity='0';splash.style.visibility='hidden';setTimeout(function(){splash.remove()},500)}
+},1000);
+
+// Bascule manuelle de thème — mémorisée d'une visite à l'autre, sans jamais dépendre uniquement
+// de la préférence système. Sans choix explicite de l'utilisateur, l'app suit le système (déjà
+// géré par le CSS via prefers-color-scheme) ; dès qu'il choisit, ce choix prévaut toujours.
+function appliquerTheme(theme){
+  if(theme==='dark'||theme==='light'){
+    document.documentElement.setAttribute('data-theme',theme);
+    localStorage.setItem('gleam-theme',theme);
+  }else{
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.removeItem('gleam-theme');
+  }
+  majIconeTheme();
+}
+function basculerTheme(){
+  var actuel=localStorage.getItem('gleam-theme');
+  var systemeSombre=window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var estSombreActuellement=actuel?actuel==='dark':systemeSombre;
+  appliquerTheme(estSombreActuellement?'light':'dark');
+}
+function majIconeTheme(){
+  var icone=document.getElementById('theme-toggle-icon');
+  if(!icone)return;
+  var actuel=localStorage.getItem('gleam-theme');
+  var systemeSombre=window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var estSombre=actuel?actuel==='dark':systemeSombre;
+  icone.setAttribute('data-lucide',estSombre?'sun':'moon');
+  if(window.lucide)lucide.createIcons();
+}
+(function(){
+  var themeMemorise=localStorage.getItem('gleam-theme');
+  if(themeMemorise)document.documentElement.setAttribute('data-theme',themeMemorise);
+})();
+
 // Intercepte TOUTES les requêtes réseau de l'app : si une réponse 401 (session expirée/invalide)
 // arrive sur une requête authentifiée, l'utilisateur est prévenu et déconnecté proprement —
 // plutôt que de devoir ajouter cette vérification à chacun des nombreux appels au serveur.
@@ -1257,7 +1350,7 @@ async function loadDemandes(silent){
     const c=document.getElementById('recent-demands');
     renderActiveRequestBanner(dataAll);
     var data=(dataAll||[]).filter(function(d){return!d.archivee_client});
-    if(!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.</p></div>';return}
+    if(!data.length){c.innerHTML=emptyStateHtml({title:'Aucune demande pour l\u2019instant',sub:'Lancez votre première demande de nettoyage en quelques secondes.',ctaLabel:'Créer une demande',ctaAction:'goTab(\'home\')'});return}
 
     var order={en_cours:0,acceptee:1,devis_recus:2,en_attente:3,terminee:4,expiree:5};
     data.sort(function(a,b){return(order[a.statut]??9)-(order[b.statut]??9)});
