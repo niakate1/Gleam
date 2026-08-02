@@ -12,6 +12,7 @@
     "cors": "^2.8.5",
     "@supabase/supabase-js": "^2.97.0",
     "@sentry/node": "^8.0.0",
+    "ws": "^8.18.0",
     "stripe": "^14.10.0",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
