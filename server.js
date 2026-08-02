@@ -74,9 +74,17 @@ async function envoyerNotificationPush(userId, { titre, corps, url }) {
 const app = express();
 app.set('trust proxy', 1);
 
+// Le client "temps réel" de Supabase (basé sur WebSocket) n'est jamais utilisé dans ce projet —
+// aucune fonctionnalité de ce type nulle part dans ce fichier. Mais la bibliothèque l'initialise
+// quand même en interne dès la création du client, quoi qu'il arrive. Les versions récentes
+// exigent donc explicitement un transport WebSocket pour Node < 22 (Railway tourne sur Node 20),
+// sans quoi la création du client échoue immédiatement au démarrage — solution officielle
+// documentée par Supabase : fournir le paquet "ws" en transport, même sans s'en servir ensuite.
+const WebSocketTransport = require('ws');
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_KEY,
+  { realtime: { transport: WebSocketTransport }, auth: { persistSession: false } }
 );
 
 app.use(helmet());
