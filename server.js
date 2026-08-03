@@ -1030,18 +1030,21 @@ app.post('/api/demandes', auth, async (req, res) => {
 
     if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
 
-    // 📧 Email "nouvelle demande" désactivé pour l'instant (risque de spam pour les pros).
-    // Pour le réactiver, décommentez le bloc ci-dessous :
-    // supabase.from('users').select('email, prenom').eq('type', 'pro').eq('disponible', true)
-    //   .then(({ data: pros }) => {
-    //     (pros || []).forEach((pro) => {
-    //       sendEmail('nouvelle_demande', pro.email, {
-    //         prenom: pro.prenom,
-    //         prestation: prestationLabel,
-    //         ville: address
-    //       });
-    //     });
-    //   });
+    // 📧 Notification aux prestataires — réactivée, mais CIBLÉE.
+    // Le bloc d'origine écrivait à tous les pros disponibles sans distinction de
+    // zone ni de prestation, d'où sa mise en sommeil. prosConcernesParDemande()
+    // applique désormais les mêmes règles que /api/demandes/all : un pro ne reçoit
+    // un email que pour une demande qu'il verrait dans son application.
+    //
+    // Volontairement sans await : la réponse au client ne doit pas attendre
+    // l'envoi des emails.
+    notifierProsPourDemande(data, 'nouvelle_demande')
+      .then((nb) => {
+        if (nb > 0) supabase.from('demandes')
+          .update({ notifiee_pros_le: new Date().toISOString() }).eq('id', data.id)
+          .then(() => {}, () => {});
+      })
+      .catch((e) => console.error('Notification création:', e.message));
 
     res.status(201).json(data);
   } catch (e) {
@@ -1108,6 +1111,188 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
     }
   } catch (e) {
     console.error('Erreur création occurrence récurrente:', e.message);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CIBLAGE DES PRESTATAIRES
+//
+// Applique exactement les mêmes règles que /api/demandes/all, pour une raison
+// simple : un pro ne doit jamais recevoir un email à propos d'une demande qu'il
+// ne verrait pas en ouvrant l'application. L'inverse serait pire que le silence.
+//
+//   · disponible, et compte non supprimé
+//   · prestations déclarées correspondant à la demande (si le pro en a déclaré)
+//   · zone d'intervention couvrant l'adresse (si le pro l'a configurée)
+//   · demande adressée à un favori : ce pro-là uniquement
+//
+// C'est ce ciblage qui rend la notification réactivable. Le bloc d'origine
+// écrivait à tous les pros disponibles sans distinction — d'où sa mise en
+// sommeil, justifiée à l'époque.
+// ─────────────────────────────────────────────────────────────────────────────
+const PLAFOND_PROS_NOTIFIES = 25;
+
+async function prosConcernesParDemande(demande) {
+  const { data: pros } = await supabase
+    .from('users')
+    .select('id, email, prenom, prestations_proposees, latitude, longitude, rayon_intervention_km, compte_supprime')
+    .eq('disponible', true);
+  if (!pros || !pros.length) return [];
+
+  const typesDemandes = extractPrestationTypes(demande);
+
+  let retenus = pros.filter((pro) => {
+    if (pro.compte_supprime) return false;
+    if (!pro.email) return false;
+
+    // Demande réservée à un prestataire favori : lui seul est concerné.
+    if (demande.pro_prefere_id) return pro.id === demande.pro_prefere_id;
+
+    // Prestations déclarées. Un pro qui n'a rien configuré continue de tout
+    // recevoir, exactement comme il voit tout dans l'application.
+    if (Array.isArray(pro.prestations_proposees) && pro.prestations_proposees.length) {
+      const proposees = new Set(pro.prestations_proposees);
+      if (!typesDemandes.some((t) => proposees.has(t))) return false;
+    }
+    return true;
+  });
+
+  // Zone d'intervention, et tri par proximité : quand le plafond s'applique,
+  // ce sont les plus proches qui sont prévenus.
+  // Un prestataire explicitement désigné par le client échappe au filtre de zone :
+  // c'est LUI que le client demande, la distance ne le regarde que lui. Sans cette
+  // exception, une demande adressée à un favori situé hors de son rayon n'était
+  // visible de personne — ni de lui (filtre de zone), ni des autres (filtre de
+  // favori) — et expirait sans avoir jamais été vue.
+  const estFavoriDesigne = !!demande.pro_prefere_id;
+
+  retenus = retenus.map((pro) => {
+    const zoneReglee = !estFavoriDesigne
+      && typeof pro.latitude === 'number' && typeof pro.longitude === 'number'
+      && typeof pro.rayon_intervention_km === 'number';
+    if (!zoneReglee || typeof demande.latitude !== 'number' || typeof demande.longitude !== 'number') {
+      return { ...pro, distance_km: null, zoneReglee };
+    }
+    const d = Math.round(distanceKm(pro.latitude, pro.longitude, demande.latitude, demande.longitude) * 10) / 10;
+    return { ...pro, distance_km: d, zoneReglee };
+  }).filter((pro) => !pro.zoneReglee || pro.distance_km === null || pro.distance_km <= pro.rayon_intervention_km);
+
+  retenus.sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
+  return retenus.slice(0, PLAFOND_PROS_NOTIFIES);
+}
+
+// Envoie la notification correspondante. `gabarit` vaut 'nouvelle_demande' à la
+// création, ou 'demande_sans_devis_pro' pour la relance à 24 h.
+async function notifierProsPourDemande(demande, gabarit) {
+  try {
+    const pros = await prosConcernesParDemande(demande);
+    if (!pros.length) {
+      console.log('📭 Aucun prestataire ne correspond à la demande ' + demande.id);
+      return 0;
+    }
+
+    const relance = gabarit === 'demande_sans_devis_pro';
+    const ville = (demande.adresse || '').split(',').pop().trim() || demande.adresse;
+
+    for (const pro of pros) {
+      sendEmail(gabarit, pro.email, {
+        prenom: pro.prenom,
+        prestation: demande.prestation,
+        ville,
+        distance: pro.distance_km,
+        creneau: demande.creneau
+      }).catch((e) => console.error('Email ' + gabarit + ':', e.message));
+
+      envoyerNotificationPush(pro.id, {
+        titre: relance ? 'Demande toujours sans devis' : 'Nouvelle demande disponible',
+        corps: demande.prestation + ' à ' + ville + (pro.distance_km !== null ? ' — ' + pro.distance_km + ' km' : ''),
+        url: '/'
+      }).catch(() => {});
+    }
+
+    console.log('📨 ' + pros.length + ' prestataire(s) notifié(s) — ' + gabarit + ' — demande ' + demande.id);
+    return pros.length;
+  } catch (e) {
+    // Une notification qui échoue ne doit jamais faire échouer la création
+    // d'une demande ni interrompre le balayage.
+    console.error('Notification prestataires:', e.message);
+    return 0;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RELANCES
+//
+// Une demande sans devis mourait jusqu'ici en silence : ni le pro, ni le client
+// n'apprenait quoi que ce soit avant l'expiration. Sur vos données, 19 demandes
+// sur 52 ont connu ce sort.
+//
+// Les marqueurs en base garantissent qu'une relance part une fois : sans eux,
+// ce balayage qui tourne toutes les 15 minutes la renverrait indéfiniment.
+// ─────────────────────────────────────────────────────────────────────────────
+async function relancerDemandesSansDevis() {
+  try {
+    const ilYA = (h) => new Date(Date.now() - h * 3600 * 1000).toISOString();
+
+    // — Relance aux prestataires, 24 h après publication —
+    const { data: pourPros } = await supabase
+      .from('demandes')
+      .select('*')
+      .eq('statut', 'en_attente')
+      .is('relance_pro_le', null)
+      .lt('created_at', ilYA(24))
+      .limit(50);
+
+    for (const demande of (pourPros || [])) {
+      const { count } = await supabase.from('devis')
+        .select('id', { count: 'exact', head: true }).eq('demande_id', demande.id);
+      if (count && count > 0) continue;   // un devis est arrivé entre-temps
+
+      await notifierProsPourDemande(demande, 'demande_sans_devis_pro');
+      await supabase.from('demandes')
+        .update({ relance_pro_le: new Date().toISOString() }).eq('id', demande.id);
+    }
+
+    // — Message au client, 48 h après publication —
+    const { data: pourClients } = await supabase
+      .from('demandes')
+      .select('*')
+      .eq('statut', 'en_attente')
+      .is('relance_client_le', null)
+      .lt('created_at', ilYA(48))
+      .limit(50);
+
+    for (const demande of (pourClients || [])) {
+      const { count } = await supabase.from('devis')
+        .select('id', { count: 'exact', head: true }).eq('demande_id', demande.id);
+      if (count && count > 0) continue;
+
+      const { data: client } = await supabase.from('users')
+        .select('email, prenom, compte_supprime').eq('id', demande.client_id).maybeSingle();
+
+      if (client && client.email && !client.compte_supprime) {
+        sendEmail('demande_sans_devis_client', client.email, {
+          prenom: client.prenom,
+          prestation: demande.prestation,
+          demandeId: demande.id,
+          creneau: demande.creneau
+        }).catch((e) => console.error('Email relance client:', e.message));
+
+        envoyerNotificationPush(demande.client_id, {
+          titre: 'Votre demande attend toujours',
+          corps: 'Élargir votre créneau augmenterait vos chances de recevoir un devis.',
+          url: '/'
+        }).catch(() => {});
+      }
+
+      await supabase.from('demandes')
+        .update({ relance_client_le: new Date().toISOString() }).eq('id', demande.id);
+    }
+
+    const total = (pourPros || []).length + (pourClients || []).length;
+    if (total) console.log('🔔 Relances traitées : ' + total + ' demande(s).');
+  } catch (e) {
+    console.error('Relances:', e.message);
   }
 }
 
@@ -1211,7 +1396,15 @@ app.get('/api/demandes/all', auth, async (req, res) => {
       return { ...d, distance_km: null };
     });
     if (proAConfigureZone) {
-      filtered = filtered.filter(d => d.distance_km === null || d.distance_km <= user.rayon_intervention_km);
+      // Une demande adressée en priorité à CE prestataire reste visible quelle que
+      // soit la distance : le client l'a choisi délibérément. Sans cette exception,
+      // elle était écartée ici après l'avoir été pour tous les autres par le filtre
+      // de favori juste au-dessus — donc invisible de tout le monde, jusqu'à
+      // expiration silencieuse.
+      filtered = filtered.filter(d =>
+        d.pro_prefere_id === req.user.id
+        || d.distance_km === null
+        || d.distance_km <= user.rayon_intervention_km);
     }
 
     res.json(filtered);
@@ -3177,11 +3370,8 @@ if (process.env.SENTRY_DSN && Sentry.setupExpressErrorHandler) {
 // ne consultait ne expirait jamais. Ce balayage couvre toute la table,
 // indépendamment du trafic.
 //
-// C'est aussi le bon endroit pour brancher les relances qui manquent
-// aujourd'hui — prévenir les pros de la zone à 24 h sans devis, proposer au
-// client d'élargir son créneau à 48 h. Elles ne sont pas ajoutées ici parce
-// qu'elles supposent de nouveaux gabarits dans ./email : les appeler sans les
-// avoir créés échouerait silencieusement.
+// Les relances à 24 h et 48 h sont désormais traitées par
+// relancerDemandesSansDevis(), sur son propre minuteur.
 // ─────────────────────────────────────────────────────────────────────────
 async function balayerDemandesExpirees() {
   try {
@@ -3205,6 +3395,11 @@ async function balayerDemandesExpirees() {
 // le temps que la connexion à la base soit établie.
 setInterval(balayerDemandesExpirees, 15 * 60 * 1000);
 setTimeout(balayerDemandesExpirees, 30 * 1000);
+
+// Les relances suivent le même rythme, décalées de 30 secondes pour ne pas
+// solliciter la base en même temps que le balayage des expirations.
+setInterval(relancerDemandesSansDevis, 15 * 60 * 1000);
+setTimeout(relancerDemandesSansDevis, 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, function() {
