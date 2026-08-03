@@ -2259,14 +2259,26 @@ function enterApp(){
     reponsesCapturees=null;
     setTimeout(async function(){
       try{
-        toast('Vous y êtes presque — voici votre demande, prête à finaliser !',3500);
+        toast('Bon retour — il ne manque plus que votre adresse.',4000);
         await openServiceForm(typeAReouvrir);
         restaurerReponsesFormulaire(reponsesARestaurer);
         if(assistantEtapes.length){
+          // On vise l'étape qui contient réellement le champ d'adresse, et non la
+          // dernière étape du formulaire. Après l'adresse viennent encore le favori,
+          // la récurrence et les photos : viser la fin faisait atterrir la personne
+          // sur les photos, sans jamais lui montrer ni le créneau ni l'adresse — et
+          // l'envoi échouait alors sur « adresse manquante », pour un champ qui
+          // n'était affiché nulle part. C'était une impasse.
+          var cibleAdresse=-1;
+          for(var iEtape=0;iEtape<assistantEtapes.length;iEtape++){
+            if(assistantEtapes[iEtape].querySelector('#f-addr')){cibleAdresse=iEtape;break}
+          }
+          if(cibleAdresse<0)cibleAdresse=0;
           assistantEtapes[assistantIndexActuel].style.display='none';
-          assistantIndexActuel=assistantEtapes.length-1;
+          assistantIndexActuel=cibleAdresse;
           assistantEtapes[assistantIndexActuel].style.display='block';
           majBarreProgression();
+          document.getElementById('modal-body').scrollTop=0;
         }
         if(document.getElementById('prix-estime-box'))updateEstimation();
       }catch(e){
@@ -5124,8 +5136,21 @@ function majBarreProgression(){
 // la dernière garde le vrai bouton d'envoi du formulaire original, jamais remplacé.
 function ajouterBoutonSuivant(){
   assistantEtapes.forEach(function(etape,idx){
-    if(idx===assistantEtapes.length-1)return; // dernière étape : vrai bouton d'envoi déjà présent
     if(etape.querySelector('.assistant-nav'))return; // déjà ajouté
+    if(idx===assistantEtapes.length-1){
+      // La dernière étape garde son vrai bouton d'envoi, mais reçoit un retour :
+      // sans lui, arrivé au bout du formulaire, on ne pouvait plus revenir corriger
+      // une réponse — il fallait tout fermer et tout recommencer.
+      if(idx===0)return;
+      var retour=document.createElement('button');
+      retour.type='button';
+      retour.className='assistant-nav';
+      retour.textContent='← Revenir en arrière';
+      retour.style.cssText='width:100%;padding:12px 16px;margin-top:10px;background:none;border:2px solid var(--border);color:var(--text-secondary);border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer';
+      retour.onclick=function(){assistantEtapePrecedente()};
+      etape.appendChild(retour);
+      return;
+    }
     var nav=document.createElement('div');
     nav.className='assistant-nav';
     nav.style.cssText='display:flex;gap:8px;margin-top:14px';
@@ -5244,11 +5269,16 @@ function capturerReponsesFormulaireActuel(){
     if(groupe&&valeur)selections.push({groupe:groupe,valeur:valeur});
   });
   var champs={};
-  body.querySelectorAll('input[id],textarea[id]').forEach(function(champ){
+  // Les listes déroulantes sont désormais incluses : sans elles, l'heure choisie
+  // (un <select>) était perdue à la reconnexion et repartait sur la valeur par défaut.
+  body.querySelectorAll('input[id],textarea[id],select[id]').forEach(function(champ){
     if(champ.type==='checkbox'){if(champ.checked)champs[champ.id]=true}
     else if(champ.value)champs[champ.id]=champ.value;
   });
-  return {selections:selections,champs:champs};
+  // La flexibilité horaire n'est pas un .opt-btn mais un .flex-opt : elle échappait
+  // entièrement à la capture et retombait silencieusement sur « Heure exacte ».
+  var flexChoisie=body.querySelector('.flex-opt.sel');
+  return {selections:selections,champs:champs,flexibilite:flexChoisie?flexChoisie.textContent.trim():null};
 }
 // Réapplique fidèlement les réponses capturées sur le formulaire fraîchement rouvert — clique
 // réellement chaque bouton (pour déclencher toute la logique associée, comme selOpt ou les
@@ -5264,8 +5294,19 @@ function restaurerReponsesFormulaire(reponses){
     var champ=document.getElementById(id);
     if(!champ)return;
     if(champ.type==='checkbox')champ.checked=true;
-    else{champ.value=reponses.champs[id];champ.dispatchEvent(new Event('input'))}
+    else{
+      champ.value=reponses.champs[id];
+      // Un <select> écoute 'change', pas 'input' : les deux sont émis pour couvrir
+      // les champs texte comme les listes déroulantes.
+      champ.dispatchEvent(new Event('input'));
+      champ.dispatchEvent(new Event('change'));
+    }
   });
+  if(reponses.flexibilite){
+    document.querySelectorAll('#modal-body .flex-opt').forEach(function(b){
+      if(b.textContent.trim()===reponses.flexibilite)selFlex(b);
+    });
+  }
 }
 function demanderConnexionPourContinuer(onglet){
   reponsesCapturees=capturerReponsesFormulaireActuel();
@@ -5346,38 +5387,54 @@ function choisirRecurrence(btn){
     recurrenceChoisie=parseInt(jours,10);
   }
 }
-function dateTimeBlock(isLast){
-  var today=localDateISO(new Date());
-  if(multiFlow.active&&!isLast)return '<div class="divider"></div><div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">📅 La date, l\'heure et l\'adresse seront demandées à la dernière étape.</div>';
-  // Le compte n'est jamais demandé avant ce point précis — la personne a déjà répondu à toutes
-  // les questions sur sa prestation, exactement comme les applications comparables (Uber, Airbnb) :
-  // on donne d'abord envie, on ne demande le compte qu'au moment où il devient réellement utile
-  // (recevoir des devis suppose une adresse liée à un profil, donc une identité).
-  if(!currentUser){
-    return '<div class="divider"></div>'+
-      '<div class="field-group" id="portail-connexion-requise" style="text-align:center;padding:8px 4px">'+
-        '<div style="width:52px;height:52px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i data-lucide="party-popper" style="width:26px;height:26px"></i></div>'+
-        '<h3 class="font-display" style="font-size:19px;font-weight:600;margin-bottom:8px">Votre demande est prête !</h3>'+
-        '<p style="font-size:13.5px;color:var(--text-secondary);line-height:1.6;max-width:280px;margin:0 auto">Plus qu\'une étape : connectez-vous ou créez un compte gratuitement pour indiquer votre adresse et recevoir vos devis.</p>'+
-      '</div>';
-  }
+// Le créneau souhaité ne suppose aucun compte : il est désormais demandé à tout
+// le monde, visiteur compris. Le mur d'inscription arrive donc plus tard dans le
+// parcours, et la personne a déjà répondu à davantage de questions quand il tombe.
+function blocDateHeure(today){
   var opts='';
   for(var i=0;i<27;i++){var h=Math.floor(i/2)+7,m=i%2?'30':'00';opts+='<option>'+h+'h'+m+'</option>'}
-  var flexBtns=['Heure exacte','± 30 min','± 1 heure','Matinée','Après-midi','Toute la journée'].map(function(l,i){return'<button class="flex-opt'+(i===0?' sel':'')+'" onclick="selFlex(this)">'+l+'</button>'}).join('');
-  return '<div class="divider"></div>'+
-    '<div class="field-group"><label>📅 Date et heure souhaitées</label>'+
+  var libelles=['Heure exacte','\u00b1 30 min','\u00b1 1 heure','Matin\u00e9e','Apr\u00e8s-midi','Toute la journ\u00e9e'];
+  var flexBtns=libelles.map(function(l,i){return'<button class="flex-opt'+(i===0?' sel':'')+'" onclick="selFlex(this)">'+l+'</button>'}).join('');
+  return '<div class="field-group"><label>\ud83d\udcc5 Date et heure souhait\u00e9es</label>'+
     '<div class="datetime-row"><input type="date" id="f-date" min="'+today+'" value="'+today+'"><select id="f-time">'+opts+'</select></div>'+
-    '<label style="margin-top:12px">Flexibilité <span class="optional">(optionnel)</span></label>'+
-    '<div class="flex-opts">'+flexBtns+'</div></div>'+
-    '<div class="field-group" style="position:relative"><label>📍 Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="off" oninput="chercherAdresse(this.value)"><div id="adresse-suggestions" class="adresse-suggestions"></div><div id="carte-confirmation-adresse" style="height:140px;border-radius:10px;overflow:hidden;margin-top:8px;display:none"></div></div>'+
-    '<div class="field-group" style="margin-top:10px"><label>🏙️ Ville *</label><input type="text" id="f-ville" placeholder="Paris" autocomplete="address-level2"></div>'+
-    '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-secondary);margin:-8px 0 12px"><input type="checkbox" id="f-memoriser-adresse" style="width:16px;height:16px;flex-shrink:0"> Mémoriser cette adresse pour mes prochaines demandes</label>'+
+    '<label style="margin-top:12px">Flexibilit\u00e9 <span class="optional">(optionnel)</span></label>'+
+    '<div class="flex-opts">'+flexBtns+'</div></div>';
+}
+function blocAdresseEtSuite(){
+  return '<div class="field-group" style="position:relative"><label>\ud83d\udccd Adresse d\'intervention *</label><input type="text" id="f-addr" placeholder="12 rue de la Paix" autocomplete="off" oninput="chercherAdresse(this.value)"><div id="adresse-suggestions" class="adresse-suggestions"></div><div id="carte-confirmation-adresse" style="height:140px;border-radius:10px;overflow:hidden;margin-top:8px;display:none"></div></div>'+
+    '<div class="field-group" style="margin-top:10px"><label>\ud83c\udfd9\ufe0f Ville *</label><input type="text" id="f-ville" placeholder="Paris" autocomplete="address-level2"></div>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-secondary);margin:-8px 0 12px"><input type="checkbox" id="f-memoriser-adresse" style="width:16px;height:16px;flex-shrink:0"> M\u00e9moriser cette adresse pour mes prochaines demandes</label>'+
     '<div id="favori-cible-block"></div>'+
     '<div id="recurrence-block"></div>'+
-    '<div class="field-group"><label>📸 Photos <span class="optional">(optionnel, max 5)</span></label>'+
-    '<div class="photo-zone" onclick="document.getElementById(\'photo-input\').click()"><span style="font-size:28px">📷</span><p>Touchez pour ajouter des photos</p></div>'+
+    '<div class="field-group"><label>\ud83d\udcf8 Photos <span class="optional">(optionnel, max 5)</span></label>'+
+    '<div class="photo-zone" onclick="document.getElementById(\'photo-input\').click()"><span style="font-size:28px">\ud83d\udcf7</span><p>Touchez pour ajouter des photos</p></div>'+
     '<div class="upload-progress" id="upload-progress">Compression des photos...</div>'+
     '<div class="photo-previews" id="photo-previews"></div></div>';
+}
+function dateTimeBlock(isLast){
+  var today=localDateISO(new Date());
+  if(multiFlow.active&&!isLast)return '<div class="divider"></div><div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">\ud83d\udcc5 La date, l\'heure et l\'adresse seront demand\u00e9es \u00e0 la derni\u00e8re \u00e9tape.</div>';
+  if(!currentUser){
+    // Seule l'adresse suppose r\u00e9ellement un profil : c'est donc la seule chose
+    // report\u00e9e apr\u00e8s l'inscription. Le panneau annonce ce qui reste \u00e0 faire, plut\u00f4t
+    // que de laisser la personne deviner combien d'\u00e9tapes l'attendent encore.
+    return '<div class="divider"></div>'+
+      blocDateHeure(today)+
+      '<div class="divider"></div>'+
+      '<div class="field-group" id="portail-connexion-requise" style="text-align:center;padding:4px">'+
+        '<div style="width:54px;height:54px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i data-lucide="map-pin" style="width:26px;height:26px"></i></div>'+
+        '<h3 class="font-display" style="font-size:20px;font-weight:600;margin-bottom:8px">Il reste l\'adresse</h3>'+
+        '<p style="font-size:13.5px;color:var(--text-secondary);line-height:1.6;max-width:300px;margin:0 auto 16px">Les prestataires ont besoin de savoir o\u00f9 intervenir. Cr\u00e9ez votre compte, vous revenez directement ici \u2014 toutes vos r\u00e9ponses sont conserv\u00e9es.</p>'+
+        '<div style="display:flex;flex-direction:column;gap:8px;text-align:left;background:var(--surface-alt);border-radius:12px;padding:14px 16px;max-width:300px;margin:0 auto">'+
+          '<div style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text-secondary)"><i data-lucide="check" style="width:15px;height:15px;color:var(--green)"></i> Gratuit, sans engagement</div>'+
+          '<div style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text-secondary)"><i data-lucide="check" style="width:15px;height:15px;color:var(--green)"></i> Aucune carte bancaire demand\u00e9e maintenant</div>'+
+          '<div style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text-secondary)"><i data-lucide="check" style="width:15px;height:15px;color:var(--green)"></i> Vous ne payez qu\'apr\u00e8s la prestation</div>'+
+        '</div>'+
+      '</div>';
+  }
+  return '<div class="divider"></div>'+
+    blocDateHeure(today)+
+    blocAdresseEtSuite();
 }
 function descBlock(ph){return'<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
 function sendBtn(type){
