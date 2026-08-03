@@ -2770,7 +2770,11 @@ app.patch('/api/societes/tarifs', auth, async (req, res) => {
 });
 
 // Le client obtient une estimation de prix avant/après avoir envoyé sa demande
-app.get('/api/tarifs/estimation', auth, async (req, res) => {
+// Volontairement accessible sans compte : ne renvoie que des moyennes de prix agrégées entre pros
+// disponibles (jamais d'identité ni de donnée personnelle) — permet à un visiteur de voir une
+// estimation avant de créer un compte, cohérent avec le principe de le laisser découvrir avant
+// de lui demander un compte.
+app.get('/api/tarifs/estimation', async (req, res) => {
   try {
     const prestation = req.query.prestation;
     const etat = req.query.etat || 'propre';
