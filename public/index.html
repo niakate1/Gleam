@@ -1496,6 +1496,20 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
    se centre au lieu de s'étirer sur toute la largeur.
    ──────────────────────────────────────────────────────────────────────────── */
 
+/* ────────────────────────────────────────────────────────────────────────────
+   24. RÉACTIVITÉ DE LA SÉLECTION
+   Le remplissage d'une case était animé sur 260 ms, comme les changements de
+   thème. C'est trop long pour un retour à un clic : l'œil le lit comme une
+   latence. Tout ce qui répond à une sélection passe à 140 ms.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.opt-btn, .svc-card, .role-btn, .flex-opt, .filter-chip, .tab-pill {
+  transition-duration: var(--dur-fast);
+}
+.opt-btn.sel, .svc-card.selected, .role-btn.sel, .flex-opt.sel {
+  transition-duration: 0s;
+}
+
 @media (min-width: 700px) {
   .screen.active { max-width: 560px; margin: 0 auto; box-shadow: var(--shadow-lg); }
   .services-grid { gap: var(--gap-3); }
@@ -2243,6 +2257,9 @@ function enterApp(){
     majAffichageNotifications();
     renderProfileAvatar('profile-avatar-inner',currentUser&&currentUser.photo,'👤');
     renderNoteGlobale('profile-note',currentUser&&currentUser.note_moyenne);
+    // La grille de l'accueil doit reprendre la sélection faite avant connexion,
+    // sur l'écran de découverte : sans cela les deux grilles repartaient divergentes.
+    majAffichageSelectionPrestations();
     show('s-home');
     loadDemandes();
   }
@@ -3208,7 +3225,17 @@ function renderProDemandesCards(){
   var c=document.getElementById('pro-demandes-list');
   if(!c)return;
   var data=proDemandesCache;
-  if(!data.length){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande pour l\u2019instant.<br>Revenez bientôt !</p></div>';return}
+  if(!data.length){
+    // Même traitement soigné que côté client : une explication et une action,
+    // plutôt qu'un emoji et une phrase.
+    c.innerHTML=emptyStateHtml({
+      title:'Aucune demande disponible',
+      sub:'Élargissez votre zone d\'intervention ou ajoutez des prestations à votre profil pour en recevoir davantage.',
+      ctaLabel:'Régler ma zone',
+      ctaAction:"goProTab('pro-profile')"
+    });
+    return;
+  }
 
   // Trie par urgence (créneau le plus proche en premier) plutôt que par simple ordre de publication —
   // avec beaucoup de demandes en attente, mieux vaut voir en premier celles dont le délai presse,
@@ -3235,7 +3262,14 @@ function renderProDemandesCards(){
     }).join('')+'</div>';
 
   var filtered=proDemandesFilterActive==='tous'?data:data.filter(function(d){return(d.prestation||'').indexOf(proDemandesFilterActive)>=0});
-  if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span>🔍</span><p>Aucune demande dans cette catégorie.</p></div>';return}
+  if(!filtered.length){
+    c.innerHTML=chips+emptyStateHtml({
+      title:'Rien dans cette catégorie',
+      sub:'Les demandes des autres catégories restent accessibles en changeant de filtre.',
+      ctaLabel:'',ctaAction:''
+    });
+    return;
+  }
 
   var html=chips;
   filtered.forEach(function(d,di){
@@ -3252,7 +3286,8 @@ function renderProDemandesCards(){
       (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
       (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
       (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
-      '<div class="devis-form">'+
+      '<button class="btn-devis" id="ouvrir-devis-'+safeId+'" onclick="basculerFormulaireDevis(\''+safeId+'\')">💰 Proposer un prix</button>'+
+      '<div class="devis-form" id="devis-form-'+safeId+'" style="display:none">'+
         '<label>💰 Votre prix (€ TTC)</label>'+
         '<input type="number" inputmode="decimal" id="prix-'+safeId+'" placeholder="Ex: 150" min="1">'+
         '<label>📝 Message pour le client</label>'+
@@ -3450,6 +3485,21 @@ function renderProDevisCards(){
   });
 }
 
+// Le formulaire de réponse était déplié sur chaque carte : avec dix demandes,
+// la liste devenait impossible à parcourir. Il ne s'ouvre plus que sur demande,
+// et le champ du prix reçoit directement le curseur.
+function basculerFormulaireDevis(id){
+  var form=document.getElementById('devis-form-'+id);
+  var btn=document.getElementById('ouvrir-devis-'+id);
+  if(!form)return;
+  var etaitOuvert=form.style.display!=='none';
+  form.style.display=etaitOuvert?'none':'block';
+  if(btn)btn.textContent=etaitOuvert?'💰 Proposer un prix':'Fermer';
+  if(!etaitOuvert){
+    var prix=document.getElementById('prix-'+id);
+    if(prix)setTimeout(function(){prix.focus()},60);
+  }
+}
 async function envoyerDevis(demandeId){
   var prixEl=document.getElementById('prix-'+demandeId);
   var prix=prixEl&&prixEl.value;
@@ -4174,21 +4224,33 @@ async function validerCodePro(demandeId,btn){
 }
 
 // ── SERVICES ──
-function toggleSvc(card,svc){
-  var idx=selectedServices.indexOf(svc);
-  if(idx>=0){selectedServices.splice(idx,1);card.classList.remove('selected')}
-  else{selectedServices.push(svc);card.classList.add('selected')}
-  // Deux jeux de boutons "Continuer" coexistent dans le document (écran connecté et écran de
-  // découverte), avec des identifiants distincts — on met à jour celui qui existe réellement,
-  // pour que la structure et le comportement restent identiques, connecté ou non.
+// L'affichage est entièrement redéduit du tableau selectedServices, jamais modifié
+// carte par carte. C'est ce qui garantit que les deux grilles — celle du visiteur
+// et celle de l'accueil connecté — disent toujours la même chose. Auparavant seule
+// la carte cliquée changeait d'état : passer d'un écran à l'autre laissait une
+// prestation sélectionnée en mémoire mais éteinte à l'écran, et le clic suivant la
+// retirait au lieu de l'ajouter.
+function majAffichageSelectionPrestations(){
+  document.querySelectorAll('.svc-card[data-svc]').forEach(function(c){
+    c.classList.toggle('selected',selectedServices.indexOf(c.getAttribute('data-svc'))>=0);
+  });
   ['continue-svc-btn','continue-svc-btn-invite'].forEach(function(idBtn){
     var btn=document.getElementById(idBtn);
     if(!btn)return;
-    var idCompteur=idBtn==='continue-svc-btn'?'svc-count':'svc-count-invite';
-    var compteur=document.getElementById(idCompteur);
+    var compteur=document.getElementById(idBtn==='continue-svc-btn'?'svc-count':'svc-count-invite');
     if(compteur)compteur.textContent=selectedServices.length;
     btn.style.display=selectedServices.length>0?'block':'none';
   });
+}
+function viderSelectionPrestations(){
+  selectedServices=[];
+  majAffichageSelectionPrestations();
+}
+function toggleSvc(card,svc){
+  var idx=selectedServices.indexOf(svc);
+  if(idx>=0)selectedServices.splice(idx,1);
+  else selectedServices.push(svc);
+  majAffichageSelectionPrestations();
 }
 function startMultiServiceFlow(){
   if(!selectedServices.length)return;
@@ -4802,8 +4864,8 @@ function buildDevisHtml(v){
     '@page{size:A4;margin:18mm 16mm}'+
     '*{box-sizing:border-box}'+
     'body{font-family:\'Segoe UI\',Helvetica,Arial,sans-serif;max-width:760px;margin:0 auto;padding:30px 24px;color:#1F2937;font-size:14px;line-height:1.5}'+
-    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #6D28D9}'+
-    '.marque{font-size:26px;font-weight:800;color:#6D28D9;letter-spacing:-0.3px}'+
+    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #4B2FBF}'+
+    '.marque{font-size:27px;font-weight:800;color:#4B2FBF;letter-spacing:-0.4px}'+
     '.marque-sub{font-size:11.5px;color:#6B7280;margin-top:4px;max-width:280px}'+
     '.doc-info{text-align:right}'+
     '.doc-titre{font-size:19px;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.5px}'+
@@ -4820,15 +4882,19 @@ function buildDevisHtml(v){
     '.desc{font-size:14px}.sub-desc{font-size:12px;color:#6B7280;margin-top:3px}'+
     '.qte{text-align:center;color:#6B7280;width:60px}'+
     '.montant{text-align:right;font-weight:700;width:110px;white-space:nowrap}'+
-    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#6D28D9;border-top:2px solid #111827;margin-top:4px}'+
+    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#4B2FBF;border-top:2px solid #111827;margin-top:4px}'+
     '.validite{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;margin-top:18px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:#92400E}'+
     '.pied{margin-top:44px;padding-top:18px;border-top:1px solid #E5E7EB}'+
     '.pied p{font-size:11px;color:#9CA3AF;line-height:1.7;margin:0 0 6px}'+
-    '@media print{body{padding:0}}'+
+    '@media print{body{padding:0}.bouton-impression{display:none!important}.parties,.total-ligne,.validite,.repartition,.pied{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}'+
+    '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
+    '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
+    '.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}'+
     '</style></head><body>'+
 
     '<div class="entete">'+
-      '<div><div class="marque">✨ Gleam</div><div class="marque-sub">Plateforme de mise en relation pour des services de nettoyage à domicile</div></div>'+
+      '<div><div class="marque">Gleam</div><div class="marque-sub">Plateforme de mise en relation pour des services de nettoyage à domicile</div></div>'+
       '<div class="doc-info"><div class="doc-titre">Devis</div><div class="doc-numero">N° '+escapeHtml(numero)+'</div><div class="doc-date">'+dateDoc+'</div></div>'+
     '</div>'+
 
@@ -4847,8 +4913,9 @@ function buildDevisHtml(v){
     '</tbody></table>'+
     '<div class="total-ligne"><span>Total TTC</span><span>'+parseFloat(v.prix_ttc).toFixed(2)+' €</span></div>'+
 
-    '<div class="validite"><i>⏳</i><span><strong>Ce devis est valable jusqu\'au '+dateValiditeStr+'.</strong> Passé ce délai, le prestataire pourra être amené à réviser son prix. Ce document ne constitue pas une facture — le règlement n\'intervient qu\'après acceptation et réalisation de la prestation, directement depuis votre espace Gleam.</span></div>'+
+    '<div class="validite"><span class="validite-marque">Validité</span><span><strong>Ce devis est valable jusqu\'au '+dateValiditeStr+'.</strong> Passé ce délai, le prestataire pourra être amené à réviser son prix. Ce document ne constitue pas une facture — le règlement n\'intervient qu\'après acceptation et réalisation de la prestation, directement depuis votre espace Gleam.</span></div>'+
 
+    '<button class="bouton-impression" onclick="window.print()">Imprimer ou enregistrer en PDF</button>'+
     '<div class="pied">'+
       '<p><strong>Catégorie :</strong> devis pour prestation de services — nettoyage à domicile.</p>'+
       '<p>Document généré automatiquement par la plateforme Gleam à titre indicatif. TVA non applicable — article 293B du CGI, sauf mention contraire explicite du prestataire.</p>'+
@@ -4884,8 +4951,8 @@ function buildFactureHtml(d,vuePro){
     '@page{size:A4;margin:18mm 16mm}'+
     '*{box-sizing:border-box}'+
     'body{font-family:\'Segoe UI\',Helvetica,Arial,sans-serif;max-width:760px;margin:0 auto;padding:30px 24px;color:#1F2937;font-size:14px;line-height:1.5}'+
-    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #6D28D9}'+
-    '.marque{font-size:26px;font-weight:800;color:#6D28D9;letter-spacing:-0.3px}'+
+    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #4B2FBF}'+
+    '.marque{font-size:27px;font-weight:800;color:#4B2FBF;letter-spacing:-0.4px}'+
     '.marque-sub{font-size:11.5px;color:#6B7280;margin-top:4px;max-width:280px}'+
     '.doc-info{text-align:right}'+
     '.doc-titre{font-size:19px;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.5px}'+
@@ -4902,7 +4969,7 @@ function buildFactureHtml(d,vuePro){
     '.desc{font-size:14px}.sub-desc{font-size:12px;color:#6B7280;margin-top:3px}'+
     '.qte{text-align:center;color:#6B7280;width:60px}'+
     '.montant{text-align:right;font-weight:700;width:110px;white-space:nowrap}'+
-    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#6D28D9;border-top:2px solid #111827;margin-top:4px}'+
+    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#4B2FBF;border-top:2px solid #111827;margin-top:4px}'+
     '.repartition{background:#F5F3FF;border-radius:10px;padding:16px 18px;margin-top:18px}'+
     '.repartition-titre{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6D28D9;font-weight:700;margin-bottom:10px}'+
     '.repartition-ligne{display:flex;justify-content:space-between;font-size:13px;color:#4B5563;padding:4px 0}'+
@@ -4910,11 +4977,15 @@ function buildFactureHtml(d,vuePro){
     '.pied{margin-top:44px;padding-top:18px;border-top:1px solid #E5E7EB}'+
     '.pied p{font-size:11px;color:#9CA3AF;line-height:1.7;margin:0 0 6px}'+
     '.paiement-info{font-size:12px;color:#4B5563;margin-top:22px;display:flex;gap:8px;align-items:center}'+
-    '@media print{body{padding:0}}'+
+    '@media print{body{padding:0}.bouton-impression{display:none!important}.parties,.total-ligne,.validite,.repartition,.pied{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}'+
+    '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
+    '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
+    '.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}'+
     '</style></head><body>'+
 
     '<div class="entete">'+
-      '<div><div class="marque">✨ Gleam</div><div class="marque-sub">Plateforme de mise en relation pour des services de nettoyage à domicile</div></div>'+
+      '<div><div class="marque">Gleam</div><div class="marque-sub">Plateforme de mise en relation pour des services de nettoyage à domicile</div></div>'+
       '<div class="doc-info"><div class="doc-titre">'+titre+'</div><div class="doc-numero">N° '+escapeHtml(d.numero)+'</div><div class="doc-date">'+dateDoc+'</div></div>'+
     '</div>'+
 
@@ -4937,7 +5008,7 @@ function buildFactureHtml(d,vuePro){
     '<div class="total-ligne"><span>Total '+(vuePro?'net':'TTC')+'</span><span>'+ligneMontant.toFixed(2)+' €</span></div>'+
     blocRepartition+
 
-    (!vuePro?'<div class="paiement-info">💳 Réglé par carte bancaire via Stripe, à la validation de la prestation</div>':'')+
+    (!vuePro?'<div class="paiement-info"><span class="paiement-marque">Règlement</span><span>Carte bancaire via Stripe, à la validation de la prestation</span></div>':'')+
 
     '<div class="pied">'+
       '<p><strong>Catégorie :</strong> prestation de services — nettoyage à domicile.</p>'+
@@ -4946,7 +5017,7 @@ function buildFactureHtml(d,vuePro){
       '<p style="margin-top:12px;color:#D1D5DB">Gleam — gleam-app.fr</p>'+
     '</div>'+
 
-    '<script>window.onload=function(){window.print()}<\/script>'+
+    '<button class="bouton-impression" onclick="window.print()">Imprimer ou enregistrer en PDF</button>'+
     '</body></html>';
 }
 async function showMesGains(){
@@ -5247,6 +5318,9 @@ function closeModalForce(){
   document.getElementById('modal-overlay').classList.remove('open');
   multiFlow={active:false,queue:[],current:0,results:[]};
   photos=[];
+  // Les cartes restaient allumées après fermeture, alors que la demande était
+  // abandonnée : l'écran affirmait une sélection qui n'existait plus nulle part.
+  viderSelectionPrestations();
   proPrefereChoisi=null;
   adresseChoisieLat=null;
   adresseChoisieLng=null;
@@ -5576,7 +5650,17 @@ const UNIT_CATEGORIES_CLIENT=['vitres','matelas','terrasse','toiture','tapis'];
 const UNIT_CATEGORIES_LABELS={vitres:'m² de vitres',matelas:'matelas',terrasse:'m²',toiture:'m²',tapis:'m²'};
 const COEF_KEYS=['taille','matiere','portee','intervention','type_bien','places','forme','type_bassin'];
 
-async function updateEstimation(){
+// L'estimation est regroupée puis lancée une seule fois, 220 ms après le dernier
+// clic. Auparavant chaque clic partait immédiatement en requête : cinq choix
+// rapides lançaient cinq appels concurrents, dont rien ne garantissait l'ordre
+// d'arrivée — un prix périmé pouvait s'afficher par-dessus le bon. La requête
+// précédente est désormais annulée dès qu'une nouvelle part.
+var minuteurEstimation=null,controleurEstimation=null;
+function updateEstimation(){
+  clearTimeout(minuteurEstimation);
+  minuteurEstimation=setTimeout(function(){updateEstimationMaintenant()},220);
+}
+async function updateEstimationMaintenant(){
   if(!currentFormType)return;
   var box=document.getElementById('prix-estime-box');
   if(!box)return;
@@ -5600,7 +5684,9 @@ async function updateEstimation(){
       var btn=document.querySelector('[data-coef-key="'+key+'"].sel');
       if(btn)url+='&'+key+'='+encodeURIComponent(btn.getAttribute('data-coef-val'));
     });
-    const r=await fetch(url,{headers:authHeaders()});
+    if(controleurEstimation)controleurEstimation.abort();
+    controleurEstimation=new AbortController();
+    const r=await fetch(url,{headers:authHeaders(),signal:controleurEstimation.signal});
     const d=await safeJson(r);
     if(!r.ok){
       box.innerHTML='<div style="font-size:12px;color:var(--red)">⚠️ Estimation indisponible ('+(d&&d.error?d.error:'code '+r.status)+')</div>';
@@ -5618,6 +5704,9 @@ async function updateEstimation(){
       (d.base_sur_donnees_reelles?'<div style="font-size:11px;color:var(--mint);font-weight:600">✓ Basé sur les tarifs réels de nos prestataires</div>':'<div style="font-size:11px;color:var(--gray)">Estimation indicative</div>')+
     '</div>';
   }catch(e){
+    // Une requête volontairement annulée n'est pas une erreur : l'afficher ferait
+    // clignoter un message rouge à chaque clic un peu rapide.
+    if(e&&e.name==='AbortError')return;
     box.innerHTML='<div style="font-size:12px;color:var(--red)">⚠️ Estimation indisponible ('+friendlyNetworkError(e)+')</div>';
   }
 }
@@ -5977,7 +6066,15 @@ function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><
   '<div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel..." style="resize:none"></textarea></div>'+
   dateTimeBlock(isLastInFlow())+sendBtn('autre')}
 
-function selOpt(btn){var group=btn.getAttribute('data-group');document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel');if(group==='etat'||btn.hasAttribute('data-coef-key'))updateEstimation()}
+function selOpt(btn){
+  var group=btn.getAttribute('data-group');
+  // La recherche est limitée au formulaire courant plutôt qu'au document entier :
+  // deux modales différentes peuvent employer le même nom de groupe.
+  var racine=btn.closest('#modal-body')||document;
+  racine.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.remove('sel')});
+  btn.classList.add('sel');
+  if(group==='etat'||btn.hasAttribute('data-coef-key'))updateEstimation();
+}
 // Bascule indépendante (plusieurs choix possibles à la fois) — pour les options supplémentaires
 // comme "poils d'animaux" ou "coffre à nettoyer aussi", contrairement à selOpt() qui n'autorise
 // qu'un seul choix à la fois dans son groupe.
@@ -6161,8 +6258,7 @@ async function sendDemand(type){
     adresseChoisieLat=null;adresseChoisieLng=null;
     var wasEdit=isEdit,editedId=multiFlow.editId;
     multiFlow={active:false,queue:[],current:0,results:[]};
-    document.querySelectorAll('.svc-card').forEach(function(c){c.classList.remove('selected')});
-    var cbtn=document.getElementById('continue-svc-btn');if(cbtn)cbtn.style.display='none';
+    majAffichageSelectionPrestations();
     if(wasEdit){toast('✅ Demande modifiée !');openDetail(editedId)}
     else{show('s-success')}
     loadDemandes();
