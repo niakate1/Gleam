@@ -23,6 +23,10 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+/* Garde contre le clignotement : tant qu'une icône Lucide n'a pas encore été convertie en SVG
+   réel, elle occupe un espace discret plutôt qu'un vide brut qui ferait "sauter" la mise en page
+   au moment de la conversion. */
+i[data-lucide]{display:inline-block;width:1em;height:1em;vertical-align:-.125em}
 :root{--p:#6D28D9;--p2:#4C1D95;--light:#F5F3FF;--gray:#6B7280;--border:#E5E7EB;--red:#EF4444;--green:#059669;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--text:#111827;--text-secondary:#374151;--shadow-sm:0 1px 2px rgba(17,24,39,.06),0 1px 1px rgba(17,24,39,.04);--shadow-md:0 4px 16px rgba(17,24,39,.08),0 1px 3px rgba(17,24,39,.06);--shadow-lg:0 12px 40px rgba(17,24,39,.12),0 2px 8px rgba(17,24,39,.06);
   /* Échelle de mouvement — deux courbes seulement, utilisées partout pour une sensation cohérente plutôt que des durées choisies au hasard écran par écran */
   --ease-out:cubic-bezier(.16,1,.3,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);--dur-fast:150ms;--dur-base:280ms;--dur-slow:480ms;
@@ -92,10 +96,21 @@ input,select,textarea{width:100%;padding:11px 14px;border:1.5px solid var(--bord
 input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(109,40,217,.1)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .role-select{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
-.role-btn{padding:10px 4px;border:2px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;text-align:center;font-size:11.5px;font-weight:600;color:var(--text-secondary)}
-.role-btn span{display:block;font-size:20px;margin-bottom:2px}
-.role-btn.sel{border-color:var(--p);background:var(--light);color:var(--p)}
-.role-btn span{display:block;font-size:22px;margin-bottom:4px}
+.role-btn{padding:12px 4px;border:2px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;text-align:center;font-size:11.5px;font-weight:600;color:var(--text-secondary);transition:transform var(--dur-fast) var(--ease-spring),border-color var(--dur-base) var(--ease-out),background var(--dur-base) var(--ease-out)}
+.role-btn:hover{border-color:var(--p);transform:translateY(-2px)}
+.role-btn.sel{border-color:var(--p);background:var(--light);color:var(--p);animation:selection-pop var(--dur-fast) var(--ease-spring)}
+.role-btn span{display:block;font-size:18px;margin-bottom:4px}
+@keyframes bloc-deplie{from{opacity:0;transform:translateY(-8px);max-height:0}to{opacity:1;transform:translateY(0);max-height:600px}}
+#pro-rcpro-block,#entreprise-block{animation:bloc-deplie var(--dur-slow) var(--ease-out)}
+.register-section-titre{font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--p);margin:22px 0 10px;display:flex;align-items:center;gap:7px}
+.register-section-titre:first-child{margin-top:6px}
+.register-section-titre i{width:14px;height:14px}
+.champ-icone{position:relative}
+.champ-icone i{position:absolute;left:13px;top:38px;width:17px;height:17px;color:var(--gray);pointer-events:none}
+.champ-icone input{padding-left:38px!important}
+.force-mdp{display:flex;gap:4px;margin-top:6px}
+.force-mdp-barre{height:4px;flex:1;border-radius:2px;background:var(--border);transition:background var(--dur-base) var(--ease-out)}
+.force-mdp-texte{font-size:11px;margin-top:5px;font-weight:600;transition:color var(--dur-base) var(--ease-out)}
 .btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;box-shadow:0 4px 14px rgba(109,40,217,.25);transition:transform var(--dur-fast) var(--ease-spring),box-shadow var(--dur-base) var(--ease-out),background var(--dur-base) var(--ease-out)}
 .btn:hover{background:var(--p2);box-shadow:0 8px 24px rgba(109,40,217,.35);transform:translateY(-1px)}
 .btn:active{transform:translateY(0) scale(.98)}
@@ -373,7 +388,62 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <div class="toast" id="toast"></div>
 
 <!-- AUTH -->
-<div class="screen active" id="s-auth">
+<!-- Écran de découverte sans compte — devient le nouvel écran par défaut au premier chargement.
+     Reprend la grille de prestations à titre d'aperçu ; cliquer une carte n'ouvre pas le vrai
+     formulaire (qui suppose un compte, une adresse, un paiement) mais invite poliment à créer un
+     compte ou se connecter — exactement le moment où les applications comparables le font,
+     jamais avant. -->
+<div class="screen active" id="s-guest">
+  <div class="home-hero">
+    <div class="home-hero-top"><span class="logo-sm">✨ Gleam</span>
+      <button class="user-badge" style="border:none;cursor:pointer" onclick="afficherEcranAuth('login')">Se connecter</button>
+    </div>
+    <h2>Bonjour 👋</h2>
+    <p>Découvrez Gleam, créez un compte quand vous serez prêt à réserver.</p>
+  </div>
+  <div class="home-hero-card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <i data-lucide="shield-check" style="width:20px;height:20px;color:var(--mint);flex-shrink:0"></i>
+      <span style="font-size:12.5px;color:var(--text-secondary);font-weight:600">Tous nos prestataires sont vérifiés et assurés (RC Pro)</span>
+    </div>
+  </div>
+  <div class="home-content" style="padding-top:0">
+    <div class="section-title">Nos prestations</div>
+    <div class="services-grid">
+      <div class="svc-card" data-svc="voiture" onclick="toggleSvc(this,'voiture')"><i data-lucide="car" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Voiture</div></div>
+      <div class="svc-card" data-svc="canape" onclick="toggleSvc(this,'canape')"><i data-lucide="sofa" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Canapé</div></div>
+      <div class="svc-card" data-svc="matelas" onclick="toggleSvc(this,'matelas')"><i data-lucide="bed-double" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Matelas</div></div>
+      <div class="svc-card" data-svc="terrasse" onclick="toggleSvc(this,'terrasse')"><i data-lucide="sun" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Terrasse</div></div>
+      <div class="svc-card" data-svc="piscine" onclick="toggleSvc(this,'piscine')"><i data-lucide="droplets" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Piscine</div></div>
+      <div class="svc-card" data-svc="toiture" onclick="toggleSvc(this,'toiture')"><i data-lucide="home" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Toiture</div></div>
+      <div class="svc-card" data-svc="vitres" onclick="toggleSvc(this,'vitres')"><i data-lucide="app-window" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Vitres</div></div>
+      <div class="svc-card" data-svc="tapis" onclick="toggleSvc(this,'tapis')"><i data-lucide="square" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Tapis</div></div>
+      <div class="svc-card" data-svc="autre" onclick="toggleSvc(this,'autre')"><i data-lucide="plus-circle" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Autre</div></div>
+    </div>
+    <button class="modal-send-btn" id="continue-svc-btn-invite" style="display:none;margin-bottom:24px" onclick="startMultiServiceFlow()">Continuer (<span id="svc-count-invite">0</span> sélectionnée(s))</button>
+    <div class="field-group" style="margin-top:24px">
+      <div class="section-title" style="margin-bottom:14px">Comment ça marche</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">1</div>
+          <div><strong style="font-size:14px">Décrivez votre besoin</strong><p style="font-size:13px;color:var(--text-secondary);margin-top:2px">Le type de prestation, la surface, votre créneau.</p></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">2</div>
+          <div><strong style="font-size:14px">Recevez des devis clairs</strong><p style="font-size:13px;color:var(--text-secondary);margin-top:2px">Des professionnels vérifiés de votre zone répondent avec un prix précis.</p></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">3</div>
+          <div><strong style="font-size:14px">Choisissez, c'est fait</strong><p style="font-size:13px;color:var(--text-secondary);margin-top:2px">Vous acceptez le devis qui vous convient, réglez en ligne en toute sécurité.</p></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn" style="margin-top:28px" onclick="afficherEcranAuth('register')">Créer un compte gratuitement</button>
+    <button class="btn" style="margin-top:10px;background:none;color:var(--p);box-shadow:none" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
+  </div>
+</div>
+
+<div class="screen" id="s-auth">
   <div class="auth-wrap">
     <div class="auth-box">
       <div class="logo"><h1 class="gleam-signature">✨ Gleam</h1><p>Le nettoyage, brillamment simple</p></div>
@@ -382,21 +452,29 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
         <button class="tab" onclick="switchTab('register')">Inscription</button>
       </div>
       <div id="form-login">
-        <label>Email</label><input type="email" id="le" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false">
-        <label>Mot de passe</label><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password">
+        <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="le" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password"></div>
         <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600" onclick="forgotPassword()">Mot de passe oublié ?</button></div>
         <button class="btn" id="login-btn" onclick="doLogin()">Se connecter</button>
         <div class="err" id="lerr"></div>
       </div>
       <div id="form-register" style="display:none">
+        <div class="register-section-titre"><i data-lucide="user"></i>Vos informations</div>
         <div class="row2">
           <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean" autocomplete="given-name"></div>
           <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont" autocomplete="family-name"></div>
         </div>
-        <label>Email</label><input type="email" id="re" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false">
-        <label>Téléphone</label><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel">
-        <label>Mot de passe</label><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password">
-        <label>Vous êtes</label>
+        <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="re" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+        <div class="champ-icone"><label>Téléphone</label><i data-lucide="phone"></i><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel"></div>
+
+        <div class="register-section-titre"><i data-lucide="lock"></i>Sécurité</div>
+        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"></div>
+        <div class="force-mdp" id="force-mdp-barres" style="display:none">
+          <div class="force-mdp-barre"></div><div class="force-mdp-barre"></div><div class="force-mdp-barre"></div>
+        </div>
+        <div class="force-mdp-texte" id="force-mdp-texte"></div>
+
+        <div class="register-section-titre"><i data-lucide="briefcase"></i>Votre profil</div>
         <div class="role-select">
           <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
           <button class="role-btn" id="role-entreprise" onclick="setRole('entreprise')"><span>🏢</span>Entreprise</button>
@@ -435,6 +513,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
           <span>J'accepte les <a href="cgu.html" target="_blank" style="color:var(--p);font-weight:600">Conditions Générales d'Utilisation</a> et la <a href="confidentialite.html" target="_blank" style="color:var(--p);font-weight:600">Politique de Confidentialité</a> de Gleam.</span>
         </label>
         <button class="btn" id="register-btn" onclick="doRegister()">Créer mon compte Gleam</button>
+        <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-top:12px;font-size:11.5px;color:var(--gray)"><i data-lucide="shield-check" style="width:13px;height:13px;flex-shrink:0"></i>Vos données sont protégées et jamais revendues</div>
         <div class="err" id="rerr"></div>
       </div>
     </div>
@@ -730,7 +809,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
 
 <script src="https://js.stripe.com/v3/"></script>
-<script src="https://unpkg.com/lucide@1.25.0/dist/umd/lucide.js"></script>
+<script src="https://unpkg.com/lucide@1.28.0/dist/umd/lucide.js"></script>
 <script>
 const API='https://gleam-production-9b95.up.railway.app';
 
@@ -799,6 +878,13 @@ let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisI
 let isSubmittingPhotos=false;
 
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+// Depuis l'écran de découverte sans compte : basculer vers connexion ou inscription, au moment
+// précis où la personne veut réellement agir (choisir une prestation, ou cliquer "se connecter"),
+// jamais avant — exactement le moment où les applications comparables le demandent.
+function afficherEcranAuth(onglet){
+  show('s-auth');
+  switchTab(onglet);
+}
 function toast(msg,dur=3000){
   const t=document.getElementById('toast');
   var type='warning',icon='info';
@@ -818,6 +904,22 @@ function setRole(r){
   document.getElementById('role-pro').classList.toggle('sel',r==='pro');
   var b=document.getElementById('pro-rcpro-block');if(b)b.style.display=(r==='pro')?'block':'none';
   var e=document.getElementById('entreprise-block');if(e)e.style.display=(r==='entreprise')?'block':'none';
+}
+// Indicateur de force du mot de passe, en direct — un repère visuel simple (pas un blocage strict,
+// le minimum de 8 caractères reste la seule vraie contrainte imposée à l'inscription).
+function majForceMotDePasse(valeur){
+  var barresBox=document.getElementById('force-mdp-barres'),texteBox=document.getElementById('force-mdp-texte');
+  var barres=barresBox?barresBox.querySelectorAll('.force-mdp-barre'):[];
+  if(!valeur){barresBox.style.display='none';texteBox.textContent='';return}
+  barresBox.style.display='flex';
+  var score=0;
+  if(valeur.length>=8)score++;
+  if(valeur.length>=12&&/[0-9]/.test(valeur)&&/[a-zA-Z]/.test(valeur))score++;
+  if(valeur.length>=8&&/[0-9]/.test(valeur)&&/[a-z]/.test(valeur)&&/[A-Z]/.test(valeur))score++;
+  var couleurs=['var(--red)','var(--gold)','var(--green)'],labels=['Faible — ajoutez des chiffres ou des majuscules','Correct','Solide'];
+  barres.forEach(function(b,i){b.style.background=i<score?couleurs[Math.max(0,score-1)]:'var(--border)'});
+  texteBox.textContent=valeur.length<8?'Encore '+(8-valeur.length)+' caractère(s) minimum':labels[Math.max(0,score-1)];
+  texteBox.style.color=valeur.length<8?'var(--red)':couleurs[Math.max(0,score-1)];
 }
 function switchTab(t){
   document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(t==='login'&&i===0)||(t==='register'&&i===1)));
@@ -983,6 +1085,20 @@ function enterApp(){
   toast('Bienvenue sur Gleam');
   startUnreadPoll();
   startDataPoll();
+  // La demande entamée avant de se connecter est reprise ici : on rouvre le même formulaire,
+  // maintenant que currentUser existe, l'adresse et l'envoi redeviennent possibles. Les réponses
+  // déjà données doivent être resaisies (le formulaire est court, ça reste rapide) — un compromis
+  // assumé plutôt qu'une reconstruction fragile de l'état exact de chaque étape précédente.
+  if(reprendreApresConnexion&&currentFormType&&!isPro()){
+    reprendreApresConnexion=false;
+    var typeAReouvrir=currentFormType;
+    setTimeout(function(){
+      toast('Vous y êtes presque — reprenons votre demande !',3500);
+      openServiceForm(typeAReouvrir);
+    },600);
+  }else{
+    reprendreApresConnexion=false;
+  }
 }
 async function supprimerCompte(){
   if(!confirm('Voulez-vous vraiment supprimer votre compte Gleam ? Vos informations personnelles seront effacées définitivement. Vos demandes/prestations passées resteront visibles pour l\'historique, mais sans vos données personnelles.'))return;
@@ -1875,7 +1991,7 @@ async function loadProDemandes(silent){
     const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
     const c=document.getElementById('pro-demandes-list');
     if(r.status===401){return doLogout()}
-    if(!r.ok){c.innerHTML='<div class="empty-state"><span>📋</span><p>Aucune demande disponible.</p></div>';document.getElementById('stat-demandes').textContent='0';return}
+    if(!r.ok){c.innerHTML='<div class="etat-vide"><i data-lucide="wifi-off" style="width:44px;height:44px;color:var(--gray);margin-bottom:14px"></i><h3>Chargement impossible</h3><p>Une erreur est survenue en récupérant les demandes. Vérifiez votre connexion et réessayez.</p><button class="btn" style="width:auto;padding:10px 22px" onclick="loadProDemandes()">Réessayer</button></div>';if(window.lucide)lucide.createIcons();document.getElementById('stat-demandes').textContent='0';return}
     const data=await safeJson(r);
     document.getElementById('stat-demandes').textContent=data.length||0;
     loadProDevisCount();
@@ -2844,9 +2960,17 @@ function toggleSvc(card,svc){
   var idx=selectedServices.indexOf(svc);
   if(idx>=0){selectedServices.splice(idx,1);card.classList.remove('selected')}
   else{selectedServices.push(svc);card.classList.add('selected')}
-  var btn=document.getElementById('continue-svc-btn');
-  document.getElementById('svc-count').textContent=selectedServices.length;
-  btn.style.display=selectedServices.length>0?'block':'none';
+  // Deux jeux de boutons "Continuer" coexistent dans le document (écran connecté et écran de
+  // découverte), avec des identifiants distincts — on met à jour celui qui existe réellement,
+  // pour que la structure et le comportement restent identiques, connecté ou non.
+  ['continue-svc-btn','continue-svc-btn-invite'].forEach(function(idBtn){
+    var btn=document.getElementById(idBtn);
+    if(!btn)return;
+    var idCompteur=idBtn==='continue-svc-btn'?'svc-count':'svc-count-invite';
+    var compteur=document.getElementById(idCompteur);
+    if(compteur)compteur.textContent=selectedServices.length;
+    btn.style.display=selectedServices.length>0?'block':'none';
+  });
 }
 function startMultiServiceFlow(){
   if(!selectedServices.length)return;
@@ -3812,6 +3936,16 @@ function closeModalForce(){
   adresseChoisieLng=null;
 }
 function isLastInFlow(){return!multiFlow.active||multiFlow.current===multiFlow.queue.length-1}
+// La demande en cours n'est jamais perdue : on masque simplement le formulaire (sans toucher à
+// multiFlow, aux photos, ni au type de prestation en cours), le temps de se connecter ou de créer
+// un compte — puis on la retrouve automatiquement, exactement là où on l'avait laissée.
+var reprendreApresConnexion=false;
+function demanderConnexionPourContinuer(onglet){
+  document.getElementById('modal-overlay').classList.remove('open');
+  reprendreApresConnexion=true;
+  show('s-auth');
+  switchTab(onglet);
+}
 
 var proPrefereChoisi=null;
 async function chargerFavoriCible(type){
@@ -3887,6 +4021,18 @@ function choisirRecurrence(btn){
 function dateTimeBlock(isLast){
   var today=localDateISO(new Date());
   if(multiFlow.active&&!isLast)return '<div class="divider"></div><div style="font-size:12px;color:var(--gray);text-align:center;padding:8px">📅 La date, l\'heure et l\'adresse seront demandées à la dernière étape.</div>';
+  // Le compte n'est jamais demandé avant ce point précis — la personne a déjà répondu à toutes
+  // les questions sur sa prestation, exactement comme les applications comparables (Uber, Airbnb) :
+  // on donne d'abord envie, on ne demande le compte qu'au moment où il devient réellement utile
+  // (recevoir des devis suppose une adresse liée à un profil, donc une identité).
+  if(!currentUser){
+    return '<div class="divider"></div>'+
+      '<div class="field-group" style="text-align:center;padding:8px 4px">'+
+        '<div style="width:52px;height:52px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i data-lucide="party-popper" style="width:26px;height:26px"></i></div>'+
+        '<h3 class="font-display" style="font-size:19px;font-weight:600;margin-bottom:8px">Votre demande est prête !</h3>'+
+        '<p style="font-size:13.5px;color:var(--text-secondary);line-height:1.6;max-width:280px;margin:0 auto">Plus qu\'une étape : connectez-vous ou créez un compte gratuitement pour indiquer votre adresse et recevoir vos devis.</p>'+
+      '</div>';
+  }
   var opts='';
   for(var i=0;i<27;i++){var h=Math.floor(i/2)+7,m=i%2?'30':'00';opts+='<option>'+h+'h'+m+'</option>'}
   var flexBtns=['Heure exacte','± 30 min','± 1 heure','Matinée','Après-midi','Toute la journée'].map(function(l,i){return'<button class="flex-opt'+(i===0?' sel':'')+'" onclick="selFlex(this)">'+l+'</button>'}).join('');
@@ -3908,6 +4054,12 @@ function dateTimeBlock(isLast){
 function descBlock(ph){return'<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
 function sendBtn(type){
   var isLast=isLastInFlow();
+  // Sans compte, à la dernière étape : deux boutons vers connexion/inscription plutôt que
+  // "Envoyer ma demande", qui ne peut de toute façon pas fonctionner sans adresse liée à un profil.
+  if(!currentUser&&(!multiFlow.active||isLast)){
+    return '<button class="btn" onclick="demanderConnexionPourContinuer(\'register\')">Créer un compte gratuitement</button>'+
+      '<button class="btn" style="margin-top:10px;background:none;color:var(--p);box-shadow:none" onclick="demanderConnexionPourContinuer(\'login\')">J\'ai déjà un compte</button>';
+  }
   var label=multiFlow.active&&!isLast?'Suivant →':'Envoyer ma demande';
   var html='';
   if(multiFlow.active&&multiFlow.current>0){
@@ -3949,10 +4101,10 @@ function goToPreviousStep(currentType){
 
 function etatBlock(){
   return '<div class="field-group"><label>🧽 État actuel</label><div class="options-grid">'+
-    '<button class="opt-btn sel" data-group="etat" data-etat-val="propre" onclick="selOpt(this)">Propre</button>'+
-    '<button class="opt-btn" data-group="etat" data-etat-val="moyen" onclick="selOpt(this)">Moyennement sale</button>'+
-    '<button class="opt-btn" data-group="etat" data-etat-val="sale" onclick="selOpt(this)">Sale</button>'+
-    '<button class="opt-btn" data-group="etat" data-etat-val="tres_sale" onclick="selOpt(this)">Très sale</button>'+
+    '<button class="opt-btn sel" data-group="etat" data-etat-val="propre" onclick="selOpt(this)"><i data-lucide="sparkles" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Propre</button>'+
+    '<button class="opt-btn" data-group="etat" data-etat-val="moyen" onclick="selOpt(this)"><i data-lucide="meh" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Moyennement sale</button>'+
+    '<button class="opt-btn" data-group="etat" data-etat-val="sale" onclick="selOpt(this)"><i data-lucide="frown" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Sale</button>'+
+    '<button class="opt-btn" data-group="etat" data-etat-val="tres_sale" onclick="selOpt(this)"><i data-lucide="alert-triangle" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Très sale</button>'+
     '</div><div id="prix-estime-box" style="margin-top:10px"></div></div>';
 }
 
@@ -4178,10 +4330,10 @@ var DETAIL_TERRASSE_BASE='Balayage et dégagement • Nettoyage haute pression o
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
   quantiteBlock('Surface exacte (en m²)','Ex: 34')+
   '<div class="field-group"><label>Type de sol</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)">Carrelage</button>'+
-  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="bois_composite" onclick="selOpt(this)">Bois/composite</button>'+
-  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="beton" onclick="selOpt(this)">Béton</button>'+
-  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="pierre_naturelle" onclick="selOpt(this)">Pierre naturelle</button></div>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)"><i data-lucide="grid-3x3" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Carrelage</button>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="bois_composite" onclick="selOpt(this)"><i data-lucide="trees" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Bois/composite</button>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="beton" onclick="selOpt(this)"><i data-lucide="square" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Béton</button>'+
+  '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="pierre_naturelle" onclick="selOpt(this)"><i data-lucide="mountain" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Pierre naturelle</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TERRASSE_BASE+'</div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
   '<button class="opt-btn full" data-group="terrasse-options" data-option-val="traitement_protecteur" onclick="toggleOption(this)"><span>🛡️</span>Traitement protecteur (dégriseur/saturateur)</button></div></div>'+
@@ -4206,10 +4358,10 @@ function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</d
 
 function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
   '<div class="field-group"><label>Type de toiture</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="tuiles" onclick="selOpt(this)">Tuiles</button>'+
-  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="ardoises" onclick="selOpt(this)">Ardoises</button>'+
-  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="fibrociment" onclick="selOpt(this)">Fibrociment</button>'+
-  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="zinc_metal" onclick="selOpt(this)">Zinc/Métal</button></div></div>'+
+  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="tuiles" onclick="selOpt(this)"><i data-lucide="home" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Tuiles</button>'+
+  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="ardoises" onclick="selOpt(this)"><i data-lucide="layers" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Ardoises</button>'+
+  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="fibrociment" onclick="selOpt(this)"><i data-lucide="square" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Fibrociment</button>'+
+  '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="zinc_metal" onclick="selOpt(this)"><i data-lucide="shield" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Zinc/Métal</button></div></div>'+
   quantiteBlock('Surface exacte (en m²)','Ex: 90')+
   etatBlock()+descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
 
@@ -4671,6 +4823,7 @@ if(tok){
     })
     .catch(function(){});
 }else if(/[?&#]parrain=/.test(window.location.href)){
+  show('s-auth');
   switchTab('register');
 }
 
