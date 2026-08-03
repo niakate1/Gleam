@@ -1132,6 +1132,15 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
 // ─────────────────────────────────────────────────────────────────────────────
 const PLAFOND_PROS_NOTIFIES = 25;
 
+// Plafond d'envois par passage du balayage. SendGrid facture au crédit et
+// l'offre gratuite s'arrête à 100 emails par jour : sans borne, un seul
+// balayage traitant 50 demandes × 25 prestataires pouvait tenter 1250 envois
+// et épuiser le quota — ce qui s'est produit le 3 août, faisant ensuite échouer
+// des emails vitaux comme la réinitialisation de mot de passe.
+// Ce plafond protège les envois critiques, qui ne passent jamais par ici.
+const PLAFOND_ENVOIS_PAR_PASSAGE = 40;
+let envoisCePassage = 0;
+
 async function prosConcernesParDemande(demande) {
   // ⚠️ Le filtre sur le type est INDISPENSABLE ici. La colonne `disponible` vaut
   // true par défaut pour TOUS les comptes, clients compris : sans ce filtre, la
@@ -1206,6 +1215,11 @@ async function notifierProsPourDemande(demande, gabarit) {
     const ville = (demande.adresse || '').split(',').pop().trim() || demande.adresse;
 
     for (const pro of pros) {
+      if (envoisCePassage >= PLAFOND_ENVOIS_PAR_PASSAGE) {
+        console.warn('⏸️  Plafond d\'envois atteint pour ce passage — le reste attendra le prochain.');
+        break;
+      }
+      envoisCePassage++;
       sendEmail(gabarit, pro.email, {
         prenom: pro.prenom,
         prestation: demande.prestation,
@@ -1243,6 +1257,7 @@ async function notifierProsPourDemande(demande, gabarit) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function relancerDemandesSansDevis() {
   try {
+    envoisCePassage = 0;
     const ilYA = (h) => new Date(Date.now() - h * 3600 * 1000).toISOString();
 
     // — Relance aux prestataires, 24 h après publication —
@@ -1252,7 +1267,7 @@ async function relancerDemandesSansDevis() {
       .eq('statut', 'en_attente')
       .is('relance_pro_le', null)
       .lt('created_at', ilYA(24))
-      .limit(50);
+      .limit(10);   // petits lots : le balayage repasse tous les quarts d'heure
 
     for (const demande of (pourPros || [])) {
       const { count } = await supabase.from('devis')
@@ -1271,7 +1286,7 @@ async function relancerDemandesSansDevis() {
       .eq('statut', 'en_attente')
       .is('relance_client_le', null)
       .lt('created_at', ilYA(48))
-      .limit(50);
+      .limit(10);   // petits lots : le balayage repasse tous les quarts d'heure
 
     for (const demande of (pourClients || [])) {
       const { count } = await supabase.from('devis')
