@@ -108,6 +108,15 @@
   /* Rythme vertical */
   --gap-1: 4px;  --gap-2: 8px;  --gap-3: 12px;
   --gap-4: 16px; --gap-5: 24px; --gap-6: 32px;
+
+  /* Zone sûre du haut de l'écran. En PWA installée sur iOS, la balise
+     apple-mobile-web-app-status-bar-style vaut black-translucent : le contenu
+     s'étend SOUS la barre d'état, horloge et batterie comprises. Sans réserve
+     en haut, le premier élément de chaque écran passe dessous — c'est ce qui
+     faisait chevaucher « Mon Profil » et l'horloge. Le repli à 0px garantit
+     un rendu identique partout ailleurs (navigateur, ordinateur, Android). */
+  --pad-haut: env(safe-area-inset-top, 0px);
+  --pad-bas: env(safe-area-inset-bottom, 0px);
 }
 
 
@@ -396,7 +405,7 @@ i[data-lucide] {
   overscroll-behavior-y: contain;
 }
 
-.page-header { padding: var(--gap-5) var(--gap-4) var(--gap-3); }
+.page-header { padding: calc(var(--gap-5) + var(--pad-haut)) var(--gap-4) var(--gap-3); }
 .page-header h1 {
   font-size: 31px;
   font-weight: 600;
@@ -426,7 +435,7 @@ i[data-lucide] {
 .home-hero {
   position: relative;
   overflow: hidden;
-  padding: var(--gap-4) var(--gap-4) 54px;
+  padding: calc(var(--gap-4) + var(--pad-haut)) var(--gap-4) 54px;
   background:
     radial-gradient(ellipse 340px 260px at 88% -8%,  rgba(245,197,66,.30), transparent 65%),
     radial-gradient(ellipse 380px 300px at 4% 108%,  rgba(0,168,145,.34),  transparent 68%),
@@ -484,9 +493,9 @@ i[data-lucide] {
 
 .navbar {
   position: sticky; top: 0; z-index: 100;
-  height: 58px;
+  height: calc(58px + var(--pad-haut));
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 var(--gap-4);
+  padding: var(--pad-haut) var(--gap-4) 0;
   background: color-mix(in srgb, var(--surface) 86%, transparent);
   backdrop-filter: saturate(180%) blur(14px);
   -webkit-backdrop-filter: saturate(180%) blur(14px);
@@ -516,7 +525,7 @@ i[data-lucide] {
   backdrop-filter: saturate(180%) blur(16px);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--pad-bas);
 }
 .bnav-item {
   position: relative;
@@ -737,7 +746,7 @@ select {
 .auth-wrap {
   flex: 1;
   display: flex; align-items: center; justify-content: center;
-  padding: var(--gap-5) var(--gap-4);
+  padding: calc(var(--gap-5) + var(--pad-haut)) var(--gap-4) var(--gap-5);
   position: relative; overflow: hidden;
   background:
     radial-gradient(ellipse 420px 340px at 92% -6%, rgba(245,197,66,.32), transparent 66%),
@@ -1121,7 +1130,7 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(162,28,
   max-height: 92vh; overflow-y: auto;
   background: var(--surface);
   border-radius: var(--r-lg) var(--r-lg) 0 0;
-  padding: var(--gap-5) var(--gap-5) calc(var(--gap-6) + env(safe-area-inset-bottom));
+  padding: var(--gap-5) var(--gap-5) calc(var(--gap-6) + var(--pad-bas));
   box-shadow: var(--shadow-xl);
   animation: modal-monte var(--dur-base) var(--ease-out);
 }
@@ -1277,7 +1286,7 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(162,28,
   display: flex; align-items: center; gap: var(--gap-2);
   background: var(--surface);
   border-top: 1px solid var(--border);
-  padding: 10px var(--gap-3) calc(10px + env(safe-area-inset-bottom));
+  padding: 10px var(--gap-3) calc(10px + var(--pad-bas));
 }
 .chat-input-bar input { flex: 1; padding: 11px 16px; border-radius: var(--r-pill); }
 
@@ -1437,7 +1446,7 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(162,28,
 
 .toast {
   position: fixed; left: 50%; z-index: 500;
-  bottom: calc(90px + env(safe-area-inset-bottom));
+  bottom: calc(90px + var(--pad-bas));
   transform: translateX(-50%) translateY(16px);
   display: flex; align-items: center; gap: var(--gap-2);
   max-width: min(90%, 420px);
@@ -2743,6 +2752,15 @@ async function handleProfilePhoto(input,who){
   finally{if(progress){progress.textContent='';progress.classList.remove('show')} input.value=''}
 }
 
+// Traduit un nombre de jours en formulation courante. « 180 » ne dit rien à un
+// client ; « tous les 6 mois » lui rappelle ce qu'il a choisi.
+function libelleRecurrence(jours){
+  var n=parseInt(jours,10);
+  if(!n)return 'récurrente';
+  var connus={7:'chaque semaine',14:'tous les 15 jours',30:'chaque mois',
+              60:'tous les 2 mois',90:'tous les 3 mois',180:'tous les 6 mois',365:'chaque année'};
+  return connus[n]||('tous les '+n+' jours');
+}
 function formatCreneau(creneau){
   if(!creneau)return'';
   var match=creneau.match(/(\d{4})-(\d{2})-(\d{2})\s*à\s*(.+)/);
@@ -2829,14 +2847,27 @@ async function loadDemandes(silent){
       var icon=ICONS_get((d.prestation||'').split(' + ')[0]);
       var urgentStyle=d.statut==='en_cours'?'border-color:var(--green);background:var(--green-clair);':'';
       var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px;margin-left:6px">ACTION REQUISE</span>':'';
+      // La carte affichait la date de CRÉATION de la demande. Une prestation
+      // programmée pour le 31 janvier 2027 s'affichait donc « 03/08/2026 » — la
+      // date à laquelle elle avait été créée. C'est le créneau qui compte pour
+      // le client, jamais le moment où il a rempli le formulaire.
+      var dateAffichee=new Date(d.created_at).toLocaleDateString('fr-FR');
+      var m=/(\d{4})-(\d{2})-(\d{2})/.exec(d.creneau||'');
+      if(m)dateAffichee=m[3]+'/'+m[2]+'/'+m[1];
+      // Sans ce repère, une occurrence créée automatiquement par la récurrence
+      // apparaissait comme un doublon inexplicable à côté de la prestation
+      // terminée qui l'avait engendrée.
+      var badgeRecurrence=(d.recurrence&&d.recurrence_active)
+        ? '<span style="font-size:10px;background:var(--light);color:var(--p);padding:2px 8px;border-radius:10px;margin-left:6px;white-space:nowrap">🔁 '+libelleRecurrence(d.recurrence)+'</span>'
+        : '';
       html+='<div class="demand-row fade-in-item" style="animation-delay:'+(i*0.04)+'s;'+urgentStyle+'" onclick="openDetail(\''+escAttr(d.id)+'\')">'+
         '<span class="demand-icon">'+icon+'</span>'+
         '<div class="demand-info">'+
-          '<div class="demand-type">'+escapeHtml(d.prestation)+urgentBadge+'</div>'+
+          '<div class="demand-type">'+escapeHtml(d.prestation)+urgentBadge+badgeRecurrence+'</div>'+
           '<div class="demand-addr">'+escapeHtml(d.adresse)+'</div>'+
           '<div class="demand-status '+st[1]+'">'+st[0]+'</div>'+
         '</div>'+
-        '<div class="demand-date">'+new Date(d.created_at).toLocaleDateString('fr-FR')+'</div>'+
+        '<div class="demand-date">'+dateAffichee+'</div>'+
       '</div>';
     });
     c.innerHTML=html;
@@ -3218,6 +3249,29 @@ function renderDetail(d){
     '<button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>'+
   '</div>';
   if(canCancel)html+='<button class="btn-delete" style="width:100%;margin-top:10px" onclick="annulerDemandeAcceptee()">🚫 Annuler cette prestation</button>';
+  // ouvrirGererRecurrence() existait, la route serveur aussi — mais aucun bouton
+  // n'y menait nulle part dans l'application. Un client ayant programmé « tous
+  // les 6 mois » ne pouvait donc ni l'interrompre, ni la mettre en pause : à
+  // chaque prestation terminée, une nouvelle demande réapparaissait sans qu'il
+  // puisse rien y faire. C'est ce bouton qui manquait.
+  if(d.recurrence){
+    html+='<div class="detail-card" style="border-color:var(--p)">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+        '<span style="font-size:22px">🔁</span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-weight:700;font-size:14px">Prestation récurrente</div>'+
+          '<div style="font-size:12.5px;color:var(--gray)">Renouvelée '+libelleRecurrence(d.recurrence)+
+            (d.recurrence_active===false?' — en pause':'')+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.5;margin-bottom:12px">'+
+        'Une nouvelle demande est créée automatiquement après chaque prestation terminée. '+
+        'C\'est pourquoi vous pouvez voir deux lignes pour la même prestation : l\'une terminée, '+
+        'l\'autre programmée pour la prochaine fois.'+
+      '</div>'+
+      '<button class="btn-modify" style="width:100%" onclick="ouvrirGererRecurrence(\''+escAttr(d.id)+'\','+(d.recurrence_active!==false)+')">Gérer la répétition</button>'+
+    '</div>';
+  }
   var isClosed=d.statut==='terminee'||d.statut==='annulee_client'||d.statut==='expiree';
   if(isClosed&&!d.archivee_client)html+='<button class="btn-modify" style="width:100%;margin-top:10px" onclick="archiverDemande()"><i data-lucide="archive" style="width:15px;height:15px;vertical-align:-3px"></i> Archiver (la ranger de ma liste)</button>';
   if(d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours')
