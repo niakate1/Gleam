@@ -42,6 +42,43 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   console.log('ℹ️ Notifications push non configurées (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY absents).');
 }
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
+// Le secret administrateur ne doit pas dériver du secret utilisateur : avec
+// JWT_SECRET + '_admin', toute fuite de JWT_SECRET — capture d'écran du tableau
+// de bord, ancien collaborateur — permettait de forger soi-même un jeton
+// { admin: true } sans jamais connaître le mot de passe. Définissez
+// ADMIN_JWT_SECRET (une longue chaîne aléatoire, sans rapport avec l'autre).
+// Sans elle, l'ancien comportement est conservé pour ne rien casser.
+const SECRET_ADMIN = process.env.ADMIN_JWT_SECRET || (process.env.JWT_SECRET + '_admin');
+if (!process.env.ADMIN_JWT_SECRET) {
+  console.warn('⚠️  ADMIN_JWT_SECRET absente : le secret admin est dérivé de JWT_SECRET. À corriger.');
+}
+
+// Comparaison à temps constant : `!==` s'arrête au premier caractère différent,
+// ce qui laisse fuiter la longueur du préfixe correct par le temps de réponse.
+function comparaisonSure(a, b) {
+  const ta = Buffer.from(String(a || ''), 'utf8');
+  const tb = Buffer.from(String(b || ''), 'utf8');
+  if (ta.length !== tb.length) return false;
+  return crypto.timingSafeEqual(ta, tb);
+}
+
+// Mot de passe admin haché, si vous en définissez un.
+// Format attendu pour ADMIN_PASSWORD_HASH : "scrypt$<selHex>$<empreinteHex>"
+// Génération :
+//   node -e "const c=require('crypto');const s=c.randomBytes(16);const m=process.argv[1];console.log('scrypt$'+s.toString('hex')+'$'+c.scryptSync(m,s,64).toString('hex'))" 'VotreMotDePasse'
+function motDePasseAdminValide(saisi) {
+  const empreinte = process.env.ADMIN_PASSWORD_HASH;
+  if (empreinte) {
+    const [algo, selHex, attenduHex] = String(empreinte).split('$');
+    if (algo !== 'scrypt' || !selHex || !attenduHex) return false;
+    const calcule = crypto.scryptSync(String(saisi || ''), Buffer.from(selHex, 'hex'), 64);
+    return comparaisonSure(calcule.toString('hex'), attenduHex);
+  }
+  if (!process.env.ADMIN_PASSWORD) return false;
+  return comparaisonSure(saisi, process.env.ADMIN_PASSWORD);
+}
 const { sendEmail } = require('./email');
 
 // Envoie une notification push à toutes les inscriptions actives d'un utilisateur (un par
@@ -190,7 +227,7 @@ const adminAuth = async (req, res, next) => {
   const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Non autorisé' });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET + '_admin');
+    const decoded = jwt.verify(token, SECRET_ADMIN);
     if (!decoded.admin) return res.status(403).json({ error: 'Accès refusé.' });
     next();
   } catch (e) {
@@ -233,6 +270,55 @@ function traduireErreurSupabase(messageOriginal) {
 // français à l'heure système du serveur (UTC) crée une fenêtre chaque jour (au moment où Paris a
 // déjà changé de jour calendaire mais pas encore l'UTC) où une heure déjà passée en France pouvait
 // être acceptée sans le moindre blocage. Bug confirmé et corrigé.
+// ─────────────────────────────────────────────────────────────────────────
+// Conversion d'un créneau en instant réel
+//
+// Les créneaux sont stockés en texte, dans l'heure du client français :
+// "2026-09-15 à 14h30". Les interpréter avec new Date(a, m, j, h, min) les
+// place dans le fuseau du SERVEUR — UTC sur Railway. Un rendez-vous à 9h00 à
+// Reims devenait donc 9h00 UTC, soit 11h00 heure française, et expirait deux
+// heures trop tard en été. La création, elle, validait déjà correctement en
+// Europe/Paris : les deux moitiés du code ne parlaient pas de la même heure.
+// ─────────────────────────────────────────────────────────────────────────
+function decalageParisMinutes(instant) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(instant);
+  const g = (t) => parseInt(parts.find(p => p.type === t).value, 10);
+  const commeSiUTC = Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second'));
+  return Math.round((commeSiUTC - instant.getTime()) / 60000);
+}
+
+function creneauVersInstant(creneau) {
+  const m = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(creneau || '');
+  if (!m) return null;
+  // On lit d'abord les composantes comme si elles étaient en UTC, puis on retire
+  // le décalage réel de Paris à cette date (+1 h en hiver, +2 h en été).
+  const provisoire = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  const decalage = decalageParisMinutes(new Date(provisoire));
+  return new Date(provisoire - decalage * 60000);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Réservation atomique
+//
+// Le motif « je lis, je vérifie, puis j'écris » ne protège de rien : entre la
+// lecture et l'écriture, une seconde requête peut passer le même contrôle. On
+// écrit donc sous condition — le statut attendu fait partie du filtre — et on
+// regarde si une ligne a réellement bougé. Une seule requête peut gagner.
+// ─────────────────────────────────────────────────────────────────────────
+async function reserverLigne(table, id, statutsAttendus, nouveauStatut) {
+  const { data, error } = await supabase
+    .from(table)
+    .update({ statut: nouveauStatut })
+    .eq('id', id)
+    .in('statut', statutsAttendus)
+    .select('id');
+  if (error) throw error;
+  return !!(data && data.length);
+}
+
 function maintenantEnFrance() {
   const parts = new Intl.DateTimeFormat('fr-FR', {
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -862,7 +948,7 @@ app.post('/api/demandes', auth, async (req, res) => {
         if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
           return res.status(400).json({ error: 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).' });
         }
-        if (p.length > 3 * 1024 * 1024) {
+        if (p.length > 800 * 1024) {  // 800 ko : une demande reste sous 4 Mo au total
           return res.status(400).json({ error: 'Une photo est trop volumineuse. Réessayez avec une photo plus légère.' });
         }
       }
@@ -947,12 +1033,15 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
 
     const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau || '');
     if (!match) return;
-    const dateActuelle = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
     const joursAAjouter = parseInt(demande.recurrence, 10) || 7;
-    const prochaineDate = new Date(dateActuelle.getTime() + joursAAjouter * 24 * 60 * 60 * 1000);
+    // Les jours sont ajoutés au calendrier, pas en millisecondes : un rendez-vous de
+    // 14h30 reste à 14h30 même quand la série traverse un changement d'heure. En
+    // ajoutant des millisecondes, il devenait 13h30 ou 15h30 fin mars et fin octobre.
     const pad = n => String(n).padStart(2, '0');
-    const dateStr = prochaineDate.getFullYear() + '-' + pad(prochaineDate.getMonth() + 1) + '-' + pad(prochaineDate.getDate());
-    const heureStr = pad(prochaineDate.getHours()) + 'h' + pad(prochaineDate.getMinutes());
+    const base = new Date(Date.UTC(+match[1], +match[2] - 1, +match[3]));
+    base.setUTCDate(base.getUTCDate() + joursAAjouter);
+    const dateStr = base.getUTCFullYear() + '-' + pad(base.getUTCMonth() + 1) + '-' + pad(base.getUTCDate());
+    const heureStr = pad(+match[4]) + 'h' + pad(+match[5]);
 
     await supabase.from('demandes').insert({
       client_id: demande.client_id,
@@ -989,9 +1078,10 @@ async function expirerDemandesEnRetard(demandes) {
   const aExpirerAcceptees = [];
   for (const d of (demandes || [])) {
     if ((d.statut === 'en_attente' || d.statut === 'devis_recus' || d.statut === 'acceptee') && d.creneau) {
-      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(d.creneau);
-      if (match) {
-        const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
+      // Le créneau est exprimé en heure française : il est converti en instant réel
+      // plutôt qu'interprété dans le fuseau du serveur, qui est UTC sur Railway.
+      const dateCreneau = creneauVersInstant(d.creneau);
+      if (dateCreneau) {
         const heuresDepassement = (maintenant - dateCreneau) / (1000 * 60 * 60);
         if (heuresDepassement > 3) {
           aExpirer.push(d.id);
@@ -1007,7 +1097,12 @@ async function expirerDemandesEnRetard(demandes) {
   if (aExpirerAcceptees.length) {
     // Annule le(s) devis "accepté" resté(s) sans paiement, pour ne pas laisser un devis "accepté"
     // pointer vers une demande désormais expirée — incohérence qui perturberait l'affichage côté pro.
-    await supabase.from('devis').update({ statut: 'annule_client' }).in('demande_id', aExpirerAcceptees).eq('statut', 'accepte');
+    // 'expire_sans_paiement' et non 'annule_client' : le client n'a rien annulé, il a
+    // accepté un devis puis n'a jamais réglé, et le créneau est passé. Confondre les
+    // deux affichait « Annulé par le client » à un prestataire à qui personne n'avait
+    // rien annulé, et rendait indistinguables deux problèmes produit opposés — un
+    // désistement d'une part, un tunnel de paiement qui décroche de l'autre.
+    await supabase.from('devis').update({ statut: 'expire_sans_paiement' }).in('demande_id', aExpirerAcceptees).eq('statut', 'accepte');
   }
   return demandes;
 }
@@ -1026,11 +1121,18 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     if (!user || !isProType(user.type))
       return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
 
+    // Colonnes explicites plutôt que select('*') : la colonne `notes` contient les
+    // photos encodées en base64 (jusqu'à 282 ko pour une seule demande dans la base
+    // actuelle). Elle partait intégralement, pour toutes les demandes ouvertes, à
+    // chaque sondage de chaque pro — pour n'en afficher que quelques-unes après
+    // filtrage. `notes` reste servie par /api/demandes/:id, à l'ouverture d'une
+    // demande précise, qui est le seul moment où le détail est réellement lu.
     const { data: demandes, error: demErr } = await supabase
       .from('demandes')
-      .select('*')
+      .select('id, client_id, prestation, adresse, creneau, notes, statut, numero_anonyme, created_at, pro_prefere_id, latitude, longitude, recurrence')
       .or('statut.eq.en_attente,statut.eq.devis_recus')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (demErr) return res.status(500).json({ error: 'Erreur demandes: ' + demErr.message });
 
@@ -1198,10 +1300,11 @@ app.post('/api/demandes/:id/relancer-recurrente', auth, async (req, res) => {
     const pad = n => String(n).padStart(2, '0');
     let dateStr, heureStr;
     if (match) {
-      const dateBase = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
-      const prochaine = new Date(dateBase.getTime() + joursAAjouter * 24 * 60 * 60 * 1000);
-      dateStr = prochaine.getFullYear() + '-' + pad(prochaine.getMonth() + 1) + '-' + pad(prochaine.getDate());
-      heureStr = pad(prochaine.getHours()) + 'h' + pad(prochaine.getMinutes());
+      // Jours calendaires, heure locale préservée — voir creerProchaineOccurrenceRecurrente.
+      const dateBase = new Date(Date.UTC(+match[1], +match[2] - 1, +match[3]));
+      dateBase.setUTCDate(dateBase.getUTCDate() + joursAAjouter);
+      dateStr = dateBase.getUTCFullYear() + '-' + pad(dateBase.getUTCMonth() + 1) + '-' + pad(dateBase.getUTCDate());
+      heureStr = pad(+match[4]) + 'h' + pad(+match[5]);
     } else {
       const prochaine = new Date(Date.now() + joursAAjouter * 24 * 60 * 60 * 1000);
       dateStr = prochaine.getFullYear() + '-' + pad(prochaine.getMonth() + 1) + '-' + pad(prochaine.getDate());
@@ -1412,9 +1515,13 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
     // créneau n'est renseigné, auquel cas le remboursement intégral s'applique par défaut.
     let heuresRestantes = null;
     if (demande.creneau) {
-      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau);
-      if (match) {
-        const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
+      // Ce calcul détermine le palier de remboursement : il doit raisonner sur
+      // l'heure française du rendez-vous, pas sur celle du serveur. Sur Railway
+      // (UTC), le créneau était lu deux heures trop tard en été — une annulation
+      // à 1 h du rendez-vous paraissait faite à 3 h, et donnait droit à 70 % de
+      // remboursement là où le barème n'en prévoyait aucun.
+      const dateCreneau = creneauVersInstant(demande.creneau);
+      if (dateCreneau) {
         heuresRestantes = (dateCreneau - new Date()) / (1000 * 60 * 60);
       }
     }
@@ -1670,8 +1777,16 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
     if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
     if (demande.statut === 'acceptee') return res.status(400).json({ error: 'Une demande a déjà été acceptée pour cette prestation.' });
 
+    // La demande est réservée par écriture conditionnelle. Le contrôle ci-dessus
+    // ne suffisait pas : entre lui et l'écriture, une seconde requête — double-tap
+    // sur mobile, ou deux onglets — passait le même test. Deux devis se
+    // retrouvaient acceptés, et deux prestataires recevaient « Devis accepté ».
+    const gagnee = await reserverLigne('demandes', devis.demande_id, ['en_attente', 'devis_recus'], 'acceptee');
+    if (!gagnee) {
+      return res.status(409).json({ error: 'Un devis vient d\'être accepté pour cette prestation.' });
+    }
+
     await supabase.from('devis').update({ statut: 'accepte' }).eq('id', req.params.id);
-    await supabase.from('demandes').update({ statut: 'acceptee' }).eq('id', devis.demande_id);
     await supabase.from('devis').update({ statut: 'refuse' }).eq('demande_id', devis.demande_id).neq('id', req.params.id);
 
     // 📧 Email 3/8 : devis accepté → pro gagnant
@@ -1744,9 +1859,10 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     // Vérifie le délai de 24h avant le créneau (signalé, mais jamais bloquant — cohérent avec l'annulation côté client)
     let tardive = false;
     if (demande.creneau) {
-      const match = /(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(demande.creneau);
-      if (match) {
-        const dateCreneau = new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5]);
+      // Même correction que pour l'annulation côté client : le délai de 24 h se
+      // mesure par rapport à l'heure française du rendez-vous.
+      const dateCreneau = creneauVersInstant(demande.creneau);
+      if (dateCreneau) {
         const heuresRestantes = (dateCreneau - new Date()) / (1000 * 60 * 60);
         tardive = heuresRestantes < 24;
       }
@@ -2272,7 +2388,9 @@ async function finaliserPrestation(paiement) {
     }
   }
 
-  await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id);
+  // Le paiement porte ici le statut de réservation posé par l'appelant ('liberation_en_cours'),
+  // ou encore 'paye' pour les appels internes qui ne réservent pas : les deux sont acceptés.
+  await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id).in('statut', ['liberation_en_cours', 'paye']);
   await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
   creerProchaineOccurrenceRecurrente(paiement.demande_id).catch(e => console.error('Récurrence non créée:', e.message));
 
@@ -2301,7 +2419,7 @@ function validerPhotos(photos, max) {
     if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
       return 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).';
     }
-    if (p.length > 3 * 1024 * 1024) {
+    if (p.length > 800 * 1024) {  // 800 ko : une demande reste sous 4 Mo au total
       return 'Une photo est trop volumineuse. Réessayez avec une photo plus légère.';
     }
   }
@@ -2370,8 +2488,29 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
       await supabase.from('demandes').update({ photos_apres: JSON.stringify(photos_apres) }).eq('id', demande_id);
     }
 
-    const resultat = await finaliserPrestation(paiement);
-    if (resultat.erreur) return res.status(400).json({ error: resultat.erreur });
+    // ⚠️ Point le plus sensible du serveur : au-delà de cette ligne, de l'argent
+    // bouge réellement. Le paiement est réservé AVANT le virement, par écriture
+    // conditionnelle. Sans cela, un double appui du pro sur un réseau lent
+    // faisait lire 'paye' aux deux requêtes, et déclenchait DEUX virements
+    // Stripe vers le même prestataire pour une seule prestation.
+    const reserve = await reserverLigne('paiements', paiement.id, ['paye'], 'liberation_en_cours');
+    if (!reserve) {
+      return res.status(409).json({ error: 'Cette prestation est déjà en cours de validation.' });
+    }
+
+    let resultat;
+    try {
+      resultat = await finaliserPrestation(paiement);
+    } catch (erreurFinalisation) {
+      // La réservation est rendue, sans quoi le paiement resterait bloqué dans un
+      // statut intermédiaire qu'aucune autre requête ne saurait reprendre.
+      await supabase.from('paiements').update({ statut: 'paye' }).eq('id', paiement.id).eq('statut', 'liberation_en_cours');
+      throw erreurFinalisation;
+    }
+    if (resultat.erreur) {
+      await supabase.from('paiements').update({ statut: 'paye' }).eq('id', paiement.id).eq('statut', 'liberation_en_cours');
+      return res.status(400).json({ error: resultat.erreur });
+    }
 
     res.json({ message: 'Prestation validée, paiement transféré ✨' });
   } catch (e) {
@@ -2870,9 +3009,15 @@ app.get('/api/tarifs/estimation', async (req, res) => {
 // avec une clé dérivée mais distincte de celle des comptes utilisateurs.
 app.post('/api/admin/login', authLimiter, async (req, res) => {
   const { password } = req.body;
-  if (!process.env.ADMIN_PASSWORD) return res.status(500).json({ error: 'Accès admin non configuré (ADMIN_PASSWORD manquant côté serveur).' });
-  if (!password || password !== process.env.ADMIN_PASSWORD) return res.status(401).json({ error: 'Mot de passe incorrect.' });
-  const token = jwt.sign({ admin: true }, process.env.JWT_SECRET + '_admin', { expiresIn: '12h' });
+  if (!process.env.ADMIN_PASSWORD && !process.env.ADMIN_PASSWORD_HASH)
+    return res.status(500).json({ error: 'Accès admin non configuré côté serveur.' });
+  if (!motDePasseAdminValide(password)) {
+    // Trace horodatée : sans elle, une tentative d'intrusion ne laissait aucune marque.
+    console.warn('⚠️  Tentative de connexion admin refusée — ' + new Date().toISOString() + ' — IP ' + (req.ip || 'inconnue'));
+    return res.status(401).json({ error: 'Mot de passe incorrect.' });
+  }
+  console.log('🔑 Connexion admin — ' + new Date().toISOString() + ' — IP ' + (req.ip || 'inconnue'));
+  const token = jwt.sign({ admin: true }, SECRET_ADMIN, { expiresIn: '12h' });
   res.json({ token });
 });
 
@@ -2982,6 +3127,45 @@ app.use((req, res) => {
 if (process.env.SENTRY_DSN && Sentry.setupExpressErrorHandler) {
   Sentry.setupExpressErrorHandler(app);
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// Balayage périodique des demandes expirées
+//
+// Jusqu'ici l'expiration n'était déclenchée que par la lecture, sur le lot que
+// l'appelant venait de charger. Trois conséquences : une requête GET modifiait
+// la base, le périmètre dépendait de qui regardait, et une demande que personne
+// ne consultait ne expirait jamais. Ce balayage couvre toute la table,
+// indépendamment du trafic.
+//
+// C'est aussi le bon endroit pour brancher les relances qui manquent
+// aujourd'hui — prévenir les pros de la zone à 24 h sans devis, proposer au
+// client d'élargir son créneau à 48 h. Elles ne sont pas ajoutées ici parce
+// qu'elles supposent de nouveaux gabarits dans ./email : les appeler sans les
+// avoir créés échouerait silencieusement.
+// ─────────────────────────────────────────────────────────────────────────
+async function balayerDemandesExpirees() {
+  try {
+    const { data, error } = await supabase
+      .from('demandes')
+      .select('id, statut, creneau')
+      .in('statut', ['en_attente', 'devis_recus', 'acceptee']);
+    if (error) return console.error('Balayage expiration — lecture:', error.message);
+    if (!data || !data.length) return;
+
+    const avant = data.filter(d => d.statut !== 'expiree').length;
+    await expirerDemandesEnRetard(data);
+    const expirees = data.filter(d => d.statut === 'expiree').length;
+    if (expirees) console.log('🧹 Balayage : ' + expirees + ' demande(s) expirée(s) sur ' + avant + ' ouverte(s).');
+  } catch (e) {
+    console.error('Balayage expiration:', e.message);
+  }
+}
+
+// Toutes les 15 minutes, et une première fois 30 secondes après le démarrage —
+// le temps que la connexion à la base soit établie.
+setInterval(balayerDemandesExpirees, 15 * 60 * 1000);
+setTimeout(balayerDemandesExpirees, 30 * 1000);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, function() {
