@@ -148,7 +148,14 @@ const supabase = createClient(
 const supabaseAuth = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY,
-  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+  {
+    // Le transport WebSocket est obligatoire ici aussi, pour la raison expliquée
+    // plus haut : la bibliothèque initialise son client temps réel à la création,
+    // qu'on s'en serve ou non, et Node 20 n'a pas de WebSocket natif. Sans cette
+    // option, createClient lève une erreur AVANT même le démarrage du serveur.
+    realtime: { transport: WebSocketTransport },
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  }
 );
 
 app.use(helmet());
