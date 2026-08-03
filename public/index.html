@@ -860,7 +860,9 @@ function majIconeTheme(){
   var sessionExpiredHandled=false;
   window.fetch=function(url,opts){
     return nativeFetch(url,opts).then(function(r){
-      if(r.status===401&&opts&&opts.headers&&opts.headers.Authorization&&!sessionExpiredHandled){
+      var authEnvoyee=opts&&opts.headers&&opts.headers.Authorization;
+      var vraiJetonEnvoye=authEnvoyee&&/^Bearer\s+\S+$/.test(authEnvoyee)&&!/^Bearer\s+(null|undefined)$/.test(authEnvoyee);
+      if(r.status===401&&vraiJetonEnvoye&&!sessionExpiredHandled){
         sessionExpiredHandled=true;
         toast('⚠️ Votre session a expiré. Reconnectez-vous.');
         setTimeout(function(){ if(typeof doLogout==='function')doLogout() },1200);
@@ -932,7 +934,18 @@ function switchTab(t){
   }
 }
 function isPro(){const t=(currentUser&&currentUser.type||'').toLowerCase().trim();return t==='pro'||t==='societe'||t==='professionnel'}
-function authHeaders(){const t=localStorage.getItem('gleam_token');return{'Content-Type':'application/json','Authorization':'Bearer '+t}}
+function authHeaders(){
+  const t=localStorage.getItem('gleam_token');
+  const base={'Content-Type':'application/json'};
+  // N'ajoute l'en-tête d'autorisation que si un vrai jeton existe — sans ça, "Bearer null" était
+  // envoyé littéralement pour un visiteur non connecté, que le serveur rejetait à juste titre,
+  // mais que l'app interprétait ensuite à tort comme "votre session a expiré" alors que la
+  // personne n'avait jamais été connectée. Depuis que les visiteurs sans compte peuvent interagir
+  // avec des boutons qui déclenchent des appels au serveur (l'estimation de prix, notamment),
+  // ce cas se produit bien plus souvent qu'avant.
+  if(t)base.Authorization='Bearer '+t;
+  return base;
+}
 function escapeHtml(s){if(s===null||s===undefined)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML}
 function escAttr(s){var str=String(s===null||s===undefined?'':s);return str.split('\\').join('\\\\').split("'").join("\\'");}
 
