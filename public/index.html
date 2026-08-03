@@ -612,15 +612,13 @@ select {
 .field-group label { margin-top: 0; }
 .optional { font-weight: 500; color: var(--gray); font-size: 11.5px; }
 
-.champ-icone { position: relative; }
-.champ-icone i {
-  position: absolute; left: 13px; top: 40px;
-  width: 17px; height: 17px;
-  color: var(--gray);
-  pointer-events: none;
-}
-.champ-icone input { padding-left: 40px !important; }
-.champ-icone:has(button) input { padding-right: 40px !important; }
+/* Le positionnement des icônes de champ est défini en section 25, en une seule
+   règle ancrée sur le bas du champ. L'ancienne règle vivait ici et employait un
+   sélecteur descendant `.champ-icone i` : elle capturait donc aussi l'icône
+   contenue DANS le bouton afficher/masquer, et lui appliquait `top: 40px`
+   relativement à ce bouton — qui fait précisément 40 px de haut. L'icône
+   atterrissait ainsi sur son bord inférieur, seule et à l'extérieur du champ.
+   Section 25 emploie `> i`, qui ne vise que les enfants directs. */
 
 .err {
   display: none;
@@ -1510,6 +1508,143 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   transition-duration: 0s;
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+   25. CHAMPS DE SAISIE — ALIGNEMENT ANCRÉ SUR LE CHAMP
+   Les icônes étaient positionnées par un `top` fixe, calculé pour un libellé
+   d'une seule ligne. Dès qu'un libellé passait sur deux lignes, ou que la
+   taille du texte changeait, l'icône se retrouvait dans le libellé.
+   Elles sont désormais ancrées sur le BAS du conteneur, donc sur le champ
+   lui-même — dont la hauteur est explicite plutôt que déduite.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+:root { --h-champ: 48px; }
+
+input:not([type="checkbox"]):not([type="range"]):not([type="file"]), select {
+  height: var(--h-champ);
+}
+textarea { min-height: 92px; padding-top: 13px; }
+
+.champ-icone { position: relative; }
+
+.champ-icone > i {
+  position: absolute;
+  left: 14px; bottom: 0; top: auto;
+  width: 16px; height: var(--h-champ);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gray);
+  pointer-events: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.champ-icone input { padding-left: 42px !important; }
+.champ-icone:focus-within > i { color: var(--p); }
+
+/* Zone de clic de 40 px de côté : l'ancien bouton faisait 21 px, trop petit
+   pour un pouce, et son `top` en dur le décalait dès que le libellé bougeait. */
+.bascule-mdp {
+  position: absolute;
+  right: 5px; bottom: 4px;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none;
+  border-radius: var(--r-sm);
+  color: var(--gray);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+}
+.bascule-mdp i { width: 17px; height: 17px; }
+.bascule-mdp:hover { color: var(--p); background: var(--surface-alt); }
+.champ-icone:has(.bascule-mdp) input { padding-right: 50px !important; }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   26. ÉCRAN DE CONNEXION ET D'INSCRIPTION
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.auth-box {
+  padding: 34px 28px 30px;
+  max-height: min(94vh, 860px);
+}
+.auth-box::-webkit-scrollbar { width: 4px; }
+
+.logo { margin-bottom: 26px; }
+.logo h1 { font-size: 34px; line-height: 1.05; }
+.logo p { font-size: 13px; color: var(--gray); margin-top: 8px; letter-spacing: .01em; }
+
+.tabs { padding: 4px; margin-bottom: 22px; }
+.tab { padding: 11px 8px; font-size: 14px; }
+
+/* Un libellé, un champ, un intervalle constant. Les marges venaient jusqu'ici
+   d'une règle générale sur `label`, ce qui donnait des écarts différents selon
+   qu'un champ suivait un titre de section, une case à cocher ou un autre champ. */
+#form-login label, #form-register label { margin-top: 18px; margin-bottom: 7px; }
+#form-login > div:first-child > label,
+#form-register > div:first-child > label { margin-top: 0; }
+.row2 > div > label { margin-top: 0; }
+.row2 { gap: 10px; }
+
+.register-section-titre {
+  margin: 26px 0 14px;
+  padding-bottom: 8px;
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.register-section-titre i { width: 13px; height: 13px; color: var(--p); }
+
+/* Les rôles sont des choix de même importance : même hauteur, icône centrée,
+   libellé sur une seule ligne. Les emojis rendaient les trois boutons
+   visuellement inégaux, chaque plateforme les dessinant à sa façon. */
+.role-select { gap: 8px; margin-top: 4px; }
+.role-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 7px;
+  min-height: 76px;
+  padding: 12px 6px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.role-btn i { width: 20px; height: 20px; }
+.role-btn span { font-size: 19px; margin-bottom: 0; }
+
+#pro-rcpro-block, #entreprise-block {
+  border-radius: var(--r-md);
+  padding: 16px;
+  margin-top: 16px;
+}
+#pro-rcpro-block label:first-child,
+#entreprise-block label:first-child { margin-top: 0; }
+
+/* Indicateur de force — collé au champ qu'il décrit, pas flottant entre deux. */
+.force-mdp { margin-top: 9px; gap: 5px; }
+.force-mdp-barre { height: 3px; }
+.force-mdp-texte { font-size: 11px; margin-top: 6px; line-height: 1.4; }
+
+/* Cases à cocher : la case et son texte alignés sur la même première ligne. */
+#form-register label:has(input[type="checkbox"]) {
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+#form-register input[type="checkbox"] {
+  width: 18px; height: 18px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+#form-login .btn, #form-register .btn { margin-top: 24px; }
+
+.err { font-size: 12.5px; line-height: 1.45; }
+
+@media (max-width: 380px) {
+  .auth-box { padding: 26px 20px 24px; }
+  .logo h1 { font-size: 30px; }
+  .role-btn { min-height: 70px; font-size: 11px; }
+}
+
 @media (min-width: 700px) {
   .screen.active { max-width: 560px; margin: 0 auto; box-shadow: var(--shadow-lg); }
   .services-grid { gap: var(--gap-3); }
@@ -1594,7 +1729,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
       </div>
       <div id="form-login">
         <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="le" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
-        <div class="champ-icone" style="position:relative"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password"><button type="button" onclick="basculerVisibiliteMdp('lp',this)" style="position:absolute;right:12px;top:38px;background:none;border:none;cursor:pointer;color:var(--gray);padding:2px"><i data-lucide="eye" style="width:17px;height:17px"></i></button></div>
+        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password"><button type="button" class="bascule-mdp" aria-label="Afficher ou masquer le mot de passe" onclick="basculerVisibiliteMdp('lp',this)"><i data-lucide="eye"></i></button></div>
         <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600" onclick="forgotPassword()">Mot de passe oublié ?</button></div>
         <button class="btn" id="login-btn" onclick="doLogin()">Se connecter</button>
         <div class="err" id="lerr"></div>
@@ -1609,7 +1744,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
         <div class="champ-icone"><label>Téléphone</label><i data-lucide="phone"></i><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel"></div>
 
         <div class="register-section-titre"><i data-lucide="lock"></i>Sécurité</div>
-        <div class="champ-icone" style="position:relative"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"><button type="button" onclick="basculerVisibiliteMdp('rpw',this)" style="position:absolute;right:12px;top:38px;background:none;border:none;cursor:pointer;color:var(--gray);padding:2px"><i data-lucide="eye" style="width:17px;height:17px"></i></button></div>
+        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"><button type="button" class="bascule-mdp" aria-label="Afficher ou masquer le mot de passe" onclick="basculerVisibiliteMdp('rpw',this)"><i data-lucide="eye"></i></button></div>
         <div class="force-mdp" id="force-mdp-barres" style="display:none">
           <div class="force-mdp-barre"></div><div class="force-mdp-barre"></div><div class="force-mdp-barre"></div>
         </div>
@@ -1617,9 +1752,9 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 
         <div class="register-section-titre"><i data-lucide="briefcase"></i>Votre profil</div>
         <div class="role-select">
-          <button class="role-btn sel" id="role-client" onclick="setRole('client')"><span>👤</span>Particulier</button>
-          <button class="role-btn" id="role-entreprise" onclick="setRole('entreprise')"><span>🏢</span>Entreprise</button>
-          <button class="role-btn" id="role-pro" onclick="setRole('pro')"><span>🧑‍🔧</span>Prestataire</button>
+          <button class="role-btn sel" id="role-client" onclick="setRole('client')"><i data-lucide="user"></i>Particulier</button>
+          <button class="role-btn" id="role-entreprise" onclick="setRole('entreprise')"><i data-lucide="building-2"></i>Entreprise</button>
+          <button class="role-btn" id="role-pro" onclick="setRole('pro')"><i data-lucide="wrench"></i>Prestataire</button>
         </div>
         <div id="entreprise-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
           <label style="margin-top:0">Raison sociale *</label>
@@ -1647,7 +1782,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
             <span>J'atteste disposer d'une assurance responsabilité civile professionnelle en cours de validité, couvrant les dommages pouvant survenir dans le cadre de mes prestations.</span>
           </label>
         </div>
-        <label style="margin-top:14px">🎁 Code de parrainage <span class="optional">(optionnel)</span></label>
+        <label style="margin-top:20px">Code de parrainage <span class="optional">(optionnel)</span></label>
         <input type="text" id="r-code-parrainage" placeholder="Ex: MADY1234" style="text-transform:uppercase">
         <label style="display:flex;align-items:flex-start;gap:8px;margin-top:16px;cursor:pointer;font-weight:400;font-size:13px">
           <input type="checkbox" id="r-cgu-accept" style="width:auto;margin-top:2px">
@@ -4396,7 +4531,7 @@ async function actionRecurrence(demandeId,action){
     const d=await safeJson(r);
     if(!r.ok){toast('❌ '+(d.error||'Erreur.'));return}
     toast('✅ '+d.message);
-    closeModal();
+    fermerModale();
     loadDemandes();
   }catch(e){toast(friendlyNetworkError(e))}
 }
@@ -4451,7 +4586,7 @@ async function confirmerRelanceRecurrente(demandeId){
     const d=await safeJson(r);
     if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
     toast('✅ '+d.message,4000);
-    closeModal();
+    fermerModale();
     freqRelanceChoisie=null;
     loadDemandes();
   }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
@@ -4712,7 +4847,7 @@ async function enregistrerZoneIntervention(){
     if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
     toast('✅ '+d.message);
     if(currentUser){currentUser.latitude=pos.lat;currentUser.longitude=pos.lng;currentUser.rayon_intervention_km=rayon}
-    closeModal();
+    fermerModale();
   }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
 }
 function ouvrirConfirmerEmail(){
@@ -4735,7 +4870,7 @@ async function validerCodeVerifEmail(){
     const d=await safeJson(r);
     if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
     toast('✅ '+d.message);
-    closeModal();
+    fermerModale();
     var itemC=document.getElementById('item-confirmer-email-client');if(itemC)itemC.style.display='none';
     var itemP=document.getElementById('item-confirmer-email-pro');if(itemP)itemP.style.display='none';
     if(currentUser)currentUser.email_verifie=true;
@@ -5318,7 +5453,20 @@ function validerEtapeAssistant(etape){
   }
   return null;
 }
-function closeModal(e){if(e.target===document.getElementById('modal-overlay')){closeModalForce()}}
+// Ferme la modale uniquement si l'on a cliqué sur le fond, pas sur son contenu.
+// Le test sur e.target est désormais protégé : appelée sans événement, cette
+// fonction levait une TypeError qui remontait dans le catch de l'appelant et s'y
+// faisait passer pour une panne réseau. Quatre fonctions annonçaient ainsi
+// « Connexion impossible » sur des opérations qui avaient parfaitement réussi.
+function closeModal(e){
+  if(!e||!e.target){fermerModale();return}
+  if(e.target===document.getElementById('modal-overlay'))closeModalForce();
+}
+// Fermeture directe, après une action réussie : rien à confirmer, rien à perdre.
+function fermerModale(){
+  var overlay=document.getElementById('modal-overlay');
+  if(overlay)overlay.classList.remove('open');
+}
 function closeModalForce(){
   var hadData=multiFlow.active||(document.getElementById('f-addr')&&document.getElementById('f-addr').value.trim());
   if(hadData&&!confirm('Fermer sans envoyer cette demande ? Les informations saisies seront perdues.'))return;
