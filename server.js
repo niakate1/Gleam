@@ -124,6 +124,33 @@ const supabase = createClient(
   { realtime: { transport: WebSocketTransport }, auth: { persistSession: false } }
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Client SÉPARÉ, réservé aux appels d'authentification qui ouvrent une session.
+//
+// Pourquoi : supabase-js mémorise la session renvoyée par signInWithPassword()
+// DANS l'instance du client, même avec persistSession à false — l'option
+// n'empêche que l'écriture sur disque, pas la mémorisation en mémoire. À partir
+// de là, le client envoie le jeton de CET utilisateur en en-tête Authorization
+// à la place de la clé de service. PostgREST en déduit le rôle `authenticated`,
+// qui ne contourne pas RLS.
+//
+// Conséquence sur le client partagé : dès la première connexion d'un
+// utilisateur, TOUTES les requêtes suivantes du serveur — pour tous les
+// utilisateurs — cessaient de s'exécuter en service_role. C'est ce qui a produit
+// l'erreur du 2 août, « new row violates row-level security policy for table
+// users », sur l'insertion faite juste après signInWithPassword ci-dessous. Et
+// c'est pourquoi push_subscriptions, seule table restée en RLS, n'a jamais
+// enregistré la moindre ligne.
+//
+// En isolant cet appel, le client de données reste en service_role en
+// permanence, et RLS peut être activé sans rien casser.
+// ─────────────────────────────────────────────────────────────────────────────
+const supabaseAuth = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+);
+
 app.use(helmet());
 // CORS restreint au(x) domaine(s) réel(s) de Gleam plutôt qu'ouvert à n'importe quelle origine.
 //
@@ -667,10 +694,15 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ error: 'Email et mot de passe requis.' });
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabaseAuth.auth.signInWithPassword({
       email: email.toLowerCase().trim(),
       password: password
     });
+    // La session est refermée aussitôt : on n'a besoin que de la vérification du
+    // mot de passe, jamais de rester connecté au nom de cette personne. Le champ
+    // scope reste local — un signOut global révoquerait les jetons de rafraîchissement
+    // de l'utilisateur sur tous ses appareils.
+    await supabaseAuth.auth.signOut({ scope: 'local' }).catch(() => {});
     if (error) return res.status(401).json({ error: 'Identifiants incorrects.' });
 
     let { data: user } = await supabase.from('users').select('*').eq('id', data.user.id).single();
