@@ -28,16 +28,16 @@ const APP_URL = process.env.FRONTEND_URL || 'https://gleam-app.fr/';
 function wrapTemplate({ title, body, ctaLabel, ctaUrl }) {
   return `
   <div style="font-family: Arial, Helvetica, sans-serif; max-width: 560px; margin: 0 auto; background: #ffffff;">
-    <div style="background: #0f766e; padding: 24px; text-align: center;">
+    <div style="background: #4B2FBF; padding: 24px; text-align: center;">
       <h1 style="color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 1px;">Gleam</h1>
     </div>
     <div style="padding: 32px 28px; color: #1f2937; font-size: 15px; line-height: 1.6;">
-      <h2 style="font-size: 18px; color: #0f766e; margin-top: 0;">${title}</h2>
+      <h2 style="font-size: 18px; color: #4B2FBF; margin-top: 0;">${title}</h2>
       ${body}
       ${
         ctaUrl
           ? `<div style="text-align:center; margin-top: 28px;">
-               <a href="${ctaUrl}" style="background:#0f766e; color:#ffffff; text-decoration:none; padding: 12px 28px; border-radius: 6px; font-weight: bold; display:inline-block;">
+               <a href="${ctaUrl}" style="background:#4B2FBF; color:#ffffff; text-decoration:none; padding: 12px 28px; border-radius: 6px; font-weight: bold; display:inline-block;">
                  ${ctaLabel}
                </a>
              </div>`
@@ -51,7 +51,7 @@ function wrapTemplate({ title, body, ctaLabel, ctaUrl }) {
 }
 
 // ---------------------------------------------------------------------------
-// Les 8 templates métier
+// Les gabarits métier
 // ---------------------------------------------------------------------------
 
 const templates = {
@@ -187,7 +187,7 @@ const templates = {
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
       body: `<p>Votre prestation récurrente (${d.prestation}) a bien été réalisée — la prochaine est déjà programmée automatiquement :</p>
-             <p style="font-size:18px;font-weight:700;color:#7C3AED;text-align:center;margin:20px 0">${d.date} à ${d.heure}</p>
+             <p style="font-size:18px;font-weight:700;color:#4B2FBF;text-align:center;margin:20px 0">${d.date} à ${d.heure}</p>
              <p>Vous pouvez la modifier, la mettre en pause, ou l'annuler à tout moment depuis l'application.</p>`,
     }),
   }),
@@ -197,7 +197,7 @@ const templates = {
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
       body: `<p>Voici votre code pour choisir un nouveau mot de passe :</p>
-             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#7C3AED;text-align:center;margin:20px 0">${d.code}</p>
+             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#4B2FBF;text-align:center;margin:20px 0">${d.code}</p>
              <p>Ce code est valable 30 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>`,
     }),
   }),
@@ -209,7 +209,7 @@ const templates = {
     html: wrapTemplate({
       title: `Bienvenue ${d.prenom} !`,
       body: `<p>Merci de vous être inscrit sur Gleam. Voici votre code pour confirmer votre adresse email :</p>
-             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#7C3AED;text-align:center;margin:20px 0">${d.code}</p>
+             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#4B2FBF;text-align:center;margin:20px 0">${d.code}</p>
              <p>Ce code est valable 24 heures. Vous pouvez le saisir depuis votre profil, dans la rubrique "Confirmer mon email" — pas d'urgence, vous pouvez continuer à utiliser Gleam normalement en attendant.</p>`,
     }),
   }),
@@ -224,6 +224,46 @@ const templates = {
              <p>Vous n'avez plus besoin de vous rendre à ce rendez-vous.</p>`,
       ctaLabel: 'Voir mes devis',
       ctaUrl: `${APP_URL}#devis`,
+    }),
+  }),
+
+  // Relance aux prestataires de la zone, 24 h après une demande restée sans devis.
+  // Distinct de "nouvelle_demande" : le ton change, l'urgence est réelle, et le
+  // client attend depuis un jour entier.
+  demande_sans_devis_pro: (d) => ({
+    subject: `Toujours sans devis : ${d.prestation} à ${d.ville}`,
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Une demande publiée il y a 24 heures près de chez vous n'a encore reçu <strong>aucun devis</strong>.</p>
+             <p><strong>Prestation :</strong> ${d.prestation}<br/>
+                <strong>Ville :</strong> ${d.ville || 'Non précisée'}${d.distance ? `<br/><strong>Distance :</strong> ${d.distance} km` : ''}
+                ${d.creneau ? `<br/><strong>Créneau souhaité :</strong> ${d.creneau}` : ''}</p>
+             <p>Le client attend. Vous êtes pour l'instant seul à pouvoir y répondre.</p>`,
+      ctaLabel: 'Envoyer mon devis',
+      ctaUrl: `${APP_URL}#demandes-disponibles`,
+    }),
+  }),
+
+  // Message au client, 48 h sans devis. Le ton compte particulièrement ici : il
+  // s'agit d'expliquer sans se justifier, et de proposer une action concrète
+  // plutôt que de laisser la demande mourir en silence.
+  demande_sans_devis_client: (d) => ({
+    subject: `Votre demande n'a pas encore reçu de devis`,
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Votre demande <strong>${d.prestation}</strong> n'a pas encore trouvé de prestataire disponible.</p>
+             <p>Cela arrive quand le créneau souhaité est proche, ou quand peu de professionnels
+                interviennent encore dans votre secteur.</p>
+             <p><strong>Deux choses peuvent aider :</strong></p>
+             <ul style="padding-left:18px;margin:8px 0">
+               <li>Élargir votre créneau, ou le décaler de quelques jours</li>
+               <li>Ajouter des photos : les prestataires répondent plus volontiers à une demande
+                   dont ils mesurent précisément le travail</li>
+             </ul>
+             <p>Votre demande reste active${d.creneau ? ` jusqu'au ${d.creneau}` : ''}. Vous pouvez la
+                modifier à tout moment depuis l'application.</p>`,
+      ctaLabel: 'Modifier ma demande',
+      ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
     }),
   }),
 
@@ -248,7 +288,7 @@ const templates = {
 
 /**
  * Envoie un email transactionnel.
- * @param {string} type - une des 8 clés de `templates`
+ * @param {string} type - une des clés de `templates`
  * @param {string} to - email du destinataire
  * @param {object} data - données injectées dans le template
  */
