@@ -3,227 +3,451 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>Gleam — Administration</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="icon" href="/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet">
 <style>
-:root{--p:#6D28D9;--p2:#4C1D95;--bg:#F9FAFB;--surface:#FFFFFF;--surface-alt:#F3F4F6;--border:#E5E7EB;--text:#111827;--text-secondary:#374151;--gray:#6B7280;--red:#EF4444;--green:#059669;--gold:#F5B942;--shadow-sm:0 1px 2px rgba(17,24,39,.06);--shadow-md:0 4px 16px rgba(17,24,39,.08)}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.hidden{display:none!important}
+/* ============================================================================
+   GLEAM — ADMINISTRATION
+   Mêmes jetons visuels que l'application : un tableau de bord qui ne
+   ressemblerait pas au produit qu'il supervise serait déroutant.
+   ============================================================================ */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --p:#4B2FBF; --p2:#2E1A82; --light:#EEEAFC; --aqua:#00A891; --gold:#D9930C;
+  --bg:#F6F6FB; --surface:#FFFFFF; --surface-alt:#EFEFF6;
+  --border:#E2E2EE; --border-fort:#CFCFE0;
+  --text:#14132B; --text-secondary:#4A4966; --gray:#75748C;
+  --green:#0E9F6E; --green-clair:#E3F7EF; --red:#DC2626; --red-clair:#FDEDED;
+  --amber:#B4740A; --amber-clair:#FDF4E3;
+  --shadow-sm:0 1px 3px rgba(20,19,43,.07); --shadow-md:0 4px 16px rgba(20,19,43,.08);
+  --shadow-lg:0 12px 36px rgba(20,19,43,.11); --shadow-xl:0 24px 64px rgba(20,19,43,.16);
+  --r-sm:10px; --r-md:14px; --r-lg:20px; --r-pill:999px;
+  --ease:cubic-bezier(.16,1,.3,1); --dur:160ms;
+}
+@media (prefers-color-scheme:dark){:root{
+  --p:#9E86FF; --p2:#C3B2FF; --light:#241F45; --aqua:#2FD8BE; --gold:#F5C542;
+  --bg:#0C0B18; --surface:#16152A; --surface-alt:#201E38;
+  --border:#2E2C4A; --border-fort:#423F63;
+  --text:#EDECF5; --text-secondary:#C2C0D6; --gray:#8F8DA8;
+  --green:#34D399; --green-clair:#10352A; --red:#F87171; --red-clair:#3B1A1A;
+  --amber:#FBBF4C; --amber-clair:#3A2C0C;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.45); --shadow-md:0 4px 16px rgba(0,0,0,.5);
+  --shadow-lg:0 12px 36px rgba(0,0,0,.6); --shadow-xl:0 24px 64px rgba(0,0,0,.7);
+}}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+.serif{font-family:'Fraunces',Georgia,serif;font-variation-settings:'opsz' 32;letter-spacing:-.015em}
+:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(75,47,191,.35);border-radius:var(--r-sm)}
+button{font-family:inherit;cursor:pointer}
+.masque{display:none!important}
 
-#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#6D28D9,#3B1878 65%,#2A1150)}
-.login-box{background:var(--surface);border-radius:16px;padding:36px 32px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-.login-box h1{font-family:'Fraunces',Georgia,serif;font-size:26px;font-weight:700;color:var(--p);margin-bottom:4px}
-.login-box p{color:var(--gray);font-size:13px;margin-bottom:20px}
-.login-box input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;margin-bottom:12px;font-family:inherit}
-.login-box input:focus{outline:none;border-color:var(--p)}
-.login-box button{width:100%;padding:12px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
-.login-box button:hover{background:var(--p2)}
-.login-err{color:var(--red);font-size:13px;margin-top:10px;display:none}
-.login-err.show{display:block}
+/* ── Connexion ─────────────────────────────────────────────────────────── */
+#ecran-connexion{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(ellipse 420px 340px at 92% -6%,rgba(245,197,66,.30),transparent 66%),
+             radial-gradient(ellipse 460px 380px at 2% 104%,rgba(0,168,145,.36),transparent 68%),
+             linear-gradient(160deg,#4B2FBF 0%,#34209B 60%,#1C1049 100%)}
+.boite-connexion{background:var(--surface);border-radius:var(--r-lg);padding:36px 30px;
+  width:100%;max-width:390px;box-shadow:var(--shadow-xl)}
+.boite-connexion h1{font-size:27px;font-weight:600;color:var(--p);text-align:center}
+.boite-connexion .sous{text-align:center;font-size:13px;color:var(--gray);margin:8px 0 26px}
+label{display:block;font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:7px}
+input{width:100%;height:48px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);
+  background:var(--surface);color:var(--text);font-family:inherit;font-size:16px;outline:none;
+  transition:border-color var(--dur) var(--ease)}
+input:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(75,47,191,.14)}
+.btn{width:100%;padding:14px;border:none;border-radius:var(--r-sm);background:var(--p);color:#fff;
+  font-size:15px;font-weight:700;transition:background var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.btn:hover{background:var(--p2)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.erreur{display:none;background:var(--red-clair);color:var(--red);border-left:3px solid var(--red);
+  padding:11px 14px;border-radius:var(--r-sm);font-size:13px;font-weight:600;margin-top:14px}
+.erreur.visible{display:block}
 
-#admin-app{display:none}
-#admin-app.show{display:block}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
-.topbar h1{font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:700;color:var(--p)}
-.topbar button{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
-.topbar button:hover{background:var(--surface-alt)}
-.tabs{display:flex;gap:4px;padding:14px 24px 0;max-width:1100px;margin:0 auto}
-.tab-btn{padding:10px 18px;border:none;background:none;color:var(--gray);font-size:14px;font-weight:700;cursor:pointer;border-bottom:2.5px solid transparent;font-family:inherit}
-.tab-btn.active{color:var(--p);border-bottom-color:var(--p)}
-.content{max-width:1100px;margin:0 auto;padding:20px 24px 60px}
+/* ── Structure ─────────────────────────────────────────────────────────── */
+.barre{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between}
+.barre .marque{font-size:19px;font-weight:600;color:var(--p)}
+.barre .marque span{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--gray);margin-left:9px;font-family:'Plus Jakarta Sans',sans-serif}
+.deconnexion{background:none;border:1.5px solid var(--border);color:var(--text-secondary);
+  padding:8px 15px;border-radius:var(--r-sm);font-size:13px;font-weight:700}
+.deconnexion:hover{background:var(--surface-alt)}
+main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
+.onglets{display:flex;gap:4px;background:var(--surface-alt);border-radius:var(--r-md);padding:4px;margin-bottom:26px}
+.onglet{flex:1;padding:11px;border:none;background:none;border-radius:10px;font-size:14px;font-weight:700;
+  color:var(--gray);transition:all var(--dur) var(--ease)}
+.onglet.actif{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
+.titre-section{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--gray);margin:28px 0 13px}
+.titre-section:first-child{margin-top:0}
 
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
-.stat-card{background:var(--surface);border-radius:14px;padding:18px;box-shadow:var(--shadow-sm);border:1px solid var(--border)}
-.stat-num{font-size:26px;font-weight:800;color:var(--p)}
-.stat-label{font-size:12.5px;color:var(--gray);margin-top:4px;font-weight:600}
+/* ── Chiffres ──────────────────────────────────────────────────────────── */
+.grille-chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:13px}
+.chiffre{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:18px}
+.chiffre .valeur{font-family:'Fraunces',Georgia,serif;font-variation-settings:'opsz' 40;
+  font-size:31px;font-weight:600;line-height:1;color:var(--p);font-variant-numeric:tabular-nums}
+.chiffre .etiquette{font-size:12px;font-weight:600;color:var(--gray);margin-top:7px}
+.chiffre.accent{background:var(--light);border-color:transparent}
+.chiffre.alerte{background:var(--amber-clair);border-color:transparent}
+.chiffre.alerte .valeur{color:var(--amber)}
 
-.search-row{display:flex;gap:10px;margin-bottom:16px}
-.search-row input{flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit}
-
-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-sm)}
-thead td{background:var(--surface-alt);font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--gray);font-weight:700;padding:10px 14px}
-tbody td{padding:12px 14px;border-top:1px solid var(--border);font-size:13.5px;vertical-align:top}
-tbody tr:hover{background:var(--surface-alt)}
-.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700}
-.badge-nouveau{background:#FEF3C7;color:#B45309}
-.badge-traite{background:#D1FAE5;color:#047857}
-.badge-client{background:#E0E7FF;color:#4338CA}
-.badge-pro{background:#D1FAE5;color:#047857}
-.badge-entreprise{background:#FCE7F3;color:#BE185D}
-.btn-sm{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
-.btn-sm:hover{background:var(--surface-alt)}
-.btn-sm.danger{color:var(--red);border-color:var(--red)}
-.btn-sm.success{color:var(--green);border-color:var(--green)}
-.empty{text-align:center;padding:50px;color:var(--gray);font-size:14px}
-.loading{text-align:center;padding:50px;color:var(--gray);font-size:14px}
+/* ── Listes ────────────────────────────────────────────────────────────── */
+.carte{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:16px;margin-bottom:11px;box-shadow:var(--shadow-sm)}
+.carte-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:9px}
+.badge{flex-shrink:0;padding:5px 11px;border-radius:var(--r-pill);font-size:11px;font-weight:800;white-space:nowrap}
+.badge.nouveau{background:var(--amber-clair);color:var(--amber)}
+.badge.traite{background:var(--green-clair);color:var(--green)}
+.badge.neutre{background:var(--surface-alt);color:var(--gray)}
+.badge.suspendu{background:var(--red-clair);color:var(--red)}
+.ligne{font-size:13.5px;color:var(--text-secondary);margin-bottom:3px}
+.ligne strong{color:var(--text);font-weight:700}
+.citation{background:var(--surface-alt);border-radius:var(--r-sm);padding:11px 13px;
+  font-size:13px;line-height:1.5;margin-top:9px;white-space:pre-wrap;word-break:break-word}
+.petit{font-size:11.5px;color:var(--gray);font-variant-numeric:tabular-nums}
+.action{margin-top:12px;padding:10px 16px;border:1.5px solid var(--border);border-radius:var(--r-sm);
+  background:none;color:var(--text-secondary);font-size:13px;font-weight:700}
+.action:hover{background:var(--surface-alt);border-color:var(--p);color:var(--p)}
+.action.danger:hover{border-color:var(--red);color:var(--red);background:var(--red-clair)}
+.recherche{margin-bottom:16px}
+.vide{text-align:center;padding:48px 20px;color:var(--gray);font-size:14px}
+.vide .gros{font-size:17px;font-weight:600;color:var(--text);margin-bottom:6px;
+  font-family:'Fraunces',Georgia,serif;font-variation-settings:'opsz' 32}
+.squelette{height:88px;border-radius:var(--r-md);background:var(--surface-alt);margin-bottom:11px;
+  animation:respire 1.4s ease-in-out infinite}
+@keyframes respire{0%,100%{opacity:1}50%{opacity:.5}}
+.avis{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);
+  background:#201E38;color:#fff;padding:13px 20px;border-radius:var(--r-md);font-size:14px;font-weight:600;
+  box-shadow:var(--shadow-xl);opacity:0;pointer-events:none;transition:all 260ms var(--ease);z-index:200;max-width:90%}
+.avis.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+.avis.ok{background:#075E4A} .avis.ko{background:#7F1D1D}
+@media (max-width:520px){
+  main{padding:20px 14px 50px}
+  .chiffre .valeur{font-size:27px}
+}
 </style>
 </head>
 <body>
 
-<div id="login-screen">
-  <div class="login-box">
-    <h1>✨ Gleam</h1>
-    <p>Espace administration</p>
-    <input type="password" id="admin-password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')adminLogin()">
-    <button onclick="adminLogin()">Se connecter</button>
-    <div class="login-err" id="login-err"></div>
+<!-- ── CONNEXION ─────────────────────────────────────────────────────────── -->
+<div id="ecran-connexion">
+  <div class="boite-connexion">
+    <h1 class="serif">Gleam</h1>
+    <div class="sous">Espace d'administration</div>
+    <label for="mdp">Mot de passe administrateur</label>
+    <input type="password" id="mdp" placeholder="••••••••" autocomplete="current-password">
+    <button class="btn" id="btn-entrer" style="margin-top:20px">Se connecter</button>
+    <div class="erreur" id="erreur-connexion"></div>
+    <p class="petit" style="text-align:center;margin-top:18px;line-height:1.5">
+      Session valable 12 heures.<br>Cet espace n'est pas indexé par les moteurs de recherche.
+    </p>
   </div>
 </div>
 
-<div id="admin-app">
-  <div class="topbar">
-    <h1>✨ Gleam — Administration</h1>
-    <button onclick="adminLogout()">Se déconnecter</button>
-  </div>
-  <div class="tabs">
-    <button class="tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">Vue d'ensemble</button>
-    <button class="tab-btn" id="tab-btn-signalements" onclick="switchTab('signalements')">Signalements</button>
-    <button class="tab-btn" id="tab-btn-users" onclick="switchTab('users')">Utilisateurs</button>
+<!-- ── TABLEAU DE BORD ───────────────────────────────────────────────────── -->
+<div id="ecran-admin" class="masque">
+  <div class="barre">
+    <div class="marque serif">Gleam<span>Administration</span></div>
+    <button class="deconnexion" id="btn-sortir">Se déconnecter</button>
   </div>
 
-  <div class="content">
-    <div id="panel-dashboard">
-      <div class="stats-grid" id="stats-grid"><div class="loading">Chargement...</div></div>
+  <main>
+    <div class="onglets">
+      <button class="onglet actif" data-vue="chiffres">Chiffres</button>
+      <button class="onglet" data-vue="signalements">Signalements</button>
+      <button class="onglet" data-vue="comptes">Comptes</button>
     </div>
 
-    <div id="panel-signalements" class="hidden">
-      <div id="signalements-list"><div class="loading">Chargement...</div></div>
-    </div>
+    <section id="vue-chiffres">
+      <div class="titre-section">Activité</div>
+      <div class="grille-chiffres" id="grille-chiffres"></div>
+      <div class="titre-section">Encaissements</div>
+      <div class="grille-chiffres" id="grille-argent"></div>
+      <p class="petit" style="margin-top:16px;line-height:1.6">
+        Les montants agrègent les paiements aux statuts <strong>payé</strong> et <strong>libéré</strong> :
+        ce qui a été encaissé, que la prestation soit confirmée ou non.
+      </p>
+    </section>
 
-    <div id="panel-users" class="hidden">
-      <div class="search-row">
-        <input type="text" id="users-search" placeholder="Rechercher par email ou nom..." oninput="debounceUsersSearch()">
-      </div>
-      <div id="users-list"><div class="loading">Chargement...</div></div>
-    </div>
-  </div>
+    <section id="vue-signalements" class="masque">
+      <div class="titre-section">Signalements et messages au support</div>
+      <div id="liste-signalements"></div>
+    </section>
+
+    <section id="vue-comptes" class="masque">
+      <div class="titre-section">Comptes</div>
+      <input type="text" id="recherche" class="recherche" placeholder="Rechercher par email, prénom ou nom…">
+      <div id="liste-comptes"></div>
+    </section>
+  </main>
 </div>
+
+<div class="avis" id="avis"></div>
 
 <script>
+/* ============================================================================
+   Cette page n'appelle que des routes qui existaient déjà dans server.js :
+     POST   /api/admin/login
+     GET    /api/admin/stats
+     GET    /api/admin/signalements
+     PATCH  /api/admin/signalements/:id
+     GET    /api/admin/users
+     PATCH  /api/admin/users/:id/disponibilite
+   Aucune modification du serveur n'est nécessaire.
+   ============================================================================ */
 const API = 'https://gleam-production-9b95.up.railway.app';
-let adminToken = localStorage.getItem('gleam_admin_token') || '';
 
-function escapeHtml(s){return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function adminHeaders(){return {'Content-Type':'application/json', 'Authorization':'Bearer '+adminToken};}
+// sessionStorage et non localStorage : une session d'administration ne doit pas
+// survivre à la fermeture du navigateur. Elle expire de toute façon en 12 h
+// côté serveur ; autant que le poste de travail suive la même règle.
+const CLE_JETON = 'gleam_admin_jeton';
 
-async function adminLogin(){
-  const pass = document.getElementById('admin-password').value;
-  const errEl = document.getElementById('login-err');
-  errEl.classList.remove('show');
-  try{
-    const r = await fetch(API+'/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pass})});
-    const d = await r.json();
-    if(!r.ok){ errEl.textContent = d.error || 'Erreur de connexion.'; errEl.classList.add('show'); return; }
-    adminToken = d.token;
-    localStorage.setItem('gleam_admin_token', adminToken);
-    entrerDansAdmin();
-  }catch(e){ errEl.textContent = 'Erreur réseau, vérifiez votre connexion.'; errEl.classList.add('show'); }
-}
-function adminLogout(){
-  localStorage.removeItem('gleam_admin_token');
-  adminToken = '';
-  document.getElementById('admin-app').classList.remove('show');
-  document.getElementById('login-screen').style.display = 'flex';
-}
-function entrerDansAdmin(){
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('admin-app').classList.add('show');
-  loadStats();
+let jeton = sessionStorage.getItem(CLE_JETON);
+let comptes = [];
+
+const $ = (id) => document.getElementById(id);
+
+function avis(message, type) {
+  const a = $('avis');
+  a.className = 'avis visible ' + (type || '');
+  a.textContent = message;
+  clearTimeout(a._t);
+  a._t = setTimeout(() => a.classList.remove('visible'), 3200);
 }
 
-function switchTab(tab){
-  ['dashboard','signalements','users'].forEach(t => {
-    document.getElementById('panel-'+t).classList.toggle('hidden', t !== tab);
-    document.getElementById('tab-btn-'+t).classList.toggle('active', t === tab);
-  });
-  if(tab === 'signalements') loadSignalements();
-  if(tab === 'users') loadUsers('');
+function euros(n) {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+}
+function dateCourte(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+    + ' à ' + new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+function echapper(s) {
+  const d = document.createElement('div');
+  d.textContent = s === null || s === undefined ? '' : String(s);
+  return d.innerHTML;
 }
 
-async function loadStats(){
-  const grid = document.getElementById('stats-grid');
-  try{
-    const r = await fetch(API+'/api/admin/stats', {headers: adminHeaders()});
-    if(r.status === 401){ adminLogout(); return; }
-    const d = await r.json();
-    if(!r.ok){ grid.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
-    grid.innerHTML = [
-      ['Clients particuliers', d.nb_clients],
-      ['Clients entreprises', d.nb_entreprises],
-      ['Prestataires', d.nb_pros],
-      ['Demandes actives', d.nb_demandes_actives],
-      ['Signalements en attente', d.nb_signalements_ouverts],
-      ['Revenu total (TTC)', d.revenu_total + ' €'],
-      ['Commission Gleam cumulée', d.commission_totale + ' €']
-    ].map(function(pair){ return '<div class="stat-card"><div class="stat-num">'+pair[1]+'</div><div class="stat-label">'+pair[0]+'</div></div>'; }).join('');
-  }catch(e){ grid.innerHTML = '<div class="empty">Erreur réseau.</div>'; }
+// Tout appel authentifié passe par ici : un 401 ramène systématiquement à
+// l'écran de connexion plutôt que d'afficher une page à moitié vide.
+async function appel(chemin, options) {
+  const r = await fetch(API + chemin, Object.assign({}, options, {
+    headers: Object.assign({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jeton },
+                           (options && options.headers) || {})
+  }));
+  if (r.status === 401) { deconnecter('Session expirée, reconnectez-vous.'); throw new Error('401'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'Erreur ' + r.status);
+  return d;
 }
 
-async function loadSignalements(){
-  const list = document.getElementById('signalements-list');
-  list.innerHTML = '<div class="loading">Chargement...</div>';
-  try{
-    const r = await fetch(API+'/api/admin/signalements', {headers: adminHeaders()});
-    if(r.status === 401){ adminLogout(); return; }
-    const d = await r.json();
-    if(!r.ok){ list.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
-    if(!d.length){ list.innerHTML = '<div class="empty">Aucun signalement.</div>'; return; }
-    list.innerHTML = '<table><thead><tr><td>Date</td><td>Motif</td><td>Rapporteur</td><td>Concerné</td><td>Description</td><td>Statut</td><td></td></tr></thead><tbody>' +
-      d.map(function(s){
-        var rap = s.rapporteur ? escapeHtml((s.rapporteur.prenom||'')+' '+(s.rapporteur.nom||'')+' ('+s.rapporteur.email+')') : '—';
-        var sig = s.signale ? escapeHtml((s.signale.prenom||'')+' '+(s.signale.nom||'')+' ('+s.signale.email+')') : '—';
-        var badge = s.statut === 'traite' ? '<span class="badge badge-traite">Traité</span>' : '<span class="badge badge-nouveau">Nouveau</span>';
-        var action = s.statut === 'traite'
-          ? '<button class="btn-sm" onclick="toggleSignalement(\''+s.id+'\',\'nouveau\')">Rouvrir</button>'
-          : '<button class="btn-sm success" onclick="toggleSignalement(\''+s.id+'\',\'traite\')">Marquer traité</button>';
-        return '<tr><td>'+new Date(s.created_at).toLocaleDateString('fr-FR')+'</td><td>'+escapeHtml(s.motif)+'</td><td>'+rap+'</td><td>'+sig+'</td><td style="max-width:260px">'+escapeHtml(s.description||'—')+'</td><td>'+badge+'</td><td>'+action+'</td></tr>';
-      }).join('') + '</tbody></table>';
-  }catch(e){ list.innerHTML = '<div class="empty">Erreur réseau.</div>'; }
-}
-async function toggleSignalement(id, statut){
-  await fetch(API+'/api/admin/signalements/'+id, {method:'PATCH', headers: adminHeaders(), body: JSON.stringify({statut:statut})});
-  loadSignalements();
+// ── Connexion ───────────────────────────────────────────────────────────────
+async function connecter() {
+  const mdp = $('mdp').value;
+  const err = $('erreur-connexion');
+  err.classList.remove('visible');
+  if (!mdp) { err.textContent = 'Saisissez le mot de passe.'; err.classList.add('visible'); return; }
+
+  const bouton = $('btn-entrer');
+  bouton.disabled = true; bouton.textContent = 'Connexion…';
+  try {
+    const r = await fetch(API + '/api/admin/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: mdp })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { err.textContent = d.error || 'Mot de passe incorrect.'; err.classList.add('visible'); return; }
+    jeton = d.token;
+    sessionStorage.setItem(CLE_JETON, jeton);
+    $('mdp').value = '';
+    entrer();
+  } catch (e) {
+    err.textContent = 'Impossible de joindre le serveur. Vérifiez votre connexion.';
+    err.classList.add('visible');
+  } finally {
+    bouton.disabled = false; bouton.textContent = 'Se connecter';
+  }
 }
 
-var usersSearchTimeout;
-function debounceUsersSearch(){
-  clearTimeout(usersSearchTimeout);
-  usersSearchTimeout = setTimeout(function(){ loadUsers(document.getElementById('users-search').value); }, 350);
+function deconnecter(message) {
+  jeton = null;
+  sessionStorage.removeItem(CLE_JETON);
+  $('ecran-admin').classList.add('masque');
+  $('ecran-connexion').classList.remove('masque');
+  if (message) avis(message, 'ko');
 }
-async function loadUsers(q){
-  const list = document.getElementById('users-list');
-  list.innerHTML = '<div class="loading">Chargement...</div>';
-  try{
-    const r = await fetch(API+'/api/admin/users?q='+encodeURIComponent(q||''), {headers: adminHeaders()});
-    if(r.status === 401){ adminLogout(); return; }
-    const d = await r.json();
-    if(!r.ok){ list.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
-    if(!d.length){ list.innerHTML = '<div class="empty">Aucun utilisateur trouvé.</div>'; return; }
-    function typeBadge(t){
-      if(t === 'entreprise') return '<span class="badge badge-entreprise">Entreprise</span>';
-      if(['pro','societe','professionnel'].indexOf(t) >= 0) return '<span class="badge badge-pro">Pro</span>';
-      return '<span class="badge badge-client">Client</span>';
+
+function entrer() {
+  $('ecran-connexion').classList.add('masque');
+  $('ecran-admin').classList.remove('masque');
+  chargerChiffres();
+}
+
+// ── Chiffres ────────────────────────────────────────────────────────────────
+async function chargerChiffres() {
+  $('grille-chiffres').innerHTML = '<div class="squelette"></div>'.repeat(4);
+  $('grille-argent').innerHTML = '<div class="squelette"></div>'.repeat(2);
+  try {
+    const s = await appel('/api/admin/stats');
+    const bloc = (valeur, etiquette, classe) =>
+      '<div class="chiffre ' + (classe || '') + '"><div class="valeur">' + valeur +
+      '</div><div class="etiquette">' + etiquette + '</div></div>';
+
+    $('grille-chiffres').innerHTML =
+      bloc(s.nb_clients, 'Clients') +
+      bloc(s.nb_pros, 'Prestataires', 'accent') +
+      bloc(s.nb_entreprises, 'Entreprises') +
+      bloc(s.nb_demandes_actives, 'Demandes en cours') +
+      bloc(s.nb_signalements_ouverts, 'Signalements ouverts',
+           s.nb_signalements_ouverts > 0 ? 'alerte' : '');
+
+    $('grille-argent').innerHTML =
+      bloc(euros(s.revenu_total), 'Encaissé au total') +
+      bloc(euros(s.commission_totale), 'Dont commission Gleam', 'accent');
+  } catch (e) {
+    if (e.message !== '401') $('grille-chiffres').innerHTML =
+      '<div class="vide"><div class="gros">Chargement impossible</div>' + echapper(e.message) + '</div>';
+  }
+}
+
+// ── Signalements ────────────────────────────────────────────────────────────
+async function chargerSignalements() {
+  const c = $('liste-signalements');
+  c.innerHTML = '<div class="squelette"></div>'.repeat(3);
+  try {
+    const liste = await appel('/api/admin/signalements');
+    if (!liste.length) {
+      c.innerHTML = '<div class="vide"><div class="gros">Aucun signalement</div>' +
+        'Les signalements et messages au support apparaîtront ici.</div>';
+      return;
     }
-    list.innerHTML = '<table><thead><tr><td>Nom</td><td>Email</td><td>Type</td><td>Inscrit le</td><td>Statut</td><td></td></tr></thead><tbody>' +
-      d.map(function(u){
-        var estPro = ['pro','societe','professionnel'].indexOf(u.type) >= 0;
-        var action = estPro
-          ? (u.disponible === false
-            ? '<button class="btn-sm success" onclick="toggleDispo(\''+u.id+'\',true)">Réactiver</button>'
-            : '<button class="btn-sm danger" onclick="toggleDispo(\''+u.id+'\',false)">Suspendre</button>')
-          : '—';
-        var statut = u.compte_supprime ? '<span class="badge badge-nouveau">Supprimé</span>' : (u.disponible === false ? '<span class="badge" style="background:#FEE2E2;color:#B91C1C">Suspendu</span>' : '<span class="badge badge-traite">Actif</span>');
-        return '<tr><td>'+escapeHtml((u.prenom||'')+' '+(u.nom||''))+'</td><td>'+escapeHtml(u.email)+'</td><td>'+typeBadge(u.type)+'</td><td>'+new Date(u.created_at).toLocaleDateString('fr-FR')+'</td><td>'+statut+'</td><td>'+action+'</td></tr>';
-      }).join('') + '</tbody></table>';
-  }catch(e){ list.innerHTML = '<div class="empty">Erreur réseau.</div>'; }
-}
-async function toggleDispo(id, disponible){
-  await fetch(API+'/api/admin/users/'+id+'/disponibilite', {method:'PATCH', headers: adminHeaders(), body: JSON.stringify({disponible:disponible})});
-  loadUsers(document.getElementById('users-search').value);
+    // Les cas ouverts d'abord : c'est ce sur quoi il faut agir.
+    liste.sort((a, b) => (a.statut === 'nouveau' ? 0 : 1) - (b.statut === 'nouveau' ? 0 : 1));
+
+    c.innerHTML = liste.map((s) => {
+      const nom = (u) => u ? echapper((u.prenom || '') + ' ' + (u.nom || '')) +
+        ' <span class="petit">' + echapper(u.email) + '</span>' : '<span class="petit">compte introuvable</span>';
+      const ouvert = s.statut === 'nouveau';
+      return '<div class="carte">' +
+        '<div class="carte-tete">' +
+          '<div style="min-width:0"><div class="ligne"><strong>' + echapper(s.motif || 'Sans motif') + '</strong></div>' +
+          '<div class="petit">' + dateCourte(s.created_at) + '</div></div>' +
+          '<span class="badge ' + (ouvert ? 'nouveau' : 'traite') + '">' +
+            (ouvert ? 'À traiter' : 'Traité') + '</span>' +
+        '</div>' +
+        '<div class="ligne">De : ' + nom(s.rapporteur) + '</div>' +
+        (s.signale_id ? '<div class="ligne">Concerne : ' + nom(s.signale) + '</div>' : '') +
+        (s.description ? '<div class="citation">' + echapper(s.description) + '</div>' : '') +
+        '<button class="action" onclick="basculerSignalement(\'' + s.id + '\',\'' +
+          (ouvert ? 'traite' : 'nouveau') + '\')">' +
+          (ouvert ? 'Marquer comme traité' : 'Rouvrir') + '</button>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    if (e.message !== '401') c.innerHTML =
+      '<div class="vide"><div class="gros">Chargement impossible</div>' + echapper(e.message) + '</div>';
+  }
 }
 
-if(adminToken){ entrerDansAdmin(); }
+async function basculerSignalement(id, statut) {
+  try {
+    await appel('/api/admin/signalements/' + id, { method: 'PATCH', body: JSON.stringify({ statut }) });
+    avis(statut === 'traite' ? 'Signalement marqué comme traité.' : 'Signalement rouvert.', 'ok');
+    chargerSignalements();
+  } catch (e) { if (e.message !== '401') avis(e.message, 'ko'); }
+}
+
+// ── Comptes ─────────────────────────────────────────────────────────────────
+async function chargerComptes(recherche) {
+  const c = $('liste-comptes');
+  c.innerHTML = '<div class="squelette"></div>'.repeat(3);
+  try {
+    comptes = await appel('/api/admin/users' + (recherche ? '?q=' + encodeURIComponent(recherche) : ''));
+    if (!comptes.length) {
+      c.innerHTML = '<div class="vide"><div class="gros">Aucun compte trouvé</div>' +
+        (recherche ? 'Essayez une autre recherche.' : '') + '</div>';
+      return;
+    }
+    const libelleType = { client: 'Client', entreprise: 'Entreprise', pro: 'Prestataire',
+                          societe: 'Prestataire', professionnel: 'Prestataire' };
+    c.innerHTML = comptes.map((u) => {
+      const estPro = ['pro', 'societe', 'professionnel'].includes(u.type);
+      const suspendu = estPro && u.disponible === false;
+      return '<div class="carte">' +
+        '<div class="carte-tete">' +
+          '<div style="min-width:0">' +
+            '<div class="ligne"><strong>' + echapper(((u.prenom || '') + ' ' + (u.nom || '')).trim() || 'Sans nom') + '</strong></div>' +
+            '<div class="petit">' + echapper(u.email) + '</div>' +
+          '</div>' +
+          '<span class="badge ' + (u.compte_supprime ? 'neutre' : suspendu ? 'suspendu' : 'neutre') + '">' +
+            (u.compte_supprime ? 'Supprimé' : suspendu ? 'Suspendu' : (libelleType[u.type] || u.type)) + '</span>' +
+        '</div>' +
+        '<div class="petit">Inscrit le ' + dateCourte(u.created_at) +
+          (u.note_moyenne ? ' · note ' + Number(u.note_moyenne).toFixed(2).replace('.', ',') + ' / 5' : '') +
+          (estPro && u.taux_fiabilite !== null && u.taux_fiabilite !== undefined
+            ? ' · fiabilité ' + u.taux_fiabilite + ' %' : '') + '</div>' +
+        // La suspension ne concerne que les prestataires : c'est la seule population
+        // à qui le champ « disponible » s'applique réellement.
+        (estPro && !u.compte_supprime
+          ? '<button class="action' + (suspendu ? '' : ' danger') + '" onclick="basculerCompte(\'' + u.id + '\',' +
+            (suspendu ? 'true' : 'false') + ')">' +
+            (suspendu ? 'Réactiver ce prestataire' : 'Suspendre ce prestataire') + '</button>'
+          : '') +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    if (e.message !== '401') c.innerHTML =
+      '<div class="vide"><div class="gros">Chargement impossible</div>' + echapper(e.message) + '</div>';
+  }
+}
+
+async function basculerCompte(id, disponible) {
+  const compte = comptes.find((u) => u.id === id);
+  const nom = compte ? ((compte.prenom || '') + ' ' + (compte.nom || '')).trim() : 'ce compte';
+  if (!disponible && !confirm('Suspendre ' + nom + ' ?\n\nCe prestataire ne recevra plus aucune demande tant qu\'il ne sera pas réactivé.')) return;
+  try {
+    await appel('/api/admin/users/' + id + '/disponibilite',
+      { method: 'PATCH', body: JSON.stringify({ disponible }) });
+    avis(disponible ? 'Compte réactivé.' : 'Compte suspendu.', 'ok');
+    chargerComptes($('recherche').value.trim());
+  } catch (e) { if (e.message !== '401') avis(e.message, 'ko'); }
+}
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.onglet').forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll('.onglet').forEach((x) => x.classList.toggle('actif', x === b));
+    ['chiffres', 'signalements', 'comptes'].forEach((v) =>
+      $('vue-' + v).classList.toggle('masque', v !== b.dataset.vue));
+    if (b.dataset.vue === 'chiffres') chargerChiffres();
+    if (b.dataset.vue === 'signalements') chargerSignalements();
+    if (b.dataset.vue === 'comptes') chargerComptes($('recherche').value.trim());
+  };
+});
+
+let minuteurRecherche = null;
+$('recherche').oninput = function () {
+  clearTimeout(minuteurRecherche);
+  const valeur = this.value.trim();
+  // Regroupé : sans cela, chaque frappe déclencherait une requête.
+  minuteurRecherche = setTimeout(() => chargerComptes(valeur), 300);
+};
+
+$('btn-entrer').onclick = connecter;
+$('mdp').onkeypress = (e) => { if (e.key === 'Enter') connecter(); };
+$('btn-sortir').onclick = () => deconnecter('Vous êtes déconnecté.');
+
+// Reprise de session : le jeton est vérifié par un vrai appel plutôt que
+// supposé valide, sans quoi un jeton expiré afficherait un tableau de bord vide.
+if (jeton) {
+  appel('/api/admin/stats').then(entrer).catch(() => deconnecter());
+}
 </script>
 </body>
 </html>
