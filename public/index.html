@@ -2793,7 +2793,7 @@ var devisMainTab='encours';
 // ça se range tout seul dès que le statut change, sur le même principe que les messages archivés.
 function devisMainTabOf(v){
   if(v.statut==='accepte'&&v.demande_statut==='terminee')return 'termines';
-  if(v.statut==='refuse'||v.statut==='annule_pro'||v.statut==='annule_client')return 'termines';
+  if(['refuse','annule_pro','annule_client','expire_sans_paiement'].indexOf(v.statut)>=0)return 'termines';
   // Un devis encore "en attente" dont la demande sous-jacente a expiré (date dépassée sans
   // réponse) ou a été annulée ne doit plus rester affiché comme actif — sinon il reste bloqué
   // en "En attente" indéfiniment, malgré une date déjà passée.
@@ -2805,7 +2805,7 @@ function devisClientMatchesFilter(v,f){
   if(f==='attente')return v.statut==='envoye';
   if(f==='acceptes')return v.statut==='accepte'&&v.demande_statut!=='terminee';
   if(f==='termines')return v.statut==='accepte'&&v.demande_statut==='terminee';
-  if(f==='refuses')return v.statut==='refuse'||v.statut==='annule_pro'||v.statut==='annule_client'||v.demande_statut==='expiree'||v.demande_statut==='annulee_client';
+  if(f==='refuses')return ['refuse','annule_pro','annule_client','expire_sans_paiement'].indexOf(v.statut)>=0||v.demande_statut==='expiree'||v.demande_statut==='annulee_client';
   return true;
 }
 function setDevisMainTab(tab){
@@ -2955,6 +2955,12 @@ function renderDevisClientCards(){
           '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
           '<button class="btn-accept" style="background:#059669" onclick="openPayment(\''+safeVId+'\','+Number(v.prix_ttc)+')">💳 Payer '+escapeHtml(v.prix_ttc)+'\u20ac</button>'+
         '</div>';
+      }else if(v.statut==='expire_sans_paiement'){
+        // Nouveau statut serveur : le devis avait été accepté mais jamais réglé, et le
+        // créneau est passé. Sans cette branche il retomberait dans le cas par défaut
+        // « En attente », avec un bouton Accepter parfaitement cliquable.
+        badge='<span class="devis-badge badge-refused"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> Expiré faute de paiement</span>';
+        cardStyle='opacity:0.6;';
       }else if(v.statut==='annule_client'){
         // Sans cette branche, un devis annulé tombait dans le cas par défaut et
         // s'affichait « En attente » avec un bouton Accepter parfaitement cliquable.
@@ -3321,7 +3327,7 @@ function proDevisMainTabOf(v){
   if(v.statut==='accepte'&&demandeStatut==='terminee')return 'termines';
   // Idem : un devis "en attente" dont la demande a expiré ou a été annulée ne doit plus
   // apparaître comme actif indéfiniment, malgré une date déjà passée.
-  if(v.statut==='refuse'||v.statut==='annule_pro'||v.statut==='annule_client'||demandeStatut==='annulee_client'||demandeStatut==='expiree')return 'termines';
+  if(['refuse','annule_pro','annule_client','expire_sans_paiement'].indexOf(v.statut)>=0||demandeStatut==='annulee_client'||demandeStatut==='expiree')return 'termines';
   return 'encours';
 }
 function proDevisMatchesFilter(v,f){
@@ -3330,7 +3336,7 @@ function proDevisMatchesFilter(v,f){
   if(f==='attente')return v.statut==='envoye';
   if(f==='acceptes')return v.statut==='accepte'&&demandeStatut!=='terminee';
   if(f==='termines')return v.statut==='accepte'&&demandeStatut==='terminee';
-  if(f==='refuses')return v.statut==='refuse'||v.statut==='annule_pro'||v.statut==='annule_client'||demandeStatut==='annulee_client'||demandeStatut==='expiree';
+  if(f==='refuses')return ['refuse','annule_pro','annule_client','expire_sans_paiement'].indexOf(v.statut)>=0||demandeStatut==='annulee_client'||demandeStatut==='expiree';
   return true;
 }
 function setProDevisMainTab(tab){
@@ -3459,7 +3465,8 @@ function renderProDevisCards(){
           '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
           '<button class="btn-refuse" onclick="annulerProDevis(\''+safeVId+'\',this)">🚫 Annuler</button>'+
         '</div>';
-      }else if(v.statut==='annule_client'){badge='<span class="devis-badge badge-refused"><i data-lucide="ban" style="width:12px;height:12px;vertical-align:-2px"></i> Annulé par le client</span>'}
+      }else if(v.statut==='expire_sans_paiement'){badge='<span class="devis-badge badge-refused"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> Expiré faute de paiement</span>'}
+      else if(v.statut==='annule_client'){badge='<span class="devis-badge badge-refused"><i data-lucide="ban" style="width:12px;height:12px;vertical-align:-2px"></i> Annulé par le client</span>'}
       else if(v.demande_statut==='expiree'||(v.demande&&v.demande.statut==='expiree')){badge='<span class="devis-badge badge-refused"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> Expiré</span>'}
       else if(v.statut==='refuse'){badge='<span class="devis-badge badge-refused"><i data-lucide="x-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Refusé</span>'}
       else if(v.statut==='annule_pro'){badge='<span class="devis-badge badge-refused"><i data-lucide="ban" style="width:12px;height:12px;vertical-align:-2px"></i> Annulé par vous</span>'}
