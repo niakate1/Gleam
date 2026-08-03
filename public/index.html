@@ -108,6 +108,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .champ-icone{position:relative}
 .champ-icone i{position:absolute;left:13px;top:38px;width:17px;height:17px;color:var(--gray);pointer-events:none}
 .champ-icone input{padding-left:38px!important}
+.champ-icone:has(button) input{padding-right:38px!important}
 .force-mdp{display:flex;gap:4px;margin-top:6px}
 .force-mdp-barre{height:4px;flex:1;border-radius:2px;background:var(--border);transition:background var(--dur-base) var(--ease-out)}
 .force-mdp-texte{font-size:11px;margin-top:5px;font-weight:600;transition:color var(--dur-base) var(--ease-out)}
@@ -301,17 +302,21 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .empty-cta{display:inline-block;background:var(--p);color:#fff;font-weight:700;font-size:14px;padding:12px 24px;border-radius:12px;border:none;cursor:pointer;box-shadow:var(--shadow-md)}
 .empty-state span{font-size:40px;display:flex;align-items:center;justify-content:center;width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,var(--light),var(--surface-alt));margin:0 auto 16px;opacity:1}
 .empty-state p{font-size:15px;line-height:1.5;max-width:280px;margin:0 auto}
-.profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;text-align:center;position:relative;overflow:hidden}
+.profile-hero{background:linear-gradient(135deg,var(--p),#4F46E5);border-radius:20px;padding:28px 24px;color:#fff;margin-bottom:20px;text-align:center;position:relative;overflow:hidden;animation:fondu-monte var(--dur-slow) var(--ease-out)}
 .profile-hero::before{content:'';position:absolute;width:260px;height:260px;background:radial-gradient(circle,var(--gold) 0%,transparent 70%);opacity:.18;border-radius:50%;top:-90px;right:-70px}
 .profile-hero .avatar{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px}
 .profile-hero h3{font-size:20px;font-weight:800}
-.profile-menu{background:var(--surface);border-radius:14px;overflow:hidden;border:1px solid var(--border)}
-.profile-item{display:flex;align-items:center;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);gap:12px}
+.profile-section-titre{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--gray);margin:22px 4px 10px}
+.profile-section-titre:first-of-type{margin-top:0}
+.profile-menu{background:var(--surface);border-radius:16px;overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-xs)}
+.profile-item{display:flex;align-items:center;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);gap:13px;transition:background var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-spring)}
 .profile-item:last-child{border-bottom:none}
 .profile-item:hover{background:var(--surface-alt)}
-.profile-item .pi-icon{font-size:20px;width:32px;text-align:center}
-.profile-item .pi-text{flex:1;font-size:14px;font-weight:600}
-.profile-item .pi-arrow{color:var(--gray)}
+.profile-item:active{transform:scale(.98);background:var(--surface-alt)}
+.profile-item .pi-icon{font-size:16px;width:36px;height:36px;border-radius:11px;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform var(--dur-base) var(--ease-spring)}
+.profile-item:active .pi-icon{transform:scale(.9)}
+.profile-item .pi-text{flex:1;font-size:14.5px;font-weight:600}
+.profile-item .pi-arrow{color:var(--gray);display:flex;align-items:center}
 .logout-btn{width:100%;margin-top:12px;padding:13px;background:#FEF2F2;color:var(--red);border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
 @media (prefers-color-scheme: dark){.logout-btn{background:rgba(248,113,113,.15)}}
 .success-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
@@ -453,7 +458,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
       </div>
       <div id="form-login">
         <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="le" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
-        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password"></div>
+        <div class="champ-icone" style="position:relative"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password"><button type="button" onclick="basculerVisibiliteMdp('lp',this)" style="position:absolute;right:12px;top:38px;background:none;border:none;cursor:pointer;color:var(--gray);padding:2px"><i data-lucide="eye" style="width:17px;height:17px"></i></button></div>
         <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600" onclick="forgotPassword()">Mot de passe oublié ?</button></div>
         <button class="btn" id="login-btn" onclick="doLogin()">Se connecter</button>
         <div class="err" id="lerr"></div>
@@ -468,7 +473,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
         <div class="champ-icone"><label>Téléphone</label><i data-lucide="phone"></i><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel"></div>
 
         <div class="register-section-titre"><i data-lucide="lock"></i>Sécurité</div>
-        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"></div>
+        <div class="champ-icone" style="position:relative"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"><button type="button" onclick="basculerVisibiliteMdp('rpw',this)" style="position:absolute;right:12px;top:38px;background:none;border:none;cursor:pointer;color:var(--gray);padding:2px"><i data-lucide="eye" style="width:17px;height:17px"></i></button></div>
         <div class="force-mdp" id="force-mdp-barres" style="display:none">
           <div class="force-mdp-barre"></div><div class="force-mdp-barre"></div><div class="force-mdp-barre"></div>
         </div>
@@ -739,20 +744,33 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
   <div class="profile-content">
     <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p><div id="profile-type-badge" style="display:none;margin-top:6px"></div><div id="profile-note" style="display:none;margin-top:8px"></div></div>
     <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
+    <div class="profile-section-titre">Préférences</div>
     <div class="profile-menu">
-      <div class="profile-item" onclick="basculerTheme()"><span class="pi-icon"><i id="theme-toggle-icon" data-lucide="moon" style="width:20px;height:20px"></i></span><span class="pi-text">Apparence claire / sombre</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="toggleNotificationsPush()"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow" id="notif-statut-client">Activer</span></div>
-      <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:20px;height:20px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="star" style="width:20px;height:20px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:20px;height:20px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="comingSoon('Sécurité')"><span class="pi-icon"><i data-lucide="lock" style="width:20px;height:20px"></i></span><span class="pi-text">Sécurité</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:20px;height:20px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="basculerTheme()"><span class="pi-icon"><i id="theme-toggle-icon" data-lucide="moon" style="width:18px;height:18px"></i></span><span class="pi-text">Apparence claire / sombre</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="toggleNotificationsPush()"><span class="pi-icon"><i data-lucide="bell" style="width:18px;height:18px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow" id="notif-statut-client">Activer</span></div>
+      <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:18px;height:18px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+    </div>
+
+    <div class="profile-section-titre">Mon activité</div>
+    <div class="profile-menu">
+      <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:18px;height:18px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="star" style="width:18px;height:18px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="message-square" style="width:18px;height:18px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:18px;height:18px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+    </div>
+
+    <div class="profile-section-titre">Compte</div>
+    <div class="profile-menu">
+      <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon" style="background:rgba(245,185,66,.15);color:var(--gold)"><i data-lucide="mail-check" style="width:18px;height:18px"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:18px;height:18px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="comingSoon('Sécurité')"><span class="pi-icon"><i data-lucide="lock" style="width:18px;height:18px"></i></span><span class="pi-text">Sécurité</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+    </div>
+
+    <div class="profile-section-titre">Support &amp; légal</div>
+    <div class="profile-menu">
+      <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:18px;height:18px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:18px;height:18px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:18px;height:18px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
     </div>
     <button class="btn-delete" style="width:100%;margin-top:14px" onclick="supprimerCompte()"><i data-lucide="trash-2" style="width:15px;height:15px;vertical-align:-3px"></i> Supprimer mon compte</button>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
@@ -909,6 +927,15 @@ function setRole(r){
 }
 // Indicateur de force du mot de passe, en direct — un repère visuel simple (pas un blocage strict,
 // le minimum de 8 caractères reste la seule vraie contrainte imposée à l'inscription).
+// Afficher/masquer le mot de passe en clair — attendu sur toute application sérieuse, évite les
+// erreurs de saisie sur un champ qu'on ne peut normalement jamais relire.
+function basculerVisibiliteMdp(idChamp,bouton){
+  var champ=document.getElementById(idChamp);
+  var icone=bouton.querySelector('i');
+  var estMasque=champ.type==='password';
+  champ.type=estMasque?'text':'password';
+  if(icone){icone.setAttribute('data-lucide',estMasque?'eye-off':'eye');if(window.lucide)lucide.createIcons()}
+}
 function majForceMotDePasse(valeur){
   var barresBox=document.getElementById('force-mdp-barres'),texteBox=document.getElementById('force-mdp-texte');
   var barres=barresBox?barresBox.querySelectorAll('.force-mdp-barre'):[];
@@ -1098,16 +1125,32 @@ function enterApp(){
   toast('Bienvenue sur Gleam');
   startUnreadPoll();
   startDataPoll();
-  // La demande entamée avant de se connecter est reprise ici : on rouvre le même formulaire,
-  // maintenant que currentUser existe, l'adresse et l'envoi redeviennent possibles. Les réponses
-  // déjà données doivent être resaisies (le formulaire est court, ça reste rapide) — un compromis
-  // assumé plutôt qu'une reconstruction fragile de l'état exact de chaque étape précédente.
+  // La demande entamée avant de se connecter est reprise ici, avec toutes les réponses déjà
+  // données réellement restaurées — le formulaire se rouvre, les choix précédents sont réappliqués,
+  // et la personne se retrouve directement à la dernière étape (adresse), plutôt que de devoir
+  // tout retraverser depuis le début.
   if(reprendreApresConnexion&&currentFormType&&!isPro()){
     reprendreApresConnexion=false;
-    var typeAReouvrir=currentFormType;
-    setTimeout(function(){
-      toast('Vous y êtes presque — reprenons votre demande !',3500);
-      openServiceForm(typeAReouvrir);
+    var typeAReouvrir=currentFormType,reponsesARestaurer=reponsesCapturees;
+    reponsesCapturees=null;
+    setTimeout(async function(){
+      try{
+        toast('Vous y êtes presque — voici votre demande, prête à finaliser !',3500);
+        await openServiceForm(typeAReouvrir);
+        restaurerReponsesFormulaire(reponsesARestaurer);
+        if(assistantEtapes.length){
+          assistantEtapes[assistantIndexActuel].style.display='none';
+          assistantIndexActuel=assistantEtapes.length-1;
+          assistantEtapes[assistantIndexActuel].style.display='block';
+          majBarreProgression();
+        }
+        if(document.getElementById('prix-estime-box'))updateEstimation();
+      }catch(e){
+        // Si la reprise échoue pour une raison imprévue, le signaler clairement plutôt que de
+        // laisser silencieusement la personne sur un formulaire vide sans explication.
+        console.error('Échec de la reprise de la demande après connexion :', e);
+        toast('⚠️ Vos réponses précédentes n\'ont pas pu être restaurées, merci de les ressaisir.',4000);
+      }
     },600);
   }else{
     reprendreApresConnexion=false;
@@ -1767,7 +1810,8 @@ function renderDevisClientCards(){
         cardStyle='opacity:0.6;';
       }else{
         badge='<span class="devis-badge badge-pending"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> En attente</span>';
-        actions='<div style="display:flex;gap:8px;margin-top:12px">'+
+        actions='<button class="btn-accept" style="width:100%;background:none;border:2px solid var(--border);color:var(--text-secondary);margin-bottom:8px" onclick="showDevisDocument(\''+safeVId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir le devis</button>'+
+          '<div style="display:flex;gap:8px">'+
           '<button class="btn-accept" onclick="accepterDevis(\''+safeVId+'\',this)">✅ Accepter</button>'+
           '<button class="btn-refuse" onclick="refuserDevis(\''+safeVId+'\',this)">❌ Refuser</button>'+
         '</div>';
@@ -3570,6 +3614,88 @@ async function showFacture(demandeId){
     w.document.close();
   }catch(e){toast(friendlyNetworkError(e))}
 }
+// Document de devis imprimable — jusqu'ici, seule la facture en avait un ; le devis ne s'affichait
+// qu'en carte dans l'app, jamais comme un vrai document à part entière que le client peut
+// conserver, imprimer, ou montrer à un tiers avant d'accepter. Même identité visuelle que la
+// facture, pour une vraie cohérence entre les deux documents.
+function showDevisDocument(devisId){
+  var v=(devisClientCache.all||[]).find(function(item){return String(item.id)===String(devisId)});
+  if(!v){toast('Devis introuvable.');return}
+  var w=window.open('','_blank');
+  if(!w){toast('Autorisez les fenêtres pop-up pour voir le document.');return}
+  w.document.write(buildDevisHtml(v));
+  w.document.close();
+}
+function buildDevisHtml(v){
+  var proNom=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
+  var dateDoc=new Date(v.created_at||Date.now()).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+  // Un devis reste valable un temps raisonnable, pas indéfiniment — pratique courante et attendue
+  // de tout devis professionnel, la personne doit savoir jusqu'à quand ce prix est garanti.
+  var dateValidite=new Date(v.created_at||Date.now());
+  dateValidite.setDate(dateValidite.getDate()+30);
+  var dateValiditeStr=dateValidite.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+  var numero='DEV-'+(v.id||'').toString().slice(0,8).toUpperCase();
+
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Devis '+numero+'</title>'+
+    '<style>'+
+    '@page{size:A4;margin:18mm 16mm}'+
+    '*{box-sizing:border-box}'+
+    'body{font-family:\'Segoe UI\',Helvetica,Arial,sans-serif;max-width:760px;margin:0 auto;padding:30px 24px;color:#1F2937;font-size:14px;line-height:1.5}'+
+    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #6D28D9}'+
+    '.marque{font-size:26px;font-weight:800;color:#6D28D9;letter-spacing:-0.3px}'+
+    '.marque-sub{font-size:11.5px;color:#6B7280;margin-top:4px;max-width:280px}'+
+    '.doc-info{text-align:right}'+
+    '.doc-titre{font-size:19px;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.5px}'+
+    '.doc-numero{font-size:13px;color:#6B7280;margin-top:3px}'+
+    '.doc-date{font-size:13px;color:#6B7280;margin-top:2px}'+
+    '.parties{display:flex;gap:20px;margin-bottom:26px}'+
+    '.partie-box{flex:1;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px}'+
+    '.partie-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;color:#9CA3AF;font-weight:700;margin-bottom:6px}'+
+    '.partie-nom{font-size:15px;font-weight:700;color:#111827;margin-bottom:3px}'+
+    '.partie-detail{font-size:12.5px;color:#4B5563;line-height:1.5}'+
+    'table{width:100%;border-collapse:collapse;margin-bottom:8px}'+
+    'thead td{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:#9CA3AF;font-weight:700;padding:0 0 8px;border-bottom:2px solid #E5E7EB}'+
+    'tbody td{padding:16px 0;border-bottom:1px solid #E5E7EB;vertical-align:top}'+
+    '.desc{font-size:14px}.sub-desc{font-size:12px;color:#6B7280;margin-top:3px}'+
+    '.qte{text-align:center;color:#6B7280;width:60px}'+
+    '.montant{text-align:right;font-weight:700;width:110px;white-space:nowrap}'+
+    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#6D28D9;border-top:2px solid #111827;margin-top:4px}'+
+    '.validite{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;margin-top:18px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:#92400E}'+
+    '.pied{margin-top:44px;padding-top:18px;border-top:1px solid #E5E7EB}'+
+    '.pied p{font-size:11px;color:#9CA3AF;line-height:1.7;margin:0 0 6px}'+
+    '@media print{body{padding:0}}'+
+    '</style></head><body>'+
+
+    '<div class="entete">'+
+      '<div><div class="marque">✨ Gleam</div><div class="marque-sub">Plateforme de mise en relation pour des services de nettoyage à domicile</div></div>'+
+      '<div class="doc-info"><div class="doc-titre">Devis</div><div class="doc-numero">N° '+escapeHtml(numero)+'</div><div class="doc-date">'+dateDoc+'</div></div>'+
+    '</div>'+
+
+    '<div class="parties">'+
+      '<div class="partie-box"><div class="partie-label">Prestataire</div><div class="partie-nom">'+escapeHtml(proNom)+'</div>'+
+        (v.pro&&v.pro.note_moyenne?'<div class="partie-detail">Note moyenne : '+escapeHtml(v.pro.note_moyenne)+' / 5</div>':'<div class="partie-detail">Prestataire indépendant Gleam</div>')+
+      '</div>'+
+      '<div class="partie-box"><div class="partie-label">Devis adressé à</div><div class="partie-nom">Vous</div>'+
+        '<div class="partie-detail">Via votre compte Gleam</div></div>'+
+    '</div>'+
+
+    '<table><thead><tr><td class="desc">Description</td><td class="qte">Qté</td><td class="montant">Montant</td></tr></thead>'+
+    '<tbody><tr><td class="desc"><strong>Prestation de nettoyage</strong>'+(v.description?'<div class="sub-desc">'+escapeHtml(v.description)+'</div>':'')+'</td>'+
+    '<td class="qte">1</td><td class="montant">'+parseFloat(v.prix_ttc).toFixed(2)+' €</td></tr>'+
+    '<tr><td class="desc" style="color:#9CA3AF;font-size:12px">TVA (0%)</td><td class="qte"></td><td class="montant" style="color:#9CA3AF;font-size:12px">0,00 €</td></tr>'+
+    '</tbody></table>'+
+    '<div class="total-ligne"><span>Total TTC</span><span>'+parseFloat(v.prix_ttc).toFixed(2)+' €</span></div>'+
+
+    '<div class="validite"><i>⏳</i><span><strong>Ce devis est valable jusqu\'au '+dateValiditeStr+'.</strong> Passé ce délai, le prestataire pourra être amené à réviser son prix. Ce document ne constitue pas une facture — le règlement n\'intervient qu\'après acceptation et réalisation de la prestation, directement depuis votre espace Gleam.</span></div>'+
+
+    '<div class="pied">'+
+      '<p><strong>Catégorie :</strong> devis pour prestation de services — nettoyage à domicile.</p>'+
+      '<p>Document généré automatiquement par la plateforme Gleam à titre indicatif. TVA non applicable — article 293B du CGI, sauf mention contraire explicite du prestataire.</p>'+
+      '<p style="margin-top:12px;color:#D1D5DB">Gleam — gleam-app.fr</p>'+
+    '</div>'+
+
+    '</body></html>';
+}
 function buildFactureHtml(d,vuePro){
   var estEntreprise=d.client&&d.client.est_entreprise;
   var titre=vuePro?'Relevé de prestation':'Facture';
@@ -3644,13 +3770,16 @@ function buildFactureHtml(d,vuePro){
     (estEntreprise&&d.client.adresse_facturation?'<div style="font-size:11.5px;color:#9CA3AF;margin:-16px 0 20px 2px">📍 Intervention réalisée à : '+escapeHtml(d.adresse||'')+'</div>':'')+
 
     '<table><thead><tr><td class="desc">Description</td><td class="qte">Qté</td><td class="montant">Montant</td></tr></thead>'+
-    '<tbody>'+lignesTableau+'</tbody></table>'+
+    '<tbody>'+lignesTableau+
+    '<tr><td class="desc" style="color:#9CA3AF;font-size:12px">TVA (0%)</td><td class="qte"></td><td class="montant" style="color:#9CA3AF;font-size:12px">0,00 €</td></tr>'+
+    '</tbody></table>'+
     '<div class="total-ligne"><span>Total '+(vuePro?'net':'TTC')+'</span><span>'+ligneMontant.toFixed(2)+' €</span></div>'+
     blocRepartition+
 
     (!vuePro?'<div class="paiement-info">💳 Réglé par carte bancaire via Stripe, à la validation de la prestation</div>':'')+
 
     '<div class="pied">'+
+      '<p><strong>Catégorie :</strong> prestation de services — nettoyage à domicile.</p>'+
       '<p>Document généré automatiquement par la plateforme Gleam. TVA non applicable — article 293B du CGI, sauf mention contraire explicite du prestataire.</p>'+
       '<p>Ce document ne constitue pas une attestation fiscale au titre des services à la personne, sauf déclaration spécifique du prestataire auprès des autorités compétentes.</p>'+
       '<p style="margin-top:12px;color:#D1D5DB">Gleam — gleam-app.fr</p>'+
@@ -3953,7 +4082,44 @@ function isLastInFlow(){return!multiFlow.active||multiFlow.current===multiFlow.q
 // multiFlow, aux photos, ni au type de prestation en cours), le temps de se connecter ou de créer
 // un compte — puis on la retrouve automatiquement, exactement là où on l'avait laissée.
 var reprendreApresConnexion=false;
+var reponsesCapturees=null;
+// Capture fidèlement l'état actuel du formulaire (choix déjà sélectionnés, champs déjà remplis)
+// avant de le masquer — c'est ce qui permet de tout retrouver après connexion, plutôt que de faire
+// tout recommencer depuis le début comme avant.
+function capturerReponsesFormulaireActuel(){
+  var body=document.getElementById('modal-body');
+  var selections=[];
+  body.querySelectorAll('.opt-btn.sel[data-group]').forEach(function(btn){
+    var groupe=btn.getAttribute('data-group');
+    var valeur=btn.getAttribute('data-coef-val')||btn.getAttribute('data-etat-val')||btn.getAttribute('data-option-val');
+    if(groupe&&valeur)selections.push({groupe:groupe,valeur:valeur});
+  });
+  var champs={};
+  body.querySelectorAll('input[id],textarea[id]').forEach(function(champ){
+    if(champ.type==='checkbox'){if(champ.checked)champs[champ.id]=true}
+    else if(champ.value)champs[champ.id]=champ.value;
+  });
+  return {selections:selections,champs:champs};
+}
+// Réapplique fidèlement les réponses capturées sur le formulaire fraîchement rouvert — clique
+// réellement chaque bouton (pour déclencher toute la logique associée, comme selOpt ou les
+// compteurs), plutôt que de se contenter d'ajouter une classe visuelle.
+function restaurerReponsesFormulaire(reponses){
+  if(!reponses)return;
+  var body=document.getElementById('modal-body');
+  reponses.selections.forEach(function(s){
+    var btn=body.querySelector('.opt-btn[data-group="'+s.groupe+'"][data-coef-val="'+s.valeur+'"],.opt-btn[data-group="'+s.groupe+'"][data-etat-val="'+s.valeur+'"],.opt-btn[data-group="'+s.groupe+'"][data-option-val="'+s.valeur+'"]');
+    if(btn)btn.click();
+  });
+  Object.keys(reponses.champs).forEach(function(id){
+    var champ=document.getElementById(id);
+    if(!champ)return;
+    if(champ.type==='checkbox')champ.checked=true;
+    else{champ.value=reponses.champs[id];champ.dispatchEvent(new Event('input'))}
+  });
+}
 function demanderConnexionPourContinuer(onglet){
+  reponsesCapturees=capturerReponsesFormulaireActuel();
   document.getElementById('modal-overlay').classList.remove('open');
   reprendreApresConnexion=true;
   show('s-auth');
@@ -4040,7 +4206,7 @@ function dateTimeBlock(isLast){
   // (recevoir des devis suppose une adresse liée à un profil, donc une identité).
   if(!currentUser){
     return '<div class="divider"></div>'+
-      '<div class="field-group" style="text-align:center;padding:8px 4px">'+
+      '<div class="field-group" id="portail-connexion-requise" style="text-align:center;padding:8px 4px">'+
         '<div style="width:52px;height:52px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><i data-lucide="party-popper" style="width:26px;height:26px"></i></div>'+
         '<h3 class="font-display" style="font-size:19px;font-weight:600;margin-bottom:8px">Votre demande est prête !</h3>'+
         '<p style="font-size:13.5px;color:var(--text-secondary);line-height:1.6;max-width:280px;margin:0 auto">Plus qu\'une étape : connectez-vous ou créez un compte gratuitement pour indiquer votre adresse et recevoir vos devis.</p>'+
