@@ -1518,6 +1518,83 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   27. MODALE DE CONFIRMATION
+   Elle remplace confirm(), qui gelait le navigateur et affichait une boîte
+   système au moment le plus sensible du parcours. Centrée plutôt que remontée
+   du bas : une décision se prend au centre du regard, pas en périphérie.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.confirm-overlay { align-items: center; padding: var(--gap-5); z-index: 400; }
+
+.confirm-box {
+  width: 100%; max-width: 380px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: var(--gap-5) var(--gap-5) var(--gap-4);
+  box-shadow: var(--shadow-xl);
+  text-align: center;
+  animation: confirm-entree var(--dur-base) var(--ease-spring);
+}
+@keyframes confirm-entree {
+  from { opacity: 0; transform: scale(.94) translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.confirm-icone {
+  width: 52px; height: 52px;
+  margin: 0 auto var(--gap-4);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--light);
+  color: var(--p);
+}
+.confirm-icone i { width: 24px; height: 24px; }
+.confirm-box.danger .confirm-icone { background: var(--red-clair); color: var(--red); }
+
+.confirm-titre {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 32;
+  font-size: 19px; font-weight: 600; line-height: 1.25;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.confirm-texte {
+  font-size: 13.5px; line-height: 1.55;
+  color: var(--text-secondary);
+  margin-bottom: var(--gap-5);
+}
+.confirm-texte strong { color: var(--text); font-weight: 700; }
+
+#confirm-saisie-bloc { margin: -8px 0 var(--gap-5); }
+#confirm-saisie { text-align: center; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+
+.confirm-actions { display: flex; flex-direction: column; gap: var(--gap-2); }
+
+.confirm-valider, .confirm-annuler {
+  width: 100%; padding: 14px;
+  border-radius: var(--r-sm);
+  font-family: inherit; font-size: 15px; font-weight: 700;
+  cursor: pointer; border: none;
+  transition: background var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-spring),
+              opacity var(--dur-fast) var(--ease-out);
+}
+.confirm-valider { background: var(--p); color: #fff; }
+.confirm-valider:hover { background: var(--p2); }
+.confirm-box.danger .confirm-valider { background: var(--red); }
+.confirm-box.danger .confirm-valider:hover { filter: brightness(.92); }
+.confirm-valider:disabled { opacity: .4; cursor: not-allowed; }
+.confirm-annuler { background: none; color: var(--text-secondary); border: 1.5px solid var(--border); }
+.confirm-annuler:hover { background: var(--surface-alt); }
+.confirm-valider:active, .confirm-annuler:active { transform: scale(.98); }
+
+/* Sur écran large, l'action de confirmation revient à droite, comme attendu. */
+@media (min-width: 420px) {
+  .confirm-actions { flex-direction: row-reverse; }
+  .confirm-valider, .confirm-annuler { flex: 1; }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    25. CHAMPS DE SAISIE — ALIGNEMENT ANCRÉ SUR LE CHAMP
    Les icônes étaient positionnées par un `top` fixe, calculé pour un libellé
    d'une seule ligne. Dès qu'un libellé passait sur deux lignes, ou que la
@@ -2104,6 +2181,24 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
 </div>
 
+<!-- Modale de confirmation. Volontairement séparée de #modal-overlay : elle doit
+     pouvoir demander « Fermer sans envoyer cette demande ? » à propos de ce même
+     modal-overlay, donc les deux ne peuvent pas partager le même conteneur. -->
+<div class="modal-overlay confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirm-titre">
+    <div class="confirm-icone" id="confirm-icone"></div>
+    <h3 class="confirm-titre" id="confirm-titre"></h3>
+    <p class="confirm-texte" id="confirm-texte"></p>
+    <div id="confirm-saisie-bloc" style="display:none">
+      <input type="text" id="confirm-saisie" autocapitalize="characters" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-annuler" id="confirm-annuler"></button>
+      <button type="button" class="confirm-valider" id="confirm-valider"></button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
 
 <script src="https://js.stripe.com/v3/"></script>
@@ -2191,9 +2286,77 @@ function toast(msg,dur=3000){
   if(/^Erreur|❌/.test(msg)){type='error';icon='alert-circle'}
   else if(/✅|💾|📸|⭐|🗑️|📧|✨|🚫/.test(msg)){type='success';icon='check-circle'}
   t.className='toast toast-'+type;
-  t.innerHTML='<i data-lucide="'+icon+'" style="width:16px;height:16px;flex-shrink:0"></i><span>'+escapeHtml(msg)+'</span>';
+  // Le type du message a déjà déterminé une icône ci-dessus. Laisser en plus
+  // l'emoji du texte affichait deux symboles côte à côte dans chaque
+  // notification. On le retire à l'affichage, sans toucher aux 56 appels.
+  var texte=msg.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu,'').replace(/\s{2,}/g,' ').trim();
+  t.innerHTML='<i data-lucide="'+icon+'" style="width:16px;height:16px;flex-shrink:0"></i><span>'+escapeHtml(texte)+'</span>';
   requestAnimationFrame(function(){t.classList.add('show')});
   clearTimeout(t._hideTimer);t._hideTimer=setTimeout(()=>t.classList.remove('show'),dur);
+}
+// Remplace confirm(). Renvoie une promesse : les appelants passent donc de
+// `if(!confirm(...))return;` à `if(!await demanderConfirmation({...}))return;`.
+//
+// Options :
+//   titre        obligatoire
+//   texte        le corps du message ; le gras est accepté
+//   valider      libellé du bouton d'action     (défaut : « Confirmer »)
+//   annuler      libellé du bouton de retrait   (défaut : « Annuler »)
+//   danger       true pour une action destructrice : icône et bouton rouges
+//   icone        nom d'icône Lucide             (défaut selon danger)
+//   motAValider  si fourni, l'utilisateur doit le saisir pour débloquer le
+//                bouton — réservé à l'irréversible, là où un simple clic
+//                répété ne doit pas suffire
+function demanderConfirmation(options){
+  options=options||{};
+  return new Promise(function(resoudre){
+    var overlay=document.getElementById('confirm-overlay');
+    var boite=overlay.querySelector('.confirm-box');
+    var btnOk=document.getElementById('confirm-valider');
+    var btnNon=document.getElementById('confirm-annuler');
+    var blocSaisie=document.getElementById('confirm-saisie-bloc');
+    var champ=document.getElementById('confirm-saisie');
+
+    boite.classList.toggle('danger',!!options.danger);
+    document.getElementById('confirm-icone').innerHTML=
+      '<i data-lucide="'+(options.icone||(options.danger?'alert-triangle':'help-circle'))+'"></i>';
+    document.getElementById('confirm-titre').textContent=options.titre||'Confirmer';
+    document.getElementById('confirm-texte').innerHTML=options.texte||'';
+    btnOk.textContent=options.valider||'Confirmer';
+    btnNon.textContent=options.annuler||'Annuler';
+
+    var motAttendu=options.motAValider||null;
+    blocSaisie.style.display=motAttendu?'block':'none';
+    champ.value='';
+    champ.placeholder=motAttendu||'';
+    btnOk.disabled=!!motAttendu;
+
+    function verifierSaisie(){
+      btnOk.disabled=champ.value.trim().toUpperCase()!==motAttendu;
+    }
+    function fermer(reponse){
+      overlay.classList.remove('open');
+      btnOk.onclick=null; btnNon.onclick=null; overlay.onclick=null;
+      champ.oninput=null;
+      document.removeEventListener('keydown',surTouche);
+      resoudre(reponse);
+    }
+    function surTouche(e){
+      if(e.key==='Escape')fermer(false);
+      if(e.key==='Enter'&&!btnOk.disabled)fermer(true);
+    }
+
+    if(motAttendu)champ.oninput=verifierSaisie;
+    btnOk.onclick=function(){fermer(true)};
+    btnNon.onclick=function(){fermer(false)};
+    // Cliquer sur le fond revient à renoncer — jamais à confirmer.
+    overlay.onclick=function(e){ if(e.target===overlay)fermer(false) };
+    document.addEventListener('keydown',surTouche);
+
+    overlay.classList.add('open');
+    if(window.lucide)lucide.createIcons();
+    setTimeout(function(){ (motAttendu?champ:btnNon).focus() },60);
+  });
 }
 function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.classList.add('show')}
 function hideErr(id){document.getElementById(id).classList.remove('show')}
@@ -2454,8 +2617,18 @@ function enterApp(){
   }
 }
 async function supprimerCompte(){
-  if(!confirm('Voulez-vous vraiment supprimer votre compte Gleam ? Vos informations personnelles seront effacées définitivement. Vos demandes/prestations passées resteront visibles pour l\'historique, mais sans vos données personnelles.'))return;
-  if(!confirm('Dernière confirmation : cette action est irréversible. Continuer ?'))return;
+  // Une seule demande, mais qui exige un geste délibéré. Deux confirmations
+  // successives et quasi identiques entraînaient le réflexe de valider sans lire.
+  if(!await demanderConfirmation({
+    titre:'Supprimer votre compte',
+    texte:'Vos informations personnelles seront effacées <strong>définitivement</strong>. '+
+          'Vos prestations passées resteront visibles pour l\'historique, mais sans vos données.'+
+          '<br><br>Saisissez <strong>SUPPRIMER</strong> pour confirmer.',
+    motAValider:'SUPPRIMER',
+    valider:'Supprimer mon compte',
+    annuler:'Garder mon compte',
+    danger:true, icone:'trash-2'
+  }))return;
   try{
     const r=await fetch(API+'/api/users/me/supprimer',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
@@ -2475,7 +2648,21 @@ function iconHtml(name,size){
   return '<i data-lucide="'+(name||'sparkles')+'" style="width:'+size+'px;height:'+size+'px;vertical-align:-4px;display:inline-block"></i>';
 }
 function ICONS_get(key){return iconHtml(ICON_NAMES[key])}
-const STATUTS={en_attente:['⏳ En attente','s-attente'],devis_recus:['📋 Devis reçus','s-devis'],acceptee:['✅ Acceptée','s-acceptee'],en_cours:['🔧 En cours','s-acceptee'],terminee:['🏁 Terminée','s-terminee'],annulee_client:['🚫 Annulée','s-terminee'],expiree:['⌛ Expirée','s-terminee']};
+// Icônes vectorielles plutôt qu'emojis : un emoji se dessine différemment sur
+// iOS, Android et Windows, et ne prend jamais la couleur du statut. Ces icônes
+// héritent de la teinte de leur classe (s-attente, s-acceptee…).
+function icoStatut(nom){
+  return '<i data-lucide="'+nom+'" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px"></i>';
+}
+const STATUTS={
+  en_attente:     [icoStatut('clock')+'En attente','s-attente'],
+  devis_recus:    [icoStatut('file-text')+'Devis reçus','s-devis'],
+  acceptee:       [icoStatut('check-circle')+'Acceptée','s-acceptee'],
+  en_cours:       [icoStatut('wrench')+'En cours','s-acceptee'],
+  terminee:       [icoStatut('flag')+'Terminée','s-terminee'],
+  annulee_client: [icoStatut('ban')+'Annulée','s-terminee'],
+  expiree:        [icoStatut('calendar-x')+'Expirée','s-terminee']
+};
 
 // Affiche les détails d'une prestation en ajoutant l'unité claire pour la quantité/surface
 // (ex: "6 m²" plutôt que juste "6"), pour que ce soit toujours compréhensible sans ambiguïté.
@@ -3168,7 +3355,11 @@ function renderDevisClientCards(){
 }
 
 async function accepterDevis(devisId,btn){
-  if(!confirm('Accepter ce devis ? Les autres devis seront automatiquement refusés.'))return;
+  if(!await demanderConfirmation({
+    titre:'Accepter ce devis',
+    texte:'Les autres devis reçus pour cette prestation seront automatiquement refusés.',
+    valider:'Accepter', icone:'check-circle'
+  }))return;
   if(btn){btn.disabled=true;var sib=btn.parentElement&&btn.parentElement.querySelector('.btn-refuse');if(sib)sib.disabled=true}
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/accepter',{method:'POST',headers:authHeaders()});
@@ -3281,7 +3472,15 @@ function renderDetail(d){
 }
 async function annulerDemandeAcceptee(){
   if(!currentDetailDemande)return;
-  if(!confirm('Confirmer l\'annulation de cette prestation ?\n\nRappel du barème : gratuite plus de 24h avant, 70% remboursé entre 2h et 24h avant, aucun remboursement moins de 2h avant. Le prestataire sera prévenu immédiatement.'))return;
+  if(!await demanderConfirmation({
+    titre:'Annuler cette prestation',
+    texte:'<strong>Plus de 24 h avant</strong> — annulation gratuite.<br>'+
+          '<strong>Entre 2 h et 24 h</strong> — 70 % remboursé.<br>'+
+          '<strong>Moins de 2 h avant</strong> — aucun remboursement.'+
+          '<br><br>Le prestataire sera prévenu immédiatement.',
+    valider:'Annuler la prestation', annuler:'La conserver',
+    danger:true, icone:'calendar-x'
+  }))return;
   try{
     const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id+'/annuler-client',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
@@ -3307,7 +3506,11 @@ async function archiverDemande(){
 }
 async function deleteDemande(){
   if(!currentDetailDemande)return;
-  if(!confirm('Supprimer définitivement cette demande ?'))return;
+  if(!await demanderConfirmation({
+    titre:'Supprimer cette demande',
+    texte:'Elle disparaîtra définitivement de votre liste. Cette action est irréversible.',
+    valider:'Supprimer', danger:true, icone:'trash-2'
+  }))return;
   try{
     const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id,{method:'DELETE',headers:authHeaders()});
     const d=await safeJson(r);
@@ -3866,7 +4069,13 @@ async function toggleDispo(){
 }
 
 async function annulerProDevis(devisId,btn){
-  if(!confirm('Annuler ce devis accepté ? Le client sera notifié.'))return;
+  if(!await demanderConfirmation({
+    titre:'Annuler ce devis accepté',
+    texte:'Le client sera notifié immédiatement. Les annulations répétées font '+
+          'baisser votre taux de fiabilité.',
+    valider:'Annuler le devis', annuler:'Le conserver',
+    danger:true, icone:'ban'
+  }))return;
   if(btn)btn.disabled=true;
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
@@ -5521,9 +5730,17 @@ function fermerModale(){
   var overlay=document.getElementById('modal-overlay');
   if(overlay)overlay.classList.remove('open');
 }
-function closeModalForce(){
+// Devenue asynchrone pour pouvoir attendre la modale. Aucun appelant n'exploite
+// sa valeur de retour, et lorsqu'il n'y a rien à confirmer aucune attente n'a
+// lieu : le comportement reste identique dans ce cas.
+async function closeModalForce(){
   var hadData=multiFlow.active||(document.getElementById('f-addr')&&document.getElementById('f-addr').value.trim());
-  if(hadData&&!confirm('Fermer sans envoyer cette demande ? Les informations saisies seront perdues.'))return;
+  if(hadData&&!await demanderConfirmation({
+    titre:'Abandonner cette demande',
+    texte:'Toutes vos réponses seront perdues et vous devrez recommencer depuis le début.',
+    valider:'Abandonner', annuler:'Continuer ma demande',
+    danger:true, icone:'x-circle'
+  }))return;
   document.getElementById('modal-overlay').classList.remove('open');
   multiFlow={active:false,queue:[],current:0,results:[]};
   photos=[];
