@@ -1133,9 +1133,16 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
 const PLAFOND_PROS_NOTIFIES = 25;
 
 async function prosConcernesParDemande(demande) {
+  // ⚠️ Le filtre sur le type est INDISPENSABLE ici. La colonne `disponible` vaut
+  // true par défaut pour TOUS les comptes, clients compris : sans ce filtre, la
+  // requête remonte l'intégralité des utilisateurs, et des clients reçoivent des
+  // emails leur demandant d'envoyer un devis. C'est exactement ce qui s'est
+  // produit le 3 août — 10 destinataires notifiés alors que la base ne compte
+  // que 2 prestataires. Le bloc d'origine, lui, filtrait bien sur type='pro'.
   const { data: pros } = await supabase
     .from('users')
-    .select('id, email, prenom, prestations_proposees, latitude, longitude, rayon_intervention_km, compte_supprime')
+    .select('id, email, prenom, type, prestations_proposees, latitude, longitude, rayon_intervention_km, compte_supprime')
+    .in('type', ['pro', 'societe', 'professionnel'])
     .eq('disponible', true);
   if (!pros || !pros.length) return [];
 
@@ -1144,6 +1151,10 @@ async function prosConcernesParDemande(demande) {
   let retenus = pros.filter((pro) => {
     if (pro.compte_supprime) return false;
     if (!pro.email) return false;
+    // Second garde-fou, volontairement redondant avec le filtre SQL ci-dessus :
+    // ce sont des emails envoyés à des personnes réelles, une erreur ne se
+    // rattrape pas.
+    if (!isProType(pro.type)) return false;
 
     // Demande réservée à un prestataire favori : lui seul est concerné.
     if (demande.pro_prefere_id) return pro.id === demande.pro_prefere_id;
