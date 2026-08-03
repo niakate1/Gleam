@@ -174,6 +174,11 @@ const auth = async (req, res, next) => {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
   } catch (e) {
+    // Diagnostic précis, jamais le jeton ni la clé secrète eux-mêmes : seulement le type d'erreur
+    // JWT réel (expiré, signature invalide, malformé) — pour savoir avec certitude la prochaine
+    // fois, plutôt que de deviner entre un jeton simplement expiré (normal après 7 jours) et un
+    // vrai problème de configuration (clé JWT_SECRET incohérente entre deux déploiements).
+    console.warn('⚠️ Jeton rejeté — type d\'erreur JWT : ' + e.name + ' (' + e.message + ')');
     res.status(401).json({ error: 'Token invalide' });
   }
 };
@@ -353,7 +358,11 @@ const PRESTATION_CONFIG = {
     // grande que le 180x200 (King Size), confirmée par la recherche de marché (IKEA, Epéda,
     // La Maison Senso...). Prix extrapolé en suivant la progression déjà établie entre les paliers.
     tierLabels: { A: '90x190 cm', B: '140x190 cm', C: '160x200 cm', D: '180x200 cm', E: '200x200 cm (Empereur)' },
-    tierDefaults: { A: 45, B: 60, C: 72, D: 90, E: 105 } // propre
+    // Corrigé après nouvelle recherche de marché : l'ensemble de la gamme était sous-évalué
+    // d'environ 20 à 30% par rapport aux tarifs réels observés (BuildingDrive : 59€ à 99€ selon
+    // taille ; L'Atelier du Nettoyeur : 72€ à 132€ selon taille) — progression resserrée sur les
+    // nouveaux montants.
+    tierDefaults: { A: 60, B: 78, C: 90, D: 105, E: 125 } // propre (marché observé 2026 : 59-72€ pour 90x190, jusqu'à 120-132€ pour 180x200/200x200)
   },
   terrasse: {
     unite: true,
@@ -377,7 +386,11 @@ const PRESTATION_CONFIG = {
     unite: true,
     uniteLabel: 'm²', // le pro fixe un prix par m² réel, le client indique la surface exacte
     prixReferenceDefaut: 20, // €/m², tuiles, démoussage + hydrofuge, état propre (marché observé : 9 à 40€/m²)
-    coefMatiere: { tuiles: 1.0, ardoises: 0.75, fibrociment: 0.9, zinc_metal: 1.1 }
+    // Corrigé après nouvelle recherche de marché : ardoise et fibrociment étaient auparavant moins
+    // chers que tuiles, alors que le marché montre l'inverse — l'ardoise naturelle demande plus de
+    // minutie (fixations à préserver), et le fibrociment implique un risque amiante à gérer,
+    // justifiant un tarif au moins équivalent, voire légèrement supérieur, à celui des tuiles.
+    coefMatiere: { tuiles: 1.0, ardoises: 1.05, fibrociment: 1.05, zinc_metal: 1.1 }
   },
   vitres: {
     unite: true,
@@ -385,7 +398,10 @@ const PRESTATION_CONFIG = {
     tierKey: 'type_bien', // le type de bien reste pertinent : accès et vitrages souvent plus complexes en commerce/bureaux
     tiers: ['maison', 'appartement', 'commerce', 'bureaux'],
     tierLabels: { maison: 'Maison', appartement: 'Appartement', commerce: 'Commerce', bureaux: 'Bureaux' },
-    tierDefaults: { maison: 4, appartement: 4, commerce: 4.8, bureaux: 5.2 } // €/m², propre (marché observé : 1 à 5€/m²)
+    // Bureaux corrigé après nouvelle recherche : le marché pro/copropriété/hauteur observe plutôt
+    // 7 à 12€/m², contre 5,2€ auparavant — trop proche du tarif particulier alors que ce segment
+    // implique souvent un accès plus complexe (immeubles, façades vitrées en hauteur).
+    tierDefaults: { maison: 4, appartement: 4, commerce: 5, bureaux: 6.5 } // €/m², propre (marché observé 2026 : 4-8€/m² particulier, 7-12€/m² pro/copropriété/hauteur)
   },
   tapis: {
     unite: true,
