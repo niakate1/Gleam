@@ -1010,7 +1010,15 @@ app.post('/api/demandes', auth, async (req, res) => {
       : [{ type: type || 'autre', description: description || '', details: details || {} }];
 
     const prestationLabel = listePrestations.map(p => p.type).join(' + ');
-    const notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations, photos: photos || [] });
+
+    // Les photos partent dans le dépôt de fichiers ; seuls leurs chemins sont
+    // conservés en base. Le dossier est tiré au hasard : l'identifiant de la
+    // demande n'existe pas encore à cet instant, et un chemin devinable serait
+    // de toute façon inutile puisque le dépôt est privé.
+    const dossierPhotos = 'demandes/' + crypto.randomUUID();
+    const cheminsPhotos = await televerserPhotos(photos || [], dossierPhotos);
+
+    const notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations, photos: cheminsPhotos });
 
     const { data, error } = await supabase.from('demandes').insert({
       client_id: req.user.id,
@@ -1322,6 +1330,133 @@ async function relancerDemandesSansDevis() {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PHOTOS — STOCKAGE DE FICHIERS
+//
+// Les photos étaient encodées en base64 dans des colonnes `text`. Sur cette
+// base, une seule demande atteignait 282 ko : chaque lecture de la ligne
+// transportait l'image entière, même pour afficher une simple liste.
+//
+// Le navigateur n'est pas modifié. Il envoie toujours du base64, et reçoit
+// désormais des adresses https — <img src> accepte les deux sans distinction.
+// Toute la bascule tient donc au serveur.
+// ─────────────────────────────────────────────────────────────────────────────
+const DEPOT_PHOTOS = 'photos-demandes';
+const DUREE_LIEN_SIGNE = 3600;   // une heure, largement au-delà d'une session
+
+function estBase64(v) { return typeof v === 'string' && v.startsWith('data:'); }
+function estCheminDepot(v) {
+  return typeof v === 'string' && !v.startsWith('data:') && !v.startsWith('http') && v.includes('/');
+}
+
+// Téléverse une image base64 et renvoie son chemin dans le dépôt.
+// En cas d'échec, renvoie le base64 d'origine : une photo mal rangée vaut
+// toujours mieux qu'une photo perdue.
+async function televerserPhoto(base64, dossier) {
+  try {
+    const m = /^data:(image\/(?:jpeg|jpg|png|webp));base64,(.+)$/.exec(base64 || '');
+    if (!m) return base64;
+
+    const typeMime = m[1] === 'image/jpg' ? 'image/jpeg' : m[1];
+    const extension = typeMime === 'image/png' ? 'png' : typeMime === 'image/webp' ? 'webp' : 'jpg';
+    const contenu = Buffer.from(m[2], 'base64');
+    const chemin = dossier + '/' + crypto.randomUUID() + '.' + extension;
+
+    const { error } = await supabase.storage.from(DEPOT_PHOTOS)
+      .upload(chemin, contenu, { contentType: typeMime, upsert: false });
+    if (error) {
+      console.error('Téléversement photo échoué, conservation en base64:', error.message);
+      return base64;
+    }
+    return chemin;
+  } catch (e) {
+    console.error('Téléversement photo:', e.message);
+    return base64;
+  }
+}
+
+async function televerserPhotos(liste, dossier) {
+  if (!Array.isArray(liste) || !liste.length) return [];
+  const resultats = [];
+  for (const photo of liste) {
+    resultats.push(estBase64(photo) ? await televerserPhoto(photo, dossier) : photo);
+  }
+  return resultats;
+}
+
+// Transforme les chemins du dépôt en liens temporaires. Une seule requête pour
+// l'ensemble des chemins, quel qu'en soit le nombre.
+// Les valeurs qui ne sont pas des chemins — base64 des demandes historiques,
+// liens déjà signés — traversent la fonction sans être touchées.
+async function signerChemins(valeurs) {
+  const chemins = [...new Set(valeurs.filter(estCheminDepot))];
+  if (!chemins.length) return {};
+  try {
+    const { data, error } = await supabase.storage.from(DEPOT_PHOTOS)
+      .createSignedUrls(chemins, DUREE_LIEN_SIGNE);
+    if (error) { console.error('Signature des photos:', error.message); return {}; }
+    const table = {};
+    (data || []).forEach((r) => { if (r.signedUrl && !r.error) table[r.path] = r.signedUrl; });
+    return table;
+  } catch (e) {
+    console.error('Signature des photos:', e.message);
+    return {};
+  }
+}
+
+// Récupère toutes les valeurs de photos portées par un lot de demandes.
+function photosDUneDemande(d) {
+  const trouvees = [];
+  if (d && d.notes) {
+    try {
+      const n = JSON.parse(d.notes);
+      if (Array.isArray(n.photos)) trouvees.push(...n.photos);
+    } catch (e) { /* notes en texte libre : rien à extraire */ }
+  }
+  ['photos_avant', 'photos_apres'].forEach((champ) => {
+    const v = d && d[champ];
+    if (!v) return;
+    if (Array.isArray(v)) trouvees.push(...v);
+    else { try { const t = JSON.parse(v); if (Array.isArray(t)) trouvees.push(...t); } catch (e) {} }
+  });
+  return trouvees;
+}
+
+// Prépare un lot de demandes pour l'envoi au navigateur : une seule requête de
+// signature pour tout le lot, quel que soit le nombre de demandes.
+async function signerPhotosDesDemandes(demandes) {
+  const lot = Array.isArray(demandes) ? demandes : [demandes];
+  const toutes = [];
+  lot.forEach((d) => toutes.push(...photosDUneDemande(d)));
+  const table = await signerChemins(toutes);
+  if (!Object.keys(table).length) return demandes;
+
+  const convertir = (v) => (table[v] || v);
+
+  lot.forEach((d) => {
+    if (!d) return;
+    if (d.notes) {
+      try {
+        const n = JSON.parse(d.notes);
+        if (Array.isArray(n.photos)) {
+          n.photos = n.photos.map(convertir);
+          d.notes = JSON.stringify(n);
+        }
+      } catch (e) {}
+    }
+    ['photos_avant', 'photos_apres'].forEach((champ) => {
+      const v = d[champ];
+      if (!v) return;
+      if (Array.isArray(v)) { d[champ] = v.map(convertir); return; }
+      try {
+        const t = JSON.parse(v);
+        if (Array.isArray(t)) d[champ] = JSON.stringify(t.map(convertir));
+      } catch (e) {}
+    });
+  });
+  return demandes;
+}
+
 async function expirerDemandesEnRetard(demandes) {
   const maintenant = new Date();
   const aExpirer = [];
@@ -1360,7 +1495,7 @@ async function expirerDemandesEnRetard(demandes) {
 app.get('/api/demandes', auth, async (req, res) => {
   const { data } = await supabase.from('demandes').select('*').eq('client_id', req.user.id).order('created_at', { ascending: false });
   const dataAJour = await expirerDemandesEnRetard(data || []);
-  res.json(dataAJour);
+  res.json(await signerPhotosDesDemandes(dataAJour));
 });
 
 // Demandes disponibles pour les pros (en attente, pas encore acceptées) — DOIT être déclarée avant /api/demandes/:id
@@ -1433,7 +1568,7 @@ app.get('/api/demandes/all', auth, async (req, res) => {
         || d.distance_km <= user.rayon_intervention_km);
     }
 
-    res.json(filtered);
+    res.json(await signerPhotosDesDemandes(filtered));
   } catch (e) {
     console.error('Erreur /api/demandes/all:', e);
     res.status(500).json({ error: 'Erreur serveur: ' + e.message });
@@ -1464,9 +1599,9 @@ app.post('/api/pro/zone-intervention', auth, async (req, res) => {
 app.get('/api/demandes/:id', auth, async (req, res) => {
   const { data } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
   if (!data) return res.status(404).json({ error: 'Demande introuvable.' });
-  if (data.client_id === req.user.id) return res.json(data);
+  if (data.client_id === req.user.id) return res.json((await signerPhotosDesDemandes([data]))[0]);
   const { data: monDevis } = await supabase.from('devis').select('id').eq('demande_id', req.params.id).eq('societe_id', req.user.id).maybeSingle();
-  if (monDevis) return res.json(data);
+  if (monDevis) return res.json((await signerPhotosDesDemandes([data]))[0]);
   return res.status(403).json({ error: 'Accès refusé.' });
 });
 
@@ -1954,6 +2089,7 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
 // problème de performance et de volume de requêtes une fois combiné au rafraîchissement automatique).
 app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
   try {
+    // Signées plus bas, une fois le lot complet rassemblé.
     const { data: demandes } = await supabase.from('demandes').select('id, prestation, statut, photos_avant, photos_apres, prestation_demarree_le, creneau, creneau_propose, creneau_propose_par')
       .eq('client_id', req.user.id).in('statut', ['devis_recus', 'acceptee', 'en_cours', 'terminee']);
     if (!demandes || !demandes.length) return res.json([]);
@@ -1995,6 +2131,10 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
       };
     });
 
+    // Les photos avant/après voyagent ici à la racine de chaque devis, et non
+    // dans un objet `demande` : le lot est donc signé tel quel.
+    await signerPhotosDesDemandes(enriched);
+
     res.json(enriched);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -2020,6 +2160,8 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
       } : null;
       return { ...d, demande: demandeAvecPhotos };
     });
+    // Ici les photos sont portées par l'objet `demande` imbriqué dans chaque devis.
+    await signerPhotosDesDemandes(enriched.map(d => d.demande).filter(Boolean));
     res.json(enriched);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -2716,7 +2858,9 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
     }
 
     await supabase.from('demandes').update({
-      photos_avant: photos_avant && photos_avant.length ? JSON.stringify(photos_avant) : null,
+      photos_avant: photos_avant && photos_avant.length
+        ? JSON.stringify(await televerserPhotos(photos_avant, 'demandes/' + req.params.id + '/avant'))
+        : null,
       prestation_demarree_le: new Date().toISOString(),
       distance_gps_arrivee: distanceGpsMetres
     }).eq('id', req.params.id);
@@ -2743,7 +2887,8 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
     const erreurPhotos = validerPhotos(photos_apres, 5);
     if (erreurPhotos) return res.status(400).json({ error: erreurPhotos });
     if (photos_apres && photos_apres.length) {
-      await supabase.from('demandes').update({ photos_apres: JSON.stringify(photos_apres) }).eq('id', demande_id);
+      const cheminsApres = await televerserPhotos(photos_apres, 'demandes/' + demande_id + '/apres');
+      await supabase.from('demandes').update({ photos_apres: JSON.stringify(cheminsApres) }).eq('id', demande_id);
     }
 
     // ⚠️ Point le plus sensible du serveur : au-delà de cette ligne, de l'argent
