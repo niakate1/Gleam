@@ -484,6 +484,111 @@ function surfaceEquivalentePonderee(quantite) {
   return total; // une "surface équivalente" à multiplier par le prix/m² plein tarif
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// VÉRIFICATION DU SIRET AUPRÈS DU RÉPERTOIRE OFFICIEL
+//
+// API Recherche d'Entreprises, opérée par la DINUM. Gratuite, sans clé, elle
+// agrège le répertoire Sirene (INSEE), le Registre National des Entreprises
+// (INPI) et le BODACC. Limite annoncée : 7 appels par seconde.
+//
+// Cette fonction ne lève jamais d'exception et ne bloque jamais un appelant.
+// Dans le pire des cas elle renvoie { statut: 'indisponible' } — jamais une
+// erreur. Une inscription ne doit pas dépendre de la disponibilité d'un service
+// tiers, si officiel soit-il.
+//
+// Codes NAF du nettoyage, à titre indicatif seulement : ils servent à signaler
+// une incohérence à l'administrateur, jamais à refuser quoi que ce soit. Un
+// artisan peut parfaitement nettoyer des canapés sous un code NAF de commerce.
+// ─────────────────────────────────────────────────────────────────────────────
+const NAF_NETTOYAGE = ['81.21Z', '81.22Z', '81.29A', '81.29B', '45.20A', '45.20B', '96.01B', '43.99C'];
+
+function normaliserSiret(brut) {
+  return String(brut || '').replace(/[^0-9]/g, '');
+}
+
+async function verifierSiretOfficiel(siretBrut) {
+  const siret = normaliserSiret(siretBrut);
+  if (siret.length !== 14) return { statut: 'introuvable', motif: 'format' };
+
+  try {
+    const reponse = await fetch(
+      'https://recherche-entreprises.api.gouv.fr/search?q=' + siret + '&per_page=1',
+      { signal: AbortSignal.timeout(4000), headers: { 'Accept': 'application/json' } }
+    );
+    if (!reponse.ok) {
+      console.warn('SIRET — API répertoire indisponible (statut ' + reponse.status + ')');
+      return { statut: 'indisponible' };
+    }
+
+    const data = await reponse.json();
+    const resultats = Array.isArray(data && data.results) ? data.results : [];
+    if (!resultats.length) return { statut: 'introuvable' };
+
+    const r = resultats[0];
+    // La réponse peut décrire l'établissement recherché soit dans
+    // matching_etablissements, soit dans siege. On lit les deux, sans supposer
+    // lequel est présent : cette API a déjà changé de forme par le passé.
+    const correspondants = Array.isArray(r.matching_etablissements) ? r.matching_etablissements : [];
+    const etab = correspondants.find(e => normaliserSiret(e && e.siret) === siret)
+              || (r.siege && normaliserSiret(r.siege.siret) === siret ? r.siege : null)
+              || correspondants[0] || r.siege || null;
+
+    const etatEtab = etab && etab.etat_administratif;
+    const etatUnite = r.etat_administratif;
+    const naf = (etab && etab.activite_principale) || r.activite_principale || null;
+    const nom = r.nom_complet || r.nom_raison_sociale
+             || [r.prenom, r.nom].filter(Boolean).join(' ') || null;
+
+    const infos = {
+      siret,
+      nom: nom,
+      activite_code: naf,
+      activite_libelle: (etab && etab.libelle_activite_principale) || r.libelle_activite_principale || null,
+      commune: (etab && (etab.libelle_commune || etab.commune)) || null,
+      code_postal: (etab && etab.code_postal) || null,
+      date_creation: r.date_creation || null,
+      nature_juridique: r.nature_juridique || null,
+      etat_etablissement: etatEtab || null,
+      etat_unite_legale: etatUnite || null,
+      // Signalé, jamais bloquant : le code NAF ne dit pas ce qu'une personne
+      // sait faire, seulement ce qu'elle a déclaré à la création.
+      naf_coherent_nettoyage: naf ? NAF_NETTOYAGE.indexOf(String(naf).toUpperCase()) >= 0 : null,
+      verifie_le: new Date().toISOString(),
+      source: 'recherche-entreprises.api.gouv.fr'
+    };
+
+    // 'A' = actif, 'F' = fermé. En l'absence d'information, on ne conclut pas
+    // à la fermeture : on considère l'établissement trouvé, c'est déjà l'essentiel.
+    if (etatEtab === 'F') return { statut: 'ferme', infos };
+    return { statut: 'verifie', infos };
+
+  } catch (e) {
+    // Délai dépassé, DNS, réseau, JSON malformé : aucune conséquence.
+    console.warn('SIRET — vérification impossible : ' + (e && e.name ? e.name : 'erreur') + ' — ' + (e && e.message));
+    return { statut: 'indisponible' };
+  }
+}
+
+// Enregistre le résultat sans jamais faire échouer l'appelant.
+async function enregistrerVerificationSiret(userId, siret) {
+  try {
+    const resultat = await verifierSiretOfficiel(siret);
+    await supabase.from('users').update({
+      siret_statut: resultat.statut,
+      siret_verifie_le: new Date().toISOString(),
+      siret_donnees: resultat.infos || null
+    }).eq('id', userId);
+
+    if (resultat.statut === 'verifie') {
+      console.log('✅ SIRET vérifié — ' + (resultat.infos.nom || siret));
+    } else {
+      console.warn('⚠️ SIRET à examiner — compte ' + userId + ' — statut : ' + resultat.statut);
+    }
+  } catch (e) {
+    console.error('Enregistrement vérification SIRET :', e.message);
+  }
+}
+
 // Distance à vol d'oiseau entre deux points GPS (formule de Haversine), en kilomètres — reprise
 // et factorisée depuis le calcul déjà utilisé pour vérifier la position d'un pro à l'arrivée,
 // réutilisée ici pour filtrer les demandes par zone d'intervention.
@@ -764,6 +869,13 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       sendEmail('verification_email', data.email, { prenom: data.prenom, code: codeVerifEmail });
     } catch (e) {
       console.error('Envoi email de vérification échoué (compte créé normalement):', e.message);
+    }
+
+    // Vérification du SIRET, volontairement SANS await : l'inscription se termine
+    // à la même vitesse qu'avant, et un répertoire momentanément injoignable ne
+    // peut en aucun cas empêcher quelqu'un de créer son compte.
+    if (siret && (isProType(type) || type === 'entreprise')) {
+      enregistrerVerificationSiret(data.id, siret).catch(() => {});
     }
 
     const token = jwt.sign({ id: data.id, email: data.email, type: data.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -3404,6 +3516,21 @@ app.delete('/api/demandes/:id/masquer', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
+});
+
+// Vérification en direct pendant la saisie du SIRET. Volontairement accessible
+// sans compte : elle sert précisément au moment de l'inscription, avant qu'un
+// compte n'existe. Elle ne renvoie que des données publiques du répertoire
+// officiel — rien qui n'apparaisse déjà sur annuaire-entreprises.data.gouv.fr.
+app.get('/api/verification/siret', async (req, res) => {
+  const resultat = await verifierSiretOfficiel(req.query.siret);
+  res.json({
+    statut: resultat.statut,
+    nom: resultat.infos ? resultat.infos.nom : null,
+    activite: resultat.infos ? resultat.infos.activite_libelle : null,
+    activite_code: resultat.infos ? resultat.infos.activite_code : null,
+    commune: resultat.infos ? resultat.infos.commune : null
+  });
 });
 
 // ══════════════ PROS / SOCIÉTÉS ══════════════
