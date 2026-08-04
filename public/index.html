@@ -1518,6 +1518,48 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   33. RAPPEL DES TARIFS DANS LE FORMULAIRE DE DEVIS
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.rappel-tarifs {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--gap-3);
+  margin-bottom: var(--gap-3);
+}
+.rappel-tarifs .titre {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--gray);
+  margin-bottom: 9px;
+}
+.rappel-tarifs .titre i { width: 13px; height: 13px; color: var(--p); }
+.rappel-tarifs .grille {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 5px var(--gap-3);
+  font-size: 13px;
+}
+.rappel-tarifs .grille span { color: var(--text-secondary); text-transform: capitalize; }
+.rappel-tarifs .grille strong { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+.rappel-tarifs .note { font-size: 11.5px; color: var(--gray); margin-top: 9px; line-height: 1.45; }
+
+.rappel-tarifs.vide {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--amber-clair);
+  border-color: transparent;
+  font-size: 12.5px; line-height: 1.45;
+  color: var(--text-secondary);
+}
+.rappel-tarifs.vide i { width: 16px; height: 16px; color: var(--amber); flex-shrink: 0; margin-top: 1px; }
+.rappel-tarifs.vide button {
+  background: none; border: none; padding: 0;
+  color: var(--p); font-family: inherit; font-size: 12.5px; font-weight: 700;
+  text-decoration: underline; cursor: pointer;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    32. EXEMPLE ILLUSTRATIF, CÔTÉ PRESTATAIRE
    Le trait discontinu et le bandeau disent tout de suite qu'il ne s'agit pas
    d'une vraie demande. Aucun bouton de réponse : il n'y a rien à y faire.
@@ -2208,9 +2250,6 @@ textarea { min-height: 92px; padding-top: 13px; }
         Estimation fondée sur les tarifs indicatifs proposés à l'inscription, et sur des
         durées d'intervention moyennes, déplacement compris. Vos prix restent les vôtres —
         vous les fixez librement, prestation par prestation.
-        <br><br>
-        Le taux de cotisations de 21 % correspond à un auto-entrepreneur en prestation de
-        services. Il dépend de votre statut : vérifiez le vôtre.
       </p>
     </div>
 
@@ -2775,10 +2814,11 @@ function afficherEcranAuth(onglet,role){
 // ─────────────────────────────────────────────────────────────────────────────
 const TAUX_COMMISSION = 0.15;
 
-// Cotisations d'un auto-entrepreneur en prestation de services. Taux indicatif :
-// il varie selon le statut, et l'écran le précise. L'omettre reviendrait à
-// annoncer un revenu que personne ne touche jamais.
-const TAUX_COTISATIONS = 0.21;
+// Volontairement, aucun taux de cotisations ici. Gleam ne connaît pas le statut
+// de ses prestataires — auto-entrepreneur, EURL, SASU, portage — et le taux
+// comme l'assiette en dépendent entièrement. Le simulateur s'arrête donc à ce
+// que Gleam sait et maîtrise : ce qu'il verse. Ce qui vient après relève du
+// prestataire et de son comptable, et le dire suffit.
 
 // La durée compte autant que le prix. Sans elle, le curseur laissait simuler
 // 25 voitures par semaine — une cinquantaine d'heures de travail — et le
@@ -2852,9 +2892,7 @@ function majSimulateur(){
   // 4,33 semaines par mois en moyenne — 52 semaines divisées par 12 mois.
   var brut = presta.panier * volume * 4.33;
   var commission = brut * TAUX_COMMISSION;
-  var encaisse = brut - commission;
-  var cotisations = brut * TAUX_COTISATIONS;   // assises sur le chiffre d'affaires
-  var disponible = encaisse - cotisations;
+  var verse = brut - commission;
 
   var euros = function(n){ return Math.round(n).toLocaleString('fr-FR') + ' €'; };
   var heures = function(h){
@@ -2870,9 +2908,8 @@ function majSimulateur(){
     '<div class="simu-ligne"><span>'+volume+' × '+presta.nom.toLowerCase()+', '+heures(presta.heures)+' l\'unité</span><span>'+euros(presta.panier)+'</span></div>'+
     '<div class="simu-ligne"><span>Chiffre d\'affaires mensuel</span><span>'+euros(brut)+'</span></div>'+
     '<div class="simu-ligne"><span>Commission Gleam (15 %)</span><span>− '+euros(commission)+'</span></div>'+
-    '<div class="simu-ligne"><span>Cotisations sociales (environ 21 %)</span><span>− '+euros(cotisations)+'</span></div>'+
-    '<div class="simu-net"><span class="titre">Il vous reste</span><span class="montant">'+euros(disponible)+'</span></div>'+
-    '<div class="simu-detail">Avant impôt sur le revenu et vos propres frais — produits, matériel, carburant.</div>';
+    '<div class="simu-net"><span class="titre">Gleam vous verse</span><span class="montant">'+euros(verse)+'</span></div>'+
+    '<div class="simu-detail">Montant brut, avant vos charges et impôts — ils dépendent de votre statut.</div>';
 }
 
 // Exemples inspirés de demandes réelles de la plateforme, reformulés.
@@ -4359,8 +4396,9 @@ function renderProDemandesCards(){
       (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
       (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
       (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
-      '<button class="btn-devis" id="ouvrir-devis-'+safeId+'" onclick="basculerFormulaireDevis(\''+safeId+'\')">💰 Proposer un prix</button>'+
+      '<button class="btn-devis" id="ouvrir-devis-'+safeId+'" onclick="basculerFormulaireDevis(\''+safeId+'\',\''+escAttr(d.prestation)+'\')">💰 Proposer un prix</button>'+
       '<div class="devis-form" id="devis-form-'+safeId+'" style="display:none">'+
+        '<div id="rappel-tarifs-'+safeId+'"></div>'+
         '<label>💰 Votre prix (€ TTC)</label>'+
         '<input type="number" inputmode="decimal" id="prix-'+safeId+'" placeholder="Ex: 150" min="1">'+
         '<label>📝 Message pour le client</label>'+
@@ -4767,7 +4805,69 @@ function renderProDevisCards(){
 // Le formulaire de réponse était déplié sur chaque carte : avec dix demandes,
 // la liste devenait impossible à parcourir. Il ne s'ouvre plus que sur demande,
 // et le champ du prix reçoit directement le curseur.
-function basculerFormulaireDevis(id){
+// Les tarifs du prestataire sont chargés une seule fois, puis conservés :
+// les rappeler à chaque ouverture de formulaire déclencherait un appel réseau
+// par demande consultée.
+var tarifsProEnCache = null;
+
+async function chargerTarifsPro(){
+  if(tarifsProEnCache)return tarifsProEnCache;
+  try{
+    const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
+    if(!r.ok)return null;
+    tarifsProEnCache=await safeJson(r);
+    return tarifsProEnCache;
+  }catch(e){ return null; }
+}
+
+// Rappelle au prestataire ce qu'il a lui-même enregistré pour cette prestation.
+// Sans cela, il chiffre de mémoire ou quitte l'écran pour aller consulter sa
+// grille — et perd la demande de vue.
+async function rappelTarifsPro(demandeId, prestation){
+  var box=document.getElementById('rappel-tarifs-'+demandeId);
+  if(!box)return;
+  var t=await chargerTarifsPro();
+  if(!t){box.innerHTML='';return}
+
+  var base=(t.tarifs||{})[prestation];
+  var unitaire=(t.tarifs_unitaires||{})[prestation];
+  var lignes=[];
+
+  if(base&&typeof base==='object'){
+    Object.keys(base).forEach(function(k){
+      var v=parseFloat(base[k]);
+      if(v>0)lignes.push({nom:k.replace(/_/g,' '),prix:Math.round(v)+' €'});
+    });
+  }else if(base&&parseFloat(base)>0){
+    lignes.push({nom:'Forfait',prix:Math.round(parseFloat(base))+' €'});
+  }
+  if(unitaire&&parseFloat(unitaire)>0){
+    // Virgule décimale, comme partout ailleurs dans l'application. Un point décimal
+    // au milieu d'une interface en français passe pour une négligence.
+    lignes.push({nom:'À l\'unité',prix:(Math.round(parseFloat(unitaire)*100)/100).toFixed(2).replace('.',',')+' € / unité'});
+  }
+
+  if(!lignes.length){
+    // Aucun tarif pour cette prestation : on le dit, et on mène à l'écran qui
+    // permet de le corriger, plutôt que de laisser un espace vide.
+    box.innerHTML='<div class="rappel-tarifs vide">'+
+      '<i data-lucide="info"></i>'+
+      '<div>Vous n\'avez pas encore de tarif enregistré pour cette prestation. '+
+      '<button type="button" onclick="event.stopPropagation();goProTab(\'pro-tarifs\')">Le renseigner</button></div>'+
+    '</div>';
+  }else{
+    box.innerHTML='<div class="rappel-tarifs">'+
+      '<div class="titre"><i data-lucide="euro"></i> Vos tarifs enregistrés</div>'+
+      '<div class="grille">'+lignes.map(function(l){
+        return '<span>'+escapeHtml(l.nom)+'</span><strong>'+escapeHtml(l.prix)+'</strong>';
+      }).join('')+'</div>'+
+      '<div class="note">Ajustez selon l\'état décrit et la distance. Le prix reste le vôtre.</div>'+
+    '</div>';
+  }
+  if(window.lucide)lucide.createIcons();
+}
+
+function basculerFormulaireDevis(id,prestation){
   var form=document.getElementById('devis-form-'+id);
   var btn=document.getElementById('ouvrir-devis-'+id);
   if(!form)return;
@@ -4775,6 +4875,7 @@ function basculerFormulaireDevis(id){
   form.style.display=etaitOuvert?'none':'block';
   if(btn)btn.textContent=etaitOuvert?'💰 Proposer un prix':'Fermer';
   if(!etaitOuvert){
+    if(prestation)rappelTarifsPro(id,prestation);
     var prix=document.getElementById('prix-'+id);
     if(prix)setTimeout(function(){prix.focus()},60);
   }
