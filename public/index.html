@@ -3928,7 +3928,7 @@ async function loadDemandes(silent){
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/demandes',{headers:authHeaders()});
-    if(r.status===401){return doLogout()}
+    if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
     if(!r.ok)return;
     const dataAll=await safeJson(r);
     var changed0=hasDataChanged('demandes',dataAll);
@@ -4099,7 +4099,7 @@ async function loadDevis(silent){
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetch(API+'/api/devis/mes-devis-recus',{headers:authHeaders()});
-    if(r.status===401){return doLogout()}
+    if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
     if(!r.ok)return;
     const c=document.getElementById('devis-list');
     var notesDonnees=[];
@@ -4577,7 +4577,7 @@ async function loadProDemandes(silent){
   try{
     const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
     const c=document.getElementById('pro-demandes-list');
-    if(r.status===401){return doLogout()}
+    if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
     if(!r.ok){c.innerHTML='<div class="etat-vide"><i data-lucide="wifi-off" style="width:44px;height:44px;color:var(--gray);margin-bottom:14px"></i><h3>Chargement impossible</h3><p>Une erreur est survenue en récupérant les demandes. Vérifiez votre connexion et réessayez.</p><button class="btn" style="width:auto;padding:10px 22px" onclick="loadProDemandes()">Réessayer</button></div>';if(window.lucide)lucide.createIcons();document.getElementById('stat-demandes').textContent='0';return}
     const data=await safeJson(r);
     document.getElementById('stat-demandes').textContent=data.length||0;
@@ -4944,7 +4944,7 @@ async function loadProDevis(silent){
   try{
     const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
     const c=document.getElementById('pro-devis-list');
-    if(r.status===401){return doLogout()}
+    if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div>';return}
     const data=await safeJson(r);
     document.getElementById('stat-devis').textContent=data.length||0;
@@ -8303,22 +8303,51 @@ if(window.lucide){
 }
 
 // ── INIT ──
+// Restauration de la session enregistrée.
+//
+// La version précédente testait `r.ok` et supprimait le jeton dès qu'il valait
+// false. Or `r.ok` est faux pour tout statut hors 200-299 — y compris 304 Not
+// Modified, que le serveur renvoyait à chaque rechargement grâce aux ETag
+// d'Express. Une session valide était donc détruite au deuxième démarrage.
+//
+// Sur iPhone, une application installée sur l'écran d'accueil est rechargée par
+// iOS à chaque retour au premier plan : le cas se produisait à chaque reprise.
+//
+// Le jeton n'est désormais effacé que si le serveur dit explicitement qu'il
+// n'est plus valable — 401 ou 403. Une panne réseau, un redémarrage du serveur,
+// un 304 ou un délai dépassé laissent la session intacte : l'utilisateur
+// réessaiera, ce qui est toujours préférable à une déconnexion injustifiée.
+async function restaurerSession(tok){
+  let r;
+  try{
+    r=await fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok},cache:'no-store'});
+  }catch(e){
+    // Réseau indisponible : on ne conclut rien. Surtout pas une déconnexion.
+    return;
+  }
+
+  if(r.status===401||r.status===403){
+    localStorage.removeItem('gleam_token');
+    return;
+  }
+  // 304, 5xx, ou toute autre réponse inattendue : la session est conservée.
+  if(!r.ok)return;
+
+  var u=await safeJson(r).catch(function(){return null});
+  if(!u||!u.id)return;
+
+  currentUser=u;enterApp();
+  // Retour depuis la configuration Stripe Connect (paiements du pro)
+  if(window.location.hash==='#paiements-retour'){
+    toast('✅ Configuration des paiements enregistrée !',4000);
+    setTimeout(checkConnectStatut,1500);
+    history.replaceState(null,'',window.location.pathname);
+  }
+}
+
 var tok=localStorage.getItem('gleam_token');
 if(tok){
-  fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok}})
-    .then(function(r){return r.ok?safeJson(r):null})
-    .then(function(u){
-      if(u&&u.id){
-        currentUser=u;enterApp();
-        // Retour depuis la configuration Stripe Connect (paiements du pro) : message de confirmation
-        if(window.location.hash==='#paiements-retour'){
-          toast('✅ Configuration des paiements enregistrée !',4000);
-          setTimeout(checkConnectStatut,1500);
-          history.replaceState(null,'',window.location.pathname);
-        }
-      }else localStorage.removeItem('gleam_token');
-    })
-    .catch(function(){});
+  restaurerSession(tok);
 }else if(/[?&#]parrain=/.test(window.location.href)){
   show('s-auth');
   switchTab('register');
