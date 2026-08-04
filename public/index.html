@@ -1564,12 +1564,28 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 /* Deux classes remplacent les styles en ligne posés champ par champ, où
    chaque étiquette avait sa propre valeur de marge et de taille. Le rythme
    vertical est désormais régulier au pixel près. */
+/* Le bloc ne suit plus la ligne sélectionnée : sans titre, il flotterait entre
+   deux sections sans qu'on sache d'où il vient. */
+.titre-bloc-pro {
+  font-size: 13.5px; font-weight: 700; color: var(--text);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
 .bloc-complement .etiquette-champ {
   display: block;
   font-size: 13px; font-weight: 600; color: var(--text);
   margin: var(--gap-4) 0 6px;
 }
-.bloc-complement .etiquette-champ:first-child { margin-top: 0; }
+/* Le titre du bloc occupe désormais la première place : la règle :first-child
+   ne visait plus rien. On cible l'étiquette qui suit le titre, et celle qui
+   ouvre un bloc sans titre. */
+/* Préfixé par #form-register : la règle « #form-login label, #form-register
+   label { margin-top: 18px } » emploie un sélecteur d'identifiant, de
+   spécificité (1,0,1). Sans identifiant de mon côté, (0,3,0) perdait. */
+#form-register .bloc-complement .etiquette-champ:first-child,
+#form-register .bloc-complement .titre-bloc-pro + .etiquette-champ { margin-top: 0; }
 .bloc-complement .etiquette-secondaire { font-size: 12.5px; font-weight: 500; color: var(--text-secondary); }
 .bloc-complement .etiquette-champ .optional {
   font-size: 11.5px; font-weight: 400; color: var(--gray); margin-left: 5px;
@@ -2612,7 +2628,12 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 .champ-icone { position: relative; }
 
-.champ-icone > i {
+/* `> i` ET `> svg` : lucide.createIcons() remplace l'élément <i> par un <svg>.
+   Selon la version, le sélecteur `> i` peut donc ne plus rien viser après le
+   rendu des icônes — l'icône retomberait dans le flux, au-dessus du champ,
+   au lieu d'être positionnée dedans. Viser les deux couvre les deux cas. */
+.champ-icone > i,
+.champ-icone > svg {
   position: absolute;
   left: 14px; bottom: 0; top: auto;
   width: 16px; height: var(--h-champ);
@@ -2622,7 +2643,8 @@ textarea { min-height: 92px; padding-top: 13px; }
   transition: color var(--dur-fast) var(--ease-out);
 }
 .champ-icone input { padding-left: 42px !important; }
-.champ-icone:focus-within > i { color: var(--p); }
+.champ-icone:focus-within > i,
+.champ-icone:focus-within > svg { color: var(--p); }
 
 /* Zone de clic de 40 px de côté : l'ancien bouton faisait 21 px, trop petit
    pour un pouce, et son `top` en dur le décalait dès que le libellé bougeait. */
@@ -2978,8 +3000,28 @@ textarea { min-height: 92px; padding-top: 13px; }
               <span class="marque-role" aria-hidden="true"></span>
             </button>
           </div>
+        </div>       <div class="register-section-titre"><i data-lucide="user"></i>Vos coordonnées</div>
+        <div class="row2">
+          <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean" autocomplete="given-name"></div>
+          <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont" autocomplete="family-name"></div>
         </div>
+        <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="re" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+        <div class="champ-icone"><label>Téléphone</label><i data-lucide="phone"></i><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel"></div>
+
+       <div class="register-section-titre"><i data-lucide="lock"></i>Sécurité</div>
+        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"><button type="button" class="bascule-mdp" aria-label="Afficher ou masquer le mot de passe" onclick="basculerVisibiliteMdp('rpw',this)"><i data-lucide="eye"></i></button></div>
+        <div class="force-mdp" id="force-mdp-barres" style="display:none">
+          <div class="force-mdp-barre"></div><div class="force-mdp-barre"></div><div class="force-mdp-barre"></div>
+        </div>
+        <div class="force-mdp-texte" id="force-mdp-texte"></div>
+
+        <!-- Les informations professionnelles ferment le formulaire, après le
+             mot de passe. Le noyau que personne ne discute — qui vous êtes,
+             comment vous connecter — reste ainsi d'un seul tenant ; le
+             professionnel vient une fois le compte constitué. -->
+
         <div id="entreprise-block" class="bloc-complement" style="display:none">
+          <div class="titre-bloc-pro">Informations de votre société</div>
           <!-- Ce qui se remplit de mémoire vient d'abord ; le numéro administratif
                ferme la marche. Quatorze chiffres qu'on va chercher dans un
                dossier ne doivent pas barrer la route au reste. -->
@@ -2998,7 +3040,10 @@ textarea { min-height: 92px; padding-top: 13px; }
           <input type="text" id="r-siret-entreprise" placeholder="14 chiffres" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret-entreprise')">
           <div class="retour-siret" id="retour-r-siret-entreprise"></div>
         </div>
+
+
         <div id="pro-rcpro-block" class="bloc-complement" style="display:none">
+          <div class="titre-bloc-pro">Votre activité professionnelle</div>
           <!-- L'assurance d'abord : une case à cocher et deux champs qu'on
                remplit de mémoire. Le SIRET ferme la marche, là où l'abandon
                coûte le moins cher. -->
@@ -3023,20 +3068,7 @@ textarea { min-height: 92px; padding-top: 13px; }
           
         </div>
 
-        <div class="register-section-titre"><i data-lucide="user"></i>Vos coordonnées</div>
-        <div class="row2">
-          <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean" autocomplete="given-name"></div>
-          <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont" autocomplete="family-name"></div>
-        </div>
-        <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="re" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
-        <div class="champ-icone"><label>Téléphone</label><i data-lucide="phone"></i><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel"></div>
 
-        <div class="register-section-titre"><i data-lucide="lock"></i>Sécurité</div>
-        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"><button type="button" class="bascule-mdp" aria-label="Afficher ou masquer le mot de passe" onclick="basculerVisibiliteMdp('rpw',this)"><i data-lucide="eye"></i></button></div>
-        <div class="force-mdp" id="force-mdp-barres" style="display:none">
-          <div class="force-mdp-barre"></div><div class="force-mdp-barre"></div><div class="force-mdp-barre"></div>
-        </div>
-        <div class="force-mdp-texte" id="force-mdp-texte"></div>
 
         <label style="margin-top:20px">Code de parrainage <span class="optional">(optionnel)</span></label>
         <input type="text" id="r-code-parrainage" placeholder="Ex: MADY1234" style="text-transform:uppercase">
