@@ -2595,7 +2595,7 @@ textarea { min-height: 92px; padding-top: 13px; }
         <div id="entreprise-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
           <label style="margin-top:0">Raison sociale *</label>
           <input type="text" id="r-raison-sociale" placeholder="Ex: Dupont Nettoyage SARL">
-          <label>Numéro SIRET *</label>
+          <label>Numéro SIRET <span class="optional">(vous pourrez le renseigner plus tard)</span></label>
           <input type="text" id="r-siret-entreprise" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret-entreprise')">
           <div class="retour-siret" id="retour-r-siret-entreprise"></div>
           <label>Numéro de TVA intracommunautaire <span class="optional">(optionnel)</span></label>
@@ -2605,7 +2605,7 @@ textarea { min-height: 92px; padding-top: 13px; }
           <div style="font-size:12px;color:var(--gray);margin-top:8px">Cette adresse sert uniquement à la facturation — l'adresse d'intervention est précisée à chaque demande.</div>
         </div>
         <div id="pro-rcpro-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
-          <label style="margin-top:0">Numéro SIRET *</label>
+          <label style="margin-top:0">Numéro SIRET <span class="optional">(vous pourrez le renseigner plus tard)</span></label>
           <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Nécessaire pour vérifier votre statut légal d'indépendant ou d'entreprise.</div>
           <input type="text" id="r-siret" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret')">
           <div class="retour-siret" id="retour-r-siret"></div>
@@ -3511,7 +3511,8 @@ async function doRegister(){
   var assuranceCompagnie='',assurancePolice='',assuranceAtteste=false,siret='';
   if(userRole==='pro'){
     siret=document.getElementById('r-siret').value.replace(/\s/g,'').trim();
-    if(!/^\d{14}$/.test(siret))return showErr('rerr','SIRET invalide (14 chiffres attendus).');
+    // Facultatif à l'inscription : on ne contrôle le format que s'il est saisi.
+    if(siret&&!/^\d{14}$/.test(siret))return showErr('rerr','SIRET invalide (14 chiffres attendus). Vous pouvez aussi laisser le champ vide et le renseigner plus tard.');
     assuranceAtteste=document.getElementById('r-assurance-atteste').checked;
     if(!assuranceAtteste)return showErr('rerr','L\'attestation d\'assurance RC Pro est requise pour créer un compte professionnel.');
     assuranceCompagnie=document.getElementById('r-assurance-compagnie').value.trim();
@@ -3524,7 +3525,8 @@ async function doRegister(){
     tva=document.getElementById('r-tva').value.trim();
     adresseFacturation=document.getElementById('r-adresse-facturation').value.trim();
     if(!raisonSociale)return showErr('rerr','Raison sociale requise.');
-    if(!/^\d{14}$/.test(siret))return showErr('rerr','SIRET invalide (14 chiffres attendus).');
+    // Facultatif à l'inscription : on ne contrôle le format que s'il est saisi.
+    if(siret&&!/^\d{14}$/.test(siret))return showErr('rerr','SIRET invalide (14 chiffres attendus). Vous pouvez aussi laisser le champ vide et le renseigner plus tard.');
     if(!adresseFacturation)return showErr('rerr','Adresse de facturation requise.');
   }
   const btn=document.getElementById('register-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
@@ -4917,7 +4919,15 @@ async function chargerParcoursDemarrage(){
     paiementsPrets=connect.statut==='pret';
   }catch(e){}
 
+  // Les justificatifs passent en tête : c'est la seule étape qui conditionne
+  // l'envoi d'un devis, donc la seule qui empêche réellement de travailler.
+  var siretFourni=/^\d{14}$/.test(String(currentUser.siret||'').replace(/\s/g,''));
+  var assuranceFournie=!!currentUser.assurance_rc_pro;
+
   var etapes=[
+    { fait:siretFourni&&assuranceFournie, titre:'Fournir vos justificatifs',
+      pourquoi:'Numéro SIRET et attestation d\'assurance. Ils vous seront demandés avant votre premier devis — pas avant.',
+      action:'ouvrirJustificatifs()', bouton:'Renseigner', icone:'file-check' },
     { fait:zoneReglee, titre:'Définir votre zone d\'intervention',
       pourquoi:'Sans elle, vous recevez toutes les demandes du pays. Avec elle, uniquement celles que vous pouvez honorer.',
       action:'ouvrirZoneIntervention()', bouton:'Régler ma zone', icone:'map-pin' },
@@ -4939,7 +4949,7 @@ async function chargerParcoursDemarrage(){
       '<div>'+
         '<div class="parcours-titre">Terminez votre installation</div>'+
         '<div class="parcours-sous">'+faites+' étape'+(faites>1?'s':'')+' sur '+etapes.length+' — '+
-          (faites===0?'aucune demande ne vous parviendra tant que votre zone n\'est pas définie'
+          (faites===0?'commencez par ce que vous voulez — rien n\'est bloquant avant votre premier devis'
                      :'encore '+(etapes.length-faites)+' pour être pleinement opérationnel')+'</div>'+
       '</div>'+
       '<div class="parcours-jauge"><div style="width:'+Math.round(faites/etapes.length*100)+'%"></div></div>'+
@@ -5305,6 +5315,63 @@ async function chargerReputationPro(){
   }catch(e){ box.innerHTML=''; }
 }
 
+// Saisie des justificatifs après l'inscription. Même formulaire, même
+// vérification du SIRET en direct, mais au moment choisi par le prestataire.
+function ouvrirJustificatifs(){
+  var siret=String(currentUser&&currentUser.siret||'');
+  var assure=!!(currentUser&&currentUser.assurance_rc_pro);
+  document.getElementById('modal-body').innerHTML=
+    '<div class="modal-title">Vos justificatifs</div>'+
+    '<p style="font-size:13px;line-height:1.5;color:var(--text-secondary);margin-bottom:16px">'+
+      'Ces informations vous seront demandées avant votre premier devis. '+
+      'Vous pouvez les renseigner maintenant ou plus tard.'+
+    '</p>'+
+    '<div class="field-group"><label>Numéro SIRET</label>'+
+      '<input type="text" id="j-siret" inputmode="numeric" maxlength="20" '+
+        'placeholder="14 chiffres" value="'+escAttr(siret)+'">'+
+      '<div class="retour-siret" id="retour-j-siret"></div></div>'+
+    '<div class="field-group">'+
+      '<label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin-top:0">'+
+        '<input type="checkbox" id="j-assurance" style="width:auto;margin-top:3px"'+(assure?' checked':'')+'>'+
+        '<span style="font-size:13px;line-height:1.45;font-weight:600">J&#39;atteste disposer d&#39;une assurance '+
+        'responsabilité civile professionnelle en cours de validité</span>'+
+      '</label></div>'+
+    '<div class="field-group"><label>Compagnie <span class="optional">(facultatif)</span></label>'+
+      '<input type="text" id="j-compagnie" placeholder="Ex : AXA" value="'+escAttr(currentUser&&currentUser.assurance_compagnie||'')+'"></div>'+
+    '<div class="field-group"><label>N° de police <span class="optional">(facultatif)</span></label>'+
+      '<input type="text" id="j-police" placeholder="Ex : 1234567" value="'+escAttr(currentUser&&currentUser.assurance_police||'')+'"></div>'+
+    '<button class="modal-send-btn" onclick="enregistrerJustificatifs()">Enregistrer</button>';
+  document.getElementById('modal-overlay').classList.add('open');
+  // Écouteur attaché après insertion : plus lisible qu'un attribut inline,
+  // et surtout sans apostrophes à échapper dans une chaîne dans une chaîne.
+  var champSiret=document.getElementById('j-siret');
+  if(champSiret)champSiret.addEventListener('input',function(){verifierSiretEnDirect('j-siret')});
+}
+
+async function enregistrerJustificatifs(){
+  var siret=(document.getElementById('j-siret')||{}).value||'';
+  var corps={
+    siret:siret.replace(/\s/g,'').trim(),
+    assurance_rc_pro:!!(document.getElementById('j-assurance')||{}).checked,
+    assurance_compagnie:(document.getElementById('j-compagnie')||{}).value||'',
+    assurance_police:(document.getElementById('j-police')||{}).value||''
+  };
+  try{
+    const r=await fetch(API+'/api/societes/justificatifs',
+      {method:'PATCH',headers:authHeaders(),body:JSON.stringify(corps)});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d&&d.error||''));return}
+    // On tient currentUser à jour pour que le parcours se rafraîchisse sans rechargement.
+    currentUser.siret=corps.siret;
+    currentUser.assurance_rc_pro=corps.assurance_rc_pro;
+    currentUser.assurance_compagnie=corps.assurance_compagnie;
+    currentUser.assurance_police=corps.assurance_police;
+    document.getElementById('modal-overlay').classList.remove('open');
+    toast('Justificatifs enregistrés.');
+    chargerParcoursDemarrage();
+  }catch(e){ toast(friendlyNetworkError(e)) }
+}
+
 // Rappelle au prestataire ce qu'il a lui-même enregistré pour cette prestation.
 // Sans cela, il chiffre de mémoire ou quitte l'écran pour aller consulter sa
 // grille — et perd la demande de vue.
@@ -5365,6 +5432,16 @@ function basculerFormulaireDevis(id,prestation){
     if(prix)setTimeout(function(){prix.focus()},60);
   }
 }
+// Un devis refusé faute de justificatifs ne doit pas se solder par un message
+// d'erreur : le prestataire est à deux minutes de pouvoir répondre, il faut l'y
+// conduire, pas le renvoyer chercher tout seul.
+function traiterDevisRefuse(d){
+  if(!d||!Array.isArray(d.justificatifs_manquants)||!d.justificatifs_manquants.length)return false;
+  toast(d.error||'Justificatifs requis.');
+  setTimeout(ouvrirJustificatifs,900);
+  return true;
+}
+
 async function envoyerDevis(demandeId){
   var prixEl=document.getElementById('prix-'+demandeId);
   var prix=prixEl&&prixEl.value;
