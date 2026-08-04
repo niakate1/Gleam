@@ -99,6 +99,27 @@ button{font-family:inherit;cursor:pointer}
 .etiquette.refuse{background:#FDECEC;color:#C0392B}
 .etiquette.urgent{background:#FDECEC;color:#C0392B}
 
+.lien-tel{display:inline-block;margin-top:4px;font-size:13px;font-weight:700;
+  color:var(--p);text-decoration:none}
+.lien-tel:hover{text-decoration:underline}
+
+/* File d'attente : on doit savoir en permanence combien il reste, et la page
+   ne doit pas sauter après chaque décision. */
+.compteur-file{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 18px;margin-bottom:18px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r-md)}
+.compteur-file .reste{font-family:'Fraunces',Georgia,serif;font-size:15px;color:var(--text)}
+.compteur-file .reste strong{font-size:24px;font-weight:600;color:var(--p)}
+.compteur-file .indication{font-size:12.5px;color:var(--gray);text-align:right;line-height:1.4}
+
+.dossier.traite{opacity:0;transform:translateY(-8px);
+  transition:opacity .35s ease,transform .35s ease}
+
+.tout-traite{text-align:center;padding:44px 20px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r-md)}
+.tout-traite .titre{font-family:'Fraunces',Georgia,serif;font-size:19px;color:var(--text);margin-bottom:7px}
+.tout-traite .sous{font-size:13.5px;color:var(--gray);line-height:1.5}
+
 /* ── Connexion ─────────────────────────────────────────────────────────── */
 #ecran-connexion{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
   background:radial-gradient(ellipse 420px 340px at 92% -6%,rgba(245,197,66,.30),transparent 66%),
@@ -548,19 +569,35 @@ async function chargerDocuments() {
   if (pastille) pastille.textContent = d.en_attente ? String(d.en_attente) : '';
 
   if (!d.documents.length) {
-    c.innerHTML = '<p class="petit">' +
-      (filtreDocuments === 'en_attente' ? 'Aucun document en attente. Tout est à jour.' : 'Aucun document.') + '</p>';
+    c.innerHTML = filtreDocuments === 'en_attente'
+      ? '<div class="tout-traite"><div class="titre">Tout est vérifié</div>' +
+        '<div class="sous">Aucun document en attente. Les nouveaux dépôts apparaîtront ici, ' +
+        'et le nombre s\'affichera sur l\'onglet.</div></div>'
+      : '<p class="petit">Aucun document dans cette catégorie.</p>';
     return;
   }
 
-  c.innerHTML = d.documents.map((doc) => {
+  // Compteur permanent : on sait toujours combien il reste, et l'ordre est
+  // annoncé pour qu'on ne se demande pas pourquoi celui-ci vient en premier.
+  const entete = filtreDocuments === 'en_attente'
+    ? '<div class="compteur-file" id="compteur-file">' +
+        '<div class="reste"><strong>' + d.documents.length + '</strong> ' +
+          'document' + (d.documents.length > 1 ? 's' : '') + ' à vérifier</div>' +
+        '<div class="indication">Les plus anciens d\'abord.<br>Chaque décision passe au suivant.</div>' +
+      '</div>'
+    : '';
+
+  c.innerHTML = entete + d.documents.map((doc) => {
     const pro = doc.pro || {};
     const decidable = doc.statut === 'en_attente';
     return '<div class="dossier" id="dossier-' + doc.id + '">' +
       '<div class="entete">' +
         '<div><div class="qui">' + (pro.prenom || '') + ' ' + (pro.nom || '') + '</div>' +
           '<div class="quoi">' + doc.type_libelle + '</div>' +
-          '<div class="petit">' + (pro.email || '') + '</div></div>' +
+          '<div class="petit">' + (pro.email || '') + '</div>' +
+          // Un appel de trente secondes règle ce que trois refus n'ont pas réglé.
+          (pro.telephone ? '<a class="lien-tel" href="tel:' + pro.telephone + '">' +
+            pro.telephone + '</a>' : '') + '</div>' +
         '<div style="text-align:right"><div class="quand">' + ilYA(doc.created_at) + '</div>' +
           (decidable ? '' : '<div style="margin-top:6px"><span class="etiquette ' + doc.statut + '">' +
             (doc.statut === 'valide' ? 'Validé' : doc.statut === 'refuse' ? 'Refusé' : 'Expiré') + '</span></div>') +
@@ -637,9 +674,33 @@ async function decider(id, decision) {
     d = await appel('/api/admin/documents/' + id, { method: 'PATCH', body: JSON.stringify(corps) });
   } catch (e) { avis(e.message, 'erreur'); return; }
   avis(d.message);
+
+  // La carte s'efface, puis la page se place sur la suivante. Recharger toute
+  // la liste faisait sauter la page et perdre le fil : après trois décisions,
+  // on ne savait plus où l'on en était.
   const carte = $('dossier-' + id);
-  if (carte) carte.remove();
-  chargerDocuments();
+  const suivante = carte ? carte.nextElementSibling : null;
+  if (carte) {
+    carte.classList.add('traite');
+    setTimeout(() => {
+      carte.remove();
+      const restantes = document.querySelectorAll('#liste-documents .dossier').length;
+      const compteur = $('compteur-file');
+      if (!restantes) {
+        // Plus rien à traiter : on recharge pour afficher l'état de fin.
+        chargerDocuments();
+      } else {
+        if (compteur) compteur.querySelector('.reste').innerHTML =
+          '<strong>' + restantes + '</strong> document' + (restantes > 1 ? 's' : '') + ' à vérifier';
+        const pastille = $('compteur-documents');
+        if (pastille) pastille.textContent = String(restantes);
+        if (suivante && suivante.classList.contains('dossier'))
+          suivante.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 350);
+  } else {
+    chargerDocuments();
+  }
 }
 
 async function chargerExpirations() {
