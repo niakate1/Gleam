@@ -1550,6 +1550,34 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .pastille-profil:empty { display: none; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   40. CHOIX DU RÔLE À L'INSCRIPTION
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.groupe-role { margin-bottom: var(--gap-4); }
+.intitule-groupe {
+  font-size: 11.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--gray);
+  margin-bottom: 9px;
+}
+.role-select.une-colonne { grid-template-columns: 1fr; }
+
+/* Le bouton porte désormais un titre et une explication : la distinction ne
+   doit pas se deviner au vocabulaire. */
+.role-btn .titre-role {
+  display: block;
+  font-size: 14px; font-weight: 700; color: inherit;
+  margin-top: 6px;
+}
+.role-btn .detail-role {
+  display: block;
+  font-size: 11.5px; font-weight: 500; line-height: 1.35;
+  color: var(--gray);
+  margin-top: 3px;
+}
+.role-btn.sel .detail-role { color: var(--p2); }
+
+/* ────────────────────────────────────────────────────────────────────────────
    39. RÉCEPTION D'UN DEVIS, CÔTÉ CLIENT
    L'écran le plus important du parcours : celui où le client choisit, et où
    il paie. La hiérarchie suit sa lecture — qui propose, combien, que faire.
@@ -2788,11 +2816,39 @@ textarea { min-height: 92px; padding-top: 13px; }
         </div>
         <div class="force-mdp-texte" id="force-mdp-texte"></div>
 
-        <div class="register-section-titre"><i data-lucide="briefcase"></i>Votre profil</div>
-        <div class="role-select">
-          <button class="role-btn sel" id="role-client" onclick="setRole('client')"><i data-lucide="user"></i>Particulier</button>
-          <button class="role-btn" id="role-entreprise" onclick="setRole('entreprise')"><i data-lucide="building-2"></i>Entreprise</button>
-          <button class="role-btn" id="role-pro" onclick="setRole('pro')"><i data-lucide="wrench"></i>Prestataire</button>
+        <div class="register-section-titre"><i data-lucide="briefcase"></i>Que venez-vous faire sur Gleam ?</div>
+
+        <!-- Deux groupes séparés, avec la question écrite. Posés côte à côte sans
+             explication, « Entreprise » et « Prestataire » se lisaient comme
+             « entreprise de nettoyage » face à « indépendant » — alors qu'une
+             entreprise est ici un CLIENT qui commande pour ses locaux. Un artisan
+             en société cochait « Entreprise » et se retrouvait compte client,
+             sans jamais voir une seule demande. -->
+        <div class="groupe-role">
+          <div class="intitule-groupe">Je cherche un prestataire</div>
+          <div class="role-select">
+            <button class="role-btn sel" id="role-client" onclick="setRole('client')">
+              <i data-lucide="user"></i>
+              <span class="titre-role">Particulier</span>
+              <span class="detail-role">Pour mon domicile</span>
+            </button>
+            <button class="role-btn" id="role-entreprise" onclick="setRole('entreprise')">
+              <i data-lucide="building-2"></i>
+              <span class="titre-role">Entreprise</span>
+              <span class="detail-role">Pour mes locaux professionnels</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="groupe-role">
+          <div class="intitule-groupe">Je propose mes services</div>
+          <div class="role-select une-colonne">
+            <button class="role-btn" id="role-pro" onclick="setRole('pro')">
+              <i data-lucide="wrench"></i>
+              <span class="titre-role">Prestataire</span>
+              <span class="detail-role">Je réalise les prestations de nettoyage</span>
+            </button>
+          </div>
         </div>
         <div id="entreprise-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
           <label style="margin-top:0">Raison sociale *</label>
@@ -7532,7 +7588,7 @@ function buildDevisHtml(v){
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
     '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
     '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
-    '.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
+    '.mentions-legales{margin-top:22px;padding-top:16px;border-top:1px solid #E5E7EB}.mention-ligne{font-size:10.5px;line-height:1.5;color:#6B7280;margin-bottom:5px}.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
     '</style></head><body>'+
 
     '<div class="entete">'+
@@ -7629,7 +7685,7 @@ function buildFactureHtml(d,vuePro){
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
     '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
     '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
-    '.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
+    '.mentions-legales{margin-top:22px;padding-top:16px;border-top:1px solid #E5E7EB}.mention-ligne{font-size:10.5px;line-height:1.5;color:#6B7280;margin-bottom:5px}.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
     '</style></head><body>'+
 
     '<div class="entete">'+
@@ -7658,6 +7714,23 @@ function buildFactureHtml(d,vuePro){
 
     (!vuePro?'<div class="paiement-info"><span class="paiement-marque">Règlement</span><span>Carte bancaire via Stripe, à la validation de la prestation</span></div>':'')+
 
+    // Mentions obligatoires entre professionnels, absentes jusqu'ici :
+    //
+    //  · Franchise en base de TVA — article 293 B du CGI. Sans cette mention,
+    //    une facture sans TVA est irrégulière.
+    //  · Pénalités de retard et indemnité forfaitaire de 40 € — articles
+    //    L.441-10 et D.441-5 du Code de commerce. Obligatoires sur toute
+    //    facture entre professionnels.
+    //  · Date de la prestation, distincte de la date de facture.
+    '<div class="mentions-legales">'+
+      '<div class="mention-ligne">TVA non applicable, article 293 B du Code général des impôts.</div>'+
+      (estEntreprise
+        ? '<div class="mention-ligne">Paiement comptant à réception. En cas de retard, pénalités au taux de '+
+          'trois fois le taux d\'intérêt légal, et indemnité forfaitaire pour frais de recouvrement de 40 € '+
+          '(articles L.441-10 et D.441-5 du Code de commerce).</div>'
+        : '')+
+      '<div class="mention-ligne">Prestation réalisée le '+escapeHtml(d.creneau||d.date||'—')+'.</div>'+
+    '</div>'+
     '<div class="pied">'+
       '<p><strong>Catégorie :</strong> prestation de services — nettoyage à domicile.</p>'+
       '<p>Document généré automatiquement par la plateforme Gleam. TVA non applicable — article 293B du CGI, sauf mention contraire explicite du prestataire.</p>'+
