@@ -1044,17 +1044,23 @@ app.post('/api/demandes', auth, async (req, res) => {
     // applique désormais les mêmes règles que /api/demandes/all : un pro ne reçoit
     // un email que pour une demande qu'il verrait dans son application.
     //
-    // Volontairement sans await : la réponse au client ne doit pas attendre
-    // l'envoi des emails.
-    notifierProsPourDemande(data, 'nouvelle_demande')
-      .then((nb) => {
-        if (nb > 0) supabase.from('demandes')
-          .update({ notifiee_pros_le: new Date().toISOString() }).eq('id', data.id)
-          .then(() => {}, () => {});
-      })
-      .catch((e) => console.error('Notification création:', e.message));
+    // Attendu, cette fois. Les envois d'emails restent asynchrones à l'intérieur :
+    // seule la sélection des prestataires est attendue, soit deux requêtes.
+    // Ce court délai achète une information que le client n'avait pas — savoir
+    // si quelqu'un a seulement vu sa demande, au lieu de l'apprendre deux jours
+    // plus tard, ou jamais.
+    let envoi = { nb: 0, elargi: false };
+    try {
+      envoi = await notifierProsPourDemande(data, 'nouvelle_demande');
+      if (envoi.nb > 0) {
+        await supabase.from('demandes')
+          .update({ notifiee_pros_le: new Date().toISOString() }).eq('id', data.id);
+      }
+    } catch (e) {
+      console.error('Notification création:', e.message);
+    }
 
-    res.status(201).json(data);
+    res.status(201).json({ ...data, prestataires_prevenus: envoi.nb, zone_elargie: envoi.elargi });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
@@ -1140,6 +1146,11 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
 // ─────────────────────────────────────────────────────────────────────────────
 const PLAFOND_PROS_NOTIFIES = 25;
 
+// Plafond réduit lorsqu'on sort des zones déclarées. Prévenir vingt-cinq
+// prestataires d'une demande hors de leur secteur reviendrait à leur envoyer du
+// courrier indésirable ; dix, triés par proximité, reste une proposition.
+const PLAFOND_PROS_ELARGI = 10;
+
 // Plafond d'envois par passage du balayage. SendGrid facture au crédit et
 // l'offre gratuite s'arrête à 100 emails par jour : sans borne, un seul
 // balayage traitant 50 demandes × 25 prestataires pouvait tenter 1250 envois
@@ -1149,7 +1160,11 @@ const PLAFOND_PROS_NOTIFIES = 25;
 const PLAFOND_ENVOIS_PAR_PASSAGE = 40;
 let envoisCePassage = 0;
 
-async function prosConcernesParDemande(demande) {
+// options.elargir : lève le filtre de zone. Les prestations déclarées, elles,
+// restent respectées — proposer une toiture à quelqu'un qui ne fait que des
+// canapés n'aiderait personne, quelle que soit la distance.
+async function prosConcernesParDemande(demande, options) {
+  const elargir = !!(options && options.elargir);
   // ⚠️ Le filtre sur le type est INDISPENSABLE ici. La colonne `disponible` vaut
   // true par défaut pour TOUS les comptes, clients compris : sans ce filtre, la
   // requête remonte l'intégralité des utilisateurs, et des clients reçoivent des
@@ -1195,7 +1210,9 @@ async function prosConcernesParDemande(demande) {
   const estFavoriDesigne = !!demande.pro_prefere_id;
 
   retenus = retenus.map((pro) => {
-    const zoneReglee = !estFavoriDesigne
+    // En mode élargi, la zone n'est plus prise en compte : la distance reste
+    // calculée et affichée, mais elle ne sert plus qu'à trier.
+    const zoneReglee = !estFavoriDesigne && !elargir
       && typeof pro.latitude === 'number' && typeof pro.longitude === 'number'
       && typeof pro.rayon_intervention_km === 'number';
     if (!zoneReglee || typeof demande.latitude !== 'number' || typeof demande.longitude !== 'number') {
@@ -1206,17 +1223,33 @@ async function prosConcernesParDemande(demande) {
   }).filter((pro) => !pro.zoneReglee || pro.distance_km === null || pro.distance_km <= pro.rayon_intervention_km);
 
   retenus.sort((a, b) => (a.distance_km ?? 9999) - (b.distance_km ?? 9999));
-  return retenus.slice(0, PLAFOND_PROS_NOTIFIES);
+  return retenus.slice(0, elargir ? PLAFOND_PROS_ELARGI : PLAFOND_PROS_NOTIFIES);
 }
 
 // Envoie la notification correspondante. `gabarit` vaut 'nouvelle_demande' à la
 // création, ou 'demande_sans_devis_pro' pour la relance à 24 h.
-async function notifierProsPourDemande(demande, gabarit) {
+async function notifierProsPourDemande(demande, gabarit, options) {
   try {
-    const pros = await prosConcernesParDemande(demande);
+    const elargir = !!(options && options.elargir);
+    let pros = await prosConcernesParDemande(demande, { elargir });
+    let aElargi = elargir;
+
+    // Personne dans les zones déclarées : plutôt que de laisser la demande
+    // mourir sans qu'aucun prestataire ne l'ait vue, on relance une fois sans
+    // le filtre de zone. C'est le seul moyen qu'elle atteigne quelqu'un.
+    if (!pros.length && !elargir) {
+      pros = await prosConcernesParDemande(demande, { elargir: true });
+      aElargi = pros.length > 0;
+      if (aElargi) console.log('🔎 Aucun prestataire dans la zone — recherche élargie pour ' + demande.id);
+    }
+
     if (!pros.length) {
-      console.log('📭 Aucun prestataire ne correspond à la demande ' + demande.id);
-      return 0;
+      // Ni dans la zone, ni au-delà : aucun prestataire ne propose cette
+      // prestation, ou aucun n'est disponible. C'est un manque d'offre, pas
+      // un problème de rayon.
+      console.warn('📭 AUCUN prestataire pour la demande ' + demande.id +
+        ' (' + demande.prestation + ', ' + (demande.adresse || 'adresse inconnue') + ') — offre insuffisante.');
+      return { nb: 0, elargi: false };
     }
 
     const relance = gabarit === 'demande_sans_devis_pro';
@@ -1237,19 +1270,26 @@ async function notifierProsPourDemande(demande, gabarit) {
       }).catch((e) => console.error('Email ' + gabarit + ':', e.message));
 
       envoyerNotificationPush(pro.id, {
-        titre: relance ? 'Demande toujours sans devis' : 'Nouvelle demande disponible',
+        // Le titre annonce l'élargissement : recevoir une demande hors de sa
+        // zone sans explication ressemblerait à un défaut de filtrage.
+        titre: aElargi ? 'Demande hors de votre zone habituelle'
+                       : (relance ? 'Demande toujours sans devis' : 'Nouvelle demande disponible'),
         corps: demande.prestation + ' à ' + ville + (pro.distance_km !== null ? ' — ' + pro.distance_km + ' km' : ''),
         url: '/'
       }).catch(() => {});
     }
 
-    console.log('📨 ' + pros.length + ' prestataire(s) notifié(s) — ' + gabarit + ' — demande ' + demande.id);
-    return pros.length;
+    console.log('📨 ' + pros.length + ' prestataire(s) notifié(s)' + (aElargi ? ' [zone élargie]' : '') +
+      ' — ' + gabarit + ' — demande ' + demande.id);
+    // Un objet plutôt qu'un nombre : l'appelant a besoin de savoir non seulement
+    // combien de prestataires ont été prévenus, mais s'il a fallu sortir de leur
+    // zone pour y parvenir. Les deux informations se disent différemment au client.
+    return { nb: pros.length, elargi: aElargi };
   } catch (e) {
     // Une notification qui échoue ne doit jamais faire échouer la création
     // d'une demande ni interrompre le balayage.
     console.error('Notification prestataires:', e.message);
-    return 0;
+    return { nb: 0, elargi: false };
   }
 }
 
@@ -1282,7 +1322,10 @@ async function relancerDemandesSansDevis() {
         .select('id', { count: 'exact', head: true }).eq('demande_id', demande.id);
       if (count && count > 0) continue;   // un devis est arrivé entre-temps
 
-      await notifierProsPourDemande(demande, 'demande_sans_devis_pro');
+      // Élargissement d'office : si personne dans la zone n'a répondu en
+      // vingt-quatre heures, réinterroger exactement les mêmes n'apporterait
+      // rien. On sort du rayon, en restant plafonné à dix destinataires.
+      await notifierProsPourDemande(demande, 'demande_sans_devis_pro', { elargir: true });
       await supabase.from('demandes')
         .update({ relance_pro_le: new Date().toISOString() }).eq('id', demande.id);
     }
