@@ -838,11 +838,18 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     // dire tout de suite que de le laisser passer et le refuser au premier devis.
     if (isProType(type) && siret && !/^\d{14}$/.test(siret))
       return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus). Vous pouvez aussi laisser le champ vide et le renseigner plus tard.' });
-    if (type === 'entreprise') {
-      if (!raisonSociale) return res.status(400).json({ error: 'Raison sociale requise.' });
-      if (!/^\d{14}$/.test(siret)) return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus).' });
-      if (!adresseFacturation) return res.status(400).json({ error: 'Adresse de facturation requise.' });
-    }
+    // Rien n'est exigé d'une entreprise pour créer son compte, pas plus que d'un
+    // prestataire ou d'un particulier. Les informations de facturation sont
+    // demandées avant le premier paiement — voir facturationManquante().
+    //
+    // Un gérant qui découvre Gleam ne connaît pas encore son besoin. Lui demander
+    // trois champs administratifs avant qu'il ait vu un seul prix, c'est le perdre
+    // pour une information dont on n'aura peut-être jamais besoin.
+    //
+    // Le format du SIRET reste contrôlé s'il est saisi : mieux vaut signaler une
+    // faute de frappe tout de suite que la découvrir au moment de payer.
+    if (type === 'entreprise' && siret && !/^\d{14}$/.test(siret))
+      return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus). Vous pouvez aussi laisser le champ vide et le renseigner plus tard.' });
 
     // Vérifie le code de parrainage éventuellement saisi (silencieusement ignoré s'il est invalide,
     // pour ne jamais bloquer une inscription à cause d'une faute de frappe sur ce champ optionnel)
@@ -2994,9 +3001,75 @@ app.get('/api/paiements/connect/statut', auth, async (req, res) => {
   }
 });
 
+// Ce qu'une entreprise doit avoir renseigné avant son premier paiement. Ce sont
+// les mentions que portera sa facture — et depuis le décret 2022-1299, le SIREN
+// du client devient une mention obligatoire des factures entre professionnels.
+//
+// Un particulier n'est pas concerné : sa facture n'a pas à porter ces éléments.
+function facturationManquante(user) {
+  if (!user || user.type !== 'entreprise') return [];
+  const manquants = [];
+  if (!String(user.raison_sociale || '').trim()) manquants.push('raison_sociale');
+  if (!/^\d{14}$/.test(String(user.siret || '').replace(/\s/g, ''))) manquants.push('siret');
+  if (!String(user.adresse_facturation || '').trim()) manquants.push('adresse_facturation');
+  return manquants;
+}
+
+// Compléter ses informations de facturation après l'inscription.
+app.patch('/api/entreprises/facturation', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (!user || user.type !== 'entreprise')
+      return res.status(403).json({ error: 'Réservé aux comptes entreprise.' });
+
+    const misAJour = {};
+    if (req.body.siret !== undefined) {
+      const siret = String(req.body.siret || '').replace(/\s/g, '').trim();
+      if (siret && !/^\d{14}$/.test(siret))
+        return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus).' });
+      misAJour.siret = siret || null;
+    }
+    if (req.body.raison_sociale !== undefined)
+      misAJour.raison_sociale = String(req.body.raison_sociale || '').trim() || null;
+    if (req.body.adresse_facturation !== undefined)
+      misAJour.adresse_facturation = String(req.body.adresse_facturation || '').trim() || null;
+    if (req.body.tva_intracom !== undefined)
+      misAJour.tva_intracom = String(req.body.tva_intracom || '').trim() || null;
+
+    if (!Object.keys(misAJour).length)
+      return res.status(400).json({ error: 'Aucune information à enregistrer.' });
+
+    const { error } = await supabase.from('users').update(misAJour).eq('id', req.user.id);
+    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+
+    // Sans await : la réponse ne doit pas attendre un service extérieur.
+    if (misAJour.siret) enregistrerVerificationSiret(req.user.id, misAJour.siret).catch(() => {});
+
+    const { data: apres } = await supabase.from('users')
+      .select('type, raison_sociale, siret, adresse_facturation').eq('id', req.user.id).single();
+    res.json({ message: 'Informations de facturation enregistrées.',
+               facturation_manquante: facturationManquante(apres) });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 app.post('/api/paiements/intent', auth, async (req, res) => {
   try {
     const { devis_id } = req.body;
+
+    // Contrôle des informations de facturation. C'est le paiement qui déclenche
+    // la facture : c'est donc ici, et nulle part avant, que ces informations
+    // deviennent nécessaires.
+    const { data: payeur } = await supabase.from('users')
+      .select('type, raison_sociale, siret, adresse_facturation').eq('id', req.user.id).single();
+    const manquantes = facturationManquante(payeur);
+    if (manquantes.length) {
+      return res.status(403).json({
+        error: 'Avant votre premier paiement, complétez vos informations de facturation.',
+        facturation_manquante: manquantes
+      });
+    }
     if (!devis_id) return res.status(400).json({ error: 'Devis requis.' });
 
     const { data: devis } = await supabase.from('devis').select('*').eq('id', devis_id).single();
