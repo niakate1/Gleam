@@ -2851,14 +2851,14 @@ textarea { min-height: 92px; padding-top: 13px; }
           </div>
         </div>
         <div id="entreprise-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
-          <label style="margin-top:0">Raison sociale *</label>
+          <label style="margin-top:0">Raison sociale <span class="optional">(vous pourrez la renseigner plus tard)</span></label>
           <input type="text" id="r-raison-sociale" placeholder="Ex: Dupont Nettoyage SARL">
           <label>Numéro SIRET <span class="optional">(vous pourrez le renseigner plus tard)</span></label>
           <input type="text" id="r-siret-entreprise" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret-entreprise')">
           <div class="retour-siret" id="retour-r-siret-entreprise"></div>
           <label>Numéro de TVA intracommunautaire <span class="optional">(optionnel)</span></label>
           <input type="text" id="r-tva" placeholder="Ex: FR12345678901">
-          <label>Adresse de facturation *</label>
+          <label>Adresse de facturation <span class="optional">(vous pourrez la renseigner plus tard)</span></label>
           <input type="text" id="r-adresse-facturation" placeholder="12 rue de la Paix, 75001 Paris">
           <div style="font-size:12px;color:var(--gray);margin-top:8px">Cette adresse sert uniquement à la facturation — l'adresse d'intervention est précisée à chaque demande.</div>
         </div>
@@ -3169,6 +3169,7 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="profile-section-titre">Compte</div>
     <div class="profile-menu">
       <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon" style="background:rgba(245,185,66,.15);color:var(--gold)"><i data-lucide="mail-check" style="width:18px;height:18px"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" id="item-facturation" style="display:none" onclick="ouvrirFacturation()"><span class="pi-icon"><i data-lucide="receipt" style="width:18px;height:18px"></i></span><span class="pi-text">Informations de facturation</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:18px;height:18px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
     </div>
 
@@ -3780,10 +3781,10 @@ async function doRegister(){
     siret=document.getElementById('r-siret-entreprise').value.replace(/\s/g,'').trim();
     tva=document.getElementById('r-tva').value.trim();
     adresseFacturation=document.getElementById('r-adresse-facturation').value.trim();
-    if(!raisonSociale)return showErr('rerr','Raison sociale requise.');
+    // Facultatifs à l'inscription : demandés avant le premier paiement.
     // Facultatif à l'inscription : on ne contrôle le format que s'il est saisi.
     if(siret&&!/^\d{14}$/.test(siret))return showErr('rerr','SIRET invalide (14 chiffres attendus). Vous pouvez aussi laisser le champ vide et le renseigner plus tard.');
-    if(!adresseFacturation)return showErr('rerr','Adresse de facturation requise.');
+
   }
   const btn=document.getElementById('register-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
@@ -3836,6 +3837,10 @@ function enterApp(){
     var itemConfirmerEmailC=document.getElementById('item-confirmer-email-client');
     if(itemConfirmerEmailC)itemConfirmerEmailC.style.display=(currentUser&&currentUser.email_verifie===false)?'flex':'none';
     majAffichageNotifications();
+    // L'entrée n'apparaît que pour les comptes entreprise : un particulier n'a
+    // aucune information de facturation à renseigner.
+    var itemFact=document.getElementById('item-facturation');
+    if(itemFact)itemFact.style.display=(currentUser&&currentUser.type==='entreprise')?'':'none';
     renderProfileAvatar('profile-avatar-inner',currentUser&&currentUser.photo,'👤');
     renderNoteGlobale('profile-note',currentUser&&currentUser.note_moyenne);
     // La grille de l'accueil doit reprendre la sélection faite avant connexion,
@@ -5619,6 +5624,97 @@ async function chargerReputationPro(){
 
 // Saisie des justificatifs après l'inscription. Même formulaire, même
 // vérification du SIRET en direct, mais au moment choisi par le prestataire.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INFORMATIONS DE FACTURATION D'UNE ENTREPRISE
+//
+// Demandées avant le premier paiement, jamais à l'inscription. C'est le paiement
+// qui déclenche la facture, et ces informations sont ce que la facture portera —
+// le SIREN du client étant devenu une mention obligatoire entre professionnels.
+// ─────────────────────────────────────────────────────────────────────────────
+function ouvrirFacturation(){
+  var u=currentUser||{};
+  document.getElementById('modal-body').innerHTML=
+    '<div class="modal-title">Vos informations de facturation</div>'+
+    '<p style="font-size:13px;line-height:1.5;color:var(--text-secondary);margin-bottom:16px">'+
+      'Elles figureront sur votre facture. Saisissez votre SIRET&nbsp;: le reste se remplit tout seul.'+
+    '</p>'+
+    '<div class="field-group"><label>Numéro SIRET</label>'+
+      '<input type="text" id="f-siret" inputmode="numeric" maxlength="20" placeholder="14 chiffres" '+
+        'value="'+escAttr(u.siret||'')+'">'+
+      '<div class="retour-siret" id="retour-f-siret"></div></div>'+
+    '<div class="field-group"><label>Raison sociale</label>'+
+      '<input type="text" id="f-raison" placeholder="Nom de votre société" value="'+escAttr(u.raison_sociale||'')+'"></div>'+
+    '<div class="field-group"><label>Adresse de facturation</label>'+
+      '<input type="text" id="f-adresse" placeholder="Numéro, rue, code postal, ville" value="'+escAttr(u.adresse_facturation||'')+'"></div>'+
+    '<div class="field-group"><label>N° de TVA intracommunautaire <span class="optional">(facultatif)</span></label>'+
+      '<input type="text" id="f-tva" placeholder="FR12345678901" value="'+escAttr(u.tva_intracom||'')+'"></div>'+
+    '<button class="modal-send-btn" onclick="enregistrerFacturation()">Enregistrer</button>';
+  document.getElementById('modal-overlay').classList.add('open');
+
+  // Écouteur attaché après insertion, et remplissage automatique de la raison
+  // sociale comme de l'adresse : le gérant saisit quatorze chiffres, le reste
+  // arrive du répertoire officiel. Ce qu'il a déjà écrit n'est jamais écrasé.
+  var champ=document.getElementById('f-siret');
+  if(champ)champ.addEventListener('input',function(){
+    verifierSiretEnDirect('f-siret');
+    remplirDepuisRepertoire();
+  });
+}
+
+var minuteurRemplissage=null;
+function remplirDepuisRepertoire(){
+  clearTimeout(minuteurRemplissage);
+  minuteurRemplissage=setTimeout(async function(){
+    var siret=(document.getElementById('f-siret')||{}).value||'';
+    siret=siret.replace(/[^0-9]/g,'');
+    if(siret.length!==14)return;
+    try{
+      const r=await fetch(API+'/api/verification/siret?siret='+encodeURIComponent(siret));
+      const d=await safeJson(r);
+      if(!d||d.statut!=='verifie')return;
+      var raison=document.getElementById('f-raison');
+      if(raison&&!raison.value.trim()&&d.nom)raison.value=d.nom;
+      var adresse=document.getElementById('f-adresse');
+      if(adresse&&!adresse.value.trim()&&d.commune)adresse.value=d.commune;
+    }catch(e){}
+  },700);
+}
+
+async function enregistrerFacturation(){
+  var corps={
+    siret:((document.getElementById('f-siret')||{}).value||'').replace(/\s/g,'').trim(),
+    raison_sociale:(document.getElementById('f-raison')||{}).value||'',
+    adresse_facturation:(document.getElementById('f-adresse')||{}).value||'',
+    tva_intracom:(document.getElementById('f-tva')||{}).value||''
+  };
+  try{
+    const r=await fetch(API+'/api/entreprises/facturation',
+      {method:'PATCH',headers:authHeaders(),body:JSON.stringify(corps)});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d&&d.error||''));return}
+    currentUser.siret=corps.siret;
+    currentUser.raison_sociale=corps.raison_sociale;
+    currentUser.adresse_facturation=corps.adresse_facturation;
+    currentUser.tva_intracom=corps.tva_intracom;
+    document.getElementById('modal-overlay').classList.remove('open');
+    if(d.facturation_manquante&&d.facturation_manquante.length){
+      toast('Enregistré. Il manque encore : '+d.facturation_manquante.join(', ').replace(/_/g,' ')+'.');
+    }else{
+      toast('Informations de facturation enregistrées.');
+    }
+  }catch(e){ toast(friendlyNetworkError(e)) }
+}
+
+// Un paiement refusé faute d'informations de facturation ne doit pas se solder
+// par un message d'erreur : le gérant est à un SIRET près de pouvoir payer.
+function traiterPaiementRefuse(d){
+  if(!d||!Array.isArray(d.facturation_manquante)||!d.facturation_manquante.length)return false;
+  toast(d.error||'Informations de facturation requises.');
+  setTimeout(ouvrirFacturation,900);
+  return true;
+}
+
 function ouvrirJustificatifs(){
   var siret=String(currentUser&&currentUser.siret||'');
   var assure=!!(currentUser&&currentUser.assurance_rc_pro);
