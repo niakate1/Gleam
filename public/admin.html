@@ -101,6 +101,41 @@ button{font-family:inherit;cursor:pointer}
 
 .lien-tel{display:inline-block;margin-top:4px;font-size:13px;font-weight:700;
   color:var(--p);text-decoration:none}
+.rappel-legal{background:var(--surface);border-left:3px solid var(--p);border-radius:var(--r-sm);
+  padding:16px 18px;margin-bottom:20px;font-size:13px;line-height:1.6;color:var(--text-secondary)}
+.rappel-legal strong{color:var(--text)}
+
+.choix-annee{display:flex;gap:8px;margin-bottom:20px}
+.choix-annee button{padding:8px 18px;border:1px solid var(--border);background:var(--surface);
+  border-radius:999px;font-family:inherit;font-size:13px;font-weight:700;color:var(--text-secondary);cursor:pointer}
+.choix-annee button.actif{background:var(--p);border-color:var(--p);color:#fff}
+
+.totaux-declaration{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+  background:var(--border);border:1px solid var(--border);border-radius:var(--r-md);
+  overflow:hidden;margin-bottom:20px}
+.totaux-declaration > div{background:var(--surface);padding:15px 17px}
+.totaux-declaration .v{font-family:'Fraunces',Georgia,serif;font-size:23px;font-weight:600;
+  line-height:1.05;font-variant-numeric:tabular-nums;color:var(--text)}
+.totaux-declaration .v.manque{color:#C0392B}
+.totaux-declaration .e{font-size:12px;font-weight:700;color:var(--gray);margin-top:5px;line-height:1.35}
+
+.ligne-declaration{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:16px 18px;margin-bottom:12px}
+.ligne-declaration.incomplete{border-color:#F0B27A}
+.ligne-declaration .tete{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px}
+.ligne-declaration .qui{font-size:15px;font-weight:800;color:var(--text)}
+.ligne-declaration .ident{font-size:12.5px;color:var(--gray);margin-top:3px;line-height:1.5}
+.ligne-declaration .net{font-family:'Fraunces',Georgia,serif;font-size:21px;font-weight:600;
+  color:var(--p);font-variant-numeric:tabular-nums;white-space:nowrap}
+.trimestres{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);
+  border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden}
+.trimestres > div{background:var(--surface-alt);padding:9px;text-align:center}
+.trimestres .t{font-size:11px;font-weight:800;color:var(--gray);letter-spacing:.05em}
+.trimestres .m{font-size:14px;font-weight:700;color:var(--text);margin-top:3px;font-variant-numeric:tabular-nums}
+.manque-siret{margin-top:10px;padding:9px 12px;border-radius:8px;background:#FEF3E2;
+  color:#9A6412;font-size:12.5px;font-weight:700}
+.bouton-export{padding:11px 20px;border:none;border-radius:var(--r-sm);background:var(--p);
+  color:#fff;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;margin-bottom:20px}
 .alerte-siret{margin-top:6px;padding:6px 10px;border-radius:8px;background:#FEF3E2;
   color:#9A6412;font-size:12px;font-weight:700}
 
@@ -275,6 +310,7 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
       <button class="onglet actif" data-vue="chiffres">Chiffres</button>
       <button class="onglet" data-vue="signalements">Signalements</button>
       <button class="onglet" data-vue="documents">Documents<span class="pastille" id="compteur-documents"></span></button>
+      <button class="onglet" data-vue="declaration">Déclaration</button>
       <button class="onglet" data-vue="comptes">Comptes</button>
     </div>
 
@@ -308,6 +344,22 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
         <button class="sous-onglet" data-filtre="valide">Validés</button>
       </div>
       <div id="liste-documents"></div>
+    </section>
+
+    <section id="vue-declaration" class="masque">
+      <div class="titre-section">Déclaration annuelle des revenus des prestataires</div>
+      <div class="rappel-legal">
+        <strong>Dispositif DPI-DAC7</strong> — directive (UE) 2021/514, articles 1649 ter A à 1649 ter E du CGI.
+        En vigueur depuis le 1<sup>er</sup> janvier 2023. Gleam est concerné : le texte vise les plateformes
+        de mise en relation qui perçoivent également le paiement.
+        <br><br>
+        Ces données sont à déposer auprès de la DGFiP <strong>avant le 31 janvier</strong> de l'année suivante,
+        au format XML normalisé. L'article 242 bis du CGI impose en outre d'adresser à chaque prestataire
+        un récapitulatif annuel de ses opérations, dans le même délai.
+      </div>
+      <div class="choix-annee" id="choix-annee"></div>
+      <div id="totaux-declaration"></div>
+      <div id="liste-declaration"></div>
     </section>
 
     <section id="vue-comptes" class="masque">
@@ -652,6 +704,98 @@ async function chargerDiagnostic() {
     : '<p class="petit">Aucune demande enregistrée.</p>';
 }
 
+
+// ── Déclaration annuelle DPI-DAC7 ───────────────────────────────────────────
+//
+// Les agrégats attendus par la DGFiP : par prestataire, le nombre d'opérations,
+// les revenus par trimestre, et les commissions prélevées. L'export CSV permet
+// à un comptable ou à un prestataire spécialisé de produire le fichier XML
+// normalisé, que cette page ne génère pas.
+
+let anneeDeclaration = new Date().getFullYear() - 1;
+
+// euros() est déjà déclarée plus haut dans ce fichier : on la réutilise plutôt
+// que d'en créer une seconde qui finirait par diverger.
+
+async function chargerDeclaration() {
+  const annees = [];
+  for (let a = new Date().getFullYear(); a >= 2026; a--) annees.push(a);
+  $('choix-annee').innerHTML = annees.map((a) =>
+    '<button data-annee="' + a + '"' + (a === anneeDeclaration ? ' class="actif"' : '') + '>' + a + '</button>').join('');
+  $('choix-annee').querySelectorAll('button').forEach((b) => {
+    b.onclick = () => { anneeDeclaration = parseInt(b.dataset.annee, 10); chargerDeclaration(); };
+  });
+
+  let d;
+  try { d = await appel('/api/admin/declaration-annuelle?annee=' + anneeDeclaration); }
+  catch (e) { $('liste-declaration').innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+
+  const t = d.totaux;
+  $('totaux-declaration').innerHTML = '<div class="totaux-declaration">' +
+    '<div><div class="v">' + t.nb_prestataires + '</div><div class="e">Prestataires à déclarer</div></div>' +
+    '<div><div class="v">' + t.nb_operations + '</div><div class="e">Opérations</div></div>' +
+    '<div><div class="v">' + euros(t.revenu_net) + '</div><div class="e">Revenus nets versés</div></div>' +
+    '<div><div class="v">' + euros(t.commission_prelevee) + '</div><div class="e">Commissions prélevées</div></div>' +
+    // Un prestataire sans SIRET ne peut pas être déclaré : c'est son identifiant
+    // fiscal. Mieux vaut le découvrir en octobre qu'un 30 janvier.
+    '<div><div class="v' + (t.sans_siret ? ' manque' : '') + '">' + t.sans_siret + '</div>' +
+      '<div class="e">Sans SIRET — non déclarables</div></div>' +
+  '</div>' +
+  '<div class="petit" style="margin-bottom:16px">Échéance de dépôt : <strong>' + d.echeance + '</strong>.</div>' +
+  (t.nb_prestataires ? '<button class="bouton-export" id="btn-export">Exporter en CSV</button>' : '');
+
+  if (t.nb_prestataires) $('btn-export').onclick = () => exporterDeclaration(d);
+
+  $('liste-declaration').innerHTML = d.prestataires.length
+    ? d.prestataires.map((p) =>
+      '<div class="ligne-declaration' + (p.declarable ? '' : ' incomplete') + '">' +
+        '<div class="tete">' +
+          '<div><div class="qui">' + echapper(p.nom_officiel || p.nom) + '</div>' +
+            '<div class="ident">' + echapper(p.email) +
+              (p.siret ? '<br>SIRET ' + echapper(p.siret) : '') +
+              (p.telephone ? '<br>' + echapper(p.telephone) : '') +
+              '<br>' + p.nb_operations + ' opération' + (p.nb_operations > 1 ? 's' : '') +
+              ' · brut ' + euros(p.revenu_brut) + ' · commission ' + euros(p.commission_prelevee) +
+            '</div></div>' +
+          '<div class="net">' + euros(p.revenu_net) + '</div>' +
+        '</div>' +
+        '<div class="trimestres">' +
+          ['T1', 'T2', 'T3', 'T4'].map((q) =>
+            '<div><div class="t">' + q + '</div><div class="m">' + euros(p.trimestres[q]) + '</div></div>').join('') +
+        '</div>' +
+        (p.declarable ? '' :
+          '<div class="manque-siret">Aucun SIRET renseigné — ce prestataire ne peut pas être déclaré. ' +
+          'À réclamer avant l\'échéance.</div>') +
+      '</div>').join('')
+    : '<p class="petit">Aucun paiement encaissé sur ' + d.annee + '.</p>';
+}
+
+// Séparateur point-virgule et BOM : c'est ce qu'attend Excel en configuration
+// française. Sans le BOM, les accents ressortent illisibles.
+function exporterDeclaration(d) {
+  const lignes = [
+    ['Nom declare', 'Nom officiel repertoire', 'Email', 'Telephone', 'SIRET', 'Adresse',
+     'Nb operations', 'Revenu brut', 'Commission prelevee', 'Revenu net',
+     'T1', 'T2', 'T3', 'T4', 'Declarable']
+  ];
+  d.prestataires.forEach((p) => lignes.push([
+    p.nom, p.nom_officiel || '', p.email, p.telephone || '', p.siret || '', p.adresse || '',
+    p.nb_operations, p.revenu_brut, p.commission_prelevee, p.revenu_net,
+    p.trimestres.T1, p.trimestres.T2, p.trimestres.T3, p.trimestres.T4,
+    p.declarable ? 'oui' : 'NON'
+  ]));
+
+  const csv = '\ufeff' + lignes.map((l) =>
+    l.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+
+  const lien = document.createElement('a');
+  lien.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  lien.download = 'gleam-declaration-' + d.annee + '.csv';
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+  avis('Export téléchargé.');
+}
+
 // ── Documents : file d'attente et décisions ─────────────────────────────────
 
 let filtreDocuments = 'en_attente';
@@ -876,11 +1020,12 @@ async function chargerExpirations() {
 document.querySelectorAll('.onglet').forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll('.onglet').forEach((x) => x.classList.toggle('actif', x === b));
-    ['chiffres', 'signalements', 'documents', 'comptes'].forEach((v) =>
+    ['chiffres', 'signalements', 'documents', 'declaration', 'comptes'].forEach((v) =>
       $('vue-' + v).classList.toggle('masque', v !== b.dataset.vue));
     if (b.dataset.vue === 'chiffres') { chargerChiffres(); chargerDiagnostic(); }
     if (b.dataset.vue === 'signalements') chargerSignalements();
     if (b.dataset.vue === 'documents') chargerDocuments();
+    if (b.dataset.vue === 'declaration') chargerDeclaration();
     if (b.dataset.vue === 'comptes') chargerComptes($('recherche').value.trim());
   };
 });
