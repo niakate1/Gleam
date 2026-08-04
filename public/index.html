@@ -1518,21 +1518,135 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   39. RÉCEPTION D'UN DEVIS, CÔTÉ CLIENT
+   L'écran le plus important du parcours : celui où le client choisit, et où
+   il paie. La hiérarchie suit sa lecture — qui propose, combien, que faire.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.carte-devis-recu .tete-devis {
+  display: flex; align-items: center; gap: var(--gap-3);
+  margin-bottom: var(--gap-3);
+}
+.carte-devis-recu .identite-devis { flex: 1; min-width: 0; }
+.carte-devis-recu .nom-pro { font-size: 15px; font-weight: 700; color: var(--text); }
+.carte-devis-recu .note-pro { font-size: 12px; font-weight: 700; color: var(--gold); margin-top: 2px; }
+
+/* Repères de comparaison : ils ne s'affichent que si plusieurs devis
+   coexistent pour la même demande. */
+.reperes-devis { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--gap-3); }
+.repere-devis {
+  font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 4px 10px; border-radius: var(--r-pill);
+}
+.repere-devis.eco  { background: var(--green-clair); color: var(--green); }
+.repere-devis.note { background: var(--amber-clair); color: var(--amber); }
+
+.carte-devis-recu .prestation-devis {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--gray);
+  text-transform: capitalize;
+}
+.carte-devis-recu .prestation-devis i,
+.carte-devis-recu .prestation-devis svg { width: 15px; height: 15px; }
+
+/* Le montant est l'information centrale : même police de titre que les autres
+   chiffres importants de l'application. */
+.carte-devis-recu .montant-devis {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 48;
+  font-size: 32px; font-weight: 600; line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--p);
+  margin: 10px 0 4px;
+}
+.carte-devis-recu .mention-ttc {
+  display: block;
+  /* La variable --police-texte n'existe pas : sans nom explicite, la mention
+     héritait du Fraunces du montant et prenait un air de titre. */
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-variation-settings: normal;
+  font-size: 11.5px; font-weight: 600; color: var(--gray);
+  margin-top: 3px; letter-spacing: 0;
+}
+
+/* Le message du prestataire, détaché : c'est sa voix, pas celle de Gleam. */
+.carte-devis-recu .mot-du-pro {
+  font-size: 13.5px; line-height: 1.5; color: var(--text-secondary);
+  background: var(--surface-alt);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+  margin-top: var(--gap-3);
+}
+
+.btn-principal-devis {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 15px;
+  margin-top: var(--gap-3);
+  background: var(--p); color: #fff;
+  border: none; border-radius: var(--r-md);
+  font-family: inherit; font-size: 15px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) var(--ease-out);
+}
+.btn-principal-devis:hover { box-shadow: var(--shadow-md); }
+.btn-principal-devis:active { transform: scale(.98); }
+.btn-principal-devis.paiement { background: var(--green); }
+.btn-principal-devis i, .btn-principal-devis svg { width: 17px; height: 17px; }
+
+.btn-secondaire-devis {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; padding: 13px;
+  margin-top: 8px;
+  background: none; color: var(--text-secondary);
+  border: 1.5px solid var(--border); border-radius: var(--r-md);
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.btn-secondaire-devis:hover { border-color: var(--border-fort); color: var(--text); }
+
+/* Refuser est sans retour possible : le bouton reste volontairement effacé,
+   assez visible pour être trouvé, jamais assez pour être cliqué par réflexe. */
+.btn-discret-devis {
+  display: block; width: 100%; padding: 11px;
+  margin-top: 6px;
+  background: none; border: none;
+  color: var(--gray);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.btn-discret-devis:hover { color: var(--red); }
+.btn-secondaire-devis i, .btn-secondaire-devis svg { width: 16px; height: 16px; }
+
+/* ────────────────────────────────────────────────────────────────────────────
    38. DOCUMENTS DU PRESTATAIRE
    ──────────────────────────────────────────────────────────────────────────── */
 
 .carte-document {
-  display: flex; align-items: center; gap: var(--gap-3);
-  padding: var(--gap-3) var(--gap-4);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  padding: var(--gap-3) var(--gap-4);
   margin-bottom: 10px;
+}
+.carte-document > .nom { font-size: 14px; font-weight: 700; color: var(--text); }
+.carte-document.multi > .nom { margin-bottom: 4px; }
+.mention-faces { font-size: 11.5px; font-weight: 600; color: var(--gray); }
+
+/* Une ligne par face. Sur un document à une seule face, elle se confond avec
+   la carte : aucune différence visible pour les attestations. */
+.face-document {
+  display: flex; align-items: center; gap: var(--gap-3);
+  padding-top: 8px;
   transition: opacity var(--dur-base) var(--ease-out);
 }
-.carte-document.en-cours { opacity: .5; pointer-events: none; }
-.carte-document .tete { flex: 1; min-width: 0; }
-.carte-document .nom { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+.face-document.en-cours { opacity: .5; pointer-events: none; }
+.carte-document.multi .face-document + .face-document {
+  border-top: 1px solid var(--border);
+  margin-top: 8px; padding-top: 12px;
+}
+.face-document .tete { flex: 1; min-width: 0; }
+.nom-face { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
 
 .etat-document {
   display: inline-block;
@@ -2830,7 +2944,6 @@ textarea { min-height: 92px; padding-top: 13px; }
                 onclick="event.stopPropagation();toggleNotificationsPush()"></button>
       </div>
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="configurerPaiementsPro()"><span class="pi-icon"><i data-lucide="landmark" style="width:20px;height:20px"></i></span><span class="pi-text">Configurer mes paiements</span><span class="pi-arrow" id="connect-statut-badge"></span></div>
       <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="ouvrirDocumentsPro()"><span class="pi-icon"><i data-lucide="file-check" style="width:20px;height:20px"></i></span><span class="pi-text">Mes documents</span><span class="pi-arrow">›</span></div>
@@ -2948,7 +3061,6 @@ textarea { min-height: 92px; padding-top: 13px; }
 
     <div class="profile-section-titre">Mon activité</div>
     <div class="profile-menu">
-      <div class="profile-item" onclick="goTab('home')"><span class="pi-icon"><i data-lucide="clipboard-list" style="width:18px;height:18px"></i></span><span class="pi-text">Mes demandes</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="showMesFavoris()"><span class="pi-icon"><i data-lucide="star" style="width:18px;height:18px"></i></span><span class="pi-text">Mes favoris</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="showMesAvis()"><span class="pi-icon"><i data-lucide="message-square" style="width:18px;height:18px"></i></span><span class="pi-text">Mes avis</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:18px;height:18px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
@@ -2958,7 +3070,6 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="profile-menu">
       <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon" style="background:rgba(245,185,66,.15);color:var(--gold)"><i data-lucide="mail-check" style="width:18px;height:18px"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:18px;height:18px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
-      <div class="profile-item" onclick="comingSoon('Sécurité')"><span class="pi-icon"><i data-lucide="lock" style="width:18px;height:18px"></i></span><span class="pi-text">Sécurité</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
     </div>
 
     <div class="profile-section-titre">Support &amp; légal</div>
@@ -4317,6 +4428,30 @@ function renderDevisClientCards(){
   var filtered=parOnglet.filter(function(v){return devisClientMatchesFilter(v,devisClientFilterActive)});
   if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span>🔍</span><p>Aucun devis dans cette catégorie.</p></div>';return}
 
+  // Repères de comparaison, calculés une seule fois. Uniquement lorsqu'une même
+  // demande a reçu plusieurs devis encore en attente : sur un devis unique, dire
+  // qu'il est « le moins cher » n'aurait aucun sens.
+  var reperesParDemande={};
+  var enAttenteParDemande={};
+  filtered.forEach(function(v){
+    if(v.statut!=='envoye')return;
+    (enAttenteParDemande[v.demande_id]=enAttenteParDemande[v.demande_id]||[]).push(v);
+  });
+  Object.keys(enAttenteParDemande).forEach(function(id){
+    var liste=enAttenteParDemande[id];
+    if(liste.length<2)return;
+    var moinsCher=null,mieuxNote=null,prixMin=Infinity,noteMax=-1;
+    liste.forEach(function(v){
+      var p=parseFloat(v.prix_ttc);
+      if(!isNaN(p)&&p<prixMin){prixMin=p;moinsCher=v.id}
+      var n=parseFloat(v.pro&&v.pro.note_moyenne);
+      if(!isNaN(n)&&n>noteMax){noteMax=n;mieuxNote=v.id}
+    });
+    // Un prestataire sans avis n'est pas « le mieux noté » : ce serait
+    // trompeur pour le client comme pour ses concurrents.
+    reperesParDemande[id]={moinsCher:moinsCher,mieuxNote:noteMax>0?mieuxNote:null};
+  });
+
   var html=chips;
   filtered.forEach(function(v,vi){
       var proNameRaw=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
@@ -4385,8 +4520,10 @@ function renderDevisClientCards(){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement requis</span>';
         cardStyle='border-color:var(--amber);background:var(--amber-clair);';
         actions='<div style="margin-top:12px;display:flex;gap:8px">'+
-          '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
-          '<button class="btn-accept" style="background:#059669" onclick="openPayment(\''+safeVId+'\','+Number(v.prix_ttc)+')">💳 Payer '+escapeHtml(v.prix_ttc)+'\u20ac</button>'+
+          '<button class="btn-secondaire-devis" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">'+
+            '<i data-lucide="message-circle"></i> Discuter</button>'+
+          '<button class="btn-principal-devis paiement" onclick="openPayment(\''+safeVId+'\','+Number(v.prix_ttc)+')">'+
+            '<i data-lucide="credit-card"></i> Payer '+escapeHtml(v.prix_ttc)+'\u20ac</button>'+
         '</div>';
       }else if(v.statut==='expire_sans_paiement'){
         // Nouveau statut serveur : le devis avait été accepté mais jamais réglé, et le
@@ -4411,23 +4548,40 @@ function renderDevisClientCards(){
         cardStyle='opacity:0.6;';
       }else{
         badge='<span class="devis-badge badge-pending"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> En attente</span>';
-        actions='<button class="btn-accept" style="width:100%;background:none;border:2px solid var(--border);color:var(--text-secondary);margin-bottom:8px" onclick="showDevisDocument(\''+safeVId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir le devis</button>'+
-          '<div style="display:flex;gap:8px">'+
-          '<button class="btn-accept" onclick="accepterDevis(\''+safeVId+'\',this)">✅ Accepter</button>'+
-          '<button class="btn-refuse" onclick="refuserDevis(\''+safeVId+'\',this)">❌ Refuser</button>'+
-        '</div>';
+        // Trois niveaux, dans l'ordre de ce que le client veut faire :
+        // accepter est l'action principale, consulter le devis vient avant la
+        // décision, et refuser reste discret — c'est une action sans retour.
+        actions='<button class="btn-principal-devis" onclick="accepterDevis(\''+safeVId+'\',this)">'+
+            '<i data-lucide="check"></i> Accepter ce devis</button>'+
+          '<button class="btn-secondaire-devis" onclick="showDevisDocument(\''+safeVId+'\')">'+
+            '<i data-lucide="file-text"></i> Voir le devis détaillé</button>'+
+          '<button class="btn-discret-devis" onclick="refuserDevis(\''+safeVId+'\',this)">Refuser</button>';
       }
 
-      html+='<div class="devis-card fade-in-item" style="animation-delay:'+(vi*0.04)+'s;'+cardStyle+'">'+
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'+
-          '<div style="display:flex;gap:10px;align-items:center">'+miniAvatarHtml(v.pro&&v.pro.photo,proNameRaw)+
-          '<div><div style="font-weight:700;font-size:15px">'+proName+'</div>'+
-          (proNote?'<div style="font-size:12px;color:var(--gold);margin-top:2px;font-weight:700">'+proNote+'</div>':'')+
-          '</div></div>'+badge+
+      // Aide à la comparaison : quand plusieurs devis arrivent pour la même
+      // demande, le client se demande lequel est le moins cher et lequel vient
+      // du prestataire le mieux noté. Personne ne répondait à cette question.
+      var reperes='';
+      if(v.statut==='envoye'&&reperesParDemande[v.demande_id]){
+        var r=reperesParDemande[v.demande_id];
+        if(r.moinsCher===v.id)reperes+='<span class="repere-devis eco">Le moins cher</span>';
+        if(r.mieuxNote===v.id)reperes+='<span class="repere-devis note">Le mieux noté</span>';
+      }
+
+      html+='<div class="devis-card carte-devis-recu fade-in-item" style="animation-delay:'+(vi*0.04)+'s;'+cardStyle+'">'+
+        '<div class="tete-devis">'+
+          miniAvatarHtml(v.pro&&v.pro.photo,proNameRaw)+
+          '<div class="identite-devis">'+
+            '<div class="nom-pro">'+proName+'</div>'+
+            (proNote?'<div class="note-pro">'+proNote+'</div>':'')+
+          '</div>'+
+          badge+
         '</div>'+
-        '<div style="font-size:13px;color:var(--gray);text-transform:capitalize">🔧 '+escapeHtml(v.prestation)+'</div>'+
-        '<div style="font-size:26px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' \u20ac</div>'+
-        (v.description?'<div style="font-size:13px;color:var(--text-secondary)">'+escapeHtml(v.description)+'</div>':'')+
+        (reperes?'<div class="reperes-devis">'+reperes+'</div>':'')+
+        '<div class="prestation-devis">'+ICONS_get(v.prestation)+' '+escapeHtml(v.prestation)+'</div>'+
+        '<div class="montant-devis">'+escapeHtml(v.prix_ttc)+' \u20ac'+
+          '<span class="mention-ttc">TTC, tout compris</span></div>'+
+        (v.description?'<div class="mot-du-pro">'+escapeHtml(v.description)+'</div>':'')+
         actions+
       '</div>';
   });
@@ -5429,6 +5583,90 @@ async function enregistrerJustificatifs(){
 // DOCUMENTS DU PRESTATAIRE
 // ─────────────────────────────────────────────────────────────────────────────
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANALYSE AUTOMATIQUE DE LA QUALITÉ D'UNE PHOTO
+//
+// Trois mesures faites dans le navigateur, sans aucun appel réseau : rien ne
+// sort du téléphone. Elles servent à prévenir le prestataire avant l'envoi,
+// jamais à refuser — l'algorithme se trompe, notamment sur les documents
+// plastifiés brillants.
+//
+// La netteté s'estime par la variance du laplacien : ce filtre met en évidence
+// les variations brusques d'intensité, c'est-à-dire les contours. Une image
+// nette en a beaucoup, donc une variance élevée ; une image floue les a
+// diffus, donc une variance faible.
+// ─────────────────────────────────────────────────────────────────────────────
+function analyserNettete(dataUrl){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onerror=function(){resolve(null)};
+    img.onload=function(){
+      try{
+        // On analyse une version réduite : la netteté relative se conserve, et
+        // le calcul reste instantané même sur un téléphone modeste.
+        var cote=520;
+        var w=img.width,h=img.height;
+        var e=Math.min(cote/w,cote/h,1);
+        var lw=Math.max(2,Math.round(w*e)),lh=Math.max(2,Math.round(h*e));
+        var c=document.createElement('canvas');
+        c.width=lw;c.height=lh;
+        var ctx=c.getContext('2d',{willReadFrequently:true});
+        ctx.drawImage(img,0,0,lw,lh);
+        var px=ctx.getImageData(0,0,lw,lh).data;
+
+        // Niveaux de gris, et luminosité moyenne au passage.
+        var gris=new Float32Array(lw*lh), somme=0;
+        for(var i=0,j=0;i<px.length;i+=4,j++){
+          var g=0.299*px[i]+0.587*px[i+1]+0.114*px[i+2];
+          gris[j]=g; somme+=g;
+        }
+        var luminosite=somme/(lw*lh);
+
+        // Laplacien 3×3, puis variance des réponses.
+        var total=0,total2=0,n=0;
+        for(var y=1;y<lh-1;y++){
+          for(var x=1;x<lw-1;x++){
+            var k=y*lw+x;
+            var v=-4*gris[k]+gris[k-1]+gris[k+1]+gris[k-lw]+gris[k+lw];
+            total+=v; total2+=v*v; n++;
+          }
+        }
+        if(!n){resolve(null);return}
+        var moyenne=total/n;
+        var variance=(total2/n)-(moyenne*moyenne);
+
+        resolve({
+          nettete:Math.round(variance*10)/10,
+          resolution:Math.min(img.width,img.height),
+          luminosite:Math.round(luminosite),
+          // Seuils établis empiriquement. Volontairement permissifs : mieux vaut
+          // laisser passer une photo moyenne que rejeter une bonne.
+          net:variance>=48,
+          assez_grand:Math.min(img.width,img.height)>=700,
+          bien_eclaire:luminosite>=45&&luminosite<=225
+        });
+      }catch(err){ resolve(null) }
+    };
+    img.src=dataUrl;
+  });
+}
+
+// Traduit les mesures en une phrase actionnable. Le prestataire doit savoir
+// quoi refaire, pas qu'il y a « un problème ».
+function conseilQualite(q){
+  if(!q)return null;
+  if(!q.assez_grand)
+    return 'La photo est de petite taille. Rapprochez-vous du document plutôt que de recadrer ensuite.';
+  if(q.luminosite<45)
+    return 'La photo est sombre. Placez le document près d\'une fenêtre ou allumez la lumière.';
+  if(q.luminosite>225)
+    return 'La photo est surexposée. Évitez le flash direct et les reflets sur le plastique.';
+  if(!q.net)
+    return 'La photo semble floue. Posez le document à plat, tenez le téléphone bien parallèle, et attendez la mise au point.';
+  return null;
+}
+
 var ETATS_DOCUMENT = {
   en_attente: { texte: 'En vérification', classe: 'attente' },
   valide:     { texte: 'Validé',          classe: 'valide' },
@@ -5456,38 +5694,51 @@ async function chargerDocumentsPro(){
     if(!d||!Array.isArray(d.documents)){c.innerHTML='';return}
 
     c.innerHTML=d.documents.map(function(item){
-      var doc=item.document;
-      var etat=doc?ETATS_DOCUMENT[doc.statut]:null;
+      // Une carte par type, une ligne par face. Une pièce d'identité en demande
+      // deux : recto seul, la date d'expiration et l'adresse manquent.
+      var faces=(item.faces&&item.faces.length)?item.faces:[{face:'unique',libelle_face:'',document:null}];
+      var multi=faces.length>1;
 
-      var ligneEtat;
-      if(etat){
-        ligneEtat='<span class="etat-document '+etat.classe+'">'+etat.texte+'</span>';
-        if(doc.statut==='refuse'&&doc.motif_refus){
-          // Le motif figure toujours : un refus sans explication produit un
-          // second envoi identique.
-          ligneEtat+='<div class="motif-document">'+escapeHtml(motifLisible(doc.motif_refus))+
-            (doc.commentaire?' — '+escapeHtml(doc.commentaire):'')+'</div>';
+      var lignes=faces.map(function(f){
+        var doc=f.document;
+        var etat=doc?ETATS_DOCUMENT[doc.statut]:null;
+
+        var ligneEtat;
+        if(etat){
+          ligneEtat='<span class="etat-document '+etat.classe+'">'+etat.texte+'</span>';
+          if(doc.statut==='refuse'&&doc.motif_refus){
+            // Le motif figure toujours : un refus sans explication produit un
+            // second envoi identique.
+            ligneEtat+='<div class="motif-document">'+escapeHtml(motifLisible(doc.motif_refus))+
+              (doc.commentaire?' — '+escapeHtml(doc.commentaire):'')+'</div>';
+          }
+          if(doc.statut==='valide'&&doc.date_expiration){
+            ligneEtat+='<div class="detail-document">Valable jusqu\'au '+formatDateFr(doc.date_expiration)+'</div>';
+          }
+        }else{
+          ligneEtat='<span class="etat-document '+(item.requis?'manquant':'facultatif')+'">'+
+            (item.requis?'À photographier':'Non requis pour l\'instant')+'</span>';
         }
-        if(doc.statut==='valide'&&doc.date_expiration){
-          ligneEtat+='<div class="detail-document">Valable jusqu\'au '+formatDateFr(doc.date_expiration)+'</div>';
-        }
-      }else{
-        ligneEtat='<span class="etat-document '+(item.requis?'manquant':'facultatif')+'">'+
-          (item.requis?'À fournir':'Non requis pour l\'instant')+'</span>';
-      }
 
-      // Un document validé ne propose plus de bouton : le remplacer par erreur
-      // le remettrait en file d'attente pour rien.
-      var action=(doc&&doc.statut==='valide')?'' :
-        '<label class="bouton-document">'+
-          '<input type="file" accept="image/*,application/pdf" capture="environment" '+
-            'data-type="'+escAttr(item.type)+'" style="display:none">'+
-          (doc?'Renvoyer':'Photographier')+
-        '</label>';
+        var action=(doc&&doc.statut==='valide')?'' :
+          '<label class="bouton-document">'+
+            '<input type="file" accept="image/*,application/pdf" capture="environment" '+
+              'data-type="'+escAttr(item.type)+'" data-face="'+escAttr(f.face)+'" style="display:none">'+
+            (doc?'Renvoyer':'Photographier')+
+          '</label>';
 
-      return '<div class="carte-document">'+
-        '<div class="tete"><div class="nom">'+escapeHtml(item.libelle)+'</div>'+ligneEtat+'</div>'+
-        action+
+        return '<div class="face-document">'+
+          '<div class="tete">'+
+            (multi?'<div class="nom-face">'+escapeHtml(f.libelle_face)+'</div>':'')+
+            ligneEtat+
+          '</div>'+action+
+        '</div>';
+      }).join('');
+
+      return '<div class="carte-document'+(multi?' multi':'')+'">'+
+        '<div class="nom">'+escapeHtml(item.libelle)+
+          (multi?' <span class="mention-faces">recto et verso</span>':'')+'</div>'+
+        lignes+
       '</div>';
     }).join('');
 
@@ -5514,7 +5765,9 @@ async function deposerDocument(champ){
   var fichier=champ.files&&champ.files[0];
   if(!fichier)return;
   var type=champ.getAttribute('data-type');
-  var carte=champ.closest('.carte-document');
+  var face=champ.getAttribute('data-face')||'unique';
+  var qualite=null;
+  var carte=champ.closest('.face-document')||champ.closest('.carte-document');
   if(carte)carte.classList.add('en-cours');
 
   try{
@@ -5531,10 +5784,24 @@ async function deposerDocument(champ){
       // 1 600 px suffisent pour lire une attestation, et la conversion en JPEG
       // règle au passage le cas du HEIC des iPhone, illisible ailleurs.
       contenu=await compressImage(fichier,1600,0.85);
+
+      // Analyse avant l'envoi : elle prévient, elle n'interdit pas. Un aller-
+      // retour de deux jours pour une photo floue est le refus le plus fréquent
+      // et le plus évitable.
+      qualite=await analyserNettete(contenu);
+      var conseil=conseilQualite(qualite);
+      if(conseil){
+        var continuer=await demanderConfirmation({
+          titre:'Cette photo est-elle lisible ?',
+          texte:conseil+'\n\nVous pouvez l\'envoyer quand même — nous la regarderons.',
+          valider:'Envoyer quand même', annuler:'Reprendre la photo', icone:'camera'
+        });
+        if(!continuer)return;
+      }
     }
 
     const r=await fetch(API+'/api/documents',{method:'POST',headers:authHeaders(),
-      body:JSON.stringify({type:type,fichier:contenu,nom_original:fichier.name})});
+      body:JSON.stringify({type:type,face:face,fichier:contenu,nom_original:fichier.name,qualite:qualite})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d&&d.error||''));return}
 
