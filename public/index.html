@@ -1518,6 +1518,18 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   36. GRILLES D'OPTIONS — PAS DE DERNIER ÉLÉMENT ORPHELIN
+   Les grilles sont sur deux colonnes. Un nombre impair d'options laissait le
+   dernier bouton seul à gauche de sa ligne, avec un vide à sa droite : c'est
+   ce qui rendait l'ajout du palier « Berline » visuellement bancal, et
+   plusieurs groupes de trois options souffraient déjà du même défaut.
+   Le dernier élément isolé occupe désormais toute la largeur.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.options-grid > .opt-btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.carte-tarif .paliers > .palier:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* ────────────────────────────────────────────────────────────────────────────
    35. ÉCARTER UNE DEMANDE
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -5298,7 +5310,7 @@ const TARIF_CATEGORIES=[
     // Aligné sur le serveur : commerce 5 €/m², bureaux 6,5 €/m².
     tierPlaceholders:{maison:4,appartement:4,commerce:5,bureaux:6.5},
     note:'Prix par m² de surface vitrée, état propre. Le client indique la surface exacte.'},
-  {key:'tapis',label:'🧶 Tapis',unite:true,uniteLabel:'m²',tiers:null,placeholder:20,
+  {key:'tapis',label:'🧶 Tapis',unite:true,uniteLabel:'m²',tiers:null,placeholder:16,
     note:'Prix par m², pour un tapis synthétique, état propre. Coton/jute-sisal/berbère/laine/soie ajustent ensuite automatiquement le prix (la soie coûte nettement plus cher à nettoyer). Le client indique la surface exacte.'},
   {key:'autre',label:'➕ Autre',tiers:null,placeholder:60,note:'Prix de base indicatif, à ajuster au cas par cas dans votre message au client.'}
 ];
