@@ -418,6 +418,40 @@ const PALIERS_DEGRESSIFS_SURFACE = [
   { jusqua: 100, coef: 0.40 },
   { jusqua: Infinity, coef: 0.28 }
 ];
+// ─────────────────────────────────────────────────────────────────────────────
+// PLANCHER D'INTERVENTION
+//
+// La dégressivité ci-dessus répond bien aux grandes surfaces. Elle laisse en
+// revanche passer des estimations que personne ne peut honorer : 24 € pour
+// 6 m² de vitres, 40 € pour 10 m² de terrasse. Un professionnel déclaré ne se
+// déplace pas à ces prix — il faut compter le trajet, le matériel, l'installation
+// et le rangement, indépendamment de la surface traitée.
+//
+// Le marché le confirme : les artisans appliquent un minimum de facturation de
+// 60 à 90 €.
+//
+// 60 € plutôt que le milieu de la fourchette, pour une raison précise : à 70 €,
+// le plancher écrasait des tarifs parfaitement légitimes que nous venons de
+// calibrer — canapé 2 places 65 €, entretien de piscine 65 €, matelas 90×190
+// 60 €. Un plancher n'est pas là pour corriger des prix justes, seulement pour
+// écarter ceux qu'aucun professionnel ne peut honorer.
+//
+// Ce plancher ne s'applique qu'à l'ESTIMATION montrée au client. Le prestataire
+// reste entièrement libre de son prix : ce n'est pas à la plateforme de le lui
+// imposer, et une demande vraiment minuscule peut se justifier autrement — un
+// client fidèle, un déplacement déjà prévu dans le quartier.
+// ─────────────────────────────────────────────────────────────────────────────
+const MINIMUM_INTERVENTION = 60;
+
+// Renvoie le prix éventuellement relevé, et signale si le plancher a joué —
+// pour que le client sache d'où vient le chiffre au lieu de le subir.
+function appliquerPlancher(prixMoyen) {
+  if (prixMoyen >= MINIMUM_INTERVENTION) {
+    return { prix: prixMoyen, plancher: false };
+  }
+  return { prix: MINIMUM_INTERVENTION, plancher: true };
+}
+
 function surfaceEquivalentePonderee(quantite) {
   var restant = quantite, borneBasse = 0, total = 0;
   for (var i = 0; i < PALIERS_DEGRESSIFS_SURFACE.length && restant > 0; i++) {
@@ -451,9 +485,13 @@ function distanceKm(lat1, lon1, lat2, lon2) {
 const PRESTATION_CONFIG = {
   voiture: {
     tierKey: 'taille', // le pro saisit un prix par type de véhicule
-    tiers: ['citadine', 'suv_4x4', 'monospace', 'utilitaire'],
-    tierLabels: { citadine: 'Citadine', suv_4x4: 'SUV / 4x4', monospace: 'Monospace', utilitaire: 'Utilitaire / Van' },
-    tierDefaults: { citadine: 85, suv_4x4: 128, monospace: 132, utilitaire: 153 }, // intérieur+extérieur, propre
+    // Le palier « berline » manquait alors que c'est le gabarit le plus répandu du
+    // parc français. Une berline devait être classée en citadine ou en SUV, deux
+    // réponses fausses. 105 € : la recherche de marché donne 85 à 110 € pour un
+    // nettoyage complet de berline (2 h), c'est le seul chiffre précis disponible.
+    tiers: ['citadine', 'berline', 'suv_4x4', 'monospace', 'utilitaire'],
+    tierLabels: { citadine: 'Citadine', berline: 'Berline', suv_4x4: 'SUV / 4x4', monospace: 'Monospace', utilitaire: 'Utilitaire / Van' },
+    tierDefaults: { citadine: 85, berline: 105, suv_4x4: 128, monospace: 132, utilitaire: 153 }, // intérieur+extérieur, propre
     coefPortee: { interieur: 0.70, exterieur: 0.55, complet: 1.0 },
     // Le nombre de places est un facteur secondaire : à type de véhicule identique, plus de places
     // signifie plus de surface à nettoyer (ex: un SUV 5 places vs un SUV 7 places).
@@ -463,7 +501,13 @@ const PRESTATION_CONFIG = {
     tierKey: 'taille', // le pro saisit un prix par nombre de places
     tiers: ['A', 'B', 'C', 'D'],
     tierLabels: { A: '2 places', B: '3 places', C: '4 places', D: '5+ places / angle' },
-    tierDefaults: { A: 45, B: 55, C: 65, D: 85 }, // tissu, propre (marché observé 2026 : 40-50€ 2 places, 60-70€ 4 places — anciens prix bien trop élevés, corrigés)
+    // Relevé sur le segment professionnel déclaré, seul comparable au modèle Gleam
+    // (SIRET et RC Pro exigés) : C'Clean Lyon 70/90 €, AJC Lille 80/100 €, Fée du
+    // propre Montpellier 100 € pour un 3 places. Les valeurs précédentes — 45 à
+    // 85 € — venaient du segment entre particuliers, où le prestataire n'est ni
+    // déclaré ni assuré. Un professionnel qui les appliquait travaillait à perte
+    // sur une intervention d'une à deux heures, déplacement compris.
+    tierDefaults: { A: 65, B: 80, C: 95, D: 115 }, // tissu, propre
     coefMatiere: { tissu: 1.0, cuir: 1.15, velours: 1.1, microfibre: 1.0 },
     // La forme influence le temps de travail à nombre de places égal (un angle est plus complexe qu'un droit).
     // Le "U" (panoramique, 2 retours) est nettement plus grand et complexe qu'un simple angle
@@ -494,7 +538,12 @@ const PRESTATION_CONFIG = {
     tierKey: 'intervention', // le pro saisit un prix par type d'intervention (le vrai driver de prix du métier)
     tiers: ['entretien', 'complet', 'eau_verte'],
     tierLabels: { entretien: 'Entretien simple', complet: 'Nettoyage complet', eau_verte: 'Eau verte / remise en état' },
-    tierDefaults: { entretien: 65, complet: 130, eau_verte: 585 }, // bassin moyen, propre
+    // entretien 65 € : au centre exact du marché (50 à 70 € la visite de contrôle).
+    // complet 190 € : le marché situe la remise en route entre 150 et 300 €.
+    // eau_verte 600 € : borne basse de la fourchette 600 à 2 200 € relevée pour un
+    // bassin laissé à l'abandon. On reste volontairement au plancher : le client
+    // découvrant un devis supérieur à l'estimation est plus fréquent que l'inverse.
+    tierDefaults: { entretien: 65, complet: 190, eau_verte: 600 }, // bassin moyen, propre
     // Coefficient revu à la baisse : l'ancien 1.9 pour les plus grands bassins, combiné au tarif
     // eau verte (585€), donnait un pire cas à 1111€ — bien au-delà des 300 à 800€ observés sur le
     // marché réel pour ce type d'intervention, même sur un grand bassin très encrassé.
@@ -3448,8 +3497,12 @@ app.get('/api/tarifs/estimation', async (req, res) => {
       const coefMatiereUnite = (config.tierKey !== 'matiere' && config.coefMatiere && matiere && config.coefMatiere.hasOwnProperty(matiere)) ? config.coefMatiere[matiere] : 1.0;
       const coefTailleUnite = (config.tierKey !== 'taille' && config.coefTaille && taille && config.coefTaille.hasOwnProperty(taille)) ? config.coefTaille[taille] : 1.0;
       const surfaceEquivalente = surfaceEquivalentePonderee(quantite);
-      const prixMoyen = Math.round(prixUnitaire * surfaceEquivalente * coefEtat * coefMatiereUnite * coefTailleUnite);
-      const prixMin = Math.round(prixMoyen * 0.85);
+      const prixCalcule = Math.round(prixUnitaire * surfaceEquivalente * coefEtat * coefMatiereUnite * coefTailleUnite);
+      const { prix: prixMoyen, plancher } = appliquerPlancher(prixCalcule);
+      // La fourchette se resserre quand le plancher joue : le prix n'est plus le
+      // produit d'un calcul, c'est un minimum. Annoncer 60 – 80 € autour d'un
+      // plancher de 70 € laisserait croire qu'on peut descendre en dessous.
+      const prixMin = plancher ? prixMoyen : Math.round(prixMoyen * 0.85);
       const prixMax = Math.round(prixMoyen * 1.15);
 
       return res.json({
@@ -3457,6 +3510,7 @@ app.get('/api/tarifs/estimation', async (req, res) => {
         prix_unitaire: Math.round(prixUnitaire * 100) / 100,
         reduction_surface_pourcent: quantite > 0 ? Math.round((1 - surfaceEquivalente / quantite) * 100) : 0,
         prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
+        minimum_applique: plancher, minimum_intervention: MINIMUM_INTERVENTION,
         base_sur_donnees_reelles: reel, nombre_pros_reference: nbPros
       });
     }
@@ -3484,13 +3538,15 @@ app.get('/api/tarifs/estimation', async (req, res) => {
     const coefTypeBassin = (config.coefTypeBassin && typeBassin && config.coefTypeBassin.hasOwnProperty(typeBassin)) ? config.coefTypeBassin[typeBassin] : 1.0;
     const coef = coefEtat * coefTaille * coefMatiere * coefPortee * coefIntervention * coefPlaces * coefForme * coefTypeBassin;
 
-    const prixMoyen = Math.round(base * coef);
-    const prixMin = Math.round(prixMoyen * 0.85);
+    const prixCalcule = Math.round(base * coef);
+    const { prix: prixMoyen, plancher } = appliquerPlancher(prixCalcule);
+    const prixMin = plancher ? prixMoyen : Math.round(prixMoyen * 0.85);
     const prixMax = Math.round(prixMoyen * 1.15);
 
     res.json({
       prestation, etat, taille: taille || null, matiere: matiere || null, portee: portee || null, intervention: intervention || null,
       prix_min: prixMin, prix_max: prixMax, prix_moyen: prixMoyen,
+      minimum_applique: plancher, minimum_intervention: MINIMUM_INTERVENTION,
       base_sur_donnees_reelles: reel,
       nombre_pros_reference: nbPros
     });
