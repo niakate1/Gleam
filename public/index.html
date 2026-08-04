@@ -784,13 +784,15 @@ select {
 }
 .tab.active { background: var(--surface); color: var(--p); box-shadow: var(--shadow-sm); }
 
+/* Le titre de section n'a plus à crier : il structure, il n'annonce pas.
+   Couleur de texte plutôt que violet, poids 700, et le filet suffit à séparer. */
 .register-section-titre {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .08em;
-  color: var(--p);
-  margin: var(--gap-5) 0 10px;
-  padding-bottom: 7px;
+  color: var(--text-secondary);
+  margin: var(--gap-6) 0 var(--gap-3);
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 .register-section-titre:first-child { margin-top: var(--gap-2); }
@@ -1549,33 +1551,120 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 .pastille-profil:empty { display: none; }
 
+/* Bloc complémentaire : il prolonge la ligne sélectionnée, il ne s'en détache
+   pas. Bordure gauche colorée plutôt qu'un cadre complet — le cadre créait un
+   second objet là où il n'y a qu'une continuation. */
+.bloc-complement {
+  border-left: 2px solid var(--p);
+  background: var(--surface-alt);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: var(--gap-4);
+  margin-top: 12px;
+}
+.bloc-complement label { font-size: 12.5px; font-weight: 600; }
+.bloc-complement label:first-of-type { margin-top: 0; }
+.bloc-complement p,
+.bloc-complement > div[style*="font-size"] { font-size: 12px; line-height: 1.5; color: var(--gray); }
+
 /* ────────────────────────────────────────────────────────────────────────────
    40. CHOIX DU RÔLE À L'INSCRIPTION
    ──────────────────────────────────────────────────────────────────────────── */
 
 .groupe-role { margin-bottom: var(--gap-4); }
-.intitule-groupe {
-  font-size: 11.5px; font-weight: 800;
-  text-transform: uppercase; letter-spacing: .06em;
-  color: var(--gray);
-  margin-bottom: 9px;
-}
-.role-select.une-colonne { grid-template-columns: 1fr; }
 
-/* Le bouton porte désormais un titre et une explication : la distinction ne
-   doit pas se deviner au vocabulaire. */
+/* Étiquette de groupe : petite, peu contrastée, présente sans s'imposer.
+   Poids 700 plutôt que 800 — au-delà, une majuscule de 11 px devient un bloc. */
+.intitule-groupe {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--gray);
+  margin-bottom: 8px;
+}
+
+/* Un seul bloc, des lignes séparées d'un filet. Une bordure de 1 px, pas 2 :
+   l'épaisseur est ce qui donnait un air de livre d'images. */
+.liste-roles {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+.liste-roles .role-btn {
+  /* flex-direction, justify-content et min-height sont redéclarés
+     explicitement : une seconde feuille de style, plus bas dans le fichier,
+     impose une disposition en colonne centrée avec une hauteur minimale de
+     76 px. Sans ces trois lignes, elle continue de s'appliquer. */
+  display: flex; flex-direction: row;
+  align-items: center; justify-content: flex-start;
+  gap: var(--gap-3);
+  width: 100%; min-height: 0; padding: 14px 15px;
+  border: none; border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 15px; line-height: 1.3;
+  text-align: left; cursor: pointer;
+  /* Aucune animation à ressort : le rebond est ludique par nature. */
+  transition: background var(--dur-fast) var(--ease-out);
+  transform: none;
+}
+.liste-roles .role-btn:last-child { border-bottom: none; }
+.liste-roles .role-btn:hover { background: var(--surface-alt); transform: none; }
+.liste-roles .role-btn:active { transform: none; }
+/* La règle générique .role-btn span impose 19 px : on la neutralise pour les
+   éléments de structure, dont le contenu est porté par leurs enfants. Le titre
+   et la description sont redéclarés juste après, avec la même spécificité,
+   pour retrouver leurs tailles propres. */
+.liste-roles .role-btn span { font-size: inherit; margin-bottom: 0; }
+.liste-roles .role-btn .titre-role { font-size: 15px; font-weight: 600; }
+.liste-roles .role-btn .detail-role { font-size: 12.5px; font-weight: 400; }
+
+.ico-role {
+  flex-shrink: 0; width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-alt); color: var(--gray);
+  border-radius: 9px;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.ico-role i, .ico-role svg { width: 17px; height: 17px; }
+
+.texte-role { flex: 1; min-width: 0; }
+
+/* Titre en 15 px, poids 600. Le 700 sur 14 px faisait du gras compensatoire :
+   la hiérarchie vient de la taille et de la couleur, pas de l'épaisseur. */
 .role-btn .titre-role {
   display: block;
-  font-size: 14px; font-weight: 700; color: inherit;
-  margin-top: 6px;
+  font-size: 15px; font-weight: 600; color: var(--text);
+  line-height: 1.3;
 }
 .role-btn .detail-role {
   display: block;
-  font-size: 11.5px; font-weight: 500; line-height: 1.35;
+  font-size: 12.5px; font-weight: 400; line-height: 1.4;
   color: var(--gray);
-  margin-top: 3px;
+  margin-top: 2px;
 }
-.role-btn.sel .detail-role { color: var(--p2); }
+
+/* Marque de sélection : un cercle, pas un aplat. Le remplissage saturé était
+   festif ; un liseré et une teinte légère disent la même chose sans crier. */
+.marque-role {
+  flex-shrink: 0; width: 20px; height: 20px;
+  border: 1.5px solid var(--border-fort);
+  border-radius: 50%;
+  position: relative;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.marque-role::after {
+  content: ''; position: absolute; inset: 3px;
+  border-radius: 50%; background: var(--p);
+  transform: scale(0);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.liste-roles .role-btn.sel { background: var(--light); }
+.liste-roles .role-btn.sel .ico-role { background: var(--p); color: #fff; }
+.liste-roles .role-btn.sel .titre-role { color: var(--p); }
+.liste-roles .role-btn.sel .detail-role { color: var(--text-secondary); }
+.liste-roles .role-btn.sel .marque-role { border-color: var(--p); }
+.liste-roles .role-btn.sel .marque-role::after { transform: scale(1); }
 
 /* ────────────────────────────────────────────────────────────────────────────
    39. RÉCEPTION D'UN DEVIS, CÔTÉ CLIENT
@@ -2549,7 +2638,7 @@ textarea { min-height: 92px; padding-top: 13px; }
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
 }
-.register-section-titre i { width: 13px; height: 13px; color: var(--p); }
+.register-section-titre i { width: 13px; height: 13px; color: var(--gray); }
 
 /* Les rôles sont des choix de même importance : même hauteur, icône centrée,
    libellé sur une seule ligne. Les emojis rendaient les trois boutons
@@ -2602,6 +2691,7 @@ textarea { min-height: 92px; padding-top: 13px; }
   .auth-box { padding: 26px 20px 24px; }
   .logo h1 { font-size: 30px; }
   .role-btn { min-height: 70px; font-size: 11px; }
+  .liste-roles .role-btn { min-height: 0; font-size: 15px; }
 }
 
 @media (min-width: 700px) {
@@ -2809,33 +2899,46 @@ textarea { min-height: 92px; padding-top: 13px; }
              entreprise est ici un CLIENT qui commande pour ses locaux. Un artisan
              en société cochait « Entreprise » et se retrouvait compte client,
              sans jamais voir une seule demande. -->
+        <!-- Des lignes plutôt que des cartes centrées : icône à gauche, texte
+             aligné, marque de sélection à droite. C'est la grammaire des
+             réglages d'iOS et des formulaires de Stripe — lisible sans effort,
+             et sans le vocabulaire visuel des applications de jeu. -->
         <div class="groupe-role">
           <div class="intitule-groupe">Je cherche un prestataire</div>
-          <div class="role-select">
+          <div class="liste-roles">
             <button class="role-btn sel" id="role-client" onclick="setRole('client')">
-              <i data-lucide="user"></i>
-              <span class="titre-role">Particulier</span>
-              <span class="detail-role">Pour mon domicile</span>
+              <span class="ico-role"><i data-lucide="user"></i></span>
+              <span class="texte-role">
+                <span class="titre-role">Particulier</span>
+                <span class="detail-role">Pour mon domicile</span>
+              </span>
+              <span class="marque-role" aria-hidden="true"></span>
             </button>
             <button class="role-btn" id="role-entreprise" onclick="setRole('entreprise')">
-              <i data-lucide="building-2"></i>
-              <span class="titre-role">Entreprise</span>
-              <span class="detail-role">Pour mes locaux professionnels</span>
+              <span class="ico-role"><i data-lucide="building-2"></i></span>
+              <span class="texte-role">
+                <span class="titre-role">Entreprise</span>
+                <span class="detail-role">Pour mes locaux professionnels</span>
+              </span>
+              <span class="marque-role" aria-hidden="true"></span>
             </button>
           </div>
         </div>
 
         <div class="groupe-role">
           <div class="intitule-groupe">Je propose mes services</div>
-          <div class="role-select une-colonne">
+          <div class="liste-roles">
             <button class="role-btn" id="role-pro" onclick="setRole('pro')">
-              <i data-lucide="wrench"></i>
-              <span class="titre-role">Prestataire</span>
-              <span class="detail-role">Je réalise les prestations de nettoyage</span>
+              <span class="ico-role"><i data-lucide="wrench"></i></span>
+              <span class="texte-role">
+                <span class="titre-role">Prestataire</span>
+                <span class="detail-role">Je réalise les prestations de nettoyage</span>
+              </span>
+              <span class="marque-role" aria-hidden="true"></span>
             </button>
           </div>
         </div>
-        <div id="entreprise-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
+        <div id="entreprise-block" class="bloc-complement" style="display:none">
           <label style="margin-top:0">Raison sociale <span class="optional">(vous pourrez la renseigner plus tard)</span></label>
           <input type="text" id="r-raison-sociale" placeholder="Ex: Dupont Nettoyage SARL">
           <label>Numéro SIRET <span class="optional">(vous pourrez le renseigner plus tard)</span></label>
@@ -2847,7 +2950,7 @@ textarea { min-height: 92px; padding-top: 13px; }
           <input type="text" id="r-adresse-facturation" placeholder="12 rue de la Paix, 75001 Paris">
           <div style="font-size:12px;color:var(--gray);margin-top:8px">Cette adresse sert uniquement à la facturation — l'adresse d'intervention est précisée à chaque demande.</div>
         </div>
-        <div id="pro-rcpro-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
+        <div id="pro-rcpro-block" class="bloc-complement" style="display:none">
           <label style="margin-top:0">Numéro SIRET <span class="optional">(vous pourrez le renseigner plus tard)</span></label>
           <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Nécessaire pour vérifier votre statut légal d'indépendant ou d'entreprise.</div>
           <input type="text" id="r-siret" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret')">
