@@ -1638,16 +1638,27 @@ const DEPOT_DOCUMENTS = 'documents-pro';
 
 // Chaque type porte son libellé, sa durée de validité et le fait qu'il soit
 // exigé ou non. Une seule source de vérité, partagée par toutes les routes.
+// `faces` liste ce qu'il faut photographier. Une carte d'identité recto seul ne
+// prouve rien : la date d'expiration, l'adresse et la bande MRZ sont au verso.
+// Les attestations, elles, tiennent sur une page.
 const TYPES_DOCUMENTS = {
-  identite:         { libelle: "Pièce d'identité",             requis: true,  mois_validite: null },
-  immatriculation:  { libelle: "Justificatif d'immatriculation", requis: true,  mois_validite: 6 },
-  rc_pro:           { libelle: "Attestation d'assurance RC Pro", requis: true,  mois_validite: null },
+  identite:         { libelle: "Pièce d'identité",             requis: true,  mois_validite: null,
+                      faces: ['recto', 'verso'] },
+  immatriculation:  { libelle: "Justificatif d'immatriculation", requis: true,  mois_validite: 6,
+                      faces: ['unique'] },
+  rc_pro:           { libelle: "Attestation d'assurance RC Pro", requis: true,  mois_validite: null,
+                      faces: ['unique'] },
   // Exigée par le Code du travail (L.8222-1) au-delà de 5 000 € HT cumulés sur
   // une année civile. Sa validité de 6 mois est fixée par l'URSSAF.
-  vigilance_urssaf: { libelle: "Attestation de vigilance URSSAF", requis: false, mois_validite: 6 },
-  sap:              { libelle: "Agrément services à la personne", requis: false, mois_validite: 12 },
-  autre:            { libelle: "Autre document",                 requis: false, mois_validite: null }
+  vigilance_urssaf: { libelle: "Attestation de vigilance URSSAF", requis: false, mois_validite: 6,
+                      faces: ['unique'] },
+  sap:              { libelle: "Agrément services à la personne", requis: false, mois_validite: 12,
+                      faces: ['unique'] },
+  autre:            { libelle: "Autre document",                 requis: false, mois_validite: null,
+                      faces: ['unique'] }
 };
+
+const LIBELLES_FACE = { unique: '', recto: 'Recto', verso: 'Verso' };
 
 const MOTIFS_REFUS = {
   illisible:       'Le document est illisible',
@@ -3752,14 +3763,21 @@ app.post('/api/documents', auth, async (req, res) => {
     const type = String(req.body.type || '').trim();
     if (!TYPES_DOCUMENTS[type]) return res.status(400).json({ error: 'Type de document inconnu.' });
 
-    const televerse = await televerserDocument(req.body.fichier, req.user.id, type);
+    // La face doit faire partie de celles attendues pour ce type : on ne veut
+    // pas d'un « verso » sur une attestation qui n'en a pas.
+    const facesAttendues = TYPES_DOCUMENTS[type].faces || ['unique'];
+    const face = facesAttendues.indexOf(String(req.body.face || 'unique')) >= 0
+      ? String(req.body.face || 'unique') : facesAttendues[0];
+
+    const televerse = await televerserDocument(req.body.fichier, req.user.id, type + '/' + face);
     if (televerse.erreur) return res.status(400).json({ error: televerse.erreur });
 
-    // Le précédent document du même type sort de la circulation. On le garde :
-    // il prouve ce que vous déteniez avant, ce qu'un contrôle peut demander.
+    // Le précédent document de la MÊME FACE sort de la circulation. Déposer un
+    // nouveau verso ne doit pas invalider le recto déjà validé.
     await supabase.from('documents_pro')
       .update({ statut: 'expire' })
-      .eq('pro_id', req.user.id).eq('type', type).in('statut', ['en_attente', 'valide']);
+      .eq('pro_id', req.user.id).eq('type', type).eq('face', face)
+      .in('statut', ['en_attente', 'valide']);
 
     // La date d'expiration est calculée quand la durée de validité est connue
     // et que le prestataire a indiqué la date d'émission — sinon on laisse
@@ -3783,6 +3801,10 @@ app.post('/api/documents', auth, async (req, res) => {
       nom_original: String(req.body.nom_original || '').slice(0, 200) || null,
       taille_octets: televerse.taille,
       type_mime: televerse.typeMime,
+      face,
+      // Mesure faite dans le navigateur avant l'envoi. Indicative : elle est
+      // enregistrée, jamais opposée au prestataire.
+      qualite: (req.body.qualite && typeof req.body.qualite === 'object') ? req.body.qualite : null,
       date_emission: emission,
       date_expiration: dateExpiration,
       reference: String(req.body.reference || '').slice(0, 100) || null
@@ -3790,8 +3812,10 @@ app.post('/api/documents', auth, async (req, res) => {
 
     if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
 
-    console.log('📄 Document déposé — ' + regle.libelle + ' — prestataire ' + req.user.id);
-    res.status(201).json({ message: 'Document déposé, il sera vérifié rapidement.', document: { id: data.id, type, statut: data.statut } });
+    console.log('📄 Document déposé — ' + regle.libelle +
+      (face !== 'unique' ? ' (' + face + ')' : '') + ' — prestataire ' + req.user.id +
+      (req.body.qualite && req.body.qualite.net === false ? ' — signalé peu net' : ''));
+    res.status(201).json({ message: 'Document déposé, il sera vérifié rapidement.', document: { id: data.id, type, face, statut: data.statut } });
   } catch (e) {
     console.error('Dépôt document :', e.message);
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -3804,19 +3828,34 @@ app.post('/api/documents', auth, async (req, res) => {
 app.get('/api/documents', auth, async (req, res) => {
   try {
     const { data: docs } = await supabase.from('documents_pro')
-      .select('id, type, statut, date_emission, date_expiration, reference, motif_refus, commentaire, created_at, verifie_le')
+      .select('id, type, face, statut, date_emission, date_expiration, reference, motif_refus, commentaire, created_at, verifie_le')
       .eq('pro_id', req.user.id).neq('statut', 'expire')
       .order('created_at', { ascending: false });
 
-    const parType = {};
-    (docs || []).forEach(d => { if (!parType[d.type]) parType[d.type] = d; });
+    // Indexé par type ET par face : un recto validé et un verso en attente
+    // coexistent, et doivent s'afficher séparément.
+    const parFace = {};
+    (docs || []).forEach(d => {
+      const cle = d.type + '|' + (d.face || 'unique');
+      if (!parFace[cle]) parFace[cle] = d;
+    });
 
-    const etat = Object.keys(TYPES_DOCUMENTS).map(type => ({
-      type,
-      libelle: TYPES_DOCUMENTS[type].libelle,
-      requis: TYPES_DOCUMENTS[type].requis,
-      document: parType[type] || null
-    }));
+    const etat = Object.keys(TYPES_DOCUMENTS).map(type => {
+      const regle = TYPES_DOCUMENTS[type];
+      const faces = (regle.faces || ['unique']).map(face => ({
+        face,
+        libelle_face: LIBELLES_FACE[face],
+        document: parFace[type + '|' + face] || null
+      }));
+      return {
+        type,
+        libelle: regle.libelle,
+        requis: regle.requis,
+        faces,
+        // Un document n'est complet que si TOUTES ses faces sont validées.
+        complet: faces.every(f => f.document && f.document.statut === 'valide')
+      };
+    });
 
     res.json({ documents: etat });
   } catch (e) {
@@ -3846,7 +3885,8 @@ app.get('/api/admin/documents', adminAuth, async (req, res) => {
 
     const enrichis = (data || []).map(d => ({
       ...d,
-      type_libelle: (TYPES_DOCUMENTS[d.type] || {}).libelle || d.type
+      type_libelle: (TYPES_DOCUMENTS[d.type] || {}).libelle || d.type,
+      face_libelle: LIBELLES_FACE[d.face || 'unique'] || ''
     }));
 
     // Compteurs affichés en tête de file, pour savoir où l'on en est.
