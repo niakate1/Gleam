@@ -3173,6 +3173,13 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
   }).eq('stripe_payment_intent_id', payment_intent_id);
   const { data: paiement } = await supabase.from('paiements').select('*').eq('stripe_payment_intent_id', payment_intent_id).single();
 
+  // Le numéro de facture est attribué au moment exact de l'encaissement : c'est
+  // la date qui doit correspondre à la position dans la séquence. Sans await —
+  // un échec de numérotation ne doit jamais compromettre un paiement abouti.
+  if (paiement && !paiement.numero_facture) {
+    attribuerNumeroFacture(paiement.id).catch(() => {});
+  }
+
   if (paiement) {
     await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
 
@@ -3489,7 +3496,10 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
     const montantPro = paiement ? parseFloat(paiement.montant_societe) : Math.round((montantTtc - commission) * 100) / 100;
 
     res.json({
-      numero: 'GLEAM-' + demande.id.slice(0, 8).toUpperCase(),
+      // Numéro séquentiel attribué en base à l'encaissement. Le repli sur
+      // l'ancien format ne concerne que les paiements antérieurs à cette
+      // correction, s'il en restait ; il ne doit jamais servir en production.
+      numero: (paiement && paiement.numero_facture) || ('GLEAM-' + demande.id.slice(0, 8).toUpperCase()),
       date: demande.updated_at || demande.created_at,
       prestation: construireDescriptionPrestation(demande.notes, demande.prestation),
       adresse: demande.adresse,
@@ -3826,6 +3836,37 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
   }
 });
 
+// Attribue un numéro de facture séquentiel, une seule fois par paiement.
+//
+// L'article 242 nonies A de l'annexe II du CGI impose une séquence
+// « chronologique continue, sans rupture ». L'attribution se fait donc en base,
+// par une fonction atomique : deux paiements aboutissant dans la même
+// milliseconde ne peuvent pas recevoir le même numéro.
+//
+// Ne lève jamais d'exception : un échec de numérotation ne doit pas empêcher un
+// encaissement. Le numéro sera attribué au prochain accès à la facture.
+async function attribuerNumeroFacture(paiementId) {
+  try {
+    const { data: existant } = await supabase.from('paiements')
+      .select('numero_facture').eq('id', paiementId).single();
+    if (existant && existant.numero_facture) return existant.numero_facture;
+
+    const { data: numero, error } = await supabase
+      .rpc('attribuer_numero_facture', { p_annee: new Date().getFullYear() });
+    if (error || !numero) {
+      console.error('Numérotation de facture impossible :', error && error.message);
+      return null;
+    }
+
+    await supabase.from('paiements').update({ numero_facture: numero }).eq('id', paiementId);
+    console.log('🧾 Facture ' + numero + ' — paiement ' + paiementId);
+    return numero;
+  } catch (e) {
+    console.error('Numérotation de facture :', e.message);
+    return null;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DÉCLARATION ANNUELLE DES REVENUS DES PRESTATAIRES — dispositif DPI-DAC7
 //
@@ -3854,6 +3895,126 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
 // un récapitulatif annuel de ses opérations, dans le même délai. Les mêmes
 // données servent.
 // ─────────────────────────────────────────────────────────────────────────────
+// Les revenus de Gleam : la commission est votre chiffre d'affaires, celui que
+// vous déclarez. Ventilé par mois ET par trimestre, parce que la TVA se déclare
+// selon l'un ou l'autre régime.
+app.get('/api/admin/mes-revenus', adminAuth, async (req, res) => {
+  try {
+    const annee = parseInt(req.query.annee, 10) || new Date().getFullYear();
+    const { data: paiements } = await supabase.from('paiements')
+      .select('montant, commission, montant_societe, statut, created_at, numero_facture')
+      .in('statut', ['paye', 'libere'])
+      .gte('created_at', annee + '-01-01T00:00:00.000Z')
+      .lt('created_at', (annee + 1) + '-01-01T00:00:00.000Z')
+      .limit(20000);
+
+    const mois = Array.from({ length: 12 }, () => ({ encaisse: 0, commission: 0, reverse: 0, nb: 0 }));
+    (paiements || []).forEach((p) => {
+      const m = new Date(p.created_at).getMonth();
+      mois[m].encaisse += parseFloat(p.montant) || 0;
+      mois[m].commission += parseFloat(p.commission) || 0;
+      mois[m].reverse += parseFloat(p.montant_societe) || 0;
+      mois[m].nb += 1;
+    });
+
+    const arrondir = (n) => Math.round(n * 100) / 100;
+    const noms = ['Janvier','Février','Mars','Avril','Mai','Juin',
+                  'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+    const parMois = mois.map((m, i) => ({
+      mois: i + 1, nom: noms[i], nb: m.nb,
+      encaisse: arrondir(m.encaisse), commission: arrondir(m.commission), reverse: arrondir(m.reverse)
+    }));
+
+    const parTrimestre = [0, 1, 2, 3].map((t) => {
+      const tranche = mois.slice(t * 3, t * 3 + 3);
+      return {
+        trimestre: 'T' + (t + 1),
+        nb: tranche.reduce((s, m) => s + m.nb, 0),
+        encaisse: arrondir(tranche.reduce((s, m) => s + m.encaisse, 0)),
+        commission: arrondir(tranche.reduce((s, m) => s + m.commission, 0)),
+        reverse: arrondir(tranche.reduce((s, m) => s + m.reverse, 0))
+      };
+    });
+
+    res.json({
+      annee, par_mois: parMois, par_trimestre: parTrimestre,
+      total: {
+        nb: parMois.reduce((s, m) => s + m.nb, 0),
+        encaisse: arrondir(parMois.reduce((s, m) => s + m.encaisse, 0)),
+        commission: arrondir(parMois.reduce((s, m) => s + m.commission, 0)),
+        reverse: arrondir(parMois.reduce((s, m) => s + m.reverse, 0))
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// La liste des factures émises, avec contrôle de séquence.
+//
+// Une numérotation irrégulière ne se rattrape pas : mieux vaut la surveiller en
+// permanence que la découvrir lors d'un contrôle. Cette route vérifie à chaque
+// consultation qu'il n'existe ni doublon, ni trou dans la suite.
+app.get('/api/admin/factures', adminAuth, async (req, res) => {
+  try {
+    const annee = parseInt(req.query.annee, 10) || new Date().getFullYear();
+    const { data: paiements } = await supabase.from('paiements')
+      .select('id, demande_id, numero_facture, montant, commission, montant_societe, statut, created_at, client_id, societe_id')
+      .in('statut', ['paye', 'libere'])
+      .gte('created_at', annee + '-01-01T00:00:00.000Z')
+      .lt('created_at', (annee + 1) + '-01-01T00:00:00.000Z')
+      .order('created_at', { ascending: true })
+      .limit(20000);
+
+    const ids = [...new Set([].concat(
+      (paiements || []).map(p => p.client_id), (paiements || []).map(p => p.societe_id)
+    ).filter(Boolean))];
+    const { data: gens } = ids.length
+      ? await supabase.from('users').select('id, prenom, nom, raison_sociale, type').in('id', ids)
+      : { data: [] };
+    const nomDe = {};
+    (gens || []).forEach(u => {
+      nomDe[u.id] = u.raison_sociale || ((u.prenom || '') + ' ' + (u.nom || '')).trim() || '—';
+    });
+
+    const factures = (paiements || []).map(p => ({
+      numero: p.numero_facture,
+      date: p.created_at,
+      client: nomDe[p.client_id] || '—',
+      prestataire: nomDe[p.societe_id] || '—',
+      montant: parseFloat(p.montant) || 0,
+      commission: parseFloat(p.commission) || 0,
+      net: parseFloat(p.montant_societe) || 0
+    }));
+
+    // Contrôle de séquence : les rangs doivent former 1, 2, 3… sans trou.
+    const rangs = factures.filter(f => f.numero)
+      .map(f => parseInt(String(f.numero).split('-').pop(), 10))
+      .filter(n => !isNaN(n)).sort((a, b) => a - b);
+
+    const doublons = rangs.filter((n, i) => i > 0 && n === rangs[i - 1]);
+    const trous = [];
+    for (let i = 1; i <= (rangs.length ? rangs[rangs.length - 1] : 0); i++) {
+      if (rangs.indexOf(i) === -1) trous.push(i);
+    }
+
+    res.json({
+      annee, factures,
+      sans_numero: factures.filter(f => !f.numero).length,
+      sequence: {
+        conforme: !doublons.length && !trous.length && !factures.filter(f => !f.numero).length,
+        doublons: [...new Set(doublons)],
+        trous,
+        premier: rangs.length ? rangs[0] : null,
+        dernier: rangs.length ? rangs[rangs.length - 1] : null
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 app.get('/api/admin/declaration-annuelle', adminAuth, async (req, res) => {
   try {
     const annee = parseInt(req.query.annee, 10) || (new Date().getFullYear() - 1);
