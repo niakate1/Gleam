@@ -3751,6 +3751,145 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DIAGNOSTIC — les chiffres qui disent quoi corriger
+//
+// Les statistiques existantes comptent des volumes : combien de clients,
+// combien de demandes, combien encaissé. Utile, mais muet sur la seule question
+// qui compte tant que la plateforme démarre : qu'est-ce qui ne marche pas ?
+//
+// Tout est agrégé ici en JavaScript plutôt qu'en SQL. À ces volumes — quelques
+// dizaines de lignes — la différence est imperceptible, et cela évite d'écrire
+// des requêtes que le client Supabase ne sait pas composer. Le plafond de 5 000
+// lignes garde la route rapide si l'activité décolle ; il faudra passer à des
+// vues SQL agrégées bien avant de l'atteindre.
+// ─────────────────────────────────────────────────────────────────────────────
+const LIBELLES_MOTIF_SIGNALEMENT = {
+  reclamation: 'Réclamation sur une prestation',
+  bug: 'Problème technique',
+  absence: 'Prestataire absent',
+  paiement: 'Litige de paiement',
+  comportement: 'Comportement inapproprié',
+  autre: 'Autre'
+};
+
+const LIBELLES_MOTIF_ECARTEMENT = {
+  trop_loin: 'Trop loin',
+  creneau_impossible: 'Créneau impossible',
+  trop_petit: 'Prestation trop petite',
+  hors_competence: 'Hors de leur métier',
+  autre: 'Autre'
+};
+
+function compterPar(liste, cle, libelles) {
+  const compte = {};
+  (liste || []).forEach((x) => {
+    const v = x[cle] || 'autre';
+    compte[v] = (compte[v] || 0) + 1;
+  });
+  return Object.keys(compte)
+    .map((k) => ({ cle: k, libelle: (libelles && libelles[k]) || k, nombre: compte[k] }))
+    .sort((a, b) => b.nombre - a.nombre);
+}
+
+function mediane(valeurs) {
+  const v = valeurs.filter((x) => typeof x === 'number' && isFinite(x)).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+
+app.get('/api/admin/diagnostic', adminAuth, async (req, res) => {
+  try {
+    const [demandes, devis, signalements, ecartements, documents, evaluations] = await Promise.all([
+      supabase.from('demandes').select('id, statut, prestation, adresse, created_at').limit(5000).then(r => r.data || []),
+      supabase.from('devis').select('id, demande_id, statut, prix_ttc, created_at').limit(5000).then(r => r.data || []),
+      supabase.from('signalements').select('motif, statut').limit(5000).then(r => r.data || []),
+      supabase.from('demandes_masquees').select('motif').not('motif', 'is', null).limit(5000).then(r => r.data || []),
+      supabase.from('documents_pro').select('statut, motif_refus').limit(5000).then(r => r.data || []),
+      supabase.from('evaluations').select('note').limit(5000).then(r => r.data || [])
+    ]);
+
+    // ── Taux de réponse : LE chiffre central ──────────────────────────────
+    // Une demande sans devis n'a servi à rien : ni au client, ni au prestataire,
+    // ni à vous. C'est la mesure la plus honnête de la santé de la place de marché.
+    const premierDevisPar = {};
+    devis.forEach((v) => {
+      const t = new Date(v.created_at).getTime();
+      if (!premierDevisPar[v.demande_id] || t < premierDevisPar[v.demande_id]) premierDevisPar[v.demande_id] = t;
+    });
+
+    const avecDevis = demandes.filter((d) => premierDevisPar[d.id]).length;
+    const sansDevis = demandes.length - avecDevis;
+    const morteSansDevis = demandes.filter(
+      (d) => !premierDevisPar[d.id] && (d.statut === 'expiree' || d.statut === 'expire_sans_paiement')
+    ).length;
+
+    // Délai de première réponse, en heures. La médiane plutôt que la moyenne :
+    // une seule demande répondue au bout de trois jours fausserait la moyenne.
+    const delais = demandes
+      .filter((d) => premierDevisPar[d.id])
+      .map((d) => (premierDevisPar[d.id] - new Date(d.created_at).getTime()) / 3600000)
+      .filter((h) => h >= 0);
+
+    // ── Conversion des devis ──────────────────────────────────────────────
+    const devisRepondus = devis.filter((v) => v.statut !== 'envoye').length;
+    const devisAcceptes = devis.filter((v) => v.statut === 'accepte').length;
+
+    // ── Villes ────────────────────────────────────────────────────────────
+    const parVille = {};
+    demandes.forEach((d) => {
+      const ville = String(d.adresse || '').split(',').pop().trim() || 'Inconnue';
+      if (!parVille[ville]) parVille[ville] = { ville, demandes: 0, sans_devis: 0 };
+      parVille[ville].demandes++;
+      if (!premierDevisPar[d.id]) parVille[ville].sans_devis++;
+    });
+
+    const notes = evaluations.map((e) => parseFloat(e.note)).filter((n) => !isNaN(n));
+
+    res.json({
+      reponse: {
+        total_demandes: demandes.length,
+        avec_devis: avecDevis,
+        sans_devis: sansDevis,
+        taux_reponse: demandes.length ? Math.round((avecDevis / demandes.length) * 100) : null,
+        mortes_sans_devis: morteSansDevis,
+        delai_median_heures: delais.length ? Math.round(mediane(delais) * 10) / 10 : null
+      },
+      conversion: {
+        devis_envoyes: devis.length,
+        devis_repondus: devisRepondus,
+        devis_acceptes: devisAcceptes,
+        // Calculé sur les devis ayant reçu une réponse : inclure ceux encore en
+        // attente ferait baisser le taux à mesure que l'activité augmente.
+        taux_acceptation: devisRepondus ? Math.round((devisAcceptes / devisRepondus) * 100) : null
+      },
+      signalements: {
+        par_motif: compterPar(signalements, 'motif', LIBELLES_MOTIF_SIGNALEMENT),
+        ouverts: signalements.filter((s) => s.statut !== 'traite').length,
+        total: signalements.length
+      },
+      ecartements: {
+        par_motif: compterPar(ecartements, 'motif', LIBELLES_MOTIF_ECARTEMENT),
+        total: ecartements.length
+      },
+      documents: {
+        en_attente: documents.filter((d) => d.statut === 'en_attente').length,
+        refuses_par_motif: compterPar(documents.filter((d) => d.statut === 'refuse'), 'motif_refus', MOTIFS_REFUS),
+        total: documents.length
+      },
+      villes: Object.values(parVille).sort((a, b) => b.demandes - a.demandes).slice(0, 8),
+      qualite: {
+        nombre_avis: notes.length,
+        note_moyenne: notes.length ? Math.round((notes.reduce((a, b) => a + b, 0) / notes.length) * 100) / 100 : null
+      }
+    });
+  } catch (e) {
+    console.error('Diagnostic admin :', e.message);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 // ══════════════ DOCUMENTS DES PRESTATAIRES ══════════════
 
 // Déposer un document. Un dépôt du même type remplace le précédent : l'ancien
@@ -4231,7 +4370,10 @@ app.patch('/api/admin/signalements/:id', adminAuth, async (req, res) => {
 app.get('/api/admin/users', adminAuth, async (req, res) => {
   try {
     const recherche = (req.query.q || '').trim();
-    let requete = supabase.from('users').select('id, prenom, nom, email, type, disponible, compte_supprime, created_at, note_moyenne, taux_fiabilite').order('created_at', { ascending: false }).limit(100);
+    // Le téléphone manquait. C'est pourtant l'information la plus utile de cet
+    // écran : quand un dossier coince, un appel règle en trente secondes ce que
+    // trois échanges d'emails n'ont pas réglé.
+    let requete = supabase.from('users').select('id, prenom, nom, email, telephone, type, disponible, compte_supprime, created_at, note_moyenne, taux_fiabilite, siret, siret_statut, siret_doublon').order('created_at', { ascending: false }).limit(100);
     if (recherche) requete = requete.or(`email.ilike.%${recherche}%,prenom.ilike.%${recherche}%,nom.ilike.%${recherche}%`);
     const { data } = await requete;
     res.json(data || []);
