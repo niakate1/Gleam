@@ -2801,21 +2801,6 @@ textarea { min-height: 92px; padding-top: 13px; }
         <div class="err" id="lerr"></div>
       </div>
       <div id="form-register" style="display:none">
-        <div class="register-section-titre"><i data-lucide="user"></i>Vos informations</div>
-        <div class="row2">
-          <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean" autocomplete="given-name"></div>
-          <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont" autocomplete="family-name"></div>
-        </div>
-        <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="re" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
-        <div class="champ-icone"><label>Téléphone</label><i data-lucide="phone"></i><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel"></div>
-
-        <div class="register-section-titre"><i data-lucide="lock"></i>Sécurité</div>
-        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"><button type="button" class="bascule-mdp" aria-label="Afficher ou masquer le mot de passe" onclick="basculerVisibiliteMdp('rpw',this)"><i data-lucide="eye"></i></button></div>
-        <div class="force-mdp" id="force-mdp-barres" style="display:none">
-          <div class="force-mdp-barre"></div><div class="force-mdp-barre"></div><div class="force-mdp-barre"></div>
-        </div>
-        <div class="force-mdp-texte" id="force-mdp-texte"></div>
-
         <div class="register-section-titre"><i data-lucide="briefcase"></i>Que venez-vous faire sur Gleam ?</div>
 
         <!-- Deux groupes séparés, avec la question écrite. Posés côte à côte sans
@@ -2878,6 +2863,22 @@ textarea { min-height: 92px; padding-top: 13px; }
             <span>J'atteste disposer d'une assurance responsabilité civile professionnelle en cours de validité, couvrant les dommages pouvant survenir dans le cadre de mes prestations.</span>
           </label>
         </div>
+
+        <div class="register-section-titre"><i data-lucide="user"></i>Vos coordonnées</div>
+        <div class="row2">
+          <div><label>Prénom</label><input type="text" id="rfn" placeholder="Jean" autocomplete="given-name"></div>
+          <div><label>Nom</label><input type="text" id="rln" placeholder="Dupont" autocomplete="family-name"></div>
+        </div>
+        <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="re" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+        <div class="champ-icone"><label>Téléphone</label><i data-lucide="phone"></i><input type="tel" id="rp" placeholder="06 00 00 00 00" autocomplete="tel"></div>
+
+        <div class="register-section-titre"><i data-lucide="lock"></i>Sécurité</div>
+        <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="rpw" placeholder="Minimum 8 caractères" autocomplete="new-password" oninput="majForceMotDePasse(this.value)"><button type="button" class="bascule-mdp" aria-label="Afficher ou masquer le mot de passe" onclick="basculerVisibiliteMdp('rpw',this)"><i data-lucide="eye"></i></button></div>
+        <div class="force-mdp" id="force-mdp-barres" style="display:none">
+          <div class="force-mdp-barre"></div><div class="force-mdp-barre"></div><div class="force-mdp-barre"></div>
+        </div>
+        <div class="force-mdp-texte" id="force-mdp-texte"></div>
+
         <label style="margin-top:20px">Code de parrainage <span class="optional">(optionnel)</span></label>
         <input type="text" id="r-code-parrainage" placeholder="Ex: MADY1234" style="text-transform:uppercase">
         <label style="display:flex;align-items:flex-start;gap:8px;margin-top:16px;cursor:pointer;font-weight:400;font-size:13px">
