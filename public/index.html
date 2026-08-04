@@ -1561,10 +1561,36 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   padding: var(--gap-4);
   margin-top: 12px;
 }
-.bloc-complement label { font-size: 12.5px; font-weight: 600; }
-.bloc-complement label:first-of-type { margin-top: 0; }
-.bloc-complement p,
-.bloc-complement > div[style*="font-size"] { font-size: 12px; line-height: 1.5; color: var(--gray); }
+/* Deux classes remplacent les styles en ligne posés champ par champ, où
+   chaque étiquette avait sa propre valeur de marge et de taille. Le rythme
+   vertical est désormais régulier au pixel près. */
+.bloc-complement .etiquette-champ {
+  display: block;
+  font-size: 13px; font-weight: 600; color: var(--text);
+  margin: var(--gap-4) 0 6px;
+}
+.bloc-complement .etiquette-champ:first-child { margin-top: 0; }
+.bloc-complement .etiquette-secondaire { font-size: 12.5px; font-weight: 500; color: var(--text-secondary); }
+.bloc-complement .etiquette-champ .optional {
+  font-size: 11.5px; font-weight: 400; color: var(--gray); margin-left: 5px;
+}
+
+/* Le texte d'aide se place SOUS l'étiquette et AU-DESSUS du champ : il explique
+   avant qu'on saisisse, pas après. */
+.bloc-complement .aide-champ {
+  font-size: 12px; line-height: 1.45; color: var(--gray);
+  margin: -2px 0 8px;
+}
+.bloc-complement input { margin-bottom: 0; }
+
+.case-attestation {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-top: var(--gap-4);
+  font-size: 12.5px; font-weight: 400; line-height: 1.45;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.case-attestation input { width: auto; margin: 2px 0 0; flex-shrink: 0; }
 
 /* ────────────────────────────────────────────────────────────────────────────
    40. CHOIX DU RÔLE À L'INSCRIPTION
@@ -1618,14 +1644,26 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .liste-roles .role-btn .titre-role { font-size: 15px; font-weight: 600; }
 .liste-roles .role-btn .detail-role { font-size: 12.5px; font-weight: 400; }
 
-.ico-role {
+.liste-roles .role-btn .ico-role {
   flex-shrink: 0; width: 36px; height: 36px;
+  /* display:flex redéclaré à spécificité supérieure : la règle générique
+     .role-btn span impose display:block et supprimait le centrage. */
   display: flex; align-items: center; justify-content: center;
   background: var(--surface-alt); color: var(--gray);
   border-radius: 9px;
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
-.ico-role i, .ico-role svg { width: 17px; height: 17px; }
+/* display:block est indispensable : une icône Lucide devient un <svg> en
+   ligne, donc aligné sur la ligne de base du texte — il descend de deux à
+   trois pixels et n'est jamais centré dans son carré. C'est le décalage visible.
+   Les dimensions sont posées avec une spécificité supérieure à .role-btn i,
+   déclarée plus bas dans une autre feuille de style avec 20 px. */
+.liste-roles .role-btn .ico-role i,
+.liste-roles .role-btn .ico-role svg {
+  display: block;
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+}
 
 .texte-role { flex: 1; min-width: 0; }
 
@@ -2638,7 +2676,10 @@ textarea { min-height: 92px; padding-top: 13px; }
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
 }
-.register-section-titre i { width: 13px; height: 13px; color: var(--gray); }
+/* Même correction sur les titres de section : sans display:block, l'icône
+   flotte au-dessus de la ligne de base de la majuscule. */
+.register-section-titre i,
+.register-section-titre svg { display: block; width: 13px; height: 13px; color: var(--gray); flex-shrink: 0; }
 
 /* Les rôles sont des choix de même importance : même hauteur, icône centrée,
    libellé sur une seule ligne. Les emojis rendaient les trois boutons
@@ -2939,32 +2980,47 @@ textarea { min-height: 92px; padding-top: 13px; }
           </div>
         </div>
         <div id="entreprise-block" class="bloc-complement" style="display:none">
-          <label style="margin-top:0">Raison sociale <span class="optional">(vous pourrez la renseigner plus tard)</span></label>
-          <input type="text" id="r-raison-sociale" placeholder="Ex: Dupont Nettoyage SARL">
-          <label>Numéro SIRET <span class="optional">(vous pourrez le renseigner plus tard)</span></label>
-          <input type="text" id="r-siret-entreprise" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret-entreprise')">
-          <div class="retour-siret" id="retour-r-siret-entreprise"></div>
-          <label>Numéro de TVA intracommunautaire <span class="optional">(optionnel)</span></label>
-          <input type="text" id="r-tva" placeholder="Ex: FR12345678901">
-          <label>Adresse de facturation <span class="optional">(vous pourrez la renseigner plus tard)</span></label>
+          <!-- Ce qui se remplit de mémoire vient d'abord ; le numéro administratif
+               ferme la marche. Quatorze chiffres qu'on va chercher dans un
+               dossier ne doivent pas barrer la route au reste. -->
+          <label class="etiquette-champ">Raison sociale <span class="optional">facultatif pour l'instant</span></label>
+          <input type="text" id="r-raison-sociale" placeholder="Ex : Dupont Nettoyage SARL">
+
+          <label class="etiquette-champ">Adresse de facturation <span class="optional">facultatif pour l'instant</span></label>
           <input type="text" id="r-adresse-facturation" placeholder="12 rue de la Paix, 75001 Paris">
-          <div style="font-size:12px;color:var(--gray);margin-top:8px">Cette adresse sert uniquement à la facturation — l'adresse d'intervention est précisée à chaque demande.</div>
+          <div class="aide-champ">Elle ne sert qu'à la facturation. L'adresse d'intervention se précise à chaque demande.</div>
+
+          <label class="etiquette-champ">N° de TVA intracommunautaire <span class="optional">facultatif</span></label>
+          <input type="text" id="r-tva" placeholder="Ex : FR12345678901">
+
+          <label class="etiquette-champ">Numéro SIRET <span class="optional">facultatif pour l'instant</span></label>
+          <div class="aide-champ">Saisissez-le et le nom de votre société se remplira automatiquement.</div>
+          <input type="text" id="r-siret-entreprise" placeholder="14 chiffres" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret-entreprise')">
+          <div class="retour-siret" id="retour-r-siret-entreprise"></div>
         </div>
         <div id="pro-rcpro-block" class="bloc-complement" style="display:none">
-          <label style="margin-top:0">Numéro SIRET <span class="optional">(vous pourrez le renseigner plus tard)</span></label>
-          <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Nécessaire pour vérifier votre statut légal d'indépendant ou d'entreprise.</div>
-          <input type="text" id="r-siret" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret')">
-          <div class="retour-siret" id="retour-r-siret"></div>
-          <label style="margin-top:14px">Assurance RC Pro <span class="optional">(requis pour les professionnels)</span></label>
-          <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Une assurance responsabilité civile professionnelle en cours de validité est nécessaire pour intervenir chez les clients Gleam.</div>
-          <label style="font-size:12px;margin-top:0">Compagnie d'assurance <span class="optional">(optionnel)</span></label>
-          <input type="text" id="r-assurance-compagnie" placeholder="Ex: MAIF, AXA...">
-          <label style="font-size:12px">Numéro de police <span class="optional">(optionnel)</span></label>
-          <input type="text" id="r-assurance-police" placeholder="Ex: 123456789">
-          <label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;cursor:pointer;font-weight:400;font-size:13px">
-            <input type="checkbox" id="r-assurance-atteste" style="width:auto;margin-top:2px">
+          <!-- L'assurance d'abord : une case à cocher et deux champs qu'on
+               remplit de mémoire. Le SIRET ferme la marche, là où l'abandon
+               coûte le moins cher. -->
+          <label class="etiquette-champ">Assurance responsabilité civile professionnelle</label>
+          <div class="aide-champ">Elle couvre les dommages éventuels chez vos clients. Elle vous sera demandée avant votre premier devis.</div>
+
+          <label class="etiquette-champ etiquette-secondaire">Compagnie <span class="optional">facultatif</span></label>
+          <input type="text" id="r-assurance-compagnie" placeholder="Ex : MAIF, AXA…">
+
+          <label class="etiquette-champ etiquette-secondaire">Numéro de police <span class="optional">facultatif</span></label>
+          <input type="text" id="r-assurance-police" placeholder="Ex : 123456789">
+
+          <label class="case-attestation">
+            <input type="checkbox" id="r-assurance-atteste">
             <span>J'atteste disposer d'une assurance responsabilité civile professionnelle en cours de validité, couvrant les dommages pouvant survenir dans le cadre de mes prestations.</span>
           </label>
+
+          <label class="etiquette-champ">Numéro SIRET <span class="optional">facultatif pour l'instant</span></label>
+          <div class="aide-champ">Saisissez-le et nous vérifions votre immatriculation auprès du répertoire officiel.</div>
+          <input type="text" id="r-siret" placeholder="14 chiffres" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret')">
+          <div class="retour-siret" id="retour-r-siret"></div>
+          
         </div>
 
         <div class="register-section-titre"><i data-lucide="user"></i>Vos coordonnées</div>
