@@ -101,6 +101,22 @@ button{font-family:inherit;cursor:pointer}
 
 .lien-tel{display:inline-block;margin-top:4px;font-size:13px;font-weight:700;
   color:var(--p);text-decoration:none}
+.tableau-fiscal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  overflow:hidden;margin-bottom:18px}
+.tableau-fiscal .entete-tab,.tableau-fiscal .ligne-tab{display:grid;gap:12px;padding:12px 18px;align-items:center}
+.tableau-fiscal .entete-tab{background:var(--surface-alt);font-size:11.5px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--gray)}
+.tableau-fiscal .ligne-tab{border-top:1px solid var(--border);font-size:13.5px}
+.tableau-fiscal .ligne-tab.total{background:var(--surface-alt);font-weight:800}
+.tableau-fiscal .num{text-align:right;font-variant-numeric:tabular-nums}
+.tableau-fiscal .vide{color:var(--gray)}
+
+.etat-sequence{display:flex;align-items:flex-start;gap:11px;padding:14px 17px;border-radius:var(--r-md);
+  margin-bottom:18px;font-size:13px;line-height:1.5}
+.etat-sequence.ok{background:#E7F7EF;color:#0B7A55}
+.etat-sequence.souci{background:#FDECEC;color:#C0392B}
+.etat-sequence strong{font-weight:800}
+
 .rappel-legal{background:var(--surface);border-left:3px solid var(--p);border-radius:var(--r-sm);
   padding:16px 18px;margin-bottom:20px;font-size:13px;line-height:1.6;color:var(--text-secondary)}
 .rappel-legal strong{color:var(--text)}
@@ -358,6 +374,11 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
         un récapitulatif annuel de ses opérations, dans le même délai.
       </div>
       <div class="choix-annee" id="choix-annee"></div>
+      <div class="sous-onglets">
+        <button class="sous-onglet actif" data-fiscal="prestataires">Prestataires (DAC7)</button>
+        <button class="sous-onglet" data-fiscal="revenus">Mes revenus</button>
+        <button class="sous-onglet" data-fiscal="factures">Factures émises</button>
+      </div>
       <div id="totaux-declaration"></div>
       <div id="liste-declaration"></div>
     </section>
@@ -726,6 +747,15 @@ async function chargerDeclaration() {
     b.onclick = () => { anneeDeclaration = parseInt(b.dataset.annee, 10); chargerDeclaration(); };
   });
 
+  // Les sous-onglets partagent le sélecteur d'année et les deux conteneurs :
+  // seule la vue change, pas la structure.
+  document.querySelectorAll('[data-fiscal]').forEach((b) => {
+    b.classList.toggle('actif', b.dataset.fiscal === vueFiscale);
+    b.onclick = () => { vueFiscale = b.dataset.fiscal; chargerDeclaration(); };
+  });
+  if (vueFiscale === 'revenus') return chargerMesRevenus();
+  if (vueFiscale === 'factures') return chargerFactures();
+
   let d;
   try { d = await appel('/api/admin/declaration-annuelle?annee=' + anneeDeclaration); }
   catch (e) { $('liste-declaration').innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
@@ -794,6 +824,126 @@ function exporterDeclaration(d) {
   lien.click();
   URL.revokeObjectURL(lien.href);
   avis('Export téléchargé.');
+}
+
+
+// ── Pôle fiscal : trois vues sur les mêmes données ──────────────────────────
+
+let vueFiscale = 'prestataires';
+
+// Sur une liste de factures, l'heure est du bruit : seule la date compte, et
+// elle doit tenir dans une colonne étroite.
+function dateSeule(iso) {
+  try { return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  catch (e) { return iso; }
+}
+
+function grilleFiscale(colonnes, lignes, gabarit) {
+  return '<div class="tableau-fiscal">' +
+    '<div class="entete-tab" style="grid-template-columns:' + gabarit + '">' +
+      colonnes.map((c, i) => '<div' + (i ? ' class="num"' : '') + '>' + c + '</div>').join('') +
+    '</div>' +
+    lignes.map((l) => '<div class="ligne-tab' + (l.total ? ' total' : '') + '" ' +
+      'style="grid-template-columns:' + gabarit + '">' +
+      l.cellules.map((c, i) => '<div' + (i ? ' class="num"' : '') + '>' + c + '</div>').join('') +
+    '</div>').join('') +
+  '</div>';
+}
+
+// Les commissions encaissées : c'est le chiffre d'affaires de Gleam, celui que
+// vous déclarez. Ventilé par mois ET par trimestre, parce que la TVA se déclare
+// selon l'un ou l'autre régime.
+async function chargerMesRevenus() {
+  let d;
+  try { d = await appel('/api/admin/mes-revenus?annee=' + anneeDeclaration); }
+  catch (e) { $('liste-declaration').innerHTML = '<p class="petit">Chargement impossible.</p>'; return; }
+
+  $('totaux-declaration').innerHTML = '<div class="totaux-declaration">' +
+    '<div><div class="v">' + euros(d.total.commission) + '</div>' +
+      '<div class="e">Commissions encaissées<br>votre chiffre d\'affaires</div></div>' +
+    '<div><div class="v">' + euros(d.total.encaisse) + '</div><div class="e">Total encaissé des clients</div></div>' +
+    '<div><div class="v">' + euros(d.total.reverse) + '</div><div class="e">Reversé aux prestataires</div></div>' +
+    '<div><div class="v">' + d.total.nb + '</div><div class="e">Transactions</div></div>' +
+  '</div>' +
+  '<button class="bouton-export" id="btn-export">Exporter en CSV</button>';
+  $('btn-export').onclick = () => exporterRevenus(d);
+
+  const g = '1.4fr .7fr 1fr 1fr 1fr';
+  $('liste-declaration').innerHTML =
+    '<div class="titre-section">Par trimestre</div>' +
+    grilleFiscale(['Trimestre', 'Nb', 'Encaissé', 'Commission', 'Reversé'],
+      d.par_trimestre.map((t) => ({ cellules: [t.trimestre, t.nb, euros(t.encaisse), euros(t.commission), euros(t.reverse)] }))
+      .concat([{ total: true, cellules: ['Total ' + d.annee, d.total.nb, euros(d.total.encaisse), euros(d.total.commission), euros(d.total.reverse)] }]), g) +
+    '<div class="titre-section">Par mois</div>' +
+    grilleFiscale(['Mois', 'Nb', 'Encaissé', 'Commission', 'Reversé'],
+      d.par_mois.map((m) => ({ cellules: [
+        m.nb ? m.nom : '<span class="vide">' + m.nom + '</span>',
+        m.nb || '—', m.nb ? euros(m.encaisse) : '—', m.nb ? euros(m.commission) : '—', m.nb ? euros(m.reverse) : '—'
+      ] })), g);
+}
+
+// La liste des factures, et surtout le contrôle de séquence. Une numérotation
+// irrégulière ne se rattrape pas : mieux vaut la surveiller en permanence.
+async function chargerFactures() {
+  let d;
+  try { d = await appel('/api/admin/factures?annee=' + anneeDeclaration); }
+  catch (e) { $('liste-declaration').innerHTML = '<p class="petit">Chargement impossible.</p>'; return; }
+
+  const s = d.sequence;
+  const soucis = [];
+  if (d.sans_numero) soucis.push(d.sans_numero + ' facture(s) sans numéro');
+  if (s.doublons.length) soucis.push('numéros en double : ' + s.doublons.join(', '));
+  if (s.trous.length) soucis.push('numéros manquants : ' + s.trous.join(', '));
+
+  $('totaux-declaration').innerHTML =
+    '<div class="etat-sequence ' + (s.conforme ? 'ok' : 'souci') + '">' +
+      (s.conforme
+        ? '<div><strong>Numérotation conforme</strong><br>' +
+          d.factures.length + ' facture(s), séquence continue de ' +
+          String(s.premier || 0).padStart(4, '0') + ' à ' + String(s.dernier || 0).padStart(4, '0') +
+          ', sans doublon ni rupture.</div>'
+        : '<div><strong>Séquence irrégulière</strong><br>' + soucis.join(' · ') +
+          '<br>L\'article 242 nonies A de l\'annexe II du CGI impose une suite continue, sans rupture.</div>') +
+    '</div>' +
+    (d.factures.length ? '<button class="bouton-export" id="btn-export">Exporter en CSV</button>' : '');
+  if (d.factures.length) $('btn-export').onclick = () => exporterFactures(d);
+
+  $('liste-declaration').innerHTML = d.factures.length
+    ? grilleFiscale(['Numéro', 'Date', 'Client', 'Prestataire', 'Montant', 'Commission'],
+        d.factures.map((f) => ({ cellules: [
+          f.numero || '<span class="vide">sans numéro</span>',
+          dateSeule(f.date), echapper(f.client), echapper(f.prestataire),
+          euros(f.montant), euros(f.commission)
+        ] })), '1.1fr .8fr 1.2fr 1.2fr .9fr .9fr')
+    : '<p class="petit">Aucune facture émise en ' + d.annee + '.</p>';
+}
+
+function telechargerCsv(lignes, nom) {
+  // BOM et point-virgule : ce qu'attend Excel en configuration française.
+  const csv = '\ufeff' + lignes.map((l) =>
+    l.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+  const lien = document.createElement('a');
+  lien.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  lien.download = nom;
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+  avis('Export téléchargé.');
+}
+
+function exporterRevenus(d) {
+  const lignes = [['Periode', 'Nb transactions', 'Encaisse', 'Commission Gleam', 'Reverse prestataires']];
+  d.par_mois.forEach((m) => lignes.push([m.nom, m.nb, m.encaisse, m.commission, m.reverse]));
+  d.par_trimestre.forEach((t) => lignes.push([t.trimestre, t.nb, t.encaisse, t.commission, t.reverse]));
+  lignes.push(['TOTAL ' + d.annee, d.total.nb, d.total.encaisse, d.total.commission, d.total.reverse]);
+  telechargerCsv(lignes, 'gleam-revenus-' + d.annee + '.csv');
+}
+
+function exporterFactures(d) {
+  const lignes = [['Numero', 'Date', 'Client', 'Prestataire', 'Montant TTC', 'Commission', 'Net prestataire']];
+  d.factures.forEach((f) => lignes.push([
+    f.numero || '', f.date, f.client, f.prestataire, f.montant, f.commission, f.net
+  ]));
+  telechargerCsv(lignes, 'gleam-factures-' + d.annee + '.csv');
 }
 
 // ── Documents : file d'attente et décisions ─────────────────────────────────
