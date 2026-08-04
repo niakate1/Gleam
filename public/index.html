@@ -1136,7 +1136,27 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(162,28,
 }
 @keyframes modal-monte { from { transform: translateY(18px); } to { transform: none; } }
 
-.modal-handle { width: 42px; height: 4px; background: var(--border-fort); border-radius: var(--r-pill); margin: 0 auto var(--gap-5); }
+/* L'en-tête reste collé en haut de la modale. Sans cela, la croix défilait
+   avec le contenu : sur une liste longue — les documents, par exemple — on
+   descendait de trois lignes et elle sortait de l'écran. Il ne restait qu'à
+   toucher le fond sombre, à condition d'y penser. */
+.modal-entete {
+  position: sticky; top: calc(-1 * var(--gap-5)); z-index: 6;
+  display: flex; justify-content: center; align-items: flex-start;
+  margin: calc(-1 * var(--gap-5)) calc(-1 * var(--gap-5)) 0;
+  padding: var(--gap-5) var(--gap-5) var(--gap-3);
+  background: var(--surface);
+}
+.modal-handle { width: 42px; height: 4px; background: var(--border-fort); border-radius: var(--r-pill); margin: 6px auto 0; }
+.modal-fermer {
+  position: absolute; right: var(--gap-4); top: 14px;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-alt); border: none; border-radius: 50%;
+  font-size: 17px; color: var(--text-secondary); cursor: pointer; line-height: 1;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.modal-fermer:hover { background: var(--border); color: var(--text); }
 .modal-title  { font-size: 20px; font-weight: 600; line-height: 1.2; margin-bottom: 6px; }
 .modal-sub    { font-size: 13.5px; color: var(--gray); margin-bottom: var(--gap-5); line-height: 1.5; }
 
@@ -1517,6 +1537,18 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   transition-duration: 0s;
 }
 
+/* Pastille de rappel sur une entrée de profil. Rouge : elle signale une action
+   attendue du prestataire, pas une information. */
+.pastille-profil {
+  display: inline-block; min-width: 19px;
+  margin-left: 8px; padding: 1px 6px;
+  background: var(--red); color: #fff;
+  border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 800; text-align: center;
+  vertical-align: 1px;
+}
+.pastille-profil:empty { display: none; }
+
 /* ────────────────────────────────────────────────────────────────────────────
    39. RÉCEPTION D'UN DEVIS, CÔTÉ CLIENT
    L'écran le plus important du parcours : celui où le client choisit, et où
@@ -1528,11 +1560,23 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   margin-bottom: var(--gap-3);
 }
 .carte-devis-recu .identite-devis { flex: 1; min-width: 0; }
-.carte-devis-recu .nom-pro { font-size: 15px; font-weight: 700; color: var(--text); }
+/* Le nom se tronque plutôt que de déborder : un pseudonyme long ou une adresse
+   email en guise de nom ne doit jamais pousser le reste hors de la carte. */
+.carte-devis-recu .nom-pro {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .carte-devis-recu .note-pro { font-size: 12px; font-weight: 700; color: var(--gold); margin-top: 2px; }
 
 /* Repères de comparaison : ils ne s'affichent que si plusieurs devis
    coexistent pour la même demande. */
+/* Statut et repères sur une même ligne, qui passe à la ligne si besoin.
+   Aucune pastille ne peut écraser sa voisine : elles cèdent en descendant. */
+.ligne-etiquettes {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 2px 0 var(--gap-3);
+}
+.ligne-etiquettes > * { flex-shrink: 0; }
 .reperes-devis { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--gap-3); }
 .repere-devis {
   font-size: 11px; font-weight: 800;
@@ -2946,7 +2990,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="configurerPaiementsPro()"><span class="pi-icon"><i data-lucide="landmark" style="width:20px;height:20px"></i></span><span class="pi-text">Configurer mes paiements</span><span class="pi-arrow" id="connect-statut-badge"></span></div>
       <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="ouvrirDocumentsPro()"><span class="pi-icon"><i data-lucide="file-check" style="width:20px;height:20px"></i></span><span class="pi-text">Mes documents</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="ouvrirDocumentsPro()"><span class="pi-icon"><i data-lucide="file-check" style="width:20px;height:20px"></i></span><span class="pi-text">Mes documents<span class="pastille-profil" id="pastille-documents"></span></span><span class="pi-arrow">›</span></div>
     </div>
 
     <div class="profile-section-titre">Préférences</div>
@@ -3113,7 +3157,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- MODAL SERVICE -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
-  <div class="modal"><div style="display:flex;justify-content:center;position:relative"><div class="modal-handle"></div><button onclick="closeModalForce()" aria-label="Fermer" style="position:absolute;right:0;top:-4px;background:none;border:none;font-size:22px;color:var(--gray);cursor:pointer;padding:4px 8px;line-height:1">✕</button></div><div id="modal-body"></div></div>
+  <div class="modal"><div class="modal-entete"><div class="modal-handle"></div><button onclick="closeModalForce()" aria-label="Fermer" class="modal-fermer">✕</button></div><div id="modal-body"></div></div>
 </div>
 
 <!-- MODAL PAIEMENT -->
@@ -3709,6 +3753,7 @@ function enterApp(){
     var itemConfirmerEmailP=document.getElementById('item-confirmer-email-pro');
     if(itemConfirmerEmailP)itemConfirmerEmailP.style.display=(currentUser&&currentUser.email_verifie===false)?'flex':'none';
     majAffichageNotifications();
+    majPastilleDocuments();
     renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
     renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
     chargerReputationPro();
@@ -4575,9 +4620,11 @@ function renderDevisClientCards(){
             '<div class="nom-pro">'+proName+'</div>'+
             (proNote?'<div class="note-pro">'+proNote+'</div>':'')+
           '</div>'+
-          badge+
         '</div>'+
-        (reperes?'<div class="reperes-devis">'+reperes+'</div>':'')+
+        // Le badge de statut rejoint les repères : ce sont trois pastilles de
+        // même nature. Sur la ligne du nom, « Accepté — Paiement requis »
+        // recouvrait purement et simplement le prestataire.
+        ((badge||reperes)?'<div class="ligne-etiquettes">'+badge+reperes+'</div>':'')+
         '<div class="prestation-devis">'+ICONS_get(v.prestation)+' '+escapeHtml(v.prestation)+'</div>'+
         '<div class="montant-devis">'+escapeHtml(v.prix_ttc)+' \u20ac'+
           '<span class="mention-ttc">TTC, tout compris</span></div>'+
@@ -5673,6 +5720,30 @@ var ETATS_DOCUMENT = {
   refuse:     { texte: 'À renvoyer',      classe: 'refuse' }
 };
 
+// Un prestataire dont l'assurance a été refusée n'a aucune raison d'ouvrir
+// « Mes documents » : il ignore qu'il s'est passé quelque chose. La pastille le
+// lui dit depuis son profil, sans qu'il ait à chercher.
+async function majPastilleDocuments(){
+  var p=document.getElementById('pastille-documents');
+  if(!p||!currentUser||!isPro())return;
+  try{
+    const r=await fetch(API+'/api/documents',{headers:authHeaders()});
+    const d=await safeJson(r);
+    if(!d||!Array.isArray(d.documents)){p.textContent='';return}
+
+    // On compte les faces refusées, pas les types : une carte d'identité dont
+    // seul le verso est refusé demande bien une action, et une seule.
+    var refuses=0;
+    d.documents.forEach(function(item){
+      (item.faces||[]).forEach(function(f){
+        if(f.document&&f.document.statut==='refuse')refuses++;
+      });
+    });
+    p.textContent=refuses?String(refuses):'';
+    p.title=refuses?(refuses+' document'+(refuses>1?'s':'')+' à renvoyer'):'';
+  }catch(e){ p.textContent=''; }
+}
+
 async function ouvrirDocumentsPro(){
   document.getElementById('modal-body').innerHTML=
     '<div class="modal-title">Vos documents</div>'+
@@ -5808,6 +5879,7 @@ async function deposerDocument(champ){
     toast('Document déposé, il sera vérifié rapidement.');
     chargerDocumentsPro();
     chargerParcoursDemarrage();
+    majPastilleDocuments();
   }catch(e){
     toast(e&&e.message?e.message:friendlyNetworkError(e));
   }finally{
