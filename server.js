@@ -575,9 +575,19 @@ const PRESTATION_CONFIG = {
   tapis: {
     unite: true,
     uniteLabel: 'm²', // le pro fixe un prix par m² réel, le client indique la surface exacte
-    prixReferenceDefaut: 20, // €/m², synthétique, état propre (marché observé : 15 à 35€/m² synthétique)
-    // Écart de prix très marqué selon la matière (jusqu'à x4 entre synthétique et soie) — recherche de marché à l'appui.
-    coefMatiere: { synthetique: 1.0, coton: 1.2, jute_sisal: 1.3, berbere: 1.4, laine: 1.6, soie: 3.5 }
+    // 16 €/m² et non 20 : la base doit être le BAS de la fourchette de marché,
+    // pas son milieu. Les fourchettes relevées — 15 à 25 €/m² pour du synthétique,
+    // 25 à 35 pour de la laine — contiennent déjà la variation de matière et
+    // d'état. Partir du milieu puis remultiplier par 1,6 (matière) et 1,6 (état)
+    // comptait deux fois la même chose : un tapis de laine très sale ressortait à
+    // 51 €/m², soit 45 % au-dessus du plafond du marché.
+    //
+    // Avec 16 €/m² et des coefficients resserrés, les extrêmes retombent dans les
+    // clous : synthétique 16 à 25,6 · laine 23,2 à 37,1 · soie 48 à 76,8 €/m².
+    prixReferenceDefaut: 16, // €/m², synthétique, état propre (marché : 15 à 25 €/m²)
+    // Le rapport soie/synthétique reste d'environ 3, conforme au marché relevé
+    // (synthétique dès 18 €/m², soie dès 45 à 75 €/m²).
+    coefMatiere: { synthetique: 1.0, coton: 1.15, jute_sisal: 1.25, berbere: 1.3, laine: 1.45, soie: 3.0 }
   },
   autre: {
     tierKey: null, // pas de dimension structurée, un seul prix indicatif
