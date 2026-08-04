@@ -45,6 +45,60 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);c
 button{font-family:inherit;cursor:pointer}
 .masque{display:none!important}
 
+/* ── File d'attente des documents ────────────────────────────────────────── */
+.pastille{display:inline-block;min-width:19px;padding:1px 6px;margin-left:7px;border-radius:999px;
+  background:var(--red);color:#fff;font-size:11px;font-weight:800;vertical-align:1px}
+.pastille:empty{display:none}
+
+.sous-onglets{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px}
+.sous-onglet{padding:7px 15px;border:1px solid var(--border);background:var(--surface);
+  border-radius:999px;font-family:inherit;font-size:13px;font-weight:700;color:var(--text-secondary);cursor:pointer}
+.sous-onglet.actif{background:var(--p);border-color:var(--p);color:#fff}
+
+/* Une décision par écran : la carte occupe la largeur, sans voisin qui distraie. */
+.dossier{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:20px;margin-bottom:18px}
+.dossier .entete{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+  padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--border)}
+.dossier .qui{font-size:16px;font-weight:800;color:var(--text)}
+.dossier .quoi{font-size:13.5px;color:var(--p);font-weight:700;margin-top:3px}
+.dossier .quand{font-size:12px;color:var(--gray);white-space:nowrap}
+
+.apercu{display:block;width:100%;max-height:420px;object-fit:contain;background:var(--surface-alt);
+  border-radius:var(--r-sm);margin-bottom:16px;cursor:zoom-in}
+.apercu-pdf{display:flex;align-items:center;justify-content:center;gap:9px;padding:34px;
+  background:var(--surface-alt);border-radius:var(--r-sm);margin-bottom:16px;
+  font-size:14px;font-weight:700;color:var(--text-secondary);text-decoration:none}
+
+/* Le contrôle automatique, à côté du document : on compare d'un coup d'œil. */
+.controle{border-radius:var(--r-sm);padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.5}
+.controle.ok{background:#E7F7EF;color:#0B7A55}
+.controle.souci{background:#FEF3E2;color:#9A6412}
+.controle strong{font-weight:800}
+.controle .ligne{margin-top:5px}
+
+.champs-dates{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.champs-dates label{display:block;font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:5px}
+.champs-dates input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm);
+  font-family:inherit;font-size:14px;background:var(--surface);color:var(--text)}
+
+.decisions{display:flex;gap:10px;flex-wrap:wrap}
+.decisions button{padding:11px 20px;border:none;border-radius:var(--r-sm);
+  font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.btn-valider{background:var(--green,#0B7A55);color:#fff}
+.btn-refuser{background:none;border:1.5px solid var(--border)!important;color:var(--text-secondary)}
+
+.bloc-refus{margin-top:14px;padding:14px;background:var(--surface-alt);border-radius:var(--r-sm)}
+.bloc-refus select,.bloc-refus input{width:100%;padding:10px 12px;border:1px solid var(--border);
+  border-radius:var(--r-sm);font-family:inherit;font-size:14px;margin-bottom:10px;background:var(--surface);color:var(--text)}
+
+.etiquette{display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.04em;padding:3px 9px;border-radius:999px}
+.etiquette.attente{background:#FEF3E2;color:#9A6412}
+.etiquette.valide{background:#E7F7EF;color:#0B7A55}
+.etiquette.refuse{background:#FDECEC;color:#C0392B}
+.etiquette.urgent{background:#FDECEC;color:#C0392B}
+
 /* ── Connexion ─────────────────────────────────────────────────────────── */
 #ecran-connexion{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
   background:radial-gradient(ellipse 420px 340px at 92% -6%,rgba(245,197,66,.30),transparent 66%),
@@ -160,6 +214,7 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
     <div class="onglets">
       <button class="onglet actif" data-vue="chiffres">Chiffres</button>
       <button class="onglet" data-vue="signalements">Signalements</button>
+      <button class="onglet" data-vue="documents">Documents<span class="pastille" id="compteur-documents"></span></button>
       <button class="onglet" data-vue="comptes">Comptes</button>
     </div>
 
@@ -177,6 +232,16 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
     <section id="vue-signalements" class="masque">
       <div class="titre-section">Signalements et messages au support</div>
       <div id="liste-signalements"></div>
+    </section>
+
+    <section id="vue-documents" class="masque">
+      <div class="sous-onglets">
+        <button class="sous-onglet actif" data-filtre="en_attente">À vérifier</button>
+        <button class="sous-onglet" data-filtre="expirations">Expirations</button>
+        <button class="sous-onglet" data-filtre="refuse">Refusés</button>
+        <button class="sous-onglet" data-filtre="valide">Validés</button>
+      </div>
+      <div id="liste-documents"></div>
     </section>
 
     <section id="vue-comptes" class="masque">
@@ -419,15 +484,205 @@ async function basculerCompte(id, disponible) {
   } catch (e) { if (e.message !== '401') avis(e.message, 'ko'); }
 }
 
+
+// ── Documents : file d'attente et décisions ─────────────────────────────────
+
+let filtreDocuments = 'en_attente';
+let motifsRefus = {};
+
+function ilYA(iso) {
+  const h = Math.floor((Date.now() - new Date(iso)) / 3600000);
+  if (h < 1) return "à l'instant";
+  if (h < 24) return 'il y a ' + h + ' h';
+  const j = Math.floor(h / 24);
+  return 'il y a ' + j + ' jour' + (j > 1 ? 's' : '');
+}
+
+function dateFr(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  catch (e) { return iso; }
+}
+
+// Le contrôle automatique du SIRET, présenté à côté du document. C'est ce qui
+// permet de décider sans ouvrir un autre onglet.
+function blocControle(pro) {
+  if (!pro) return '';
+  const d = pro.siret_donnees || {};
+  const souci = pro.siret_statut !== 'verifie' || pro.siret_doublon;
+  let lignes = [];
+
+  if (pro.siret_statut === 'verifie') {
+    lignes.push('<strong>SIRET vérifié</strong> — ' + (d.nom || pro.siret) +
+      (d.etat_etablissement === 'A' ? ', établissement actif' : '') +
+      (d.activite_libelle ? '<div class="ligne">' + d.activite_libelle +
+        (d.activite_code ? ' (' + d.activite_code + ')' : '') + '</div>' : ''));
+  } else if (pro.siret_statut === 'ferme') {
+    lignes.push('<strong>Établissement fermé</strong> au répertoire — ' + (d.nom || pro.siret));
+  } else if (pro.siret_statut === 'introuvable') {
+    lignes.push('<strong>SIRET introuvable</strong> au répertoire officiel');
+  } else if (!pro.siret) {
+    lignes.push('<strong>Aucun SIRET renseigné</strong>');
+  } else {
+    lignes.push('SIRET non vérifié — ' + pro.siret);
+  }
+
+  if (pro.siret_doublon)
+    lignes.push('<div class="ligne"><strong>Ce SIRET est partagé</strong> avec un autre compte — à examiner.</div>');
+
+  return '<div class="controle ' + (souci ? 'souci' : 'ok') + '">' + lignes.join('') + '</div>';
+}
+
+async function chargerDocuments() {
+  const c = $('liste-documents');
+  c.innerHTML = '<p class="petit">Chargement…</p>';
+
+  if (filtreDocuments === 'expirations') return chargerExpirations();
+
+  let d;
+  try { d = await appel('/api/admin/documents?statut=' + filtreDocuments); }
+  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+  motifsRefus = d.motifs_refus || {};
+
+  const pastille = $('compteur-documents');
+  if (pastille) pastille.textContent = d.en_attente ? String(d.en_attente) : '';
+
+  if (!d.documents.length) {
+    c.innerHTML = '<p class="petit">' +
+      (filtreDocuments === 'en_attente' ? 'Aucun document en attente. Tout est à jour.' : 'Aucun document.') + '</p>';
+    return;
+  }
+
+  c.innerHTML = d.documents.map((doc) => {
+    const pro = doc.pro || {};
+    const decidable = doc.statut === 'en_attente';
+    return '<div class="dossier" id="dossier-' + doc.id + '">' +
+      '<div class="entete">' +
+        '<div><div class="qui">' + (pro.prenom || '') + ' ' + (pro.nom || '') + '</div>' +
+          '<div class="quoi">' + doc.type_libelle + '</div>' +
+          '<div class="petit">' + (pro.email || '') + '</div></div>' +
+        '<div style="text-align:right"><div class="quand">' + ilYA(doc.created_at) + '</div>' +
+          (decidable ? '' : '<div style="margin-top:6px"><span class="etiquette ' + doc.statut + '">' +
+            (doc.statut === 'valide' ? 'Validé' : doc.statut === 'refuse' ? 'Refusé' : 'Expiré') + '</span></div>') +
+        '</div>' +
+      '</div>' +
+      '<div id="apercu-' + doc.id + '"><p class="petit">Chargement de l\'aperçu…</p></div>' +
+      blocControle(pro) +
+      (decidable ?
+        '<div class="champs-dates">' +
+          '<div><label>Émis le</label><input type="date" id="emission-' + doc.id + '" value="' + (doc.date_emission || '') + '"></div>' +
+          '<div><label>Expire le</label><input type="date" id="expiration-' + doc.id + '" value="' + (doc.date_expiration || '') + '"></div>' +
+        '</div>' +
+        '<div class="decisions">' +
+          '<button class="btn-valider" data-valider="' + doc.id + '">Valider</button>' +
+          '<button class="btn-refuser" data-refuser="' + doc.id + '">Refuser…</button>' +
+        '</div>' +
+        '<div id="refus-' + doc.id + '"></div>'
+        : (doc.motif_refus ? '<p class="petit">Motif : ' + (motifsRefus[doc.motif_refus] || doc.motif_refus) +
+            (doc.commentaire ? ' — ' + doc.commentaire : '') + '</p>' : '') +
+          (doc.date_expiration ? '<p class="petit">Valable jusqu\'au ' + dateFr(doc.date_expiration) + '</p>' : '')) +
+    '</div>';
+  }).join('');
+
+  d.documents.forEach((doc) => chargerApercu(doc.id));
+  c.querySelectorAll('[data-valider]').forEach((b) => { b.onclick = () => decider(b.dataset.valider, 'valide'); });
+  c.querySelectorAll('[data-refuser]').forEach((b) => { b.onclick = () => ouvrirRefus(b.dataset.refuser); });
+}
+
+// L'URL signée n'est demandée qu'au moment de l'affichage, et elle expire en
+// cinq minutes : aucune adresse permanente ne circule ni ne se retrouve dans
+// l'historique du navigateur.
+async function chargerApercu(id) {
+  const box = $('apercu-' + id);
+  if (!box) return;
+  let d;
+  try { d = await appel('/api/admin/documents/' + id + '/fichier'); }
+  catch (e) { box.innerHTML = '<p class="petit">Aperçu indisponible.</p>'; return; }
+  if (!d || !d.url) { box.innerHTML = '<p class="petit">Aperçu indisponible.</p>'; return; }
+
+  if (d.type_mime === 'application/pdf') {
+    box.innerHTML = '<a class="apercu-pdf" href="' + d.url + '" target="_blank" rel="noopener">' +
+      'Ouvrir le PDF dans un nouvel onglet</a>';
+  } else {
+    box.innerHTML = '<img class="apercu" src="' + d.url + '" alt="Document" ' +
+      'onclick="window.open(this.src,\'_blank\')">';
+  }
+}
+
+function ouvrirRefus(id) {
+  const box = $('refus-' + id);
+  if (!box || box.innerHTML) { if (box) box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="bloc-refus">' +
+    '<select id="motif-' + id + '">' +
+      Object.keys(motifsRefus).map((k) => '<option value="' + k + '">' + motifsRefus[k] + '</option>').join('') +
+    '</select>' +
+    '<input type="text" id="commentaire-' + id + '" placeholder="Précision envoyée au prestataire (facultatif)">' +
+    '<button class="btn-refuser" style="border-color:#C0392B!important;color:#C0392B" data-confirmer="' + id + '">Confirmer le refus</button>' +
+  '</div>';
+  box.querySelector('[data-confirmer]').onclick = () => decider(id, 'refuse');
+}
+
+async function decider(id, decision) {
+  const corps = {
+    decision,
+    date_emission: ($('emission-' + id) || {}).value || null,
+    date_expiration: ($('expiration-' + id) || {}).value || null
+  };
+  if (decision === 'refuse') {
+    corps.motif = ($('motif-' + id) || {}).value;
+    corps.commentaire = ($('commentaire-' + id) || {}).value || '';
+  }
+  let d;
+  try {
+    d = await appel('/api/admin/documents/' + id, { method: 'PATCH', body: JSON.stringify(corps) });
+  } catch (e) { avis(e.message, 'erreur'); return; }
+  avis(d.message);
+  const carte = $('dossier-' + id);
+  if (carte) carte.remove();
+  chargerDocuments();
+}
+
+async function chargerExpirations() {
+  const c = $('liste-documents');
+  let d;
+  try { d = await appel('/api/admin/documents/expirations?jours=60'); }
+  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible.</p>'; return; }
+  if (!d.documents.length) {
+    c.innerHTML = '<p class="petit">Aucune échéance dans les 60 prochains jours.</p>';
+    return;
+  }
+  c.innerHTML = d.documents.map((doc) => {
+    const pro = doc.pro || {};
+    const urgent = doc.jours_restants <= 15;
+    return '<div class="dossier"><div class="entete" style="border:none;margin:0;padding:0">' +
+      '<div><div class="qui">' + (pro.prenom || '') + ' ' + (pro.nom || '') + '</div>' +
+        '<div class="quoi">' + doc.type_libelle + '</div>' +
+        '<div class="petit">' + (pro.email || '') + '</div></div>' +
+      '<div style="text-align:right"><span class="etiquette ' + (urgent ? 'urgent' : 'attente') + '">' +
+        (doc.jours_restants < 0 ? 'Expiré' : 'Dans ' + doc.jours_restants + ' jour' + (doc.jours_restants > 1 ? 's' : '')) +
+      '</span><div class="petit" style="margin-top:5px">' + dateFr(doc.date_expiration) + '</div></div>' +
+    '</div></div>';
+  }).join('');
+}
+
 // ── Navigation ──────────────────────────────────────────────────────────────
 document.querySelectorAll('.onglet').forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll('.onglet').forEach((x) => x.classList.toggle('actif', x === b));
-    ['chiffres', 'signalements', 'comptes'].forEach((v) =>
+    ['chiffres', 'signalements', 'documents', 'comptes'].forEach((v) =>
       $('vue-' + v).classList.toggle('masque', v !== b.dataset.vue));
     if (b.dataset.vue === 'chiffres') chargerChiffres();
     if (b.dataset.vue === 'signalements') chargerSignalements();
+    if (b.dataset.vue === 'documents') chargerDocuments();
     if (b.dataset.vue === 'comptes') chargerComptes($('recherche').value.trim());
+  };
+});
+
+document.querySelectorAll('.sous-onglet').forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll('.sous-onglet').forEach((x) => x.classList.toggle('actif', x === b));
+    filtreDocuments = b.dataset.filtre;
+    chargerDocuments();
   };
 });
 
