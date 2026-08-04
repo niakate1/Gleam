@@ -789,10 +789,17 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
     if (!cguAcceptees)
       return res.status(400).json({ error: 'Merci d\'accepter les CGU et la politique de confidentialité pour continuer.' });
-    if (isProType(type) && !assuranceRcPro)
-      return res.status(400).json({ error: 'L\'attestation d\'assurance RC Pro est requise pour créer un compte professionnel.' });
-    if (isProType(type) && !/^\d{14}$/.test(siret))
-      return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus).' });
+    // Ni le SIRET ni l'attestation d'assurance ne sont exigés pour créer un
+    // compte. Ils le sont avant le premier devis — voir justificatifsManquants().
+    //
+    // Un artisan convaincu par la plateforme mais qui n'a pas ses papiers sous
+    // les yeux doit pouvoir s'inscrire, regarder les demandes de son secteur et
+    // revenir. L'exiger ici revenait à le perdre définitivement.
+    //
+    // En revanche, un SIRET fourni doit être correctement formé : mieux vaut le
+    // dire tout de suite que de le laisser passer et le refuser au premier devis.
+    if (isProType(type) && siret && !/^\d{14}$/.test(siret))
+      return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus). Vous pouvez aussi laisser le champ vide et le renseigner plus tard.' });
     if (type === 'entreprise') {
       if (!raisonSociale) return res.status(400).json({ error: 'Raison sociale requise.' });
       if (!/^\d{14}$/.test(siret)) return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus).' });
@@ -2237,6 +2244,22 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
 
 // ══════════════ DEVIS ══════════════
 
+// Les justificatifs qu'un prestataire doit avoir fournis avant de proposer un
+// prix. Le devis est le moment où la relation commerciale commence : c'est là
+// que le contrôle a du sens, pas à l'inscription.
+//
+// Renvoie la liste de ce qui manque, jamais un simple refus — le prestataire
+// doit savoir quoi faire, et l'application doit pouvoir l'y emmener.
+function justificatifsManquants(user) {
+  const manquants = [];
+  if (!user) return ['compte'];
+  if (!/^\d{14}$/.test(String(user.siret || '').replace(/\s/g, '')))
+    manquants.push('siret');
+  if (!user.assurance_rc_pro)
+    manquants.push('assurance');
+  return manquants;
+}
+
 app.post('/api/devis', auth, async (req, res) => {
   try {
     const { demande_id, prix_ttc, description, creneau_propose } = req.body;
@@ -2244,6 +2267,22 @@ app.post('/api/devis', auth, async (req, res) => {
       return res.status(400).json({ error: 'Demande et prix requis.' });
     if (parseFloat(prix_ttc) <= 0)
       return res.status(400).json({ error: 'Le prix doit être positif.' });
+
+    // Contrôle des justificatifs — le seul point de blocage du parcours
+    // prestataire, et il arrive au moment où il est légitime.
+    const { data: auteur } = await supabase.from('users')
+      .select('type, siret, assurance_rc_pro').eq('id', req.user.id).single();
+    const manquants = justificatifsManquants(auteur);
+    if (manquants.length) {
+      return res.status(403).json({
+        error: manquants.length === 2
+          ? 'Avant votre premier devis, renseignez votre numéro SIRET et attestez de votre assurance RC Pro.'
+          : (manquants[0] === 'siret'
+              ? 'Avant votre premier devis, renseignez votre numéro SIRET.'
+              : 'Avant votre premier devis, attestez de votre assurance RC Pro.'),
+        justificatifs_manquants: manquants
+      });
+    }
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
     if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
@@ -3543,6 +3582,49 @@ app.get('/api/societes', auth, async (req, res) => {
 app.patch('/api/societes/disponibilite', auth, async (req, res) => {
   await supabase.from('users').update({ disponible: Boolean(req.body.disponible) }).eq('id', req.user.id);
   res.json({ message: 'Disponibilité mise à jour.' });
+});
+
+// Compléter ses justificatifs après l'inscription. Le SIRET est vérifié auprès
+// du répertoire officiel au passage, sans bloquer : un numéro introuvable est
+// enregistré et signalé à l'administrateur, il n'est pas refusé.
+app.patch('/api/societes/justificatifs', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+
+    const misAJour = {};
+
+    if (req.body.siret !== undefined) {
+      const siret = String(req.body.siret || '').replace(/\s/g, '').trim();
+      if (siret && !/^\d{14}$/.test(siret))
+        return res.status(400).json({ error: 'Numéro SIRET invalide (14 chiffres attendus).' });
+      misAJour.siret = siret || null;
+    }
+    if (req.body.assurance_rc_pro !== undefined)
+      misAJour.assurance_rc_pro = Boolean(req.body.assurance_rc_pro);
+    if (req.body.assurance_compagnie !== undefined)
+      misAJour.assurance_compagnie = String(req.body.assurance_compagnie || '').trim() || null;
+    if (req.body.assurance_police !== undefined)
+      misAJour.assurance_police = String(req.body.assurance_police || '').trim() || null;
+
+    if (!Object.keys(misAJour).length)
+      return res.status(400).json({ error: 'Aucune information à enregistrer.' });
+
+    const { error } = await supabase.from('users').update(misAJour).eq('id', req.user.id);
+    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+
+    // Sans await : la réponse ne doit pas attendre un service extérieur.
+    if (misAJour.siret) enregistrerVerificationSiret(req.user.id, misAJour.siret).catch(() => {});
+
+    const { data: apres } = await supabase.from('users')
+      .select('siret, assurance_rc_pro').eq('id', req.user.id).single();
+    res.json({
+      message: 'Justificatifs enregistrés.',
+      justificatifs_manquants: justificatifsManquants(apres)
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
 });
 
 // ══════════════ TARIFICATION (Vague 2) ══════════════
