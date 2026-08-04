@@ -109,6 +109,26 @@ async function envoyerNotificationPush(userId, { titre, corps, url }) {
 }
 
 const app = express();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAS D'ETAG, PAS DE CACHE SUR L'API
+//
+// Express ajoute par défaut un ETag aux réponses JSON. Le navigateur renvoie
+// alors If-None-Match, et le serveur répond 304 Not Modified avec un corps vide.
+//
+// C'est correct pour une ressource statique, désastreux pour une API : côté
+// client, fetch() expose un statut 304 dont `response.ok` vaut false. Tout code
+// qui teste `r.ok` interprète donc une réponse parfaitement valide comme un
+// échec — c'est ce qui déconnectait les utilisateurs au démarrage.
+//
+// Une réponse d'API dépend de l'utilisateur et de l'instant : elle n'a aucune
+// raison d'être mise en cache.
+// ─────────────────────────────────────────────────────────────────────────────
+app.set('etag', false);
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  next();
+});
 app.set('trust proxy', 1);
 
 // Le client "temps réel" de Supabase (basé sur WebSocket) n'est jamais utilisé dans ce projet —
