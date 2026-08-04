@@ -1518,6 +1518,51 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   32. EXEMPLE ILLUSTRATIF, CÔTÉ PRESTATAIRE
+   Le trait discontinu et le bandeau disent tout de suite qu'il ne s'agit pas
+   d'une vraie demande. Aucun bouton de réponse : il n'y a rien à y faire.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.exemple-pro {
+  border: 1.5px dashed var(--border-fort);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-top: var(--gap-4);
+  opacity: .92;
+}
+.exemple-pro-bandeau {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px var(--gap-4);
+  background: var(--surface-alt);
+  border-bottom: 1px dashed var(--border-fort);
+  font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--gray);
+}
+.exemple-pro-bandeau i { width: 13px; height: 13px; }
+.exemple-pro-note {
+  padding: 0 var(--gap-4) var(--gap-4);
+  font-size: 12.5px; line-height: 1.5;
+  color: var(--gray);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   31. LIGNES DE PROFIL AVEC ÉTAT
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.pi-text { display: flex; flex-direction: column; gap: 2px; }
+.pi-sous { font-size: 11.5px; font-weight: 600; line-height: 1.35; }
+.pi-sous:empty { display: none; }
+.pi-sous.active  { color: var(--green); }
+.pi-sous.eteinte { color: var(--amber); }
+.pi-sous.neutre  { color: var(--gray); }
+
+/* Les lignes de profil qui portent un interrupteur ne prennent plus le curseur
+   de la ligne entière au survol du bouton : les deux zones sont distinctes. */
+.profile-item .toggle-switch { flex-shrink: 0; }
+.profile-item .toggle-switch:disabled { cursor: not-allowed; }
+
+/* ────────────────────────────────────────────────────────────────────────────
    30. PARCOURS DE DÉMARRAGE PRESTATAIRE
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -1684,6 +1729,20 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   color: var(--p);
 }
 .simu-note { font-size: 11.5px; line-height: 1.5; color: var(--gray); margin-top: 12px; }
+.simu-detail { font-size: 11.5px; line-height: 1.45; color: var(--gray); text-align: center; margin-top: 4px; }
+.simu-resultat .simu-detail { text-align: left; margin-top: 10px; }
+
+/* Tableau de bord encore vide : on explique, on n'affiche pas des zéros. */
+.bord-vide {
+  display: flex; gap: var(--gap-3); align-items: flex-start;
+  margin-top: var(--gap-3);
+  padding: var(--gap-4);
+  background: var(--surface-alt);
+  border-radius: var(--r-md);
+}
+.bord-vide i { width: 20px; height: 20px; color: var(--p); flex-shrink: 0; margin-top: 1px; }
+.bord-vide strong { display: block; font-size: 13.5px; font-weight: 700; color: var(--text); }
+.bord-vide span { display: block; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); margin-top: 4px; }
 
 /* Exemples de demandes */
 .exemple-demande {
@@ -2141,12 +2200,17 @@ textarea { min-height: 92px; padding-top: 13px; }
       <div class="simu-curseur">
         <input type="range" id="simu-volume" min="1" max="25" value="6" oninput="majSimulateur()">
         <div class="simu-valeur"><span id="simu-volume-txt">6</span> par semaine</div>
+      <div class="simu-detail" id="simu-volume-detail"></div>
       </div>
 
       <div class="simu-resultat" id="simu-resultat"></div>
       <p class="simu-note">
-        Estimation fondée sur les tarifs indicatifs proposés à l'inscription.
-        Vos prix restent les vôtres — vous les fixez librement, prestation par prestation.
+        Estimation fondée sur les tarifs indicatifs proposés à l'inscription, et sur des
+        durées d'intervention moyennes, déplacement compris. Vos prix restent les vôtres —
+        vous les fixez librement, prestation par prestation.
+        <br><br>
+        Le taux de cotisations de 21 % correspond à un auto-entrepreneur en prestation de
+        services. Il dépend de votre statut : vérifiez le vôtre.
       </p>
     </div>
 
@@ -2345,7 +2409,8 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div id="pro-tableau-bord"></div>
     <div class="dispo-toggle" style="margin-top:12px;border:none;background:var(--surface-alt)">
       <div><div class="dispo-text">Disponibilité</div><div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div></div>
-      <button class="toggle-switch on" id="dispo-toggle" onclick="toggleDispo()"></button>
+      <button class="toggle-switch on" id="dispo-toggle" role="switch" aria-checked="true"
+              aria-label="Basculer votre disponibilité" onclick="toggleDispo()"></button>
     </div>
   </div>
   <div class="pro-content" style="padding-top:0">
@@ -2401,7 +2466,13 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="profile-menu">
       <div class="profile-item" id="item-confirmer-email-pro" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="ouvrirZoneIntervention()"><span class="pi-icon"><i data-lucide="map-pin" style="width:20px;height:20px"></i></span><span class="pi-text">Zone d'intervention</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="toggleNotificationsPush()"><span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow" id="notif-statut-pro">Activer</span></div>
+      <div class="profile-item" onclick="toggleNotificationsPush()">
+        <span class="pi-icon"><i data-lucide="bell" style="width:20px;height:20px"></i></span>
+        <span class="pi-text">Notifications<span class="pi-sous" id="notif-statut-pro"></span></span>
+        <button class="toggle-switch" id="notif-switch-pro" role="switch" aria-checked="false"
+                aria-label="Activer ou désactiver les notifications"
+                onclick="event.stopPropagation();toggleNotificationsPush()"></button>
+      </div>
       <div class="profile-item" onclick="showMesGains()"><span class="pi-icon"><i data-lucide="wallet" style="width:20px;height:20px"></i></span><span class="pi-text">Mes gains</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="configurerPaiementsPro()"><span class="pi-icon"><i data-lucide="landmark" style="width:20px;height:20px"></i></span><span class="pi-text">Configurer mes paiements</span><span class="pi-arrow" id="connect-statut-badge"></span></div>
@@ -2500,7 +2571,13 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="profile-section-titre">Préférences</div>
     <div class="profile-menu">
       <div class="profile-item" onclick="basculerTheme()"><span class="pi-icon"><i id="theme-toggle-icon" data-lucide="moon" style="width:18px;height:18px"></i></span><span class="pi-text">Apparence claire / sombre</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
-      <div class="profile-item" onclick="toggleNotificationsPush()"><span class="pi-icon"><i data-lucide="bell" style="width:18px;height:18px"></i></span><span class="pi-text">Notifications</span><span class="pi-arrow" id="notif-statut-client">Activer</span></div>
+      <div class="profile-item" onclick="toggleNotificationsPush()">
+        <span class="pi-icon"><i data-lucide="bell" style="width:18px;height:18px"></i></span>
+        <span class="pi-text">Notifications<span class="pi-sous" id="notif-statut-client"></span></span>
+        <button class="toggle-switch" id="notif-switch-client" role="switch" aria-checked="false"
+                aria-label="Activer ou désactiver les notifications"
+                onclick="event.stopPropagation();toggleNotificationsPush()"></button>
+      </div>
       <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="sparkles" style="width:18px;height:18px"></i></span><span class="pi-text">Comment ça marche ?</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
     </div>
 
@@ -2698,14 +2775,27 @@ function afficherEcranAuth(onglet,role){
 // ─────────────────────────────────────────────────────────────────────────────
 const TAUX_COMMISSION = 0.15;
 
+// Cotisations d'un auto-entrepreneur en prestation de services. Taux indicatif :
+// il varie selon le statut, et l'écran le précise. L'omettre reviendrait à
+// annoncer un revenu que personne ne touche jamais.
+const TAUX_COTISATIONS = 0.21;
+
+// La durée compte autant que le prix. Sans elle, le curseur laissait simuler
+// 25 voitures par semaine — une cinquantaine d'heures de travail — et le
+// résultat perdait toute crédibilité auprès de ceux qui connaissent le métier.
+// Durées portes ouvertes comprises : déplacement, installation, rangement.
 const PANIERS_MOYENS = [
-  { cle:'voiture',  nom:'Voiture',  icone:'car',        panier:125 },
-  { cle:'canape',   nom:'Canapé',   icone:'sofa',       panier:63 },
-  { cle:'matelas',  nom:'Matelas',  icone:'bed-double', panier:74 },
-  { cle:'vitres',   nom:'Vitres',   icone:'app-window', panier:68 },
-  { cle:'tapis',    nom:'Tapis',    icone:'square',     panier:120 },
-  { cle:'terrasse', nom:'Terrasse', icone:'sun',        panier:136 }
+  { cle:'voiture',  nom:'Voiture',  icone:'car',        panier:125, heures:2.5 },
+  { cle:'canape',   nom:'Canapé',   icone:'sofa',       panier:63,  heures:1.5 },
+  { cle:'matelas',  nom:'Matelas',  icone:'bed-double', panier:74,  heures:1.5 },
+  { cle:'vitres',   nom:'Vitres',   icone:'app-window', panier:68,  heures:2 },
+  { cle:'tapis',    nom:'Tapis',    icone:'square',     panier:120, heures:2 },
+  { cle:'terrasse', nom:'Terrasse', icone:'sun',        panier:136, heures:3 }
 ];
+
+// Une semaine de travail plausible pour un indépendant. Au-delà, le simulateur
+// cesserait de décrire une activité tenable dans la durée.
+const HEURES_SEMAINE_MAX = 35;
 
 var simuPrestation = 'voiture';
 
@@ -2721,8 +2811,17 @@ function initDecouvertePro(){
   }
   var exemples = document.getElementById('pro-exemples');
   if(exemples && !exemples.innerHTML) exemples.innerHTML = EXEMPLES_DEMANDES.map(carteExemple).join('');
-  majSimulateur();
+  // On passe par choisirPrestationSimulee plutôt que d'appeler directement
+  // majSimulateur : c'est elle qui recalcule le plafond du curseur selon la
+  // durée de la prestation. Sans cela, le maximum inscrit dans le balisage (25)
+  // s'appliquait à la voiture au premier affichage — soit 62 h de travail par
+  // semaine, un chiffre qui décrédibilise tout le reste.
+  choisirPrestationSimulee(simuPrestation);
   if(window.lucide)lucide.createIcons();
+}
+
+function prestationSimulee(){
+  return PANIERS_MOYENS.filter(function(p){return p.cle===simuPrestation})[0] || PANIERS_MOYENS[0];
 }
 
 function choisirPrestationSimulee(cle){
@@ -2730,6 +2829,14 @@ function choisirPrestationSimulee(cle){
   document.querySelectorAll('#simu-prestations .opt-btn').forEach(function(b){
     b.classList.toggle('sel', b.getAttribute('data-simu')===cle);
   });
+  // Le plafond dépend de la prestation : une terrasse prend deux fois plus de
+  // temps qu'un canapé, on ne peut donc pas en faire autant dans une semaine.
+  var curseur = document.getElementById('simu-volume');
+  if(curseur){
+    var maxi = Math.max(2, Math.floor(HEURES_SEMAINE_MAX / prestationSimulee().heures));
+    curseur.max = maxi;
+    if(parseInt(curseur.value,10) > maxi) curseur.value = maxi;
+  }
   majSimulateur();
 }
 
@@ -2740,20 +2847,32 @@ function majSimulateur(){
   var txt = document.getElementById('simu-volume-txt');
   if(txt) txt.textContent = volume;
 
-  var presta = PANIERS_MOYENS.filter(function(p){return p.cle===simuPrestation})[0] || PANIERS_MOYENS[0];
+  var presta = prestationSimulee();
+  var heuresSemaine = volume * presta.heures;
   // 4,33 semaines par mois en moyenne — 52 semaines divisées par 12 mois.
   var brut = presta.panier * volume * 4.33;
   var commission = brut * TAUX_COMMISSION;
-  var net = brut - commission;
-  var euros = function(n){
-    return Math.round(n).toLocaleString('fr-FR') + ' €';
+  var encaisse = brut - commission;
+  var cotisations = brut * TAUX_COTISATIONS;   // assises sur le chiffre d'affaires
+  var disponible = encaisse - cotisations;
+
+  var euros = function(n){ return Math.round(n).toLocaleString('fr-FR') + ' €'; };
+  var heures = function(h){
+    var entier = Math.floor(h), minutes = Math.round((h - entier) * 60);
+    return entier + ' h' + (minutes ? String(minutes).padStart(2,'0') : '');
   };
 
+  if(txt) txt.textContent = volume;
+  var detail = document.getElementById('simu-volume-detail');
+  if(detail) detail.textContent = 'soit environ ' + heures(heuresSemaine) + ' de travail par semaine';
+
   boite.innerHTML =
-    '<div class="simu-ligne"><span>'+volume+' × '+presta.nom.toLowerCase()+' par semaine</span><span>'+euros(presta.panier)+' l\'unité</span></div>'+
+    '<div class="simu-ligne"><span>'+volume+' × '+presta.nom.toLowerCase()+', '+heures(presta.heures)+' l\'unité</span><span>'+euros(presta.panier)+'</span></div>'+
     '<div class="simu-ligne"><span>Chiffre d\'affaires mensuel</span><span>'+euros(brut)+'</span></div>'+
     '<div class="simu-ligne"><span>Commission Gleam (15 %)</span><span>− '+euros(commission)+'</span></div>'+
-    '<div class="simu-net"><span class="titre">Vous percevez</span><span class="montant">'+euros(net)+'</span></div>';
+    '<div class="simu-ligne"><span>Cotisations sociales (environ 21 %)</span><span>− '+euros(cotisations)+'</span></div>'+
+    '<div class="simu-net"><span class="titre">Il vous reste</span><span class="montant">'+euros(disponible)+'</span></div>'+
+    '<div class="simu-detail">Avant impôt sur le revenu et vos propres frais — produits, matériel, carburant.</div>';
 }
 
 // Exemples inspirés de demandes réelles de la plateforme, reformulés.
@@ -3041,6 +3160,7 @@ function enterApp(){
     document.getElementById('pro-profile-email').textContent=(currentUser&&currentUser.email)||'';
     var itemConfirmerEmailP=document.getElementById('item-confirmer-email-pro');
     if(itemConfirmerEmailP)itemConfirmerEmailP.style.display=(currentUser&&currentUser.email_verifie===false)?'flex':'none';
+    majAffichageNotifications();
     renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
     renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
     checkConnectStatut();
@@ -3805,6 +3925,11 @@ function renderDevisClientCards(){
             '<button class="btn-accept" style="background:var(--gray)" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeSocieteId+'\',\''+safeProName+'\')">⭐ Noter le prestataire</button>'+
           '</div>';
         }
+        // Ranger la prestation depuis la carte elle-même. Le bouton existait déjà,
+        // mais uniquement dans le détail de la demande — à trois écrans d'ici, là
+        // où personne ne va le chercher.
+        actions+='<button class="btn-accept" style="background:none;border:1.5px solid var(--border);color:var(--gray);width:100%;margin-top:8px;font-size:13px" onclick="archiverDemande(\''+safeDemandeId+'\')">'+
+          '<i data-lucide="archive" style="width:14px;height:14px;vertical-align:-2px"></i> Ranger cette prestation</button>';
       }else if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement requis</span>';
         cardStyle='border-color:var(--amber);background:var(--amber-clair);';
@@ -3998,14 +4123,26 @@ async function annulerDemandeAcceptee(){
     goTab('home');loadDemandes();
   }catch(e){toast(friendlyNetworkError(e))}
 }
-async function archiverDemande(){
-  if(!currentDetailDemande)return;
+// Accepte désormais un identifiant, ce qui permet d'archiver depuis une carte
+// de devis sans passer par le détail de la demande. Sans argument, le
+// comportement d'origine est conservé pour l'écran de détail.
+async function archiverDemande(demandeId){
+  var cible=demandeId||(currentDetailDemande&&currentDetailDemande.id);
+  if(!cible)return;
+  if(!await demanderConfirmation({
+    titre:'Ranger cette prestation',
+    texte:'Elle disparaîtra de vos listes. Votre facture et votre historique restent accessibles, et le prestataire n\'est pas prévenu.',
+    valider:'Ranger', annuler:'La garder', icone:'archive'
+  }))return;
   try{
-    const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id+'/archiver',{method:'PATCH',headers:authHeaders()});
+    const r=await fetch(API+'/api/demandes/'+cible+'/archiver',{method:'PATCH',headers:authHeaders()});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
-    toast('📥 Demande archivée — elle ne s\'affichera plus dans votre liste.');
-    goTab('home');loadDemandes();
+    toast('📥 Prestation rangée — elle ne s\'affichera plus dans vos listes.');
+    // On reste où l'on est : renvoyer sur l'accueil après un rangement fait dans
+    // la liste des devis serait déroutant.
+    if(demandeId){loadDevis();loadDemandes()}
+    else{goTab('home');loadDemandes()}
   }catch(e){toast(friendlyNetworkError(e))}
 }
 async function deleteDemande(){
@@ -4105,6 +4242,33 @@ function setProDemandesFilter(f){
   proDemandesFilterActive=f;
   renderProDemandesCards();
 }
+// Affiché uniquement lorsque la liste est vide. Le bandeau « Exemple » et
+// l'absence de bouton de réponse le rendent impossible à confondre avec une
+// vraie demande — c'est précisément ce qui manquait aux demandes de
+// démonstration créées en base, et qui a justifié leur suppression.
+function exempleDemandePro(){
+  return '<div class="exemple-pro">'+
+    '<div class="exemple-pro-bandeau"><i data-lucide="eye"></i> Exemple — ceci n\'est pas une vraie demande</div>'+
+    '<div class="demande-card" style="margin:0;border:none;box-shadow:none">'+
+      '<div class="dc-header">'+
+        '<div class="dc-type"><i data-lucide="car" style="width:20px;height:20px;color:var(--p)"></i> voiture</div>'+
+        '<span class="dc-num">#A1B2C3</span>'+
+      '</div>'+
+      '<div style="margin-bottom:8px"><span class="urgence proche"><i data-lucide="clock"></i>Dans 2 jours</span></div>'+
+      '<div class="dc-info"><i data-lucide="map-pin" style="width:14px;height:14px"></i> Poissy — 8,4 km de vous</div>'+
+      '<div class="dc-info"><i data-lucide="calendar" style="width:14px;height:14px"></i> Jeudi à 9h30 — flexibilité ± 1 heure</div>'+
+      '<div class="dc-info"><i data-lucide="sparkles" style="width:14px;height:14px"></i> Monospace, 7 places, intérieur + extérieur</div>'+
+      '<div style="background:var(--surface-alt);border-radius:10px;padding:11px 13px;margin-top:10px;font-size:13px;line-height:1.5;color:var(--text-secondary)">'+
+        'Voiture familiale, deux enfants en bas âge — traces sur les sièges arrière et miettes un peu partout.'+
+      '</div>'+
+    '</div>'+
+    '<div class="exemple-pro-note">'+
+      'Voilà le niveau de détail que vous recevrez : type de véhicule, état, options, '+
+      'créneau et distance depuis votre zone. Assez pour chiffrer sans vous déplacer.'+
+    '</div>'+
+  '</div>';
+}
+
 async function loadProDemandes(silent){
   var c0=document.getElementById('pro-demandes-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
@@ -4128,14 +4292,16 @@ function renderProDemandesCards(){
   if(!c)return;
   var data=proDemandesCache;
   if(!data.length){
-    // Même traitement soigné que côté client : une explication et une action,
-    // plutôt qu'un emoji et une phrase.
+    // Un écran vide n'apprend rien. On explique la cause probable, on propose
+    // l'action correspondante, et on montre à quoi ressemblera une demande —
+    // clairement identifié comme exemple, jamais mêlé à de vraies demandes.
     c.innerHTML=emptyStateHtml({
-      title:'Aucune demande disponible',
+      title:'Aucune demande pour le moment',
       sub:'Élargissez votre zone d\'intervention ou ajoutez des prestations à votre profil pour en recevoir davantage.',
       ctaLabel:'Régler ma zone',
       ctaAction:"goProTab('pro-profile')"
-    });
+    })+exempleDemandePro();
+    if(window.lucide)lucide.createIcons();
     return;
   }
 
@@ -4260,6 +4426,20 @@ async function chargerTableauDeBordPro(){
              '<div class="etiquette">'+etiquette+'</div></div>';
     }
     var euros=function(n){return (Math.round((n||0)*100)/100).toFixed(2).replace('.',',')+' €'};
+
+    // Six cases à zéro ne distinguent pas « vous n'avez pas encore commencé » de
+    // « quelque chose est cassé ». Tant qu'aucun devis n'a été envoyé, on explique
+    // ce qui apparaîtra ici plutôt que d'afficher des zéros.
+    if(!liste.length){
+      box.innerHTML='<div class="bord-vide">'+
+        '<i data-lucide="line-chart"></i>'+
+        '<div><strong>Vos chiffres apparaîtront ici</strong>'+
+        '<span>Gains reçus, montants en attente, taux d\'acceptation et note moyenne — '+
+        'dès votre premier devis envoyé.</span></div>'+
+      '</div>';
+      if(window.lucide)lucide.createIcons();
+      return;
+    }
 
     box.innerHTML='<div class="bord-pro">'+
       bloc(euros(gains.total_libere),'Reçu à ce jour','gain')+
@@ -4749,7 +4929,9 @@ async function saveTarifs(){
 
 async function toggleDispo(){
   disponible=!disponible;
-  document.getElementById('dispo-toggle').classList.toggle('on',disponible);
+  var inter=document.getElementById('dispo-toggle');
+  inter.classList.toggle('on',disponible);
+  inter.setAttribute('aria-checked',disponible?'true':'false');
   document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
   try{
     const r=await fetch(API+'/api/societes/disponibilite',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({disponible})});
@@ -5618,11 +5800,40 @@ async function estAbonneAuxNotifications(){
     return !!sub;
   }catch(e){return false}
 }
+// « Activer » était un ordre, pas un état : rien ne disait clairement que les
+// notifications étaient éteintes. L'interrupteur montre la situation, et la
+// ligne en dessous annonce ce qu'on manque — c'est cette conséquence, et non le
+// réglage lui-même, qui décide quelqu'un à l'activer.
 async function majAffichageNotifications(){
   var abonne=await estAbonneAuxNotifications();
-  ['notif-statut-client','notif-statut-pro'].forEach(function(id){
-    var el=document.getElementById(id);
-    if(el)el.textContent=abonne?'Activées ✓':'Activer';
+  var possible=('serviceWorker' in navigator)&&('PushManager' in window);
+  var estPro=typeof isPro==='function'&&isPro();
+
+  ['client','pro'].forEach(function(role){
+    var inter=document.getElementById('notif-switch-'+role);
+    var sous=document.getElementById('notif-statut-'+role);
+    if(inter){
+      inter.classList.toggle('on',abonne);
+      inter.setAttribute('aria-checked',abonne?'true':'false');
+      inter.disabled=!possible;
+      inter.style.opacity=possible?'':'.4';
+    }
+    if(sous){
+      if(!possible){
+        // Sur iOS, l'API n'existe pas tant que l'application n'est pas installée
+        // sur l'écran d'accueil. Le dire évite de laisser croire à une panne.
+        sous.textContent='Indisponible — installez Gleam sur votre écran d\'accueil';
+        sous.className='pi-sous neutre';
+      }else if(abonne){
+        sous.textContent='Activées';
+        sous.className='pi-sous active';
+      }else{
+        sous.textContent=(role==='pro'||estPro)
+          ? 'Éteintes — vous ne serez pas prévenu des nouvelles demandes'
+          : 'Éteintes — vous ne serez pas prévenu de vos devis';
+        sous.className='pi-sous eteinte';
+      }
+    }
   });
 }
 async function toggleNotificationsPush(){
