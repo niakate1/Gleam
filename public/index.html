@@ -1518,6 +1518,288 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   30. PARCOURS DE DÉMARRAGE PRESTATAIRE
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.parcours {
+  background: var(--surface);
+  border: 1.5px solid var(--p);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-bottom: var(--gap-3);
+}
+.parcours-tete { padding: var(--gap-4) var(--gap-4) var(--gap-3); }
+.parcours-titre {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 32;
+  font-size: 16px; font-weight: 600; color: var(--text);
+}
+.parcours-sous { font-size: 12.5px; color: var(--gray); margin-top: 3px; line-height: 1.4; }
+.parcours-jauge {
+  height: 5px; margin-top: 12px;
+  background: var(--surface-alt);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.parcours-jauge > div {
+  height: 100%; background: var(--p);
+  border-radius: var(--r-pill);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.parcours-etapes { border-top: 1px solid var(--border); }
+.parcours-etape {
+  display: flex; gap: var(--gap-3); align-items: flex-start;
+  padding: var(--gap-3) var(--gap-4);
+  border-bottom: 1px solid var(--border);
+}
+.parcours-etape:last-child { border-bottom: none; }
+.parcours-etape .marque {
+  flex-shrink: 0; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-alt); color: var(--gray);
+}
+.parcours-etape .marque i { width: 15px; height: 15px; }
+.parcours-etape .corps { flex: 1; min-width: 0; }
+.parcours-etape .intitule { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.parcours-etape .pourquoi { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); margin-top: 4px; }
+.parcours-etape button {
+  margin-top: 10px; padding: 9px 16px;
+  background: var(--p); color: #fff;
+  border: none; border-radius: var(--r-sm);
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-spring);
+}
+.parcours-etape button:hover { background: var(--p2); }
+.parcours-etape button:active { transform: scale(.97); }
+
+/* Étape franchie : elle reste visible, mais s'efface visuellement. La faire
+   disparaître priverait le prestataire du sentiment d'avancer. */
+.parcours-etape.faite .marque { background: var(--green-clair); color: var(--green); }
+.parcours-etape.faite .intitule { color: var(--gray); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* Étape suivante : la seule mise en avant, pour qu'il n'y ait jamais d'hésitation
+   sur ce qu'il faut faire maintenant. */
+.parcours-etape.active { background: var(--light); }
+.parcours-etape.active .marque { background: var(--p); color: #fff; }
+
+/* ── Récapitulatif de l'écran « Mes devis » ─────────────────────────────── */
+.recap-devis {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-bottom: var(--gap-4);
+}
+.recap-devis > div { background: var(--surface); padding: 12px 10px; text-align: center; }
+.recap-devis .valeur {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 32;
+  font-size: 18px; font-weight: 600; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.recap-devis .valeur.attente { color: var(--amber); }
+.recap-devis .valeur.gagne { color: var(--green); }
+.recap-devis .etiquette { font-size: 10.5px; font-weight: 600; color: var(--gray); margin-top: 4px; line-height: 1.3; }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   29. DÉCOUVERTE PRESTATAIRE, SANS COMPTE
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Passerelle entre les deux publics. Discrète, mais présente dès le premier
+   écran : un professionnel ne doit pas avoir à deviner qu'il a sa place ici. */
+.passerelle {
+  display: flex; align-items: center; gap: var(--gap-3);
+  margin-top: var(--gap-5);
+  padding: var(--gap-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-spring);
+}
+.passerelle:hover { border-color: var(--p); box-shadow: var(--shadow-sm); }
+.passerelle:active { transform: scale(.99); }
+.passerelle-icone {
+  flex-shrink: 0; width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--light); color: var(--p);
+  border-radius: 12px;
+}
+.passerelle-icone i { width: 19px; height: 19px; }
+.passerelle-texte { flex: 1; min-width: 0; }
+.passerelle-texte strong { display: block; font-size: 14px; font-weight: 700; color: var(--text); }
+.passerelle-texte span { display: block; font-size: 12.5px; color: var(--gray); margin-top: 2px; line-height: 1.4; }
+
+/* Les trois arguments d'entrée */
+.pro-arguments { display: flex; flex-direction: column; gap: var(--gap-4); }
+.pro-arguments > div { display: flex; gap: var(--gap-3); align-items: flex-start; }
+.pro-arguments .chiffre {
+  flex-shrink: 0; width: 52px;
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 40;
+  font-size: 25px; font-weight: 600; line-height: 1.1;
+  color: var(--p); text-align: center;
+}
+.pro-arguments .chiffre i { width: 24px; height: 24px; }
+.pro-arguments .libelle { flex: 1; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+
+/* Simulateur de revenus */
+.simulateur {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--gap-4);
+}
+.simulateur .options-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 0; }
+.simulateur .opt-btn { padding: 11px 8px; font-size: 12.5px; }
+.simu-curseur { margin-top: 6px; }
+.simu-curseur input[type="range"] { width: 100%; height: auto; padding: 0; }
+.simu-valeur { text-align: center; font-size: 13px; font-weight: 700; color: var(--p); margin-top: 6px; }
+.simu-resultat {
+  margin-top: var(--gap-4);
+  background: linear-gradient(155deg, var(--light), var(--surface) 75%);
+  border-radius: var(--r-sm);
+  padding: var(--gap-4);
+}
+.simu-ligne { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+.simu-ligne span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); }
+.simu-net {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 10px; padding-top: 12px;
+  border-top: 1px solid var(--border-fort);
+}
+.simu-net .titre { font-size: 13px; font-weight: 700; color: var(--text); }
+.simu-net .montant {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 48;
+  font-size: 29px; font-weight: 600; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--p);
+}
+.simu-note { font-size: 11.5px; line-height: 1.5; color: var(--gray); margin-top: 12px; }
+
+/* Exemples de demandes */
+.exemple-demande {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--gap-4);
+  margin-bottom: 10px;
+}
+.exemple-tete { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.exemple-tete .titre { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; text-transform: capitalize; }
+.exemple-prix {
+  flex-shrink: 0;
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 32;
+  font-size: 17px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--green);
+}
+.exemple-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.exemple-meta span {
+  font-size: 11px; font-weight: 700;
+  background: var(--surface-alt); color: var(--text-secondary);
+  padding: 4px 10px; border-radius: var(--r-pill);
+}
+.exemple-desc { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+
+/* Étapes et conditions */
+.etapes-pro { display: flex; flex-direction: column; gap: var(--gap-4); }
+.etapes-pro > div { display: flex; gap: var(--gap-3); align-items: flex-start; }
+.etapes-pro span {
+  flex-shrink: 0; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--light); color: var(--p);
+  border-radius: 50%; font-size: 13px; font-weight: 800;
+}
+.etapes-pro strong { font-size: 14px; font-weight: 700; }
+.etapes-pro p { font-size: 13px; line-height: 1.5; color: var(--text-secondary); margin-top: 3px; }
+
+.conditions-pro { display: flex; flex-direction: column; gap: var(--gap-3); }
+.conditions-pro > div {
+  display: flex; gap: var(--gap-3); align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--gap-3) var(--gap-4);
+}
+.conditions-pro i { width: 19px; height: 19px; color: var(--aqua); flex-shrink: 0; margin-top: 2px; }
+.conditions-pro strong { display: block; font-size: 13.5px; font-weight: 700; }
+.conditions-pro span { display: block; font-size: 12.5px; line-height: 1.45; color: var(--gray); margin-top: 3px; }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   28. ESPACE PRESTATAIRE
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.bord-pro {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-top: var(--gap-3);
+}
+.bord-pro > div {
+  background: var(--surface);
+  padding: 13px 14px;
+}
+.bord-pro .valeur {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 36;
+  font-size: 21px; font-weight: 600; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.bord-pro .valeur.gain  { color: var(--green); }
+.bord-pro .valeur.attente { color: var(--amber); }
+.bord-pro .etiquette {
+  font-size: 11px; font-weight: 600; color: var(--gray);
+  margin-top: 4px; line-height: 1.3;
+}
+
+/* Repère d'urgence — la liste était déjà triée par créneau le plus proche,
+   mais rien ne le montrait. Le pro devait lire chaque date pour comprendre. */
+.urgence {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 800;
+  white-space: nowrap;
+}
+.urgence i { width: 12px; height: 12px; }
+.urgence.pressee  { background: var(--red-clair);   color: var(--red); }
+.urgence.proche   { background: var(--amber-clair); color: var(--amber); }
+.urgence.calme    { background: var(--surface-alt); color: var(--gray); }
+
+.rappel-config {
+  display: flex; gap: 11px; align-items: flex-start;
+  background: var(--amber-clair);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: var(--gap-3);
+}
+.rappel-config i { width: 18px; height: 18px; color: var(--amber); flex-shrink: 0; margin-top: 1px; }
+.rappel-config .texte { flex: 1; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+.rappel-config strong { color: var(--text); font-weight: 700; }
+.rappel-config button {
+  margin-top: 8px; padding: 7px 14px;
+  background: var(--amber); color: #fff;
+  border: none; border-radius: var(--r-sm);
+  font-family: inherit; font-size: 12px; font-weight: 700;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    27. MODALE DE CONFIRMATION
    Elle remplace confirm(), qui gelait le navigateur et affichait une boîte
    système au moment le plus sensible du parcours. Centrée plutôt que remontée
@@ -1802,6 +2084,111 @@ textarea { min-height: 92px; padding-top: 13px; }
     </div>
     <button class="btn" style="margin-top:28px" onclick="afficherEcranAuth('register')">Créer un compte gratuitement</button>
     <button class="btn" style="margin-top:10px;background:none;color:var(--p);box-shadow:none" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
+
+    <!-- Aiguillage vers l'autre public. Un professionnel qui arrive ici ne
+         trouvait rien qui s'adresse à lui, et devait deviner qu'il fallait
+         créer un compte pour découvrir ce qu'on lui proposait. -->
+    <div class="passerelle" onclick="show('s-guest-pro')">
+      <div class="passerelle-icone"><i data-lucide="wrench"></i></div>
+      <div class="passerelle-texte">
+        <strong>Vous êtes un professionnel du nettoyage ?</strong>
+        <span>Découvrez les demandes près de chez vous et estimez vos revenus</span>
+      </div>
+      <i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--gray);flex-shrink:0"></i>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     DÉCOUVERTE PRESTATAIRE — accessible sans compte
+     ════════════════════════════════════════════════════════════════════════ -->
+<div class="screen" id="s-guest-pro">
+  <div class="home-hero">
+    <div class="home-hero-top">
+      <span class="logo-sm">✨ Gleam Pro</span>
+      <button class="user-badge" style="border:none;cursor:pointer" onclick="afficherEcranAuth('login')">Se connecter</button>
+    </div>
+    <h2>Votre métier, nos clients</h2>
+    <p>Recevez des demandes près de chez vous. Vous fixez vos prix, vous choisissez vos créneaux.</p>
+  </div>
+
+  <div class="home-hero-card">
+    <div class="pro-arguments">
+      <div>
+        <div class="chiffre"><span id="pro-taux-commission">15</span> %</div>
+        <div class="libelle">de commission, et rien d'autre. Aucun abonnement, aucun frais d'inscription.</div>
+      </div>
+      <div>
+        <div class="chiffre"><i data-lucide="shield-check"></i></div>
+        <div class="libelle">Le client paie avant l'intervention. Vous êtes réglé dès qu'il valide la prestation.</div>
+      </div>
+      <div>
+        <div class="chiffre"><i data-lucide="sliders-horizontal"></i></div>
+        <div class="libelle">Vos tarifs, votre zone, vos disponibilités. Vous refusez ce qui ne vous convient pas.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-content" style="padding-top:0">
+
+    <!-- ── Simulateur ─────────────────────────────────────────────────── -->
+    <div class="section-title">Combien pouvez-vous gagner ?</div>
+    <div class="simulateur">
+      <label style="margin-top:0">Votre spécialité</label>
+      <div class="options-grid" id="simu-prestations"></div>
+
+      <label>Nombre d'interventions par semaine</label>
+      <div class="simu-curseur">
+        <input type="range" id="simu-volume" min="1" max="25" value="6" oninput="majSimulateur()">
+        <div class="simu-valeur"><span id="simu-volume-txt">6</span> par semaine</div>
+      </div>
+
+      <div class="simu-resultat" id="simu-resultat"></div>
+      <p class="simu-note">
+        Estimation fondée sur les tarifs indicatifs proposés à l'inscription.
+        Vos prix restent les vôtres — vous les fixez librement, prestation par prestation.
+      </p>
+    </div>
+
+    <!-- ── Exemples ───────────────────────────────────────────────────── -->
+    <div class="section-title" style="margin-top:28px">À quoi ressemble une demande</div>
+    <div id="pro-exemples"></div>
+
+    <!-- ── Fonctionnement ─────────────────────────────────────────────── -->
+    <div class="section-title" style="margin-top:28px">Comment ça marche</div>
+    <div class="etapes-pro">
+      <div><span>1</span><div><strong>Vous recevez les demandes de votre zone</strong>
+        <p>Uniquement celles qui correspondent aux prestations que vous déclarez, dans le rayon que vous choisissez.</p></div></div>
+      <div><span>2</span><div><strong>Vous envoyez votre prix</strong>
+        <p>Le client compare, discute avec vous par messagerie, et décide. Aucune obligation de répondre à tout.</p></div></div>
+      <div><span>3</span><div><strong>Le client paie avant votre venue</strong>
+        <p>La somme est conservée en sécurité. Elle ne vous est versée qu'après la prestation, mais elle est déjà là.</p></div></div>
+      <div><span>4</span><div><strong>Vous êtes réglé sur votre compte</strong>
+        <p>Le client vous donne un code à six chiffres en fin d'intervention. Le virement part immédiatement.</p></div></div>
+    </div>
+
+    <!-- ── Conditions ─────────────────────────────────────────────────── -->
+    <div class="section-title" style="margin-top:28px">Ce qu'il faut pour commencer</div>
+    <div class="conditions-pro">
+      <div><i data-lucide="file-badge"></i><div><strong>Un numéro SIRET</strong>
+        <span>Auto-entrepreneur, société, peu importe le statut — il faut être déclaré.</span></div></div>
+      <div><i data-lucide="shield-check"></i><div><strong>Une assurance RC Pro en cours de validité</strong>
+        <span>Elle couvre les dommages éventuels chez le client. C'est ce qui rassure, et c'est obligatoire.</span></div></div>
+      <div><i data-lucide="landmark"></i><div><strong>Un compte bancaire</strong>
+        <span>Pour recevoir vos virements. La configuration se fait après l'inscription, en quelques minutes.</span></div></div>
+    </div>
+
+    <button class="btn" style="margin-top:28px" onclick="afficherEcranAuth('register','pro')">Devenir prestataire Gleam</button>
+    <button class="btn" style="margin-top:10px;background:none;color:var(--p);box-shadow:none" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
+
+    <div class="passerelle" onclick="show('s-guest')">
+      <div class="passerelle-icone"><i data-lucide="sparkles"></i></div>
+      <div class="passerelle-texte">
+        <strong>Vous cherchez plutôt un prestataire ?</strong>
+        <span>Décrivez votre besoin et recevez des devis gratuitement</span>
+      </div>
+      <i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--gray);flex-shrink:0"></i>
+    </div>
   </div>
 </div>
 
@@ -1943,17 +2330,26 @@ textarea { min-height: 92px; padding-top: 13px; }
     <p>Voici les demandes disponibles</p>
   </div>
   <div class="home-hero-card">
+    <!-- Rappel de configuration : n'apparaît que si la zone d'intervention ou les
+         tarifs manquent. Ces deux réglages déterminent quelles demandes le
+         prestataire reçoit et s'il compte dans l'estimation affichée aux clients. -->
+    <div id="pro-rappel-config"></div>
+
     <div class="pro-stats" style="margin-bottom:0">
       <div class="stat-card stat-card-p"><div class="stat-num" id="stat-demandes">0</div><div class="stat-label">Demandes disponibles</div></div>
       <div class="stat-card stat-card-gold"><div class="stat-num" id="stat-devis">0</div><div class="stat-label">Devis envoyés</div></div>
     </div>
+
+    <!-- Tableau de bord — calculé à partir de routes qui existaient déjà, mais
+         dont aucun écran ne montrait la synthèse. -->
+    <div id="pro-tableau-bord"></div>
     <div class="dispo-toggle" style="margin-top:12px;border:none;background:var(--surface-alt)">
       <div><div class="dispo-text">Disponibilité</div><div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div></div>
       <button class="toggle-switch on" id="dispo-toggle" onclick="toggleDispo()"></button>
     </div>
   </div>
   <div class="pro-content" style="padding-top:0">
-    <div class="section-title">📋 Demandes clients</div>
+    <div class="section-title">Demandes clients — les plus urgentes d'abord</div>
     <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Chargement...</p></div></div>
   </div>
   <div class="bottom-nav">
@@ -2272,13 +2668,119 @@ let selectedServices=[],multiFlow={active:false,queue:[],current:0,results:[]};
 let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisId=null;
 let isSubmittingPhotos=false;
 
-function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // L'écran de découverte prestataire construit son contenu à la première
+  // ouverture seulement : inutile de le calculer pour les visiteurs qui ne s'y
+  // rendront jamais.
+  if(id==='s-guest-pro'&&typeof initDecouvertePro==='function')initDecouvertePro();
+}
 // Depuis l'écran de découverte sans compte : basculer vers connexion ou inscription, au moment
 // précis où la personne veut réellement agir (choisir une prestation, ou cliquer "se connecter"),
 // jamais avant — exactement le moment où les applications comparables le demandent.
-function afficherEcranAuth(onglet){
+function afficherEcranAuth(onglet,role){
   show('s-auth');
   switchTab(onglet);
+  // Un professionnel venu de l'écran de découverte arrive avec son profil déjà
+  // sélectionné. Le lui faire choisir une seconde fois donnerait l'impression
+  // que la plateforme n'a pas retenu ce qu'il venait de lui dire.
+  if(onglet==='register'&&role)setTimeout(function(){setRole(role)},60);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DÉCOUVERTE PRESTATAIRE
+//
+// Le taux de commission et les paniers moyens viennent de vos propres données :
+// 15 % est le taux appliqué dans server.js, et les montants sont la moyenne des
+// tarifs indicatifs proposés aux prestataires à l'inscription (TARIF_CATEGORIES).
+// Rien n'est inventé pour la démonstration.
+// ─────────────────────────────────────────────────────────────────────────────
+const TAUX_COMMISSION = 0.15;
+
+const PANIERS_MOYENS = [
+  { cle:'voiture',  nom:'Voiture',  icone:'car',        panier:125 },
+  { cle:'canape',   nom:'Canapé',   icone:'sofa',       panier:63 },
+  { cle:'matelas',  nom:'Matelas',  icone:'bed-double', panier:74 },
+  { cle:'vitres',   nom:'Vitres',   icone:'app-window', panier:68 },
+  { cle:'tapis',    nom:'Tapis',    icone:'square',     panier:120 },
+  { cle:'terrasse', nom:'Terrasse', icone:'sun',        panier:136 }
+];
+
+var simuPrestation = 'voiture';
+
+function initDecouvertePro(){
+  var grille = document.getElementById('simu-prestations');
+  if(grille && !grille.innerHTML){
+    grille.innerHTML = PANIERS_MOYENS.map(function(p){
+      return '<button class="opt-btn'+(p.cle===simuPrestation?' sel':'')+'" data-simu="'+p.cle+'" '+
+             'onclick="choisirPrestationSimulee(\''+p.cle+'\')">'+
+             '<i data-lucide="'+p.icone+'" style="width:19px;height:19px;display:block;margin:0 auto 5px"></i>'+
+             p.nom+'</button>';
+    }).join('');
+  }
+  var exemples = document.getElementById('pro-exemples');
+  if(exemples && !exemples.innerHTML) exemples.innerHTML = EXEMPLES_DEMANDES.map(carteExemple).join('');
+  majSimulateur();
+  if(window.lucide)lucide.createIcons();
+}
+
+function choisirPrestationSimulee(cle){
+  simuPrestation = cle;
+  document.querySelectorAll('#simu-prestations .opt-btn').forEach(function(b){
+    b.classList.toggle('sel', b.getAttribute('data-simu')===cle);
+  });
+  majSimulateur();
+}
+
+function majSimulateur(){
+  var boite = document.getElementById('simu-resultat');
+  if(!boite)return;
+  var volume = parseInt((document.getElementById('simu-volume')||{}).value,10)||6;
+  var txt = document.getElementById('simu-volume-txt');
+  if(txt) txt.textContent = volume;
+
+  var presta = PANIERS_MOYENS.filter(function(p){return p.cle===simuPrestation})[0] || PANIERS_MOYENS[0];
+  // 4,33 semaines par mois en moyenne — 52 semaines divisées par 12 mois.
+  var brut = presta.panier * volume * 4.33;
+  var commission = brut * TAUX_COMMISSION;
+  var net = brut - commission;
+  var euros = function(n){
+    return Math.round(n).toLocaleString('fr-FR') + ' €';
+  };
+
+  boite.innerHTML =
+    '<div class="simu-ligne"><span>'+volume+' × '+presta.nom.toLowerCase()+' par semaine</span><span>'+euros(presta.panier)+' l\'unité</span></div>'+
+    '<div class="simu-ligne"><span>Chiffre d\'affaires mensuel</span><span>'+euros(brut)+'</span></div>'+
+    '<div class="simu-ligne"><span>Commission Gleam (15 %)</span><span>− '+euros(commission)+'</span></div>'+
+    '<div class="simu-net"><span class="titre">Vous percevez</span><span class="montant">'+euros(net)+'</span></div>';
+}
+
+// Exemples inspirés de demandes réelles de la plateforme, reformulés.
+const EXEMPLES_DEMANDES = [
+  { type:'voiture', icone:'car', ville:'Poissy', distance:'8 km', quand:'Dans 2 jours', prix:'110 – 150 €',
+    tags:['Monospace','Intérieur + extérieur','7 places'],
+    desc:"Voiture familiale, deux enfants en bas âge — traces sur les sièges arrière et miettes un peu partout." },
+  { type:'canapé', icone:'sofa', ville:'Le Vésinet', distance:'12 km', quand:'Dans 3 jours', prix:'70 – 95 €',
+    tags:['Angle','5+ places','Tissu'],
+    desc:"Canapé d'angle en tissu clair, taches de café sur l'assise gauche." },
+  { type:'vitres', icone:'app-window', ville:'Versailles', distance:'21 km', quand:'Semaine prochaine', prix:'90 – 130 €',
+    tags:['Commerce','22 m²','Accès en hauteur'],
+    desc:"Vitrine de commerce, intervention avant l'ouverture. Prestation à reconduire chaque mois si tout se passe bien." }
+];
+
+function carteExemple(e){
+  return '<div class="exemple-demande">'+
+    '<div class="exemple-tete">'+
+      '<div class="titre"><i data-lucide="'+e.icone+'" style="width:19px;height:19px;color:var(--p)"></i>'+e.type+'</div>'+
+      '<div class="exemple-prix">'+e.prix+'</div>'+
+    '</div>'+
+    '<div class="exemple-meta">'+
+      '<span>'+e.ville+' · '+e.distance+'</span><span>'+e.quand+'</span>'+
+      e.tags.map(function(t){return '<span>'+t+'</span>'}).join('')+
+    '</div>'+
+    '<div class="exemple-desc">'+e.desc+'</div>'+
+  '</div>';
 }
 function toast(msg,dur=3000){
   const t=document.getElementById('toast');
@@ -2452,7 +2954,7 @@ function goProTab(tab){
   show(map[tab]);
   const idx={'pro-home':0,'pro-messages':1,'pro-devis':2,'pro-profile':3}[tab];
   if(idx!==undefined)document.querySelectorAll('#'+map[tab]+' .bnav-item').forEach((b,i)=>b.classList.toggle('active',i===idx));
-  if(tab==='pro-home')loadProDemandes();
+  if(tab==='pro-home'){loadProDemandes();chargerTableauDeBordPro();verifierConfigurationPro()}
   if(tab==='pro-devis')loadProDevis();
   if(tab==='pro-messages')loadConversationsPro();
   if(tab==='pro-tarifs')loadProTarifs();
@@ -2547,6 +3049,8 @@ function enterApp(){
     document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
     show('s-pro-home');
     loadProDemandes();
+    chargerTableauDeBordPro();
+    verifierConfigurationPro();
   }else{
     document.getElementById('greeting-name').textContent='Bonjour '+name+' 👋';
     document.getElementById('user-name-badge').textContent=name;
@@ -3673,9 +4177,14 @@ function renderProDemandesCards(){
   filtered.forEach(function(d,di){
     var hasPhotos=getPhotosFromNotes(d.notes).length>0;
     var safeId=escAttr(d.id);
+    var urgence=libelleUrgence(d.creneau);
     html+='<div class="demande-card fade-in-item" style="animation-delay:'+(di*0.04)+'s">'+
       '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
       '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
+      // Le repère d'urgence rend visible le tri déjà appliqué : la liste est
+      // ordonnée du créneau le plus proche au plus lointain.
+      '<div style="margin-bottom:8px"><span class="urgence '+urgence.niveau+'">'+
+        '<i data-lucide="'+urgence.icone+'"></i>'+urgence.texte+'</span></div>'+
       // La récurrence ne s'affiche que si CE pro précis est le favori ciblé — sinon, la prochaine
       // occurrence sera de nouveau ouverte à tous les pros, rien ne lui garantit de la récupérer.
       // L'annoncer dans ce cas créerait une fausse attente de business répété, sans rien assurer.
@@ -3698,6 +4207,179 @@ function renderProDemandesCards(){
     var ph=getPhotosFromNotes(d.notes);
     if(ph.length)renderPhotoPreviews(ph,'photos-pro-'+d.id);
   });
+}
+
+// Traduit un créneau en délai lisible. Le tri par urgence existait déjà dans
+// renderProDemandesCards ; il n'était simplement jamais rendu visible.
+function libelleUrgence(creneau){
+  var instant=creneauVersInstantLocal(creneau);
+  if(!instant)return {texte:'Date à convenir',niveau:'calme',icone:'calendar'};
+  var heures=(instant-new Date())/3600000;
+  if(heures<0)   return {texte:'Créneau dépassé',niveau:'pressee',icone:'alert-triangle'};
+  if(heures<3)   return {texte:'Dans '+Math.max(1,Math.round(heures))+' h',niveau:'pressee',icone:'alarm-clock'};
+  if(heures<24)  return {texte:"Aujourd'hui "+formatHeure(instant),niveau:'pressee',icone:'alarm-clock'};
+  if(heures<48)  return {texte:'Demain '+formatHeure(instant),niveau:'proche',icone:'clock'};
+  var jours=Math.round(heures/24);
+  if(jours<=7)   return {texte:'Dans '+jours+' jours',niveau:'proche',icone:'clock'};
+  return {texte:'Dans '+jours+' jours',niveau:'calme',icone:'calendar'};
+}
+function creneauVersInstantLocal(creneau){
+  var m=/(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(creneau||'');
+  if(!m)return null;
+  return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);
+}
+function formatHeure(d){
+  return d.getHours()+'h'+String(d.getMinutes()).padStart(2,'0');
+}
+
+// Tableau de bord. Toutes ces valeurs étaient déjà servies par l'API ; il
+// manquait seulement un écran pour les rassembler. Aucune route nouvelle.
+async function chargerTableauDeBordPro(){
+  var box=document.getElementById('pro-tableau-bord');
+  if(!box)return;
+  try{
+    var [gains,devis]=await Promise.all([
+      fetch(API+'/api/paiements/mes-gains',{headers:authHeaders()}).then(safeJson).catch(function(){return{}}),
+      fetch(API+'/api/devis/mes-devis',{headers:authHeaders()}).then(safeJson).catch(function(){return[]})
+    ]);
+    var liste=Array.isArray(devis)?devis:[];
+    var acceptes=liste.filter(function(v){return v.statut==='accepte'}).length;
+    var repondus=liste.filter(function(v){return v.statut!=='envoye'}).length;
+    // Le taux se calcule sur les devis qui ont reçu une réponse : inclure ceux
+    // encore en attente ferait chuter artificiellement le chiffre d'un pro actif.
+    var taux=repondus>0?Math.round(acceptes/repondus*100):null;
+    var termines=liste.filter(function(v){
+      return v.statut==='accepte'&&v.demande&&v.demande.statut==='terminee';
+    }).length;
+
+    var note=currentUser&&currentUser.note_moyenne;
+    var fiabilite=currentUser&&currentUser.taux_fiabilite;
+
+    function bloc(valeur,etiquette,classe){
+      return '<div><div class="valeur '+(classe||'')+'">'+valeur+'</div>'+
+             '<div class="etiquette">'+etiquette+'</div></div>';
+    }
+    var euros=function(n){return (Math.round((n||0)*100)/100).toFixed(2).replace('.',',')+' €'};
+
+    box.innerHTML='<div class="bord-pro">'+
+      bloc(euros(gains.total_libere),'Reçu à ce jour','gain')+
+      bloc(euros(gains.total_en_attente),'En attente de validation','attente')+
+      bloc(termines,'Prestations terminées')+
+      bloc(taux===null?'—':taux+' %','Devis acceptés')+
+      bloc(note&&Number(note)>0?Number(note).toFixed(1).replace('.',','):'—','Note moyenne')+
+      bloc((typeof fiabilite==='number'?fiabilite:100)+' %','Fiabilité')+
+    '</div>';
+  }catch(e){ box.innerHTML=''; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARCOURS DE DÉMARRAGE
+//
+// Trois réglages conditionnent tout ce qui suit, et un prestataire fraîchement
+// inscrit n'a aucun moyen de le deviner. Les trois écrans existaient ; il leur
+// manquait un fil conducteur.
+//
+// Le parcours disparaît dès qu'il est complet — il accompagne, il ne surveille
+// pas. Un bandeau qui resterait affiché après coup deviendrait du bruit.
+// ─────────────────────────────────────────────────────────────────────────────
+async function chargerParcoursDemarrage(){
+  var box=document.getElementById('pro-rappel-config');
+  if(!box||!currentUser||!isPro())return;
+
+  // Les trois vérifications partent en parallèle : trois appels successifs
+  // feraient clignoter le bandeau pendant une seconde à chaque ouverture.
+  var zoneReglee=typeof currentUser.latitude==='number'&&typeof currentUser.rayon_intervention_km==='number';
+
+  var tarifsSaisis=false,paiementsPrets=false;
+  try{
+    var [tarifs,connect]=await Promise.all([
+      fetch(API+'/api/societes/tarifs',{headers:authHeaders()}).then(safeJson).catch(function(){return{}}),
+      fetch(API+'/api/paiements/connect/statut',{headers:authHeaders()}).then(safeJson).catch(function(){return{}})
+    ]);
+    tarifsSaisis=!!((tarifs.tarifs&&Object.keys(tarifs.tarifs).length)||
+                    (tarifs.tarifs_unitaires&&Object.keys(tarifs.tarifs_unitaires).length));
+    paiementsPrets=connect.statut==='pret';
+  }catch(e){}
+
+  var etapes=[
+    { fait:zoneReglee, titre:'Définir votre zone d\'intervention',
+      pourquoi:'Sans elle, vous recevez toutes les demandes du pays. Avec elle, uniquement celles que vous pouvez honorer.',
+      action:'ouvrirZoneIntervention()', bouton:'Régler ma zone', icone:'map-pin' },
+    { fait:tarifsSaisis, titre:'Renseigner vos tarifs',
+      pourquoi:'Ils alimentent l\'estimation de prix montrée aux clients avant leur inscription. Sans eux, vous n\'y figurez pas.',
+      action:"goProTab('pro-tarifs')", bouton:'Saisir mes tarifs', icone:'euro' },
+    { fait:paiementsPrets, titre:'Configurer vos paiements',
+      pourquoi:'C\'est par là que transitent vos virements. À faire avant votre première prestation, pas après.',
+      action:'configurerPaiementsPro()', bouton:'Configurer', icone:'landmark' }
+  ];
+
+  var faites=etapes.filter(function(e){return e.fait}).length;
+  if(faites===etapes.length){ box.innerHTML=''; return; }
+
+  var prochaine=etapes.filter(function(e){return !e.fait})[0];
+
+  box.innerHTML='<div class="parcours">'+
+    '<div class="parcours-tete">'+
+      '<div>'+
+        '<div class="parcours-titre">Terminez votre installation</div>'+
+        '<div class="parcours-sous">'+faites+' étape'+(faites>1?'s':'')+' sur '+etapes.length+' — '+
+          (faites===0?'aucune demande ne vous parviendra tant que votre zone n\'est pas définie'
+                     :'encore '+(etapes.length-faites)+' pour être pleinement opérationnel')+'</div>'+
+      '</div>'+
+      '<div class="parcours-jauge"><div style="width:'+Math.round(faites/etapes.length*100)+'%"></div></div>'+
+    '</div>'+
+    '<div class="parcours-etapes">'+
+      etapes.map(function(e){
+        return '<div class="parcours-etape'+(e.fait?' faite':'')+(e===prochaine?' active':'')+'">'+
+          '<div class="marque">'+(e.fait?'<i data-lucide="check"></i>':'<i data-lucide="'+e.icone+'"></i>')+'</div>'+
+          '<div class="corps">'+
+            '<div class="intitule">'+e.titre+'</div>'+
+            (e.fait?'':'<div class="pourquoi">'+e.pourquoi+'</div>'+
+              '<button onclick="'+e.action+'">'+e.bouton+'</button>')+
+          '</div>'+
+        '</div>';
+      }).join('')+
+    '</div>'+
+  '</div>';
+  if(window.lucide)lucide.createIcons();
+}
+
+async function verifierConfigurationPro(){
+  var box=document.getElementById('pro-rappel-config');
+  if(!box||!currentUser)return;
+  // Conservée sous forme de renvoi : deux endroits l'appelaient déjà, et le
+  // parcours de démarrage couvre désormais entièrement son rôle.
+  return chargerParcoursDemarrage();
+}
+async function _ancienRappelConfigurationPro(){
+  var box=document.getElementById('pro-rappel-config');
+  if(!box||!currentUser)return;
+  var manques=[];
+  if(typeof currentUser.latitude!=='number'||typeof currentUser.rayon_intervention_km!=='number')
+    manques.push({texte:'votre zone d\'intervention',action:"ouvrirZoneIntervention()",bouton:'Régler ma zone'});
+  try{
+    const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
+    if(r.ok){
+      const t=await safeJson(r);
+      var aucun=(!t.tarifs||!Object.keys(t.tarifs).length)&&(!t.tarifs_unitaires||!Object.keys(t.tarifs_unitaires).length);
+      if(aucun)manques.push({texte:'vos tarifs',action:"goProTab('pro-tarifs')",bouton:'Saisir mes tarifs'});
+    }
+  }catch(e){}
+  if(!manques.length){box.innerHTML='';return}
+
+  var premier=manques[0];
+  var quoi=manques.map(function(m){return m.texte}).join(' et ');
+  box.innerHTML='<div class="rappel-config">'+
+    '<i data-lucide="settings"></i>'+
+    '<div class="texte">Il vous reste à renseigner <strong>'+quoi+'</strong>. '+
+      (manques.length>1
+        ? 'Sans zone, vous recevez des demandes trop éloignées ; sans tarifs, vous n\'apparaissez pas dans l\'estimation de prix montrée aux clients.'
+        : (premier.bouton==='Régler ma zone'
+            ? 'Sans elle, vous recevez toutes les demandes, y compris celles situées à l\'autre bout du pays.'
+            : 'Sans eux, vous n\'apparaissez pas dans l\'estimation de prix montrée aux clients avant leur inscription.'))+
+      '<br><button onclick="'+premier.action+'">'+premier.bouton+'</button>'+
+    '</div></div>';
+  if(window.lucide)lucide.createIcons();
 }
 
 async function loadProDevisCount(){
@@ -3802,9 +4484,27 @@ function renderProDevisCards(){
     return;
   }
   var filtered=parOnglet.filter(function(v){return proDevisMatchesFilter(v,proDevisFilterActive)});
-  if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span>🔍</span><p>Aucun devis dans cette catégorie.</p></div>';return}
 
-  var html=chips;
+  // Ce que la liste ne disait jamais : combien d'argent est en jeu. Un pro qui a
+  // envoyé douze devis veut savoir ce que ça représente s'ils aboutissent, et
+  // combien attendent encore une réponse.
+  var enAttente=data.filter(function(v){return v.statut==='envoye'});
+  var montantEnJeu=enAttente.reduce(function(t,v){return t+(parseFloat(v.prix_ttc)||0)},0);
+  var gagnes=data.filter(function(v){
+    return v.statut==='accepte'&&v.demande&&v.demande.statut==='terminee';
+  });
+  var montantGagne=gagnes.reduce(function(t,v){return t+(parseFloat(v.prix_ttc)||0)*(1-TAUX_COMMISSION)},0);
+  var euros=function(n){return Math.round(n).toLocaleString('fr-FR')+' €'};
+
+  var recap='<div class="recap-devis">'+
+    '<div><div class="valeur attente">'+enAttente.length+'</div><div class="etiquette">En attente de réponse</div></div>'+
+    '<div><div class="valeur attente">'+euros(montantEnJeu)+'</div><div class="etiquette">Montant en jeu</div></div>'+
+    '<div><div class="valeur gagne">'+euros(montantGagne)+'</div><div class="etiquette">Perçu, net de commission</div></div>'+
+  '</div>';
+
+  if(!filtered.length){c.innerHTML=recap+chips+emptyStateHtml({title:'Rien dans cette catégorie',sub:'Changez de filtre pour retrouver vos autres devis.',ctaLabel:'',ctaAction:''});return}
+
+  var html=recap+chips;
   filtered.forEach(function(v,vi){
       var badge,extra='';
       var safeVId=escAttr(v.id),safeDemandeId=escAttr(v.demande_id);
