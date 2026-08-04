@@ -1653,9 +1653,11 @@ const TYPES_DOCUMENTS = {
   vigilance_urssaf: { libelle: "Attestation de vigilance URSSAF", requis: false, mois_validite: 6,
                       faces: ['unique'] },
   sap:              { libelle: "Agrément services à la personne", requis: false, mois_validite: 12,
-                      faces: ['unique'] },
-  autre:            { libelle: "Autre document",                 requis: false, mois_validite: null,
                       faces: ['unique'] }
+  // « Autre document » a été retiré : un prestataire n'a aucune raison de
+  // déposer un justificatif que personne ne lui demande, et l'administrateur
+  // n'aurait aucun critère pour le valider. La valeur reste admise par la
+  // contrainte en base — inutile de la modifier pour une entrée jamais utilisée.
 };
 
 const LIBELLES_FACE = { unique: '', recto: 'Recto', verso: 'Verso' };
@@ -3747,6 +3749,124 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
       siret_partage: partage.partage
     });
   } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DÉCLARATION ANNUELLE DES REVENUS DES PRESTATAIRES — dispositif DPI-DAC7
+//
+// Directive (UE) 2021/514, transposée aux articles 1649 ter A à 1649 ter E du
+// CGI. En vigueur depuis le 1ᵉʳ janvier 2023.
+//
+// Gleam entre dans le périmètre sans ambiguïté : le texte vise « tout logiciel
+// ou application permettant à des prestataires d'être connectés à des
+// acheteurs », et « inclut également tout mécanisme de perception et de
+// paiement d'une contrepartie ». Mise en relation ET encaissement.
+//
+// Ce que la DGFiP attend, pour chaque prestataire actif :
+//   · ses coordonnées d'identification
+//   · le nombre d'opérations réalisées
+//   · les revenus perçus, ventilés PAR TRIMESTRE
+//   · les frais, commissions et taxes prélevés par la plateforme
+//
+// À déposer avant le 31 janvier de l'année suivante, en XML normalisé.
+//
+// Cette route produit les agrégats exacts. Elle ne génère PAS le fichier XML
+// au format DPI_OECD : c'est un travail spécialisé, avec un schéma imposé et
+// deux niveaux de contrôle. Elle fournit les données justes, sous une forme
+// qu'un comptable ou un prestataire spécialisé peut reprendre.
+//
+// L'article 242 bis du CGI impose en outre de transmettre à chaque prestataire
+// un récapitulatif annuel de ses opérations, dans le même délai. Les mêmes
+// données servent.
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/admin/declaration-annuelle', adminAuth, async (req, res) => {
+  try {
+    const annee = parseInt(req.query.annee, 10) || (new Date().getFullYear() - 1);
+    const debut = annee + '-01-01T00:00:00.000Z';
+    const fin = (annee + 1) + '-01-01T00:00:00.000Z';
+
+    // Seuls les paiements réellement encaissés comptent : un paiement remboursé
+    // ou abandonné n'a produit aucun revenu à déclarer.
+    const { data: paiements } = await supabase.from('paiements')
+      .select('id, demande_id, societe_id, montant, montant_societe, commission, statut, created_at')
+      .in('statut', ['paye', 'libere'])
+      .gte('created_at', debut).lt('created_at', fin)
+      .limit(20000);
+
+    const idsPros = [...new Set((paiements || []).map(p => p.societe_id).filter(Boolean))];
+    const { data: pros } = idsPros.length
+      ? await supabase.from('users')
+          .select('id, prenom, nom, email, telephone, siret, raison_sociale, adresse_facturation, type, siret_donnees')
+          .in('id', idsPros)
+      : { data: [] };
+
+    const parPro = {};
+    (pros || []).forEach((p) => {
+      parPro[p.id] = {
+        id: p.id,
+        nom: (p.raison_sociale || ((p.prenom || '') + ' ' + (p.nom || '')).trim() || p.email),
+        email: p.email,
+        telephone: p.telephone || null,
+        siret: p.siret || null,
+        // Le nom officiel du répertoire prime sur le nom déclaré : c'est celui
+        // que l'administration reconnaîtra.
+        nom_officiel: (p.siret_donnees && p.siret_donnees.nom) || null,
+        adresse: p.adresse_facturation || null,
+        nb_operations: 0,
+        revenu_brut: 0,
+        commission_prelevee: 0,
+        revenu_net: 0,
+        trimestres: { T1: 0, T2: 0, T3: 0, T4: 0 }
+      };
+    });
+
+    (paiements || []).forEach((p) => {
+      const f = parPro[p.societe_id];
+      if (!f) return;
+      const brut = parseFloat(p.montant) || 0;
+      const commission = parseFloat(p.commission) || 0;
+      const net = parseFloat(p.montant_societe) || (brut - commission);
+      const trimestre = 'T' + (Math.floor(new Date(p.created_at).getMonth() / 3) + 1);
+
+      f.nb_operations += 1;
+      f.revenu_brut += brut;
+      f.commission_prelevee += commission;
+      f.revenu_net += net;
+      f.trimestres[trimestre] += net;
+    });
+
+    const arrondir = (n) => Math.round(n * 100) / 100;
+    const prestataires = Object.values(parPro).map((f) => ({
+      ...f,
+      revenu_brut: arrondir(f.revenu_brut),
+      commission_prelevee: arrondir(f.commission_prelevee),
+      revenu_net: arrondir(f.revenu_net),
+      trimestres: {
+        T1: arrondir(f.trimestres.T1), T2: arrondir(f.trimestres.T2),
+        T3: arrondir(f.trimestres.T3), T4: arrondir(f.trimestres.T4)
+      },
+      // Un prestataire sans SIRET renseigné ne peut pas être déclaré : c'est
+      // son identifiant fiscal. À signaler avant l'échéance, pas après.
+      declarable: !!f.siret
+    })).sort((a, b) => b.revenu_net - a.revenu_net);
+
+    res.json({
+      annee,
+      echeance: '31 janvier ' + (annee + 1),
+      prestataires,
+      totaux: {
+        nb_prestataires: prestataires.length,
+        nb_operations: prestataires.reduce((s, p) => s + p.nb_operations, 0),
+        revenu_brut: arrondir(prestataires.reduce((s, p) => s + p.revenu_brut, 0)),
+        commission_prelevee: arrondir(prestataires.reduce((s, p) => s + p.commission_prelevee, 0)),
+        revenu_net: arrondir(prestataires.reduce((s, p) => s + p.revenu_net, 0)),
+        sans_siret: prestataires.filter((p) => !p.declarable).length
+      }
+    });
+  } catch (e) {
+    console.error('Déclaration annuelle :', e.message);
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
