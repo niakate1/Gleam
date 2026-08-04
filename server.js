@@ -1573,6 +1573,13 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     const idsRepondues = new Set((mesDevis || []).filter(d => d.statut === 'envoye' || d.statut === 'accepte').map(d => d.demande_id));
     let filtered = demandesEncoreValides.filter(d => !idsRepondues.has(d.id));
 
+    // Les demandes que ce prestataire a lui-même écartées. Strictement
+    // personnel : elles restent visibles de tous les autres.
+    const { data: masquees } = await supabase.from('demandes_masquees')
+      .select('demande_id').eq('pro_id', req.user.id);
+    const idsMasquees = new Set((masquees || []).map(m => m.demande_id));
+    filtered = filtered.filter(d => !idsMasquees.has(d.id));
+
     // Ne montrer que les demandes correspondant aux prestations que le pro a déclaré savoir faire
     // (si le pro n'a configuré aucune préférence dans "Mes tarifs", on continue à tout lui montrer
     // pour ne pas casser l'expérience des pros n'ayant pas encore configuré cet écran).
@@ -3269,6 +3276,52 @@ app.get('/api/evaluations/mes-notes-donnees', auth, async (req, res) => {
   try {
     const { data } = await supabase.from('evaluations').select('demande_id').eq('evaluateur_id', req.user.id);
     res.json((data || []).map(e => e.demande_id));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Écarter une demande — action personnelle et réversible. Le client n'en est
+// jamais informé : lui annoncer un refus serait décourageant sans rien lui
+// apprendre d'actionnable.
+app.post('/api/demandes/:id/masquer', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+
+    // Le motif est facultatif, et volontairement borné à une liste connue :
+    // du texte libre serait impossible à agréger, donc inutile pour comprendre
+    // pourquoi les demandes n'aboutissent pas.
+    //
+    // « prix trop bas » ne figure PAS dans cette liste, et c'est délibéré : le
+    // prestataire fixe lui-même son prix dans son devis. Aucun montant ne lui est
+    // imposé — une demande ne porte ni budget ni prix indicatif, l'estimation
+    // n'étant montrée qu'au client avant publication. Lui proposer ce motif
+    // l'inviterait à répondre à une question qui ne se pose pas.
+    //
+    // Le vrai motif économique est ailleurs : la prestation est trop petite pour
+    // justifier le déplacement. Celui-là appelle une décision produit — panier
+    // minimum, frais de déplacement, ou regroupement de demandes.
+    const motifsAdmis = ['trop_loin', 'creneau_impossible', 'trop_petit', 'hors_competence', 'autre'];
+    const motif = motifsAdmis.includes(req.body && req.body.motif) ? req.body.motif : null;
+
+    const { error } = await supabase.from('demandes_masquees')
+      .upsert({ pro_id: req.user.id, demande_id: req.params.id, motif },
+              { onConflict: 'pro_id,demande_id' });
+    if (error) return res.status(500).json({ error: 'Impossible d\'écarter cette demande.' });
+
+    res.json({ message: 'Demande écartée.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Annuler : la demande réapparaît dans la liste.
+app.delete('/api/demandes/:id/masquer', auth, async (req, res) => {
+  try {
+    await supabase.from('demandes_masquees').delete()
+      .eq('pro_id', req.user.id).eq('demande_id', req.params.id);
+    res.json({ message: 'Demande rétablie.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
