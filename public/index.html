@@ -2616,7 +2616,7 @@ textarea { min-height: 92px; padding-top: 13px; }
     </div>
   </div>
   <div class="pro-content" style="padding-top:0">
-    <div class="section-title">Demandes clients — les plus urgentes d'abord</div>
+    <div class="section-title">Demandes clients — les plus proches d'abord</div>
     <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Chargement...</p></div></div>
   </div>
   <div class="bottom-nav">
@@ -2845,8 +2845,8 @@ textarea { min-height: 92px; padding-top: 13px; }
   <div class="navbar"><span class="logo-sm">✨ Gleam</span></div>
   <div class="success-screen">
     <div class="success-icon gleam-signature">✨</div>
-    <h2>Demande envoyée !</h2>
-    <p>Votre demande a été transmise aux prestataires Gleam.<br>Vous recevrez des devis dans les plus brefs délais.</p>
+    <h2>Demande envoyée</h2>
+    <p id="success-message">Votre demande a été transmise aux prestataires Gleam.</p>
     <button class="btn" onclick="goTab('home')" style="max-width:300px">Retour à l'accueil</button>
     <button class="btn" style="background:var(--surface);color:var(--p);border:2px solid var(--p);margin-top:10px;max-width:300px" onclick="goTab('devis')">Voir mes devis</button>
   </div>
@@ -3866,7 +3866,16 @@ async function loadDemandes(silent){
     if(!data.length){c.innerHTML=emptyStateHtml({title:'Aucune demande pour l\u2019instant',sub:'Lancez votre première demande de nettoyage en quelques secondes.',ctaLabel:'Créer une demande',ctaAction:'goTab(\'home\')'});return}
 
     var order={en_cours:0,acceptee:1,devis_recus:2,en_attente:3,terminee:4,expiree:5};
-    data.sort(function(a,b){return(order[a.statut]??9)-(order[b.statut]??9)});
+    data.sort(function(a,b){
+      var diff=(order[a.statut]??9)-(order[b.statut]??9);
+      if(diff!==0)return diff;
+      // À statut égal, le rendez-vous le plus proche d'abord. Sans ce
+      // départage, l'ordre dépendait de ce que renvoyait la base et pouvait
+      // changer d'un rafraîchissement à l'autre.
+      var ta=instantCreneau(a.creneau), tb=instantCreneau(b.creneau);
+      if(ta!==tb)return ta-tb;
+      return new Date(b.created_at||0)-new Date(a.created_at||0);
+    });
 
     var html='';
     data.forEach(function(d,i){
@@ -4037,6 +4046,10 @@ async function loadDevis(silent){
     all.sort(function(a,b){
       var diff=clientDevisScore(a)-clientDevisScore(b);
       if(diff!==0)return diff;
+      // À rang égal, la prestation la plus imminente d'abord : c'est elle qui
+      // demande une décision. La date d'envoi ne sert que de dernier recours.
+      var ta=instantCreneau(a.creneau), tb=instantCreneau(b.creneau);
+      if(ta!==tb)return ta-tb;
       return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
     var changed1=hasDataChanged('devis',all);
@@ -4531,13 +4544,22 @@ function renderProDemandesCards(){
   // avec beaucoup de demandes en attente, mieux vaut voir en premier celles dont le délai presse,
   // pour ne jamais rater une demande urgente noyée sous des demandes plus récentes mais moins pressées.
   // Les demandes sans créneau précis (flexibles) passent en dernier.
-  function creneauTimestamp(creneau){
-    if(!creneau)return Infinity;
-    var match=/(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2}):(\d{2})/.exec(creneau);
-    if(!match)return Infinity;
-    return new Date(+match[1],+match[2]-1,+match[3],+match[4],+match[5]).getTime();
-  }
-  data=data.slice().sort(function(a,b){return creneauTimestamp(a.creneau)-creneauTimestamp(b.creneau)});
+  // Le tri était inopérant : l'expression exigeait « 9:00 » alors que les
+  // créneaux sont enregistrés « 9h00 ». Elle ne reconnaissait donc aucun
+  // créneau réel, renvoyait Infinity pour tous, et la comparaison
+  // Infinity − Infinity = NaN laissait la liste dans l'ordre du serveur.
+  // instantCreneau accepte les deux séparateurs et sert désormais partout.
+  data=data.slice().sort(function(a,b){
+    var ta=instantCreneau(a.creneau), tb=instantCreneau(b.creneau);
+    if(ta!==tb)return ta-tb;
+    // À créneau identique, la plus proche géographiquement passe devant :
+    // à effort égal, c'est celle qui coûte le moins de déplacement.
+    var da=typeof a.distance_km==='number'?a.distance_km:9999;
+    var db=typeof b.distance_km==='number'?b.distance_km:9999;
+    if(da!==db)return da-db;
+    // Dernier départage, pour que l'ordre ne varie jamais d'un appel à l'autre.
+    return new Date(a.created_at||0)-new Date(b.created_at||0);
+  });
 
   // Puces construites dynamiquement à partir des catégories réellement présentes dans les demandes
   // en attente — pas de puce vide pour une prestation que le pro ne voit jamais.
@@ -4611,6 +4633,14 @@ function libelleUrgence(creneau){
   var jours=Math.round(heures/24);
   if(jours<=7)   return {texte:'Dans '+jours+' jours',niveau:'proche',icone:'clock'};
   return {texte:'Dans '+jours+' jours',niveau:'calme',icone:'calendar'};
+}
+// Un créneau en millisecondes, ou Infinity s'il est absent ou illisible — ce
+// qui place naturellement les demandes sans date en fin de liste.
+// Les deux séparateurs sont acceptés : « 9h00 » est le format enregistré,
+// « 9:00 » se rencontre dans d'anciennes données.
+function instantCreneau(creneau){
+  var d=creneauVersInstantLocal(creneau);
+  return d?d.getTime():Infinity;
 }
 function creneauVersInstantLocal(creneau){
   var m=/(\d{4})-(\d{2})-(\d{2})\s*à\s*(\d{1,2})[h:](\d{2})/.exec(creneau||'');
@@ -4855,6 +4885,8 @@ async function loadProDevis(silent){
     data.sort(function(a,b){
       var diff=proDevisScore(a)-proDevisScore(b);
       if(diff!==0)return diff;
+      var ta=instantCreneau(a.demande&&a.demande.creneau), tb=instantCreneau(b.demande&&b.demande.creneau);
+      if(ta!==tb)return ta-tb;
       return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
     var changed3=hasDataChanged('proDevis',data);
@@ -7932,6 +7964,39 @@ function validateCurrentForm(type){
   }
   return null;
 }
+// Dit au client ce qui s'est réellement passé. Un message unique et rassurant
+// dans les trois cas — « vous recevrez des devis dans les plus brefs délais » —
+// serait faux dans deux d'entre eux, et le client s'en apercevrait seul, après
+// avoir attendu.
+function afficherConfirmationEnvoi(reponse){
+  var p=document.getElementById('success-message');
+  if(!p)return;
+  // Un serveur non encore déployé ne renvoie pas ces champs. Dans ce cas on
+  // reste sur le message neutre : annoncer « personne » à tort serait pire que
+  // ne rien dire de précis.
+  if(!reponse||typeof reponse.prestataires_prevenus!=='number'){
+    p.textContent='Votre demande a été transmise aux prestataires Gleam. '+
+      'Vous recevrez des devis directement dans l\'application.';
+    return;
+  }
+  var nb=reponse.prestataires_prevenus;
+  var elargie=!!reponse.zone_elargie;
+
+  if(nb===0){
+    p.innerHTML='<strong>Aucun prestataire ne propose encore cette prestation près de chez vous.</strong><br><br>'+
+      'Votre demande reste publiée. Elle sera proposée dès qu\'un professionnel correspondant '+
+      'rejoint la plateforme, et vous serez prévenu.';
+  }else if(elargie){
+    p.innerHTML='Aucun prestataire n\'intervient encore dans votre secteur. Nous avons prévenu '+
+      '<strong>'+nb+' professionnel'+(nb>1?'s':'')+' parmi les plus proches</strong> — ils sont libres '+
+      'de se déplacer ou non.<br><br>Vous serez prévenu dès qu\'un devis arrive.';
+  }else{
+    p.innerHTML='<strong>'+nb+' prestataire'+(nb>1?'s':'')+' de votre secteur '+
+      (nb>1?'ont été prévenus':'a été prévenu')+'.</strong><br><br>'+
+      'Vous recevrez '+(nb>1?'leurs devis':'son devis')+' directement dans l\'application.';
+  }
+}
+
 async function sendDemand(type){
   var validationError=validateCurrentForm(type);
   if(validationError){toast('❌ '+validationError);return}
@@ -8043,7 +8108,7 @@ async function sendDemand(type){
     multiFlow={active:false,queue:[],current:0,results:[]};
     majAffichageSelectionPrestations();
     if(wasEdit){toast('✅ Demande modifiée !');openDetail(editedId)}
-    else{show('s-success')}
+    else{afficherConfirmationEnvoi(d);show('s-success')}
     loadDemandes();
   }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='Envoyer ma demande'}}
 }
