@@ -6833,11 +6833,11 @@ function buildDevisHtml(v){
     '.validite{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;margin-top:18px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:#92400E}'+
     '.pied{margin-top:44px;padding-top:18px;border-top:1px solid #E5E7EB}'+
     '.pied p{font-size:11px;color:#9CA3AF;line-height:1.7;margin:0 0 6px}'+
-    '@media print{body{padding:0}.bouton-impression{display:none!important}.parties,.total-ligne,.validite,.repartition,.pied{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}'+
+    '@media print{body{padding:0}.bouton-impression,.bouton-retour-document{display:none!important}.parties,.total-ligne,.validite,.repartition,.pied{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}'+
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
     '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
     '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
-    '.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}'+
+    '.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
     '</style></head><body>'+
 
     '<div class="entete">'+
@@ -6862,6 +6862,12 @@ function buildDevisHtml(v){
 
     '<div class="validite"><span class="validite-marque">Validité</span><span><strong>Ce devis est valable jusqu\'au '+dateValiditeStr+'.</strong> Passé ce délai, le prestataire pourra être amené à réviser son prix. Ce document ne constitue pas une facture — le règlement n\'intervient qu\'après acceptation et réalisation de la prestation, directement depuis votre espace Gleam.</span></div>'+
 
+    // Sans ce bouton, une application installée sur l'écran d'accueil piège
+    // l'utilisateur : la fenêtre s'ouvre en plein écran, sans onglet ni barre
+    // d'adresse, et le seul recours est de quitter l'application.
+    // window.close() est parfois refusé pour une fenêtre que le navigateur n'a
+    // pas ouverte lui-même — d'où le repli sur l'historique.
+    '<button class="bouton-retour-document" onclick="try{window.close()}catch(e){};setTimeout(function(){if(!window.closed)history.back()},120)">&#8592; Retour</button>'+
     '<button class="bouton-impression" onclick="window.print()">Imprimer ou enregistrer en PDF</button>'+
     '<div class="pied">'+
       '<p><strong>Catégorie :</strong> devis pour prestation de services — nettoyage à domicile.</p>'+
@@ -6924,11 +6930,11 @@ function buildFactureHtml(d,vuePro){
     '.pied{margin-top:44px;padding-top:18px;border-top:1px solid #E5E7EB}'+
     '.pied p{font-size:11px;color:#9CA3AF;line-height:1.7;margin:0 0 6px}'+
     '.paiement-info{font-size:12px;color:#4B5563;margin-top:22px;display:flex;gap:8px;align-items:center}'+
-    '@media print{body{padding:0}.bouton-impression{display:none!important}.parties,.total-ligne,.validite,.repartition,.pied{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}'+
+    '@media print{body{padding:0}.bouton-impression,.bouton-retour-document{display:none!important}.parties,.total-ligne,.validite,.repartition,.pied{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}'+
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
     '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
     '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
-    '.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}'+
+    '.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
     '</style></head><body>'+
 
     '<div class="entete">'+
@@ -6964,6 +6970,12 @@ function buildFactureHtml(d,vuePro){
       '<p style="margin-top:12px;color:#D1D5DB">Gleam — gleam-app.fr</p>'+
     '</div>'+
 
+    // Sans ce bouton, une application installée sur l'écran d'accueil piège
+    // l'utilisateur : la fenêtre s'ouvre en plein écran, sans onglet ni barre
+    // d'adresse, et le seul recours est de quitter l'application.
+    // window.close() est parfois refusé pour une fenêtre que le navigateur n'a
+    // pas ouverte lui-même — d'où le repli sur l'historique.
+    '<button class="bouton-retour-document" onclick="try{window.close()}catch(e){};setTimeout(function(){if(!window.closed)history.back()},120)">&#8592; Retour</button>'+
     '<button class="bouton-impression" onclick="window.print()">Imprimer ou enregistrer en PDF</button>'+
     '</body></html>';
 }
