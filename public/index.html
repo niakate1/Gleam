@@ -1518,6 +1518,64 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   35. ÉCARTER UNE DEMANDE
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.actions-demande { display: flex; gap: var(--gap-2); align-items: stretch; margin-top: var(--gap-3); }
+.actions-demande .btn-devis { flex: 1; margin-top: 0; }
+
+/* Volontairement discret : écarter ne doit jamais paraître aussi engageant que
+   répondre. Assez visible pour être trouvé, assez sobre pour ne pas attirer. */
+.btn-ecarter {
+  flex-shrink: 0;
+  padding: 12px 14px;
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--gray);
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  white-space: nowrap;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-spring);
+}
+.btn-ecarter:hover { border-color: var(--border-fort); color: var(--text-secondary); }
+.btn-ecarter:active { transform: scale(.96); }
+
+.barre-ecartement {
+  position: fixed; left: 50%; z-index: 300;
+  bottom: calc(84px + var(--pad-bas));
+  transform: translateX(-50%) translateY(14px);
+  width: min(calc(100% - 32px), 420px);
+  display: flex; flex-direction: column; gap: 10px;
+  background: #201E38; color: #fff;
+  border-radius: var(--r-md);
+  padding: 13px 16px;
+  box-shadow: var(--shadow-xl);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.barre-ecartement.visible { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.barre-ecartement .texte { font-size: 14px; font-weight: 700; }
+.barre-ecartement .motifs { display: flex; flex-wrap: wrap; gap: 6px; }
+.barre-ecartement .motifs button {
+  padding: 6px 12px;
+  background: rgba(255,255,255,.14);
+  border: none; border-radius: var(--r-pill);
+  color: rgba(255,255,255,.9);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.barre-ecartement .motifs button:hover { background: rgba(255,255,255,.24); }
+.barre-ecartement .motifs button.choisi { background: var(--aqua); color: #06201C; }
+.barre-ecartement .motifs button:disabled { opacity: .35; }
+.barre-ecartement .annuler {
+  position: absolute; top: 11px; right: 14px;
+  background: none; border: none;
+  color: var(--p2); font-family: inherit; font-size: 13px; font-weight: 800;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    34. ÉCRAN DES TARIFS
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -2618,6 +2676,9 @@ textarea { min-height: 92px; padding-top: 13px; }
   <div class="pro-content" style="padding-top:0">
     <div class="section-title">Demandes clients — les plus proches d'abord</div>
     <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Chargement...</p></div></div>
+  </div>
+  <div class="barre-ecartement" id="barre-ecartement"></div>
+  <div style="display:none">
   </div>
   <div class="bottom-nav">
     <button class="bnav-item active" onclick="goProTab('pro-home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
@@ -4588,7 +4649,7 @@ function renderProDemandesCards(){
     var hasPhotos=getPhotosFromNotes(d.notes).length>0;
     var safeId=escAttr(d.id);
     var urgence=libelleUrgence(d.creneau);
-    html+='<div class="demande-card fade-in-item" style="animation-delay:'+(di*0.04)+'s">'+
+    html+='<div class="demande-card fade-in-item" id="carte-demande-'+safeId+'" style="animation-delay:'+(di*0.04)+'s">'+
       '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
       '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
       // Le repère d'urgence rend visible le tri déjà appliqué : la liste est
@@ -4603,7 +4664,13 @@ function renderProDemandesCards(){
       (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
       (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
       (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
-      '<button class="btn-devis" id="ouvrir-devis-'+safeId+'" onclick="basculerFormulaireDevis(\''+safeId+'\',\''+escAttr(d.prestation)+'\')">💰 Proposer un prix</button>'+
+      '<div class="actions-demande">'+
+        '<button class="btn-devis" id="ouvrir-devis-'+safeId+'" onclick="basculerFormulaireDevis(\''+safeId+'\',\''+escAttr(d.prestation)+'\')">💰 Proposer un prix</button>'+
+        // Secondaire, discret, sans confirmation : écarter est anodin et
+        // réversible. Demander « êtes-vous sûr ? » sur ce geste serait pénible.
+        '<button class="btn-ecarter" onclick="ecarterDemande(\''+safeId+'\')" '+
+          'aria-label="Écarter cette demande">Pas pour moi</button>'+
+      '</div>'+
       '<div class="devis-form" id="devis-form-'+safeId+'" style="display:none">'+
         '<div id="rappel-tarifs-'+safeId+'"></div>'+
         '<label>💰 Votre prix (€ TTC)</label>'+
@@ -5019,6 +5086,67 @@ function renderProDevisCards(){
     var ph=getPhotosFromNotes(v.demande&&v.demande.notes);
     if(ph.length)renderPhotoPreviews(ph,'photos-mesdevis-'+v.id);
   });
+}
+
+// Écarte une demande de la liste de ce prestataire. Aucune confirmation :
+// l'action est réversible, et le retour arrière reste offert quelques secondes.
+async function ecarterDemande(id){
+  var carte=document.getElementById('carte-demande-'+id);
+  if(carte)carte.style.display='none';
+  try{
+    await fetch(API+'/api/demandes/'+id+'/masquer',{method:'POST',headers:authHeaders(),body:JSON.stringify({})});
+  }catch(e){ if(carte)carte.style.display=''; toast(friendlyNetworkError(e)); return; }
+  afficherRetourEcartement(id);
+}
+
+// Barre de retour arrière, façon boîte de réception. Le motif y figure, mais
+// facultatif : la barre s'efface d'elle-même si on l'ignore.
+function afficherRetourEcartement(id){
+  var barre=document.getElementById('barre-ecartement');
+  if(!barre)return;
+  clearTimeout(barre._minuteur);
+  barre.innerHTML='<div class="texte">Demande écartée</div>'+
+    '<div class="motifs">'+
+      // Quatre motifs, tous vérifiables par le prestataire à la lecture de la
+      // carte. Aucun ne porte sur le prix : c'est lui qui le fixe.
+      [['trop_loin','Trop loin'],['creneau_impossible','Pas ce créneau'],
+       ['trop_petit','Trop petit'],['hors_competence','Pas mon métier']]
+      .map(function(m){return '<button onclick="preciserMotifEcartement(\''+id+'\',\''+m[0]+'\',this)">'+m[1]+'</button>'}).join('')+
+    '</div>'+
+    '<button class="annuler" onclick="retablirDemande(\''+id+'\')">Annuler</button>';
+  barre.classList.add('visible');
+  barre._minuteur=setTimeout(function(){barre.classList.remove('visible')},7000);
+}
+
+// Le motif part sans rien bloquer ni rien fermer : c'est un bonus, pas une étape.
+async function preciserMotifEcartement(id,motif,btn){
+  if(btn){
+    btn.classList.add('choisi');
+    var parent=btn.parentElement;
+    if(parent)parent.querySelectorAll('button').forEach(function(b){if(b!==btn)b.disabled=true});
+  }
+  try{
+    await fetch(API+'/api/demandes/'+id+'/masquer',
+      {method:'POST',headers:authHeaders(),body:JSON.stringify({motif:motif})});
+  }catch(e){}
+  var barre=document.getElementById('barre-ecartement');
+  if(barre){
+    var t=barre.querySelector('.texte');
+    if(t)t.textContent='Merci, c\'est noté';
+    clearTimeout(barre._minuteur);
+    barre._minuteur=setTimeout(function(){barre.classList.remove('visible')},1600);
+  }
+}
+
+async function retablirDemande(id){
+  var barre=document.getElementById('barre-ecartement');
+  if(barre)barre.classList.remove('visible');
+  try{
+    await fetch(API+'/api/demandes/'+id+'/masquer',{method:'DELETE',headers:authHeaders()});
+    var carte=document.getElementById('carte-demande-'+id);
+    if(carte)carte.style.display='';
+    toast('Demande rétablie.');
+  }catch(e){ toast(friendlyNetworkError(e)) }
 }
 
 // Le formulaire de réponse était déplié sur chaque carte : avec dix demandes,
