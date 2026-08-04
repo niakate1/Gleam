@@ -1518,6 +1518,34 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   37. RETOUR DE VÉRIFICATION DU SIRET
+   Trois tons, et aucun rouge : même quand le numéro est introuvable, rien
+   n'est bloqué, donc rien ne doit ressembler à une erreur.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.retour-siret {
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin-top: 6px;
+  padding: 0;
+}
+.retour-siret:empty { display: none; }
+.retour-siret.trouve {
+  color: var(--green);
+  background: var(--green-clair);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+}
+.retour-siret.attention {
+  color: var(--amber);
+  background: var(--amber-clair);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+}
+.retour-siret.neutre { color: var(--gray); }
+.retour-siret strong { font-weight: 700; }
+
+/* ────────────────────────────────────────────────────────────────────────────
    36. GRILLES D'OPTIONS — PAS DE DERNIER ÉLÉMENT ORPHELIN
    Les grilles sont sur deux colonnes. Un nombre impair d'options laissait le
    dernier bouton seul à gauche de sa ligne, avec un vide à sa droite : c'est
@@ -2568,7 +2596,8 @@ textarea { min-height: 92px; padding-top: 13px; }
           <label style="margin-top:0">Raison sociale *</label>
           <input type="text" id="r-raison-sociale" placeholder="Ex: Dupont Nettoyage SARL">
           <label>Numéro SIRET *</label>
-          <input type="text" id="r-siret-entreprise" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20">
+          <input type="text" id="r-siret-entreprise" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret-entreprise')">
+          <div class="retour-siret" id="retour-r-siret-entreprise"></div>
           <label>Numéro de TVA intracommunautaire <span class="optional">(optionnel)</span></label>
           <input type="text" id="r-tva" placeholder="Ex: FR12345678901">
           <label>Adresse de facturation *</label>
@@ -2578,7 +2607,8 @@ textarea { min-height: 92px; padding-top: 13px; }
         <div id="pro-rcpro-block" style="display:none;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px">
           <label style="margin-top:0">Numéro SIRET *</label>
           <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Nécessaire pour vérifier votre statut légal d'indépendant ou d'entreprise.</div>
-          <input type="text" id="r-siret" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20">
+          <input type="text" id="r-siret" placeholder="14 chiffres, ex: 123 456 789 00012" inputmode="numeric" maxlength="20" oninput="verifierSiretEnDirect('r-siret')">
+          <div class="retour-siret" id="retour-r-siret"></div>
           <label style="margin-top:14px">Assurance RC Pro <span class="optional">(requis pour les professionnels)</span></label>
           <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Une assurance responsabilité civile professionnelle en cours de validité est nécessaire pour intervenir chez les clients Gleam.</div>
           <label style="font-size:12px;margin-top:0">Compagnie d'assurance <span class="optional">(optionnel)</span></label>
@@ -3046,6 +3076,78 @@ function show(id){
 // Depuis l'écran de découverte sans compte : basculer vers connexion ou inscription, au moment
 // précis où la personne veut réellement agir (choisir une prestation, ou cliquer "se connecter"),
 // jamais avant — exactement le moment où les applications comparables le demandent.
+// ─────────────────────────────────────────────────────────────────────────────
+// VÉRIFICATION DU SIRET PENDANT LA SAISIE
+//
+// Conçue comme un service rendu, jamais comme un contrôle. Elle confirme le nom
+// de l'entreprise, remplit la raison sociale à la place du prestataire, et ne
+// bloque jamais l'inscription — quel que soit le résultat.
+//
+// Un numéro introuvable est presque toujours une faute de frappe. Le message
+// reste donc neutre et invite explicitement à continuer.
+// ─────────────────────────────────────────────────────────────────────────────
+var minuteurSiret=null, controleurSiret=null;
+
+async function verifierSiretEnDirect(champId){
+  var champ=document.getElementById(champId);
+  var box=document.getElementById('retour-'+champId);
+  if(!champ||!box)return;
+
+  var siret=champ.value.replace(/[^0-9]/g,'');
+  clearTimeout(minuteurSiret);
+  if(controleurSiret)controleurSiret.abort();
+
+  if(siret.length<14){
+    // Rien tant que le numéro est incomplet : afficher « introuvable » à la
+    // troisième frappe serait décourageant et faux.
+    box.innerHTML='';
+    box.className='retour-siret';
+    return;
+  }
+  if(siret.length>14){
+    box.innerHTML='Un SIRET compte exactement 14 chiffres.';
+    box.className='retour-siret neutre';
+    return;
+  }
+
+  box.innerHTML='Vérification…';
+  box.className='retour-siret neutre';
+
+  minuteurSiret=setTimeout(async function(){
+    controleurSiret=new AbortController();
+    try{
+      const r=await fetch(API+'/api/verification/siret?siret='+encodeURIComponent(siret),{signal:controleurSiret.signal});
+      const d=await safeJson(r);
+      if(!d){box.innerHTML='';return}
+
+      if(d.statut==='verifie'){
+        box.innerHTML='<strong>'+escapeHtml(d.nom||'Entreprise trouvée')+'</strong>'+
+          (d.activite?'<br>'+escapeHtml(d.activite)+(d.activite_code?' ('+escapeHtml(d.activite_code)+')':''):'')+
+          (d.commune?'<br>'+escapeHtml(d.commune):'');
+        box.className='retour-siret trouve';
+        // Rendre service : remplir la raison sociale si elle est vide. On
+        // n'écrase jamais ce que la personne a déjà saisi.
+        var raison=document.getElementById('r-raison-sociale');
+        if(raison&&!raison.value.trim()&&d.nom)raison.value=d.nom;
+      }else if(d.statut==='ferme'){
+        box.innerHTML='<strong>'+escapeHtml(d.nom||'Entreprise trouvée')+'</strong><br>'+
+          'Cet établissement est indiqué comme fermé au répertoire. '+
+          'Si vous avez changé d\'établissement, indiquez votre SIRET actuel.';
+        box.className='retour-siret attention';
+      }else if(d.statut==='introuvable'){
+        box.innerHTML='Nous n\'avons pas trouvé ce numéro dans le répertoire officiel. '+
+          'Vérifiez-le si vous le pouvez — <strong>vous pouvez continuer dans tous les cas</strong>.';
+        box.className='retour-siret neutre';
+      }else{
+        // Répertoire injoignable : on ne dit rien plutôt que d'inquiéter pour
+        // un problème qui n'est pas celui du prestataire.
+        box.innerHTML='';
+        box.className='retour-siret';
+      }
+    }catch(e){ box.innerHTML=''; box.className='retour-siret'; }
+  },500);
+}
+
 function afficherEcranAuth(onglet,role){
   show('s-auth');
   switchTab(onglet);
