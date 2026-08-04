@@ -101,6 +101,45 @@ button{font-family:inherit;cursor:pointer}
 
 .lien-tel{display:inline-block;margin-top:4px;font-size:13px;font-weight:700;
   color:var(--p);text-decoration:none}
+.alerte-siret{margin-top:6px;padding:6px 10px;border-radius:8px;background:#FEF3E2;
+  color:#9A6412;font-size:12px;font-weight:700}
+
+/* Diagnostic : les chiffres qui appellent une décision, avant les volumes. */
+.grille-diagnostic{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:1px;background:var(--border);border:1px solid var(--border);
+  border-radius:var(--r-md);overflow:hidden;margin-bottom:26px}
+.grille-diagnostic > div{background:var(--surface);padding:16px 18px}
+.grille-diagnostic .valeur{font-family:'Fraunces',Georgia,serif;font-size:27px;
+  font-weight:600;line-height:1.05;font-variant-numeric:tabular-nums;color:var(--text)}
+.grille-diagnostic .valeur.bon{color:#0B7A55}
+.grille-diagnostic .valeur.moyen{color:#9A6412}
+.grille-diagnostic .valeur.mauvais{color:#C0392B}
+.grille-diagnostic .etiquette{font-size:12px;font-weight:700;color:var(--gray);margin-top:6px;line-height:1.35}
+.grille-diagnostic .aide{font-size:11.5px;color:var(--gray);margin-top:5px;line-height:1.4;opacity:.85}
+
+/* Répartitions par motif : une barre vaut mieux qu'un tableau de nombres. */
+.bloc-motifs{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-md);padding:18px;margin-bottom:16px}
+.bloc-motifs .titre{font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px}
+.bloc-motifs .sous{font-size:12px;color:var(--gray);margin-bottom:14px;line-height:1.4}
+.ligne-motif{display:grid;grid-template-columns:1fr 44px;gap:12px;align-items:center;margin-bottom:9px}
+.ligne-motif .nom{font-size:13px;color:var(--text-secondary)}
+.ligne-motif .barre{height:5px;background:var(--surface-alt);border-radius:999px;
+  overflow:hidden;margin-top:5px}
+.ligne-motif .barre > div{height:100%;background:var(--p);border-radius:999px}
+.ligne-motif .nb{font-size:15px;font-weight:800;text-align:right;color:var(--text);
+  font-variant-numeric:tabular-nums}
+
+.tableau-villes{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-md);overflow:hidden;margin-bottom:26px}
+.ligne-ville{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;
+  padding:13px 18px;border-bottom:1px solid var(--border)}
+.ligne-ville:last-child{border-bottom:none}
+.ligne-ville .nom{font-size:14px;font-weight:700;color:var(--text)}
+.ligne-ville .nb{font-size:13px;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.ligne-ville .sans{font-size:12px;font-weight:800;padding:3px 9px;border-radius:999px}
+.ligne-ville .sans.alerte{background:#FDECEC;color:#C0392B}
+.ligne-ville .sans.ok{background:#E7F7EF;color:#0B7A55}
 .lien-tel:hover{text-decoration:underline}
 
 /* File d'attente : on doit savoir en permanence combien il reste, et la page
@@ -240,6 +279,12 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
     </div>
 
     <section id="vue-chiffres">
+      <div class="titre-section">Ce qui bloque</div>
+      <div id="grille-diagnostic"></div>
+      <div id="repartitions"></div>
+      <div class="titre-section">Demande par ville</div>
+      <div id="villes"></div>
+
       <div class="titre-section">Activité</div>
       <div class="grille-chiffres" id="grille-chiffres"></div>
       <div class="titre-section">Encaissements</div>
@@ -372,6 +417,7 @@ function deconnecter(message) {
 function entrer() {
   $('ecran-connexion').classList.add('masque');
   $('ecran-admin').classList.remove('masque');
+  chargerDiagnostic();
   chargerChiffres();
 }
 
@@ -470,10 +516,24 @@ async function chargerComptes(recherche) {
           '<div style="min-width:0">' +
             '<div class="ligne"><strong>' + echapper(((u.prenom || '') + ' ' + (u.nom || '')).trim() || 'Sans nom') + '</strong></div>' +
             '<div class="petit">' + echapper(u.email) + '</div>' +
+            // Cliquable : sur un ordinateur cela ouvre le logiciel de téléphonie,
+            // sur un téléphone cela appelle.
+            (u.telephone ? '<a class="lien-tel" href="tel:' + echapper(u.telephone) + '">' +
+              echapper(u.telephone) + '</a>' : '') +
           '</div>' +
           '<span class="badge ' + (u.compte_supprime ? 'neutre' : suspendu ? 'suspendu' : 'neutre') + '">' +
             (u.compte_supprime ? 'Supprimé' : suspendu ? 'Suspendu' : (libelleType[u.type] || u.type)) + '</span>' +
         '</div>' +
+        // L'état du SIRET était vérifié mais nulle part visible. Un compte
+        // introuvable au répertoire, ou partageant son numéro, doit se repérer
+        // sans ouvrir de fiche.
+        (estPro && u.siret_statut && u.siret_statut !== 'verifie'
+          ? '<div class="alerte-siret">' +
+            (u.siret_statut === 'introuvable' ? 'SIRET introuvable au répertoire'
+             : u.siret_statut === 'ferme' ? 'Établissement fermé au répertoire'
+             : 'SIRET non vérifié') +
+            (u.siret_doublon ? ' · numéro partagé avec un autre compte' : '') + '</div>'
+          : (estPro && u.siret_doublon ? '<div class="alerte-siret">SIRET partagé avec un autre compte</div>' : '')) +
         '<div class="petit">Inscrit le ' + dateCourte(u.created_at) +
           (u.note_moyenne ? ' · note ' + Number(u.note_moyenne).toFixed(2).replace('.', ',') + ' / 5' : '') +
           (estPro && u.taux_fiabilite !== null && u.taux_fiabilite !== undefined
@@ -505,6 +565,92 @@ async function basculerCompte(id, disponible) {
   } catch (e) { if (e.message !== '401') avis(e.message, 'ko'); }
 }
 
+
+
+// ── Diagnostic : les chiffres qui appellent une décision ────────────────────
+
+// Chaque chiffre porte un seuil, pour qu'on sache d'un coup d'œil s'il est bon.
+// Sans cela, « 61 % » ne dit rien à qui découvre le tableau.
+function tonSelonSeuil(valeur, bon, moyen, sensInverse) {
+  if (valeur === null || valeur === undefined) return '';
+  if (sensInverse) return valeur <= bon ? 'bon' : valeur <= moyen ? 'moyen' : 'mauvais';
+  return valeur >= bon ? 'bon' : valeur >= moyen ? 'moyen' : 'mauvais';
+}
+
+function blocMotifs(titre, sous, liste, total) {
+  if (!liste || !liste.length)
+    return '<div class="bloc-motifs"><div class="titre">' + titre + '</div>' +
+           '<div class="sous">' + sous + '</div>' +
+           '<p class="petit">Aucune donnée pour l\'instant.</p></div>';
+  const max = Math.max.apply(null, liste.map((m) => m.nombre));
+  return '<div class="bloc-motifs"><div class="titre">' + titre + '</div>' +
+    '<div class="sous">' + sous + '</div>' +
+    liste.map((m) =>
+      '<div class="ligne-motif">' +
+        '<div><div class="nom">' + echapper(m.libelle) + '</div>' +
+          '<div class="barre"><div style="width:' + Math.round((m.nombre / max) * 100) + '%"></div></div></div>' +
+        '<div class="nb">' + m.nombre + '</div>' +
+      '</div>').join('') +
+  '</div>';
+}
+
+async function chargerDiagnostic() {
+  let d;
+  try { d = await appel('/api/admin/diagnostic'); }
+  catch (e) { $('grille-diagnostic').innerHTML = '<p class="petit">Diagnostic indisponible.</p>'; return; }
+
+  const r = d.reponse, c = d.conversion;
+
+  const bloc = (valeur, etiquette, aide, ton) =>
+    '<div><div class="valeur ' + (ton || '') + '">' + valeur + '</div>' +
+    '<div class="etiquette">' + etiquette + '</div>' +
+    (aide ? '<div class="aide">' + aide + '</div>' : '') + '</div>';
+
+  $('grille-diagnostic').innerHTML = '<div class="grille-diagnostic">' +
+    bloc(r.taux_reponse === null ? '—' : r.taux_reponse + ' %', 'Demandes ayant reçu un devis',
+      'Le chiffre le plus important : une demande sans devis n\'a servi à personne.',
+      tonSelonSeuil(r.taux_reponse, 80, 60)) +
+    bloc(r.sans_devis, 'Sans aucun devis',
+      'Sur ' + r.total_demandes + ' demandes au total.',
+      tonSelonSeuil(r.sans_devis, 0, 3, true)) +
+    bloc(r.mortes_sans_devis, 'Mortes sans réponse',
+      'Expirées sans qu\'aucun prestataire n\'ait répondu. Perte sèche.',
+      tonSelonSeuil(r.mortes_sans_devis, 0, 2, true)) +
+    bloc(r.delai_median_heures === null ? '—' : r.delai_median_heures + ' h', 'Délai médian de réponse',
+      'Temps avant le premier devis. La médiane, pas la moyenne.',
+      tonSelonSeuil(r.delai_median_heures, 6, 24, true)) +
+    bloc(c.taux_acceptation === null ? '—' : c.taux_acceptation + ' %', 'Devis acceptés',
+      'Sur ' + c.devis_repondus + ' devis ayant reçu une réponse.',
+      tonSelonSeuil(c.taux_acceptation, 40, 20)) +
+    bloc(d.qualite.note_moyenne === null ? '—' : String(d.qualite.note_moyenne).replace('.', ',') + ' / 5',
+      'Note moyenne', d.qualite.nombre_avis + ' avis déposés.',
+      tonSelonSeuil(d.qualite.note_moyenne, 4.5, 4)) +
+  '</div>';
+
+  $('repartitions').innerHTML =
+    blocMotifs('Signalements par motif',
+      'Ce que vos utilisateurs subissent. ' + d.signalements.ouverts + ' non traité' +
+      (d.signalements.ouverts > 1 ? 's' : '') + ' sur ' + d.signalements.total + '.',
+      d.signalements.par_motif) +
+    blocMotifs('Pourquoi les prestataires écartent une demande',
+      'Chaque motif appelle une correction différente : la distance concerne votre recrutement, ' +
+      'le créneau une gestion de disponibilités, la taille votre modèle économique.',
+      d.ecartements.par_motif) +
+    blocMotifs('Pourquoi les documents sont refusés',
+      'Si « illisible » domine, l\'aide au cadrage est à revoir. ' +
+      d.documents.en_attente + ' document(s) en attente de vérification.',
+      d.documents.refuses_par_motif);
+
+  $('villes').innerHTML = d.villes.length
+    ? '<div class="tableau-villes">' + d.villes.map((v) =>
+        '<div class="ligne-ville">' +
+          '<div class="nom">' + echapper(v.ville) + '</div>' +
+          '<div class="nb">' + v.demandes + ' demande' + (v.demandes > 1 ? 's' : '') + '</div>' +
+          '<div class="sans ' + (v.sans_devis ? 'alerte' : 'ok') + '">' +
+            (v.sans_devis ? v.sans_devis + ' sans devis' : 'toutes servies') + '</div>' +
+        '</div>').join('') + '</div>'
+    : '<p class="petit">Aucune demande enregistrée.</p>';
+}
 
 // ── Documents : file d'attente et décisions ─────────────────────────────────
 
@@ -732,7 +878,7 @@ document.querySelectorAll('.onglet').forEach((b) => {
     document.querySelectorAll('.onglet').forEach((x) => x.classList.toggle('actif', x === b));
     ['chiffres', 'signalements', 'documents', 'comptes'].forEach((v) =>
       $('vue-' + v).classList.toggle('masque', v !== b.dataset.vue));
-    if (b.dataset.vue === 'chiffres') chargerChiffres();
+    if (b.dataset.vue === 'chiffres') { chargerChiffres(); chargerDiagnostic(); }
     if (b.dataset.vue === 'signalements') chargerSignalements();
     if (b.dataset.vue === 'documents') chargerDocuments();
     if (b.dataset.vue === 'comptes') chargerComptes($('recherche').value.trim());
