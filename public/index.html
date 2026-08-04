@@ -1518,6 +1518,50 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   38. DOCUMENTS DU PRESTATAIRE
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.carte-document {
+  display: flex; align-items: center; gap: var(--gap-3);
+  padding: var(--gap-3) var(--gap-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 10px;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.carte-document.en-cours { opacity: .5; pointer-events: none; }
+.carte-document .tete { flex: 1; min-width: 0; }
+.carte-document .nom { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+
+.etat-document {
+  display: inline-block;
+  font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 3px 9px; border-radius: var(--r-pill);
+}
+.etat-document.valide     { background: var(--green-clair); color: var(--green); }
+.etat-document.attente    { background: var(--amber-clair); color: var(--amber); }
+.etat-document.refuse     { background: var(--red-clair);   color: var(--red); }
+.etat-document.manquant   { background: var(--surface-alt);  color: var(--text-secondary); }
+.etat-document.facultatif { background: none; color: var(--gray); padding-left: 0; text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+.motif-document { font-size: 12px; line-height: 1.4; color: var(--red); margin-top: 5px; }
+.detail-document { font-size: 12px; color: var(--gray); margin-top: 5px; }
+
+.bouton-document {
+  flex-shrink: 0;
+  padding: 9px 15px;
+  background: var(--light); color: var(--p);
+  border-radius: var(--r-sm);
+  font-size: 12.5px; font-weight: 700;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-spring);
+}
+.bouton-document:hover { background: #E6E1FB; }
+.bouton-document:active { transform: scale(.97); }
+
+/* ────────────────────────────────────────────────────────────────────────────
    37. RETOUR DE VÉRIFICATION DU SIRET
    Trois tons, et aucun rouge : même quand le numéro est introuvable, rien
    n'est bloqué, donc rien ne doit ressembler à une erreur.
@@ -2789,6 +2833,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <div class="profile-item" onclick="showParrainage()"><span class="pi-icon"><i data-lucide="gift" style="width:20px;height:20px"></i></span><span class="pi-text">Parrainage</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="configurerPaiementsPro()"><span class="pi-icon"><i data-lucide="landmark" style="width:20px;height:20px"></i></span><span class="pi-text">Configurer mes paiements</span><span class="pi-arrow" id="connect-statut-badge"></span></div>
       <div class="profile-item" onclick="goProTab('pro-tarifs')"><span class="pi-icon"><i data-lucide="euro" style="width:20px;height:20px"></i></span><span class="pi-text">Mes tarifs</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="ouvrirDocumentsPro()"><span class="pi-icon"><i data-lucide="file-check" style="width:20px;height:20px"></i></span><span class="pi-text">Mes documents</span><span class="pi-arrow">›</span></div>
     </div>
 
     <div class="profile-section-titre">Préférences</div>
@@ -5367,9 +5412,141 @@ async function enregistrerJustificatifs(){
     currentUser.assurance_compagnie=corps.assurance_compagnie;
     currentUser.assurance_police=corps.assurance_police;
     document.getElementById('modal-overlay').classList.remove('open');
-    toast('Justificatifs enregistrés.');
+    // Le partage d'un SIRET n'est pas une erreur : il est fréquent au sein d'une
+    // même société. On l'annonce sans dramatiser, et sans rien bloquer.
+    if(d&&d.siret_partage){
+      toast('Justificatifs enregistrés. Ce numéro SIRET est déjà associé à un autre compte — '+
+            'c\'est normal si vous travaillez dans la même entreprise. Nous vérifierons.',7000);
+    }else{
+      toast('Justificatifs enregistrés.');
+    }
     chargerParcoursDemarrage();
   }catch(e){ toast(friendlyNetworkError(e)) }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOCUMENTS DU PRESTATAIRE
+// ─────────────────────────────────────────────────────────────────────────────
+
+var ETATS_DOCUMENT = {
+  en_attente: { texte: 'En vérification', classe: 'attente' },
+  valide:     { texte: 'Validé',          classe: 'valide' },
+  refuse:     { texte: 'À renvoyer',      classe: 'refuse' }
+};
+
+async function ouvrirDocumentsPro(){
+  document.getElementById('modal-body').innerHTML=
+    '<div class="modal-title">Vos documents</div>'+
+    '<p style="font-size:13px;line-height:1.5;color:var(--text-secondary);margin-bottom:16px">'+
+      'Photographiez vos justificatifs. Ils nous permettent de garantir à vos clients '+
+      'que vous êtes déclaré et assuré.'+
+    '</p>'+
+    '<div id="liste-documents"><div class="empty-state"><p>Chargement…</p></div></div>';
+  document.getElementById('modal-overlay').classList.add('open');
+  chargerDocumentsPro();
+}
+
+async function chargerDocumentsPro(){
+  var c=document.getElementById('liste-documents');
+  if(!c)return;
+  try{
+    const r=await fetch(API+'/api/documents',{headers:authHeaders()});
+    const d=await safeJson(r);
+    if(!d||!Array.isArray(d.documents)){c.innerHTML='';return}
+
+    c.innerHTML=d.documents.map(function(item){
+      var doc=item.document;
+      var etat=doc?ETATS_DOCUMENT[doc.statut]:null;
+
+      var ligneEtat;
+      if(etat){
+        ligneEtat='<span class="etat-document '+etat.classe+'">'+etat.texte+'</span>';
+        if(doc.statut==='refuse'&&doc.motif_refus){
+          // Le motif figure toujours : un refus sans explication produit un
+          // second envoi identique.
+          ligneEtat+='<div class="motif-document">'+escapeHtml(motifLisible(doc.motif_refus))+
+            (doc.commentaire?' — '+escapeHtml(doc.commentaire):'')+'</div>';
+        }
+        if(doc.statut==='valide'&&doc.date_expiration){
+          ligneEtat+='<div class="detail-document">Valable jusqu\'au '+formatDateFr(doc.date_expiration)+'</div>';
+        }
+      }else{
+        ligneEtat='<span class="etat-document '+(item.requis?'manquant':'facultatif')+'">'+
+          (item.requis?'À fournir':'Non requis pour l\'instant')+'</span>';
+      }
+
+      // Un document validé ne propose plus de bouton : le remplacer par erreur
+      // le remettrait en file d'attente pour rien.
+      var action=(doc&&doc.statut==='valide')?'' :
+        '<label class="bouton-document">'+
+          '<input type="file" accept="image/*,application/pdf" capture="environment" '+
+            'data-type="'+escAttr(item.type)+'" style="display:none">'+
+          (doc?'Renvoyer':'Photographier')+
+        '</label>';
+
+      return '<div class="carte-document">'+
+        '<div class="tete"><div class="nom">'+escapeHtml(item.libelle)+'</div>'+ligneEtat+'</div>'+
+        action+
+      '</div>';
+    }).join('');
+
+    // Écouteurs attachés après insertion : pas d'attribut inline à échapper.
+    c.querySelectorAll('input[type=file]').forEach(function(champ){
+      champ.addEventListener('change',function(){deposerDocument(champ)});
+    });
+  }catch(e){ c.innerHTML='<div class="empty-state"><p>Chargement impossible.</p></div>'; }
+}
+
+function motifLisible(cle){
+  var motifs={illisible:'Document illisible',expire:'Document expiré',incomplet:'Document incomplet',
+    ne_correspond_pas:'Ne correspond pas au prestataire',mauvais_type:'Ce n\'est pas le document demandé',
+    autre:'À renvoyer'};
+  return motifs[cle]||'À renvoyer';
+}
+
+function formatDateFr(iso){
+  try{ return new Date(iso).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) }
+  catch(e){ return iso }
+}
+
+async function deposerDocument(champ){
+  var fichier=champ.files&&champ.files[0];
+  if(!fichier)return;
+  var type=champ.getAttribute('data-type');
+  var carte=champ.closest('.carte-document');
+  if(carte)carte.classList.add('en-cours');
+
+  try{
+    var contenu;
+    if(fichier.type==='application/pdf'){
+      if(fichier.size>8*1024*1024){toast('Fichier trop lourd (8 Mo maximum).');return}
+      contenu=await new Promise(function(res,rej){
+        var l=new FileReader();
+        l.onload=function(e){res(e.target.result)};
+        l.onerror=function(){rej(new Error('Lecture impossible.'))};
+        l.readAsDataURL(fichier);
+      });
+    }else{
+      // 1 600 px suffisent pour lire une attestation, et la conversion en JPEG
+      // règle au passage le cas du HEIC des iPhone, illisible ailleurs.
+      contenu=await compressImage(fichier,1600,0.85);
+    }
+
+    const r=await fetch(API+'/api/documents',{method:'POST',headers:authHeaders(),
+      body:JSON.stringify({type:type,fichier:contenu,nom_original:fichier.name})});
+    const d=await safeJson(r);
+    if(!r.ok){toast('Erreur : '+(d&&d.error||''));return}
+
+    toast('Document déposé, il sera vérifié rapidement.');
+    chargerDocumentsPro();
+    chargerParcoursDemarrage();
+  }catch(e){
+    toast(e&&e.message?e.message:friendlyNetworkError(e));
+  }finally{
+    if(carte)carte.classList.remove('en-cours');
+    champ.value='';
+  }
 }
 
 // Rappelle au prestataire ce qu'il a lui-même enregistré pour cette prestation.
