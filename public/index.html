@@ -1518,6 +1518,146 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   34. ÉCRAN DES TARIFS
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.resume-tarifs {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--gap-4);
+  margin-bottom: var(--gap-4);
+}
+.resume-tarifs .tete { display: flex; align-items: center; gap: var(--gap-4); }
+.resume-tarifs .compte {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 40;
+  font-size: 15px; color: var(--gray); line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.resume-tarifs .compte strong { font-size: 27px; color: var(--p); font-weight: 600; }
+.resume-tarifs .libelle { font-size: 12px; color: var(--gray); margin-top: 4px; }
+.resume-tarifs .jauge {
+  flex: 1; height: 6px;
+  background: var(--surface-alt);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.resume-tarifs .jauge > div {
+  height: 100%; background: var(--p);
+  border-radius: var(--r-pill);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.resume-tarifs .message {
+  font-size: 12.5px; line-height: 1.5;
+  color: var(--text-secondary);
+  margin-top: var(--gap-3);
+  padding-top: var(--gap-3);
+  border-top: 1px solid var(--border);
+}
+
+/* Une catégorie non proposée tient sur une ligne. Les neuf dépliées à la fois
+   formaient une trentaine de champs, dont la plupart grisés et inutilisables. */
+.carte-tarif {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.carte-tarif.ouverte { border-color: var(--p); }
+.carte-tarif .entete {
+  display: flex; align-items: center; gap: var(--gap-3);
+  padding: var(--gap-3) var(--gap-4);
+  cursor: pointer;
+}
+.carte-tarif .entete:hover { background: var(--surface-alt); }
+.carte-tarif .ico {
+  flex-shrink: 0; width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-alt); color: var(--gray);
+  border-radius: 10px;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.carte-tarif.ouverte .ico { background: var(--light); color: var(--p); }
+.carte-tarif .ico i { width: 17px; height: 17px; }
+.carte-tarif .nom { flex: 1; font-size: 14.5px; font-weight: 700; }
+.carte-tarif .marque {
+  font-size: 10.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 9px; border-radius: var(--r-pill);
+}
+.carte-tarif .marque:empty { display: none; }
+.carte-tarif .marque.ok { background: var(--green-clair); color: var(--green); }
+.carte-tarif .marque.manque { background: var(--amber-clair); color: var(--amber); }
+
+/* La case reste dans le document — saveTarifs() la lit — mais l'interrupteur
+   visible est ce que l'on manipule. Deux commandes pour un seul état seraient
+   déroutantes. */
+.masque-visuel { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+.carte-tarif .toggle-switch { pointer-events: none; }
+.carte-tarif.ouverte .toggle-switch { background: var(--p); }
+.carte-tarif.ouverte .toggle-switch::after { transform: translateX(22px); }
+
+.carte-tarif .corps { display: none; padding: 0 var(--gap-4) var(--gap-4); }
+.carte-tarif.ouverte .corps { display: block; animation: fadeInUp var(--dur-base) var(--ease-out); }
+.carte-tarif .note {
+  font-size: 12px; line-height: 1.5; color: var(--gray);
+  padding-top: var(--gap-2); margin-bottom: var(--gap-3);
+  border-top: 1px solid var(--border);
+}
+.carte-tarif .conseil {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 15px; margin-bottom: var(--gap-4);
+  background: var(--light); color: var(--p);
+  border: none; border-radius: var(--r-sm);
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+.carte-tarif .conseil i { width: 14px; height: 14px; }
+.carte-tarif .conseil:active { transform: scale(.97); }
+
+.carte-tarif .paliers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap-3); }
+.carte-tarif .palier label {
+  display: block; font-size: 11.5px; font-weight: 700;
+  color: var(--text-secondary); margin: 0 0 5px;
+}
+.carte-tarif .saisie { position: relative; }
+.carte-tarif .saisie input { padding-right: 46px; height: 44px; font-size: 15px; }
+.carte-tarif .saisie .unite {
+  position: absolute; right: 12px; top: 0; height: 44px;
+  display: flex; align-items: center;
+  font-size: 12.5px; font-weight: 700; color: var(--gray);
+  pointer-events: none;
+}
+.carte-tarif .conseille { font-size: 11px; color: var(--gray); margin-top: 4px; }
+
+/* Barre d'enregistrement : elle reste sous la main, et dit s'il y a quelque
+   chose à enregistrer. Un bouton perdu en bas d'une longue page laisse partir
+   des modifications non sauvegardées. */
+.barre-enregistrement {
+  position: sticky; bottom: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  margin: var(--gap-4) calc(-1 * var(--gap-4)) 0;
+  padding: var(--gap-3) var(--gap-4) calc(var(--gap-3) + var(--pad-bas));
+}
+.barre-enregistrement .etat {
+  font-size: 12px; font-weight: 700;
+  text-align: center; margin-bottom: 8px;
+  min-height: 16px;
+}
+.barre-enregistrement .etat:empty { display: none; }
+.barre-enregistrement .etat.modifie { color: var(--amber); }
+.barre-enregistrement .etat.enregistre { color: var(--green); }
+
+@media (max-width: 380px) {
+  .carte-tarif .paliers { grid-template-columns: 1fr; }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    33. RAPPEL DES TARIFS DANS LE FORMULAIRE DE DEVIS
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -2540,12 +2680,12 @@ textarea { min-height: 92px; padding-top: 13px; }
     <span style="width:24px"></span>
   </div>
   <div class="home-content">
-    <div class="locked-banner" style="background:var(--light);border-color:#DDD6FE;color:#5B21B6">
-      <span>💡</span>
-      <div>Fixez un tarif de base par prestation. Les clients verront une estimation de prix calculée à partir de ces tarifs (et de ceux des autres pros) avant même de recevoir un devis. Laissez un champ vide si vous ne proposez pas cette prestation — un tarif par défaut sera utilisé pour l'estimation en attendant.</div>
-    </div>
+    <div id="tarifs-resume"></div>
     <div id="pro-tarifs-form"></div>
-    <button class="modal-send-btn" id="save-tarifs-btn" onclick="saveTarifs()" style="margin-top:8px">💾 Enregistrer mes tarifs</button>
+    <div class="barre-enregistrement" id="barre-tarifs">
+      <div class="etat" id="etat-tarifs"></div>
+      <button class="modal-send-btn" id="save-tarifs-btn" onclick="saveTarifs()" style="margin-top:0">Enregistrer mes tarifs</button>
+    </div>
   </div>
 </div>
 
@@ -4927,31 +5067,129 @@ const TARIF_CATEGORIES=[
   {key:'autre',label:'➕ Autre',tiers:null,placeholder:60,note:'Prix de base indicatif, à ajuster au cas par cas dans votre message au client.'}
 ];
 
+// Icônes vectorielles plutôt que les emojis des libellés : ils se dessinent
+// différemment sur chaque système, et sur un écran de réglages financiers cela
+// donne une impression d'à-peu-près.
+const ICONES_TARIF={voiture:'car',canape:'sofa',matelas:'bed-double',terrasse:'sun',
+  piscine:'droplets',toiture:'home',vitres:'app-window',tapis:'square',autre:'plus-circle'};
+
+var tarifsModifies=false;
+
+function nomTarif(cat){
+  // Le libellé porte un emoji en préfixe ; on ne garde que le mot.
+  return cat.label.replace(/^[^\p{L}]+/u,'').trim();
+}
+
+// Remplit tous les champs d'une catégorie avec les montants conseillés. Un
+// prestataire d'accord avec la référence n'a plus quatre montants à saisir.
+function appliquerTarifsConseilles(key){
+  var cat=TARIF_CATEGORIES.filter(function(c){return c.key===key})[0];
+  if(!cat)return;
+  if(cat.tiers){
+    cat.tiers.forEach(function(t){
+      var i=document.getElementById('tarif-'+key+'-'+t);
+      if(i&&!i.disabled)i.value=cat.tierPlaceholders[t];
+    });
+  }else{
+    var i=document.getElementById('tarif-'+key);
+    if(i&&!i.disabled)i.value=cat.placeholder;
+  }
+  marquerTarifsModifies();
+  majResumeTarifs();
+  majMarquesTarifs();
+  toast('Tarifs conseillés appliqués — ajustez-les si besoin.');
+}
+
+function marquerTarifsModifies(){
+  tarifsModifies=true;
+  var e=document.getElementById('etat-tarifs');
+  if(e){e.textContent='Modifications non enregistrées';e.className='etat modifie'}
+}
+
+// Une catégorie compte comme configurée si elle est proposée ET qu'au moins un
+// montant est saisi. Cocher sans chiffrer ne sert à rien : le prestataire
+// recevrait les demandes sans apparaître dans l'estimation montrée aux clients.
+function categorieConfiguree(cat){
+  var ch=document.getElementById('propose-'+cat.key);
+  if(!ch||!ch.checked)return false;
+  if(cat.tiers){
+    return cat.tiers.some(function(t){
+      var i=document.getElementById('tarif-'+cat.key+'-'+t);
+      return i&&i.value.trim()!=='';
+    });
+  }
+  var i=document.getElementById('tarif-'+cat.key);
+  return !!(i&&i.value.trim()!=='');
+}
+
+function majResumeTarifs(){
+  var box=document.getElementById('tarifs-resume');
+  if(!box)return;
+  var total=TARIF_CATEGORIES.length;
+  var faites=TARIF_CATEGORIES.filter(categorieConfiguree).length;
+
+  var message;
+  if(faites===0){
+    message='Tant qu\'aucun tarif n\'est saisi, vous n\'apparaissez pas dans l\'estimation de prix montrée aux clients avant leur inscription.';
+  }else if(faites<3){
+    message='Vous apparaissez désormais dans l\'estimation pour '+(faites===1?'cette prestation':'ces '+faites+' prestations')+'. En configurer d\'autres élargit les demandes que vous recevez.';
+  }else{
+    message='Vous êtes visible dans l\'estimation pour '+faites+' prestations. Vos tarifs restent modifiables à tout moment.';
+  }
+
+  box.innerHTML='<div class="resume-tarifs">'+
+    '<div class="tete">'+
+      '<div><div class="compte"><strong>'+faites+'</strong> sur '+total+'</div>'+
+      '<div class="libelle">prestation'+(faites>1?'s':'')+' configurée'+(faites>1?'s':'')+'</div></div>'+
+      '<div class="jauge"><div style="width:'+Math.round(faites/total*100)+'%"></div></div>'+
+    '</div>'+
+    '<div class="message">'+message+'</div>'+
+  '</div>';
+}
+
 async function loadProTarifs(){
   var c=document.getElementById('pro-tarifs-form');
   var html='';
   TARIF_CATEGORIES.forEach(function(cat){
-    html+='<div class="field-group" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px">'+
-      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:0">'+
-        '<input type="checkbox" id="propose-'+cat.key+'" style="width:auto" onchange="toggleTarifInput(\''+cat.key+'\')">'+
-        '<span>'+cat.label+' — je propose cette prestation</span>'+
-      '</label>'+
-      '<div style="font-size:11px;color:var(--gray);margin:4px 0 8px">'+cat.note+'</div>';
+    var unite=cat.unite?(' / '+cat.uniteLabel):'';
+    html+='<div class="carte-tarif" id="carte-tarif-'+cat.key+'">'+
+      // L'en-tête entier bascule la prestation : viser une petite case sur un
+      // téléphone est inutilement pénible.
+      '<div class="entete" onclick="basculerPrestationTarif(\''+cat.key+'\')">'+
+        '<span class="ico"><i data-lucide="'+(ICONES_TARIF[cat.key]||'tag')+'"></i></span>'+
+        '<span class="nom">'+nomTarif(cat)+'</span>'+
+        '<span class="marque" id="marque-tarif-'+cat.key+'"></span>'+
+        '<input type="checkbox" id="propose-'+cat.key+'" class="masque-visuel" onchange="toggleTarifInput(\''+cat.key+'\')">'+
+        '<span class="toggle-switch" aria-hidden="true"></span>'+
+      '</div>'+
+      '<div class="corps">'+
+        '<div class="note">'+cat.note+'</div>'+
+        '<button type="button" class="conseil" onclick="appliquerTarifsConseilles(\''+cat.key+'\')">'+
+          '<i data-lucide="wand-2"></i> Appliquer les tarifs conseillés</button>';
     if(cat.tiers){
-      html+='<div id="tarif-tiers-'+cat.key+'" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+      html+='<div class="paliers" id="tarif-tiers-'+cat.key+'">';
       cat.tiers.forEach(function(tier){
-        var ph=cat.unite?('ex: '+cat.tierPlaceholders[tier]):('ex: '+cat.tierPlaceholders[tier]);
-        html+='<div><label style="font-size:11px;margin-top:0">'+cat.tierLabels[tier]+(cat.unite?' (par '+cat.uniteLabel+')':'')+'</label>'+
-          '<input type="number" inputmode="decimal" min="0.5" step="0.5" id="tarif-'+cat.key+'-'+tier+'" placeholder="'+ph+'" disabled></div>';
+        html+='<div class="palier"><label>'+cat.tierLabels[tier]+'</label>'+
+          '<div class="saisie"><input type="number" inputmode="decimal" min="0.5" step="0.5" '+
+            'id="tarif-'+cat.key+'-'+tier+'" placeholder="—" oninput="marquerTarifsModifies();majResumeTarifs();majMarquesTarifs()" disabled>'+
+            '<span class="unite">€'+unite+'</span></div>'+
+          // Le montant conseillé est affiché comme une valeur, pas caché dans un
+          // texte d'exemple gris : c'est le seul repère de marché dont dispose
+          // un prestataire qui débute.
+          '<div class="conseille">Conseillé : '+cat.tierPlaceholders[tier]+' €'+unite+'</div></div>';
       });
       html+='</div>';
     }else{
-      var placeholderTxt=cat.unite?('Prix par '+cat.uniteLabel+', ex: '+cat.placeholder):('Prix de base, ex: '+cat.placeholder);
-      html+='<input type="number" inputmode="decimal" min="0.5" step="0.5" id="tarif-'+cat.key+'" placeholder="'+placeholderTxt+'" disabled>';
+      html+='<div class="paliers"><div class="palier"><label>Prix de base</label>'+
+        '<div class="saisie"><input type="number" inputmode="decimal" min="0.5" step="0.5" '+
+          'id="tarif-'+cat.key+'" placeholder="—" oninput="marquerTarifsModifies();majResumeTarifs();majMarquesTarifs()" disabled>'+
+          '<span class="unite">€'+unite+'</span></div>'+
+        '<div class="conseille">Conseillé : '+cat.placeholder+' €'+unite+'</div></div></div>';
     }
-    html+='</div>';
+    html+='</div></div>';
   });
   c.innerHTML=html;
+  if(window.lucide)lucide.createIcons();
   try{
     const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
     if(!r.ok)return;
@@ -4980,13 +5218,45 @@ async function loadProTarifs(){
           input.disabled=!propose;
         }
       }
+      var carte=document.getElementById('carte-tarif-'+cat.key);
+      if(carte)carte.classList.toggle('ouverte',propose);
     });
   }catch(e){}
+  majResumeTarifs();
+  majMarquesTarifs();
+  var e=document.getElementById('etat-tarifs');
+  if(e){e.textContent='';e.className='etat'}
+  tarifsModifies=false;
+}
+
+// Pastille sur l'en-tête : « configuré » ou « à chiffrer ». Elle rend visible,
+// sans déplier, une catégorie cochée mais laissée vide — le cas le plus
+// fréquent, et le plus coûteux puisqu'il ne sert à rien.
+function majMarquesTarifs(){
+  TARIF_CATEGORIES.forEach(function(cat){
+    var m=document.getElementById('marque-tarif-'+cat.key);
+    if(!m)return;
+    var ch=document.getElementById('propose-'+cat.key);
+    if(!ch||!ch.checked){m.textContent='';m.className='marque';return}
+    if(categorieConfiguree(cat)){m.textContent='Configuré';m.className='marque ok'}
+    else{m.textContent='À chiffrer';m.className='marque manque'}
+  });
+}
+
+function basculerPrestationTarif(key){
+  var ch=document.getElementById('propose-'+key);
+  if(!ch)return;
+  ch.checked=!ch.checked;
+  toggleTarifInput(key);
 }
 function toggleTarifInput(key){
   var checkbox=document.getElementById('propose-'+key);
   var cat=TARIF_CATEGORIES.filter(function(c){return c.key===key})[0];
   if(!cat)return;
+  var carte=document.getElementById('carte-tarif-'+key);
+  if(carte)carte.classList.toggle('ouverte',checkbox.checked);
+  marquerTarifsModifies();
+  setTimeout(function(){majResumeTarifs();majMarquesTarifs()},0);
   if(cat.tiers){
     cat.tiers.forEach(function(tier){
       var input=document.getElementById('tarif-'+key+'-'+tier);
@@ -5024,8 +5294,12 @@ async function saveTarifs(){
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast('💾 Tarifs enregistrés !');
+    tarifsModifies=false;
+    var etat=document.getElementById('etat-tarifs');
+    if(etat){etat.textContent='Enregistré';etat.className='etat enregistre'}
+    majResumeTarifs();majMarquesTarifs();
   }catch(e){toast(friendlyNetworkError(e))}
-  finally{btn.disabled=false;btn.textContent='💾 Enregistrer mes tarifs'}
+  finally{btn.disabled=false;btn.textContent='Enregistrer mes tarifs'}
 }
 
 async function toggleDispo(){
