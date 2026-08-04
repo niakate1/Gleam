@@ -569,9 +569,47 @@ async function verifierSiretOfficiel(siretBrut) {
   }
 }
 
+// Signale qu'un SIRET est partagé avec un autre compte. Aucune restriction
+// n'est appliquée : le partage peut être parfaitement légitime — plusieurs
+// intervenants d'une même société, plusieurs établissements — comme frauduleux.
+// Seul un humain peut trancher, et il lui faut les deux dossiers sous les yeux.
+//
+// Surtout, bloquer serait contre-productif : un SIRET est public, et refuser le
+// second inscrit reviendrait à laisser un imposteur verrouiller définitivement
+// l'accès de la vraie entreprise.
+async function signalerSiretPartage(userId, siret) {
+  try {
+    const propre = String(siret || '').replace(/\s/g, '');
+    if (!/^\d{14}$/.test(propre)) return { partage: false };
+
+    const { data: autres } = await supabase.from('users')
+      .select('id, email, prenom, nom, created_at')
+      .eq('siret', propre)
+      .neq('id', userId)
+      .eq('compte_supprime', false);
+
+    if (!autres || !autres.length) return { partage: false };
+
+    await supabase.from('users').update({ siret_doublon: true }).eq('id', userId);
+
+    console.warn('⚠️ SIRET partagé — ' + propre + ' — compte ' + userId +
+      ' partage ce numéro avec ' + autres.length + ' autre(s) : ' +
+      autres.map(u => u.email).join(', ') + ' — à examiner.');
+
+    return { partage: true, nombre: autres.length };
+  } catch (e) {
+    console.error('Détection SIRET partagé :', e.message);
+    return { partage: false };
+  }
+}
+
 // Enregistre le résultat sans jamais faire échouer l'appelant.
 async function enregistrerVerificationSiret(userId, siret) {
   try {
+    // Les deux contrôles vont de pair : l'un dit si le numéro existe, l'autre
+    // s'il est déjà utilisé chez vous. Aucun des deux ne bloque.
+    signalerSiretPartage(userId, siret).catch(() => {});
+
     const resultat = await verifierSiretOfficiel(siret);
     await supabase.from('users').update({
       siret_statut: resultat.statut,
@@ -1593,6 +1631,74 @@ function estCheminDepot(v) {
 // Téléverse une image base64 et renvoie son chemin dans le dépôt.
 // En cas d'échec, renvoie le base64 d'origine : une photo mal rangée vaut
 // toujours mieux qu'une photo perdue.
+// ─────────────────────────────────────────────────────────────────────────────
+// DOCUMENTS DES PRESTATAIRES
+// ─────────────────────────────────────────────────────────────────────────────
+const DEPOT_DOCUMENTS = 'documents-pro';
+
+// Chaque type porte son libellé, sa durée de validité et le fait qu'il soit
+// exigé ou non. Une seule source de vérité, partagée par toutes les routes.
+const TYPES_DOCUMENTS = {
+  identite:         { libelle: "Pièce d'identité",             requis: true,  mois_validite: null },
+  immatriculation:  { libelle: "Justificatif d'immatriculation", requis: true,  mois_validite: 6 },
+  rc_pro:           { libelle: "Attestation d'assurance RC Pro", requis: true,  mois_validite: null },
+  // Exigée par le Code du travail (L.8222-1) au-delà de 5 000 € HT cumulés sur
+  // une année civile. Sa validité de 6 mois est fixée par l'URSSAF.
+  vigilance_urssaf: { libelle: "Attestation de vigilance URSSAF", requis: false, mois_validite: 6 },
+  sap:              { libelle: "Agrément services à la personne", requis: false, mois_validite: 12 },
+  autre:            { libelle: "Autre document",                 requis: false, mois_validite: null }
+};
+
+const MOTIFS_REFUS = {
+  illisible:       'Le document est illisible',
+  expire:          'Le document est expiré',
+  incomplet:       'Le document est incomplet',
+  ne_correspond_pas: 'Le document ne correspond pas au prestataire',
+  mauvais_type:    "Ce n'est pas le document demandé",
+  autre:           'Autre motif'
+};
+
+// Accepte les images et les PDF. Le HEIC est indispensable : c'est le format
+// natif des photos d'iPhone, et refuser une photo prise à l'instant serait le
+// meilleur moyen de faire abandonner le prestataire.
+async function televerserDocument(base64, proId, type) {
+  const m = /^data:(image\/(?:jpeg|jpg|png|webp|heic|heif)|application\/pdf);base64,(.+)$/.exec(base64 || '');
+  if (!m) return { erreur: 'Format non accepté. Envoyez une photo ou un PDF.' };
+
+  let typeMime = m[1] === 'image/jpg' ? 'image/jpeg' : m[1];
+  const extensions = {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+    'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf'
+  };
+  const contenu = Buffer.from(m[2], 'base64');
+
+  if (contenu.length > 8 * 1024 * 1024)
+    return { erreur: 'Fichier trop lourd (8 Mo maximum).' };
+
+  // Un dossier par prestataire, un sous-dossier par type : le dépôt reste
+  // navigable à la main depuis Supabase si vous devez chercher quelque chose.
+  const chemin = proId + '/' + type + '/' + crypto.randomUUID() + '.' + extensions[typeMime];
+
+  const { error } = await supabase.storage.from(DEPOT_DOCUMENTS)
+    .upload(chemin, contenu, { contentType: typeMime, upsert: false });
+  if (error) {
+    console.error('Téléversement document échoué :', error.message);
+    return { erreur: "Le dépôt a échoué. Réessayez dans un instant." };
+  }
+  return { chemin, typeMime, taille: contenu.length };
+}
+
+// URL signée de courte durée. Jamais stockée, jamais publique : régénérée à
+// chaque consultation, elle expire en cinq minutes.
+async function signerDocument(chemin) {
+  try {
+    const { data } = await supabase.storage.from(DEPOT_DOCUMENTS).createSignedUrl(chemin, 300);
+    return data ? data.signedUrl : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function televerserPhoto(base64, dossier) {
   try {
     const m = /^data:(image\/(?:jpeg|jpg|png|webp));base64,(.+)$/.exec(base64 || '');
@@ -3613,14 +3719,219 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
     const { error } = await supabase.from('users').update(misAJour).eq('id', req.user.id);
     if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
 
-    // Sans await : la réponse ne doit pas attendre un service extérieur.
-    if (misAJour.siret) enregistrerVerificationSiret(req.user.id, misAJour.siret).catch(() => {});
+    // Le partage est vérifié tout de suite — c'est immédiat, une seule requête —
+    // afin de pouvoir en informer le prestataire dans la même réponse. La
+    // vérification auprès du répertoire officiel, elle, part sans await.
+    let partage = { partage: false };
+    if (misAJour.siret) {
+      partage = await signalerSiretPartage(req.user.id, misAJour.siret);
+      enregistrerVerificationSiret(req.user.id, misAJour.siret).catch(() => {});
+    }
 
     const { data: apres } = await supabase.from('users')
       .select('siret, assurance_rc_pro').eq('id', req.user.id).single();
     res.json({
       message: 'Justificatifs enregistrés.',
-      justificatifs_manquants: justificatifsManquants(apres)
+      justificatifs_manquants: justificatifsManquants(apres),
+      siret_partage: partage.partage
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ══════════════ DOCUMENTS DES PRESTATAIRES ══════════════
+
+// Déposer un document. Un dépôt du même type remplace le précédent : l'ancien
+// passe en « expire », il n'est jamais supprimé.
+app.post('/api/documents', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+
+    const type = String(req.body.type || '').trim();
+    if (!TYPES_DOCUMENTS[type]) return res.status(400).json({ error: 'Type de document inconnu.' });
+
+    const televerse = await televerserDocument(req.body.fichier, req.user.id, type);
+    if (televerse.erreur) return res.status(400).json({ error: televerse.erreur });
+
+    // Le précédent document du même type sort de la circulation. On le garde :
+    // il prouve ce que vous déteniez avant, ce qu'un contrôle peut demander.
+    await supabase.from('documents_pro')
+      .update({ statut: 'expire' })
+      .eq('pro_id', req.user.id).eq('type', type).in('statut', ['en_attente', 'valide']);
+
+    // La date d'expiration est calculée quand la durée de validité est connue
+    // et que le prestataire a indiqué la date d'émission — sinon on laisse
+    // l'administrateur la renseigner en lisant le document.
+    let dateExpiration = req.body.date_expiration || null;
+    const emission = req.body.date_emission || null;
+    const regle = TYPES_DOCUMENTS[type];
+    if (!dateExpiration && emission && regle.mois_validite) {
+      const d = new Date(emission);
+      if (!isNaN(d.getTime())) {
+        d.setMonth(d.getMonth() + regle.mois_validite);
+        dateExpiration = d.toISOString().slice(0, 10);
+      }
+    }
+
+    const { data, error } = await supabase.from('documents_pro').insert({
+      pro_id: req.user.id,
+      type,
+      statut: 'en_attente',
+      chemin_fichier: televerse.chemin,
+      nom_original: String(req.body.nom_original || '').slice(0, 200) || null,
+      taille_octets: televerse.taille,
+      type_mime: televerse.typeMime,
+      date_emission: emission,
+      date_expiration: dateExpiration,
+      reference: String(req.body.reference || '').slice(0, 100) || null
+    }).select().single();
+
+    if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+
+    console.log('📄 Document déposé — ' + regle.libelle + ' — prestataire ' + req.user.id);
+    res.status(201).json({ message: 'Document déposé, il sera vérifié rapidement.', document: { id: data.id, type, statut: data.statut } });
+  } catch (e) {
+    console.error('Dépôt document :', e.message);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Ce que le prestataire voit de ses propres documents : l'état de chacun, et ce
+// qu'il lui reste à fournir. Les documents expirés ne sont pas listés — il n'y
+// peut rien, et les afficher brouillerait la lecture.
+app.get('/api/documents', auth, async (req, res) => {
+  try {
+    const { data: docs } = await supabase.from('documents_pro')
+      .select('id, type, statut, date_emission, date_expiration, reference, motif_refus, commentaire, created_at, verifie_le')
+      .eq('pro_id', req.user.id).neq('statut', 'expire')
+      .order('created_at', { ascending: false });
+
+    const parType = {};
+    (docs || []).forEach(d => { if (!parType[d.type]) parType[d.type] = d; });
+
+    const etat = Object.keys(TYPES_DOCUMENTS).map(type => ({
+      type,
+      libelle: TYPES_DOCUMENTS[type].libelle,
+      requis: TYPES_DOCUMENTS[type].requis,
+      document: parType[type] || null
+    }));
+
+    res.json({ documents: etat });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// ══════════════ DOCUMENTS — ADMINISTRATION ══════════════
+
+// La file d'attente, ou le dossier complet d'un prestataire.
+// Les plus anciens d'abord : aucun dossier ne doit rester oublié au fond.
+app.get('/api/admin/documents', adminAuth, async (req, res) => {
+  try {
+    let requete = supabase.from('documents_pro')
+      .select('*, pro:users!documents_pro_pro_id_fkey(id, prenom, nom, email, telephone, siret, siret_statut, siret_doublon, siret_donnees)');
+
+    if (req.query.pro_id) {
+      // Dossier d'un prestataire : historique compris, expirés inclus.
+      requete = requete.eq('pro_id', req.query.pro_id).order('created_at', { ascending: false });
+    } else {
+      requete = requete.eq('statut', req.query.statut || 'en_attente')
+        .order('created_at', { ascending: true }).limit(100);
+    }
+
+    const { data, error } = await requete;
+    if (error) return res.status(500).json({ error: 'Lecture impossible.' });
+
+    const enrichis = (data || []).map(d => ({
+      ...d,
+      type_libelle: (TYPES_DOCUMENTS[d.type] || {}).libelle || d.type
+    }));
+
+    // Compteurs affichés en tête de file, pour savoir où l'on en est.
+    const { count: enAttente } = await supabase.from('documents_pro')
+      .select('id', { count: 'exact', head: true }).eq('statut', 'en_attente');
+
+    res.json({ documents: enrichis, en_attente: enAttente || 0, motifs_refus: MOTIFS_REFUS });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// URL signée pour consulter un document. Cinq minutes, régénérée à chaque
+// demande : aucune adresse permanente ne circule.
+app.get('/api/admin/documents/:id/fichier', adminAuth, async (req, res) => {
+  try {
+    const { data: doc } = await supabase.from('documents_pro')
+      .select('chemin_fichier, type_mime').eq('id', req.params.id).single();
+    if (!doc) return res.status(404).json({ error: 'Document introuvable.' });
+
+    const url = await signerDocument(doc.chemin_fichier);
+    if (!url) return res.status(500).json({ error: 'Lien de consultation indisponible.' });
+    res.json({ url, type_mime: doc.type_mime });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Valider ou refuser. Le motif est exigé pour un refus : sans lui, le
+// prestataire renvoie le même document et deux jours sont perdus.
+app.patch('/api/admin/documents/:id', adminAuth, async (req, res) => {
+  try {
+    const decision = String(req.body.decision || '').trim();
+    if (decision !== 'valide' && decision !== 'refuse')
+      return res.status(400).json({ error: 'Décision attendue : valide ou refuse.' });
+
+    if (decision === 'refuse' && !MOTIFS_REFUS[String(req.body.motif || '')])
+      return res.status(400).json({ error: 'Un motif de refus est requis.' });
+
+    const misAJour = {
+      statut: decision,
+      verifie_par: 'admin',
+      verifie_le: new Date().toISOString(),
+      motif_refus: decision === 'refuse' ? req.body.motif : null,
+      commentaire: String(req.body.commentaire || '').slice(0, 500) || null
+    };
+    // L'administrateur corrige au besoin les dates lues sur le document :
+    // le prestataire les saisit de mémoire, lui les lit.
+    if (req.body.date_emission !== undefined) misAJour.date_emission = req.body.date_emission || null;
+    if (req.body.date_expiration !== undefined) misAJour.date_expiration = req.body.date_expiration || null;
+
+    const { data, error } = await supabase.from('documents_pro')
+      .update(misAJour).eq('id', req.params.id).select('*, pro:users!documents_pro_pro_id_fkey(email, prenom)').single();
+    if (error || !data) return res.status(400).json({ error: 'Mise à jour impossible.' });
+
+    const libelle = (TYPES_DOCUMENTS[data.type] || {}).libelle || data.type;
+    console.log((decision === 'valide' ? '✅' : '❌') + ' Document ' + decision + ' — ' + libelle +
+      ' — ' + (data.pro && data.pro.email));
+
+    res.json({ message: decision === 'valide' ? 'Document validé.' : 'Document refusé.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Les échéances à venir. La vue la plus importante après la file d'attente :
+// elle permet d'anticiper au lieu de constater.
+app.get('/api/admin/documents/expirations', adminAuth, async (req, res) => {
+  try {
+    const jours = Math.min(parseInt(req.query.jours, 10) || 60, 365);
+    const limite = new Date();
+    limite.setDate(limite.getDate() + jours);
+
+    const { data } = await supabase.from('documents_pro')
+      .select('id, type, date_expiration, pro:users!documents_pro_pro_id_fkey(prenom, nom, email)')
+      .eq('statut', 'valide').not('date_expiration', 'is', null)
+      .lte('date_expiration', limite.toISOString().slice(0, 10))
+      .order('date_expiration', { ascending: true });
+
+    res.json({
+      documents: (data || []).map(d => ({
+        ...d,
+        type_libelle: (TYPES_DOCUMENTS[d.type] || {}).libelle || d.type,
+        jours_restants: Math.ceil((new Date(d.date_expiration) - new Date()) / 86400000)
+      }))
     });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
