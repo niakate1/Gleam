@@ -1,0 +1,146 @@
+# ============================================================================
+# Gleam — configuration Netlify
+#
+# POURQUOI CE FICHIER EXISTE
+#
+# Le réglage qui nous a fait chercher pendant des heures — « le dossier publié
+# est public/ » — n'existait que dans le tableau de bord Netlify. Invisible
+# depuis le dépôt, invisible dans l'historique, invisible pour quiconque
+# reprendrait le projet.
+#
+# Ce fichier le rend explicite et versionné. Quelqu'un qui ouvre le dépôt dans
+# six mois comprend en dix secondes comment le site est servi.
+#
+# C'est la vraie leçon : ce n'est pas Netlify contre GitHub Pages qui posait
+# problème, c'est un réglage important caché dans une interface.
+#
+# Placer ce fichier à la RACINE du dépôt, pas dans public/.
+# ============================================================================
+
+[build]
+  # Le dossier réellement publié. Netlify sert son contenu comme s'il était la
+  # racine du site : public/index.html devient gleam-app.fr/index.html
+  publish = "public"
+
+  # Aucune commande de compilation : le site est en HTML, CSS et JavaScript
+  # directs, sans étape de construction. C'est volontaire et cela vous épargne
+  # toute une catégorie de pannes.
+  command = ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Le service worker
+#
+# Deux règles indispensables, sans lesquelles les notifications ne peuvent pas
+# fonctionner de façon fiable.
+# ─────────────────────────────────────────────────────────────────────────────
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    # Un navigateur REFUSE catégoriquement d'enregistrer un service worker qui
+    # n'est pas servi en JavaScript. Netlify le fait correctement d'après
+    # l'extension, mais l'écrire noir sur blanc évite toute surprise.
+    Content-Type = "text/javascript; charset=utf-8"
+
+    # Jamais de cache sur ce fichier. Un service worker mis en cache continue
+    # de tourner dans sa version périmée pendant des jours, et vos corrections
+    # n'atteignent jamais les téléphones déjà installés.
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+    # Autorise le service worker à contrôler tout le site, et pas seulement son
+    # propre dossier. Inutile tant qu'il est à la racine du dossier publié,
+    # mais c'est un filet si l'organisation des fichiers change un jour.
+    Service-Worker-Allowed = "/"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Les pages HTML
+#
+# Toujours revalidées : c'est ce qui garantit qu'une correction déployée arrive
+# immédiatement chez vos utilisateurs, sans qu'ils aient à vider leur cache.
+# ─────────────────────────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
+    Cache-Control = "public, max-age=3600"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Les icônes
+#
+# Elles ne changent quasiment jamais : un an de cache évite de les retélécharger
+# à chaque visite. Si vous en modifiez une, changez son nom de fichier.
+# ─────────────────────────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sécurité — s'applique à tout le site
+# ─────────────────────────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Empêche l'affichage de Gleam dans un cadre sur un autre site, technique
+    # utilisée pour faire cliquer un utilisateur sans qu'il s'en rende compte.
+    X-Frame-Options = "SAMEORIGIN"
+
+    # Interdit au navigateur de deviner le type d'un fichier. C'est cette
+    # devinette qui pousse parfois à exécuter comme script un fichier qui ne
+    # devrait pas l'être.
+    X-Content-Type-Options = "nosniff"
+
+    # Les sites vers lesquels vos utilisateurs cliquent ne reçoivent que le
+    # domaine, jamais l'adresse complète — laquelle peut contenir un
+    # identifiant de demande.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # Aucune page ne demande la caméra ni le micro. La géolocalisation reste
+    # autorisée : elle sert à la zone d'intervention des prestataires et à la
+    # confirmation d'arrivée.
+    Permissions-Policy = "camera=(), microphone=(), payment=(), geolocation=(self)"
+
+    # Impose HTTPS pendant un an. À n'activer qu'une fois le certificat en
+    # place et le domaine stabilisé — ce que Netlify fait automatiquement.
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# L'ancienne adresse
+#
+# Les personnes ayant installé Gleam depuis gleam-app.fr/public/ conservent ce
+# raccourci sur leur écran d'accueil. Cette redirection leur évite une page
+# morte. À supprimer dans quelques semaines.
+# ─────────────────────────────────────────────────────────────────────────────
+[[redirects]]
+  from = "/public/*"
+  to = "/:splat"
+  status = 301
+  force = true
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CE QU'IL NE FAUT SURTOUT PAS AJOUTER
+#
+# La redirection attrape-tout des applications monopage :
+#
+#     [[redirects]]
+#       from = "/*"
+#       to = "/index.html"
+#       status = 200
+#
+# Elle renverrait index.html pour TOUTE adresse inconnue — y compris /sw.js,
+# qui serait alors servi en text/html et refusé par le navigateur. C'est la
+# panne la plus fréquente sur ce sujet.
+#
+# Gleam n'en a de toute façon aucun besoin : la navigation se fait par
+# fragments d'URL (#devis, #demande-123), que le serveur ne voit jamais.
+# ─────────────────────────────────────────────────────────────────────────────
