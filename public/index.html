@@ -5269,29 +5269,34 @@ async function envoyerDevis(demandeId){
 
 // ── TARIFICATION (Vague 2) ──
 const TARIF_CATEGORIES=[
-  {key:'voiture',label:'🚗 Voiture',tiers:['citadine','suv_4x4','monospace','utilitaire'],
-    tierLabels:{citadine:'Citadine',suv_4x4:'SUV / 4x4',monospace:'Monospace',utilitaire:'Utilitaire / Van'},
-    tierPlaceholders:{citadine:85,suv_4x4:128,monospace:132,utilitaire:153},
+  {key:'voiture',label:'🚗 Voiture',tiers:['citadine','berline','suv_4x4','monospace','utilitaire'],
+    tierLabels:{citadine:'Citadine',berline:'Berline',suv_4x4:'SUV / 4x4',monospace:'Monospace',utilitaire:'Utilitaire / Van'},
+    tierPlaceholders:{citadine:85,berline:105,suv_4x4:128,monospace:132,utilitaire:153},
     note:'Prix pour un nettoyage intérieur + extérieur complet, état propre. Le type de nettoyage (intérieur seul/extérieur seul) ajuste ensuite automatiquement.'},
   {key:'canape',label:'🛋️ Canapé',tiers:['A','B','C','D'],
     tierLabels:{A:'2 places',B:'3 places',C:'4 places',D:'5+ places / angle'},
-    tierPlaceholders:{A:45,B:55,C:65,D:85},
+    tierPlaceholders:{A:65,B:80,C:95,D:115},
     note:'Prix pour un canapé en tissu, état propre. Cuir/velours ajustent ensuite automatiquement le prix.'},
   {key:'matelas',label:'🛏️ Matelas',unite:true,uniteLabel:'matelas',tiers:['A','B','C','D','E'],
     tierLabels:{A:'90x190 cm',B:'140x190 cm',C:'160x200 cm',D:'180x200 cm',E:'200x200 cm (Empereur)'},
-    tierPlaceholders:{A:45,B:60,C:72,D:90,E:105},
+    // Aligné sur PRESTATION_CONFIG.matelas du serveur, qui pilote l'estimation
+    // affichée au client. La divergence précédente conseillait au prestataire
+    // 60 € là où le client s'était vu annoncer 78 € : il facturait 23 % sous ce
+    // que la plateforme jugeait juste, en croyant suivre son conseil.
+    tierPlaceholders:{A:60,B:78,C:90,D:105,E:125},
     note:'Prix par matelas, état propre. Le nombre de matelas est fourni par le client.'},
   {key:'terrasse',label:'☀️ Terrasse',unite:true,uniteLabel:'m²',tiers:null,placeholder:4,
     note:'Prix par m², pour une terrasse en carrelage, état propre. Bois/béton/pierre ajustent ensuite automatiquement le prix. Le client indique la surface exacte.'},
   {key:'piscine',label:'💧 Piscine',tiers:['entretien','complet','eau_verte'],
     tierLabels:{entretien:'Entretien simple',complet:'Nettoyage complet',eau_verte:'Eau verte / remise en état'},
-    tierPlaceholders:{entretien:65,complet:130,eau_verte:585},
+    tierPlaceholders:{entretien:65,complet:190,eau_verte:600},
     note:'Prix pour un bassin de taille moyenne, état propre. La surface exacte ajuste ensuite automatiquement le prix.'},
   {key:'toiture',label:'🏠 Toiture',unite:true,uniteLabel:'m²',tiers:null,placeholder:20,
     note:'Prix par m², pour une toiture en tuiles, démoussage + hydrofuge, état propre. Ardoises/fibrociment/zinc ajustent ensuite automatiquement le prix. Le client indique la surface exacte.'},
   {key:'vitres',label:'🪟 Vitres',unite:true,uniteLabel:'m²',tiers:['maison','appartement','commerce','bureaux'],
     tierLabels:{maison:'Maison',appartement:'Appartement',commerce:'Commerce',bureaux:'Bureaux'},
-    tierPlaceholders:{maison:4,appartement:4,commerce:4.8,bureaux:5.2},
+    // Aligné sur le serveur : commerce 5 €/m², bureaux 6,5 €/m².
+    tierPlaceholders:{maison:4,appartement:4,commerce:5,bureaux:6.5},
     note:'Prix par m² de surface vitrée, état propre. Le client indique la surface exacte.'},
   {key:'tapis',label:'🧶 Tapis',unite:true,uniteLabel:'m²',tiers:null,placeholder:20,
     note:'Prix par m², pour un tapis synthétique, état propre. Coton/jute-sisal/berbère/laine/soie ajustent ensuite automatiquement le prix (la soie coûte nettement plus cher à nettoyer). Le client indique la surface exacte.'},
@@ -5375,6 +5380,14 @@ function majResumeTarifs(){
       '<div class="jauge"><div style="width:'+Math.round(faites/total*100)+'%"></div></div>'+
     '</div>'+
     '<div class="message">'+message+'</div>'+
+    // Le prestataire doit connaître la règle qui s'applique à l'estimation vue
+    // par ses clients, sinon il ne comprendra pas l'écart sur les petites
+    // demandes. Il reste libre de son prix — le plancher ne vaut que pour
+    // l'estimation.
+    '<div class="message" style="border-top:none;padding-top:0;margin-top:8px">'+
+      'Un minimum d\'intervention de <strong>60 €</strong> s\'applique à l\'estimation montrée '+
+      'au client, quelle que soit la surface. Vos devis restent libres.'+
+    '</div>'+
   '</div>';
 }
 
@@ -7644,6 +7657,18 @@ async function updateEstimationMaintenant(){
       '<div style="font-size:28px;font-weight:800;color:var(--p);margin:4px 0 2px">'+(d.prix_moyen||d.prix_min)+'€'+
         '<span style="font-size:13px;font-weight:600;color:var(--gray);margin-left:6px">('+d.prix_min+'€ – '+d.prix_max+'€)</span>'+
       '</div>'+
+      // Quand le plancher joue, le dire. Un client qui demande 6 m² de vitres et
+      // voit 70 € doit comprendre que c'est un minimum de déplacement, pas un
+      // tarif au mètre carré démesuré.
+      (d.minimum_applique
+        ? '<div style="font-size:11.5px;line-height:1.45;color:var(--gray);margin-top:2px">'+
+            'Minimum d\'intervention de '+d.minimum_intervention+' €. Une petite surface demande '+
+            'autant de déplacement et d\'installation qu\'une grande — regrouper plusieurs '+
+            'prestations en une seule visite est plus avantageux.'+
+          '</div>'
+        : '')+
+      '<div style="display:none">'+
+      '</div>'+
       (d.base_sur_donnees_reelles?'<div style="font-size:11px;color:var(--mint);font-weight:600">✓ Basé sur les tarifs réels de nos prestataires</div>':'<div style="font-size:11px;color:var(--gray)">Estimation indicative</div>')+
     '</div>';
   }catch(e){
@@ -7684,6 +7709,9 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="voit-options" data-option-val="anti_odeur" onclick="toggleOption(this)"><span>💨</span>Traitement anti-odeur</button></div></div>'+
   '<div class="field-group"><label>Type de véhicule</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
+  // Sans ce bouton, le palier berline existerait dans la grille du prestataire
+  // sans qu'aucun client puisse jamais le déclencher.
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="berline" onclick="selOpt(this)"><span>🚘</span>Berline</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="monospace" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚚</span>Utilitaire</button></div></div>'+
