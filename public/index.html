@@ -1652,6 +1652,65 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .retour-auth i, .retour-auth svg { display: block; width: 19px; height: 19px; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   52. EN-TÊTE DE COMPTE — LES DEUX PROFILS
+   202 px pour deux lignes de texte, c'était le cas le plus lourd de
+   l'application. L'avatar rétrécit et se range à gauche : même information,
+   moitié moins de hauteur.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.entete-compte {
+  display: flex; align-items: center; gap: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px;
+  margin-bottom: var(--gap-4);
+}
+
+/* L'avatar passe de 72 à 46 px. Assez grand pour rester une photo, assez
+   petit pour ne plus commander la page. */
+/* La largeur est imposée : la règle de base donne 72 px au conteneur, et le
+   bouton photo, positionné sur son bord, se retrouvait 26 px à droite de
+   l'avatar rétréci. */
+.entete-compte .avatar-wrap {
+  position: relative; flex-shrink: 0;
+  width: 46px; height: 46px;
+}
+.entete-compte .avatar {
+  width: 46px; height: 46px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--light); border-radius: 50%;
+  font-size: 21px; overflow: hidden;
+}
+.entete-compte .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Le bouton photo suit l'avatar : il rétrécit avec lui, sinon il le
+   déborderait. */
+.entete-compte .avatar-upload-btn {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--p); border: 2px solid var(--surface);
+  border-radius: 50%; color: #fff; cursor: pointer; padding: 0;
+}
+.entete-compte .avatar-upload-btn i,
+.entete-compte .avatar-upload-btn svg { display: block; width: 10px; height: 10px; }
+
+.entete-compte-texte { min-width: 0; flex: 1; }
+.entete-compte-texte h3 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 19px; font-weight: 700; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.entete-compte-texte p {
+  font-size: 12.5px; color: var(--text-secondary); margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Le badge et la note passent sur une ligne au lieu d'être empilés : deux
+   éléments courts côte à côte tiennent dans la place d'un seul. */
+.entete-compte-texte > div { display: inline-flex; margin-top: 5px; margin-right: 6px; }
+
+/* ────────────────────────────────────────────────────────────────────────────
    51. EN-TÊTE D'ÉTAT — ACCUEIL PRESTATAIRE
    Motif des applications de travail : ce qui compte n'est pas le nom de
    l'écran mais la situation de celui qui l'ouvre.
@@ -4030,8 +4089,22 @@ textarea { min-height: 92px; padding-top: 13px; }
 <div class="screen" id="s-pro-profile">
   <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil Pro</span></div>
   <div class="profile-content">
-    <div class="profile-hero"><div class="avatar-wrap" id="pro-profile-avatar"><div class="avatar" id="pro-profile-avatar-inner">🏢</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')"></div><h3 id="pro-profile-name">Professionnel</h3><p id="pro-profile-email">email@exemple.com</p><div id="pro-profile-note" style="display:none;margin-top:8px"></div>
-      <div id="reputation-pro"></div></div>
+    <div class="entete-compte">
+      <div class="avatar-wrap" id="pro-profile-avatar">
+        <div class="avatar" id="pro-profile-avatar-inner">🏢</div>
+        <button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button>
+        <input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')">
+      </div>
+      <div class="entete-compte-texte">
+        <h3 id="pro-profile-name">Professionnel</h3>
+        <p id="pro-profile-email">email@exemple.com</p>
+        <div id="pro-profile-note" style="display:none"></div>
+      </div>
+    </div>
+    <!-- La réputation sort de l'en-tête : ce n'est pas une identité, c'est un
+         résultat. Elle reprend sa place dans le contenu, où elle peut occuper
+         la largeur sans gonfler l'en-tête. -->
+    <div id="reputation-pro"></div>
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
       <div class="profile-item" id="item-confirmer-email-pro" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
@@ -4150,7 +4223,22 @@ textarea { min-height: 92px; padding-top: 13px; }
 <div class="screen" id="s-profile">
   <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil</span></div>
   <div class="profile-content">
-    <div class="profile-hero"><div class="avatar-wrap" id="profile-avatar"><div class="avatar" id="profile-avatar-inner">👤</div><button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button><input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')"></div><h3 id="profile-name">Utilisateur</h3><p id="profile-email">email@exemple.com</p><div id="profile-type-badge" style="display:none;margin-top:6px"></div><div id="profile-note" style="display:none;margin-top:8px"></div></div>
+    <!-- En-tête de compte. L'avatar ne disparaît pas : il rétrécit et se range à
+         gauche, à côté du nom. C'est la disposition d'un en-tête de compte, pas
+         d'une page de profil de réseau social — et elle rend 106 px au contenu. -->
+    <div class="entete-compte">
+      <div class="avatar-wrap" id="profile-avatar">
+        <div class="avatar" id="profile-avatar-inner">👤</div>
+        <button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button>
+        <input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')">
+      </div>
+      <div class="entete-compte-texte">
+        <h3 id="profile-name">Utilisateur</h3>
+        <p id="profile-email">email@exemple.com</p>
+        <div id="profile-type-badge" style="display:none"></div>
+        <div id="profile-note" style="display:none"></div>
+      </div>
+    </div>
     <div class="upload-progress" id="photo-upload-progress-client" style="text-align:center"></div>
     <div class="profile-section-titre">Préférences</div>
     <div class="profile-menu">
