@@ -1628,6 +1628,32 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .retour-auth i, .retour-auth svg { display: block; width: 19px; height: 19px; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   47. PROFIL VISITEUR ET PRÉSENTATION DE LA COMMISSION
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Un lien de bas de page, pas une entrée de menu : présent parce qu'il doit
+   l'être, sans revendiquer l'attention. */
+.lien-legal-discret {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: var(--gap-5);
+  font-size: 12px; color: var(--gray);
+}
+.lien-legal-discret a {
+  color: var(--gray); text-decoration: none; cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.lien-legal-discret a:hover { color: var(--text-secondary); border-bottom-color: var(--border-fort); }
+
+/* Le taux reste parfaitement lisible, mais cesse d'être le plus gros chiffre
+   de l'écran. Un prestataire doit pouvoir le trouver sans qu'on le lui jette
+   au visage. */
+.chiffre-sobre {
+  font-size: 26px !important;
+  color: var(--text-secondary) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    46. ÉTAT HORS-LIGNE ET AJUSTEMENTS NATIFS
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -3168,10 +3194,12 @@ textarea { min-height: 92px; padding-top: 13px; }
 
   <div class="home-hero-card">
     <div class="pro-arguments">
-      <div>
-        <div class="chiffre"><span id="pro-taux-commission">15</span> %</div>
-        <div class="libelle">de commission, et rien d'autre. Aucun abonnement, aucun frais d'inscription.</div>
-      </div>
+      <!-- L'ordre a changé. Le premier chiffre qu'un prestataire lisait était
+           ce qu'on lui prend ; il lit maintenant ce qu'il gagne.
+           La commission n'est pas masquée — la masquer serait déloyal, et
+           une clause contractuelle inconnue avant l'engagement est
+           contestable. Elle passe simplement en dernier, et sans être le
+           titre de l'écran. -->
       <div>
         <div class="chiffre"><i data-lucide="shield-check"></i></div>
         <div class="libelle">Aucune facture impayée : la somme est déposée avant votre venue.</div>
@@ -3179,6 +3207,10 @@ textarea { min-height: 92px; padding-top: 13px; }
       <div>
         <div class="chiffre"><i data-lucide="sliders-horizontal"></i></div>
         <div class="libelle">Vos tarifs, votre zone, vos disponibilités. Vous refusez ce qui ne vous convient pas.</div>
+      </div>
+      <div>
+        <div class="chiffre chiffre-sobre"><span id="pro-taux-commission">15</span> %</div>
+        <div class="libelle">de commission sur les prestations réalisées. Aucun abonnement, aucun frais d'inscription, rien à avancer.</div>
       </div>
     </div>
   </div>
@@ -3555,11 +3587,17 @@ textarea { min-height: 92px; padding-top: 13px; }
       <button class="btn-lien" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
     </div>
 
-    <div class="profile-menu">
-      <div class="profile-item" onclick="showHowItWorks()"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Comment ça marche</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="show('s-guest-pro')"><span class="pi-icon"><i data-lucide="wrench" style="width:20px;height:20px"></i></span><span class="pi-text">Vous êtes prestataire ?</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="ouvrirPageInterne('aide.html','Centre d\'aide')"><span class="pi-icon"><i data-lucide="life-buoy" style="width:20px;height:20px"></i></span><span class="pi-text">Centre d'aide</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales &amp; CGU')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales &amp; CGU</span><span class="pi-arrow">›</span></div>
+    <!-- Le menu a été retiré : quatre entrées sur un écran qui n'a qu'un but,
+         créer un compte, dispersaient l'attention.
+         Seules les mentions légales subsistent, sous forme d'un lien discret.
+         Ce n'est pas un oubli : Apple exige que les conditions soient
+         consultables AVANT toute inscription, et la loi française l'impose
+         pour un service payant. Deux lignes de texte gris suffisent à y
+         répondre, sans peser sur l'écran. -->
+    <div class="lien-legal-discret">
+      <a onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales &amp; CGU')">Mentions légales</a>
+      <span>·</span>
+      <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
     </div>
   </div>
   <div class="bottom-nav" id="nav-guest-profil"></div>
