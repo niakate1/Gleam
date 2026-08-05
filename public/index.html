@@ -1609,6 +1609,73 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .case-attestation input { width: auto; margin: 2px 0 0; flex-shrink: 0; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   45. MODE DÉCOUVERTE — ÉCRANS D'INVITATION
+   Un écran vide avec « connectez-vous » décourage. Chacun montre un exemple
+   clairement étiqueté, pour qu'on comprenne à quoi sert l'écran avant de
+   s'inscrire.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.exemple-invite {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--gap-4);
+  margin-bottom: var(--gap-4);
+}
+/* L'étiquette est indispensable : sans elle, un exemple se prend pour une
+   vraie donnée, et le visiteur croit avoir déjà un compte. */
+.etiquette-exemple {
+  position: absolute; top: -9px; left: var(--gap-4);
+  background: var(--surface-alt); color: var(--gray);
+  border-radius: var(--r-pill);
+  padding: 2px 10px;
+  font-size: 10.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+
+.conv-exemple { display: flex; flex-direction: column; gap: 8px; }
+.bulle-exemple {
+  max-width: 82%;
+  padding: 10px 13px;
+  border-radius: var(--r-md);
+  font-size: 13px; line-height: 1.45;
+}
+.bulle-exemple.recue { align-self: flex-start; background: var(--surface-alt); color: var(--text-secondary); }
+.bulle-exemple.envoyee { align-self: flex-end; background: var(--light); color: var(--p); }
+
+.carte-exemple-demande { font-size: 13.5px; }
+.ligne-exemple { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ligne-exemple strong { font-size: 15px; color: var(--text); }
+.etat-exemple {
+  flex-shrink: 0;
+  font-size: 11px; font-weight: 800; color: var(--green);
+  background: var(--green-clair);
+  border-radius: var(--r-pill); padding: 3px 9px;
+}
+.detail-exemple { color: var(--gray); margin-top: 6px; }
+.prix-exemple {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 20px; font-weight: 600; color: var(--p);
+  margin-top: 8px;
+}
+
+.bloc-invite { text-align: center; padding: var(--gap-3) 0; }
+.bloc-invite p {
+  font-size: 13.5px; line-height: 1.55; color: var(--text-secondary);
+  margin-bottom: var(--gap-4);
+}
+.bloc-invite .btn { width: 100%; }
+.btn-lien {
+  display: block; width: 100%;
+  margin-top: 10px; padding: 12px;
+  background: none; border: none;
+  font-family: inherit; font-size: 13.5px; font-weight: 600;
+  color: var(--text-secondary); cursor: pointer;
+}
+.btn-lien:hover { color: var(--p); }
+
+/* ────────────────────────────────────────────────────────────────────────────
    44. OPTIONS À CHOIX MULTIPLE — UNE SEULE COLONNE
    Les options supplémentaires portent des libellés longs : « Habitacle très
    sale / encrassé », « Rangement d'effets personnels ». Dans une colonne de
@@ -3031,6 +3098,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--gray);flex-shrink:0"></i>
     </div>
   </div>
+  <div class="bottom-nav" id="nav-guest-accueil"></div>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════════════════
@@ -3342,6 +3410,59 @@ textarea { min-height: 92px; padding-top: 13px; }
     <span id="titre-page-interne">Aide</span>
   </div>
   <iframe id="cadre-page-interne" title="Page d'information" src="about:blank"></iframe>
+</div>
+
+
+<!-- MESSAGES — VISITEUR
+     Un écran vide avec « connectez-vous » décourage. Celui-ci montre un exemple
+     clairement étiqueté : on comprend à quoi sert l'écran avant de s'inscrire. -->
+<div class="screen" id="s-guest-messages">
+  <div class="home-hero">
+    <div class="home-hero-top"><span class="logo-sm">✨ Gleam</span></div>
+    <h2>Messages</h2>
+    <p>Échangez avec votre prestataire avant, pendant et après la prestation.</p>
+  </div>
+  <div class="home-content">
+    <div class="exemple-invite">
+      <div class="etiquette-exemple">Exemple</div>
+      <div class="conv-exemple">
+        <div class="bulle-exemple recue">Bonjour, je serai chez vous à 9 h comme convenu. Faut-il prévoir un accès au garage ?</div>
+        <div class="bulle-exemple envoyee">Oui, je vous laisse le badge dans la boîte aux lettres.</div>
+        <div class="bulle-exemple recue">Parfait, à demain !</div>
+      </div>
+    </div>
+    <div class="bloc-invite">
+      <p>Vos conversations apparaîtront ici dès votre première demande.</p>
+      <button class="btn" onclick="afficherEcranAuth('register')">Créer un compte</button>
+      <button class="btn-lien" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
+    </div>
+  </div>
+  <div class="bottom-nav" id="nav-guest-messages"></div>
+</div>
+
+<!-- MES DEMANDES — VISITEUR -->
+<div class="screen" id="s-guest-demandes">
+  <div class="home-hero">
+    <div class="home-hero-top"><span class="logo-sm">✨ Gleam</span></div>
+    <h2>Mes demandes</h2>
+    <p>Suivez vos prestations, du devis au paiement.</p>
+  </div>
+  <div class="home-content">
+    <div class="exemple-invite">
+      <div class="etiquette-exemple">Exemple</div>
+      <div class="carte-exemple-demande">
+        <div class="ligne-exemple"><strong>Nettoyage voiture</strong><span class="etat-exemple">3 devis reçus</span></div>
+        <div class="detail-exemple">Lundi 10 août à 9 h · Poissy</div>
+        <div class="prix-exemple">à partir de 85 €</div>
+      </div>
+    </div>
+    <div class="bloc-invite">
+      <p>Décrivez votre besoin depuis l'accueil : vous verrez une estimation de prix avant même de créer un compte.</p>
+      <button class="btn" onclick="goTabInvite('accueil')">Décrire mon besoin</button>
+      <button class="btn-lien" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
+    </div>
+  </div>
+  <div class="bottom-nav" id="nav-guest-demandes"></div>
 </div>
 
 <!-- HOME PRO -->
@@ -3809,6 +3930,83 @@ async function verifierSiretEnDirect(champId){
   },500);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MODE DÉCOUVERTE — navigation du visiteur
+//
+// La barre du bas reste présente sans compte : c'est elle qui donne le
+// sentiment d'être DANS une application plutôt que sur une page de vente.
+// Aucun onglet ne mène à un mur — chacun montre un exemple et propose la
+// suite.
+// ─────────────────────────────────────────────────────────────────────────────
+var ONGLETS_INVITE = [
+  { cle:'accueil',  ecran:'s-guest',           icone:'home',           libelle:'Accueil' },
+  { cle:'messages', ecran:'s-guest-messages',  icone:'message-circle', libelle:'Messages' },
+  { cle:'demandes', ecran:'s-guest-demandes',  icone:'clipboard-list', libelle:'Mes demandes' },
+  { cle:'profil',   ecran:null,                icone:'user',           libelle:'Profil' }
+];
+
+function construireNavInvite(actif){
+  return ONGLETS_INVITE.map(function(o){
+    return '<button class="bnav-item'+(o.cle===actif?' active':'')+'" onclick="goTabInvite(\''+o.cle+'\')">'+
+      '<i data-lucide="'+o.icone+'" style="width:22px;height:22px"></i>'+o.libelle+'</button>';
+  }).join('');
+}
+
+function goTabInvite(cle){
+  var onglet=ONGLETS_INVITE.filter(function(o){return o.cle===cle})[0];
+  // Le profil d'un visiteur, c'est l'écran de connexion : il n'y a rien d'autre
+  // à y montrer, et l'y envoyer est exactement ce qu'il cherche.
+  if(!onglet||!onglet.ecran){ afficherEcranAuth('login'); return; }
+
+  ONGLETS_INVITE.forEach(function(o){
+    if(!o.ecran)return;
+    var barre=document.querySelector('#'+o.ecran+' .bottom-nav');
+    if(barre)barre.innerHTML=construireNavInvite(cle);
+  });
+  show(onglet.ecran);
+  if(window.lucide)lucide.createIcons();
+}
+
+// Au chargement, la barre doit exister avant le premier affichage : sans cela
+// l'accueil s'ouvre sans navigation et l'application ressemble à une page.
+function initNavInvite(){
+  ONGLETS_INVITE.forEach(function(o){
+    if(!o.ecran)return;
+    var barre=document.querySelector('#'+o.ecran+' .bottom-nav');
+    if(barre&&!barre.innerHTML.trim())barre.innerHTML=construireNavInvite('accueil');
+  });
+  if(window.lucide)lucide.createIcons();
+}
+
+// La demande qu'un visiteur a composée avant de créer son compte. Elle survit
+// à l'inscription, puis part toute seule.
+var demandeEnAttenteDeCompte=null;
+
+async function envoyerDemandeEnAttente(){
+  if(!demandeEnAttenteDeCompte)return false;
+  var corps=demandeEnAttenteDeCompte;
+  demandeEnAttenteDeCompte=null;   // consommée une seule fois, quoi qu'il arrive
+  try{
+    const r=await fetch(API+'/api/demandes',{method:'POST',headers:authHeaders(),body:JSON.stringify(corps)});
+    const d=await safeJson(r);
+    if(!r.ok){
+      // On ne perd pas la saisie en silence : le formulaire se rouvre.
+      toast('Votre demande n\'a pas pu partir : '+((d&&d.error)||'')+' Réessayez depuis l\'accueil.',7000);
+      return false;
+    }
+    photos=[];selectedServices=[];
+    adresseChoisieLat=null;adresseChoisieLng=null;
+    if(typeof majAffichageSelectionPrestations==='function')majAffichageSelectionPrestations();
+    if(typeof afficherConfirmationEnvoi==='function')afficherConfirmationEnvoi(d);
+    else toast('✅ Votre demande a bien été envoyée.');
+    if(typeof loadDemandes==='function')loadDemandes();
+    return true;
+  }catch(e){
+    toast(friendlyNetworkError(e));
+    return false;
+  }
+}
+
 function afficherEcranAuth(onglet,role){
   show('s-auth');
   switchTab(onglet);
@@ -4220,6 +4418,8 @@ async function doLogin(){
     if(!r.ok){showErr('lerr',d.error||'Identifiants incorrects.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
     enterApp();
+    // Une demande composée avant la connexion part maintenant.
+    envoyerDemandeEnAttente();
   }catch(e){showErr('lerr',friendlyNetworkError(e))}
   finally{btn.disabled=false;btn.textContent='Se connecter'}
 }
@@ -4266,6 +4466,8 @@ async function doRegister(){
     if(!r.ok){showErr('rerr',d.error||'Erreur inscription.');return}
     currentUser=d.user;localStorage.setItem('gleam_token',d.token);
     enterApp();
+    // Une demande composée avant l'inscription part maintenant.
+    envoyerDemandeEnAttente();
   }catch(e){showErr('rerr',friendlyNetworkError(e))}
   finally{btn.disabled=false;btn.textContent='Créer mon compte Gleam'}
 }
@@ -9773,6 +9975,26 @@ async function sendDemand(type){
   if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span>'}
   try{
     var isEdit=multiFlow.editMode&&multiFlow.editId;
+    // ── POINT DE BASCULE ───────────────────────────────────────────────
+    // C'est ICI qu'on demande un compte, pas à l'ouverture du formulaire. Le
+    // visiteur a décrit son besoin, vu une estimation, choisi une date : créer
+    // un compte devient la dernière étape d'un parcours engagé.
+    //
+    // Sa saisie est mise de côté et rejouée après l'inscription. S'il fallait
+    // tout ressaisir, on perdrait exactement les gens qu'on vient de convaincre.
+    if(!currentUser){
+      demandeEnAttenteDeCompte={
+        prestations:prestations, address:adresseComplete, date:date, time:time,
+        flexibility:flex, photos:photos.slice(0,5), pro_prefere_id:proPrefereChoisi,
+        recurrence:recurrenceChoisie, latitude:adresseChoisieLat, longitude:adresseChoisieLng
+      };
+      document.getElementById('modal-overlay').classList.remove('open');
+      afficherEcranAuth('register');
+      toast('Encore une étape : créez votre compte et votre demande partira aussitôt.',6000);
+      if(btn){btn.disabled=false;btn.textContent='Envoyer ma demande'}
+      return;
+    }
+
     var url=isEdit?API+'/api/demandes/'+multiFlow.editId:API+'/api/demandes';
     var method=isEdit?'PATCH':'POST';
     const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5),pro_prefere_id:proPrefereChoisi,recurrence:recurrenceChoisie,latitude:adresseChoisieLat,longitude:adresseChoisieLng})});
@@ -9853,6 +10075,10 @@ async function restaurerSession(tok){
     history.replaceState(null,'',window.location.pathname);
   }
 }
+
+// La navigation du visiteur existe avant tout affichage : sans elle, l'accueil
+// s'ouvre sans barre du bas et l'application ressemble à une page de vente.
+initNavInvite();
 
 var tok=localStorage.getItem('gleam_token');
 if(tok){
