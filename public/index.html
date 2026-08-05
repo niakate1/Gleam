@@ -1652,6 +1652,79 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .retour-auth i, .retour-auth svg { display: block; width: 19px; height: 19px; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   53. EN-TÊTE D'ÉTAT — ACCUEIL CLIENT, ET RETOUR DE LA DÉCOUVERTE
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.entete-client {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) var(--gap-4) 12px;
+}
+.entete-client-rang { display: flex; align-items: center; gap: 10px; }
+.entete-client-avatar {
+  width: 36px; height: 36px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--light); color: var(--p);
+  border: none; border-radius: 50%;
+  font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.entete-client-avatar:active { transform: scale(.94); }
+.entete-client-qui { min-width: 0; }
+.entete-client-qui strong {
+  display: block; font-size: 15px; font-weight: 800; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.entete-client-qui span { display: block; font-size: 11.5px; color: var(--gray); margin-top: 1px; }
+
+.entete-client-chiffres { display: flex; gap: 8px; margin-top: 12px; }
+.entete-client-chiffre {
+  flex: 1; min-width: 0;
+  background: var(--surface-alt); border-radius: var(--r-sm);
+  padding: 9px 11px;
+}
+/* Un devis reçu attend une décision : la tuile se teinte pour le dire.
+   Les deux autres chiffres informent, celui-ci appelle. */
+.entete-client-chiffre.a-decider { background: var(--light); }
+.entete-client-chiffre.a-decider b { color: var(--p); }
+.entete-client-chiffre b {
+  display: block;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 18px; font-weight: 700; color: var(--p);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-transform: capitalize;
+}
+.entete-client-chiffre span {
+  display: block; font-size: 9.5px; font-weight: 800; color: var(--gray);
+  text-transform: uppercase; letter-spacing: .04em; margin-top: 1px;
+}
+#s-home .home-hero-card { margin-top: var(--gap-4); }
+
+/* La flèche de retour de l'écran de découverte prestataire. Flottante sur le
+   bandeau : cet écran n'a pas d'en-tête où la loger, et lui en ajouter un
+   décalerait tout le contenu. */
+.retour-decouverte {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  left: var(--gap-4);
+  z-index: 10;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.15);
+  border: none; border-radius: 50%;
+  color: #fff; cursor: pointer;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.retour-decouverte:hover { background: rgba(255,255,255,.26); }
+.retour-decouverte:active { transform: scale(.94); }
+.retour-decouverte i, .retour-decouverte svg { display: block; width: 18px; height: 18px; }
+
+/* Le contenu du bandeau se décale pour ne pas passer sous la flèche. */
+#s-guest-pro .home-hero-top { padding-left: 44px; }
+
+/* ────────────────────────────────────────────────────────────────────────────
    52. EN-TÊTE DE COMPTE — LES DEUX PROFILS
    202 px pour deux lignes de texte, c'était le cas le plus lourd de
    l'application. L'avatar rétrécit et se range à gauche : même information,
@@ -3549,6 +3622,14 @@ textarea { min-height: 92px; padding-top: 13px; }
      ════════════════════════════════════════════════════════════════════════ -->
 <div class="screen" id="s-guest-pro">
   <div class="home-hero">
+    <!-- La seule sortie était une passerelle tout en bas, après le simulateur
+         et les arguments : il fallait parcourir l'écran entier pour revenir.
+         Et cet écran n'a pas de barre du bas pour rattraper.
+         La passerelle du bas reste : elle dit « je suis plutôt client », quand
+         cette flèche dit « je me suis trompé ». Deux intentions, deux endroits. -->
+    <button class="retour-decouverte" onclick="show('s-guest')" aria-label="Retour">
+      <i data-lucide="arrow-left"></i>
+    </button>
     <div class="home-hero-top">
       <span class="logo-sm">✨ Gleam Pro</span>
       <button class="user-badge" style="border:none;cursor:pointer" onclick="afficherEcranAuth('login')">Se connecter</button>
@@ -3798,10 +3879,24 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- HOME CLIENT -->
 <div class="screen" id="s-home">
-  <div class="home-hero">
-    <div class="home-hero-top"><span class="logo-sm">✨ Gleam</span><span class="user-badge" id="user-name-badge">Bonjour</span></div>
-    <h2 id="greeting-name">Bonjour 👋</h2>
-    <p>Que souhaitez-vous faire briller aujourd'hui ?</p>
+  <!-- En-tête d'état. « Que souhaitez-vous faire briller aujourd'hui ? » est
+       une jolie phrase, mais elle n'apprend rien à quelqu'un qui revient voir
+       où en est sa demande. Les trois chiffres répondent aux trois questions
+       qu'un client se pose vraiment.
+       Pas de champ de recherche : à ce volume, il n'aurait rien à chercher, et
+       un champ vide est pire qu'une absence de champ. -->
+  <div class="entete-client">
+    <div class="entete-client-rang">
+      <button class="entete-client-avatar" onclick="goTab('profile')" aria-label="Mon profil">
+        <span id="client-avatar-initiales">—</span>
+      </button>
+      <div class="entete-client-qui">
+        <strong id="greeting-name">Bonjour</strong>
+        <span id="client-lieu">Vos prestations en un coup d'œil</span>
+      </div>
+      <span class="user-badge" id="user-name-badge" hidden>Bonjour</span>
+    </div>
+    <div class="entete-client-chiffres" id="client-chiffres-entete"></div>
   </div>
   <div class="home-hero-card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
@@ -5324,6 +5419,7 @@ function enterApp(){
     majPastilleDocuments();
     chargerAccesRapides();
     majEnteteProChiffres();
+    majEnteteClientChiffres();
     renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
     renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
     chargerReputationPro();
@@ -6893,6 +6989,67 @@ function basculerDisponibiliteDepuisEntete(){
   // porte l'appel au serveur et le retour en arrière en cas d'échec.
   if(typeof toggleDispo==='function'){ toggleDispo(); }
   setTimeout(majEnteteProDisponibilite,60);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EN-TÊTE D'ÉTAT DU CLIENT
+//
+// Trois chiffres, choisis pour répondre à ce qu'on vient vérifier : où en sont
+// mes demandes, ai-je quelque chose à décider, quand vient le prestataire.
+// ─────────────────────────────────────────────────────────────────────────────
+async function majEnteteClientChiffres(){
+  var boite=document.getElementById('client-chiffres-entete');
+  if(!boite||!currentUser||isPro())return;
+
+  var initiales=document.getElementById('client-avatar-initiales');
+  if(initiales)initiales.textContent=initialesDe(currentUser);
+  var salut=document.getElementById('greeting-name');
+  if(salut)salut.textContent=(currentUser.prenom||'Bonjour');
+
+  var enCours=0, devisAExaminer=0, prochaine=null;
+  try{
+    const r=await fetchGroupe(API+'/api/demandes',{headers:authHeaders()});
+    const d=await safeJson(r);
+    (Array.isArray(d)?d:[]).forEach(function(dem){
+      // « En cours » exclut ce qui est terminé ou annulé : un compteur qui
+      // additionne l'historique ne dit rien de la situation présente.
+      if(['en_attente','acceptee','en_cours'].indexOf(dem.statut)>=0){
+        enCours++;
+        if(['acceptee','en_cours'].indexOf(dem.statut)>=0 && dem.creneau){
+          if(!prochaine || String(dem.creneau) < String(prochaine)) prochaine=dem.creneau;
+        }
+      }
+    });
+  }catch(e){}
+  try{
+    const r=await fetchGroupe(API+'/api/devis/mes-devis-recus',{headers:authHeaders()});
+    const d=await safeJson(r);
+    devisAExaminer=(Array.isArray(d)?d:[]).filter(function(v){
+      return v.statut==='envoye';
+    }).length;
+  }catch(e){}
+
+  // Un créneau ressemble à « 2026-08-10 à 9h00 » : on n'en garde que le jour,
+  // et abrégé. « Lundi » vaut mieux que « lundi 10 août 2026 » dans une tuile
+  // de cent pixels.
+  var libelleProchaine='—';
+  if(prochaine){
+    var jour=String(prochaine).split(' ')[0];
+    var dt=new Date(jour);
+    if(!isNaN(dt)){
+      var aujourdhui=new Date(); aujourdhui.setHours(0,0,0,0);
+      var ecart=Math.round((dt-aujourdhui)/86400000);
+      if(ecart===0)libelleProchaine='Aujourd\'hui';
+      else if(ecart===1)libelleProchaine='Demain';
+      else if(ecart>1&&ecart<7)libelleProchaine=dt.toLocaleDateString('fr-FR',{weekday:'long'});
+      else libelleProchaine=dt.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    }
+  }
+
+  boite.innerHTML=
+    '<div class="entete-client-chiffre"><b>'+enCours+'</b><span>'+(enCours>1?'demandes':'demande')+'</span></div>'+
+    '<div class="entete-client-chiffre'+(devisAExaminer?' a-decider':'')+'"><b>'+devisAExaminer+'</b><span>'+(devisAExaminer>1?'devis reçus':'devis reçu')+'</span></div>'+
+    '<div class="entete-client-chiffre"><b>'+libelleProchaine+'</b><span>prochaine</span></div>';
 }
 
 async function majEnteteProChiffres(){
