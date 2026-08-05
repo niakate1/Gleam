@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gleam ✨</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#241466">
+<meta name="theme-color" content="#062E34">
 <!-- Balises spécifiques à Safari/iOS — sans elles, "Ajouter à l'écran d'accueil" crée un simple
      raccourci plutôt qu'une vraie app installée, et les notifications restent indisponibles même
      après l'ajout à l'écran d'accueil. -->
@@ -32,7 +32,7 @@
 
    Une seule modification à faire ailleurs dans le fichier — plus haut, dans
    le <head> :
-       <meta name="theme-color" content="#241466">
+       <meta name="theme-color" content="#062E34">
    (et la même valeur pour "theme_color" dans manifest.json, sinon la barre
    de statut du téléphone gardera l'ancien violet)
 
@@ -56,17 +56,21 @@
      mieux le texte blanc, et se distingue des violets d'interface génériques.
      Le vert d'eau vient du sujet lui-même — l'eau, la surface propre — et donne
      à la marque une seconde voix, là où elle n'en avait qu'une. */
-  --p:              #4B2FBF;
-  --p2:             #2E1A82;
+  --p:              #0E5A63;
+  --p2:             #073E45;
   /* Deux teintes plus profondes, pour ce qui touche le haut de l'écran.
      La barre d'état du téléphone se pose là : un violet saturé y est criard,
      un indigo profond y est calme. */
-  --p-profond:      #241466;
-  --p-medium:       #3A22A0;
-  --light:          #EEEAFC;
-  --aqua:           #00A891;
-  --aqua-clair:     #E0F7F3;
-  --mint:           #00A891;   /* alias conservé : utilisé tel quel dans le JS */
+  --p-profond:      #062E34;
+  --p-medium:       #0A4750;
+  --light:          #E3F1F2;
+  /* Déplacé du turquoise vers un vert franc : #2E9E5B et le nouveau bleu
+     pétrole sont deux bleu-verts sombres, indistinguables côte à côte.
+     Un état « validé » qui ressemble à la couleur principale ne signale
+     plus rien. */
+  --aqua:           #2E9E5B;
+  --aqua-clair:     #E4F5EA;
+  --mint:           #2E9E5B;   /* alias conservé : utilisé tel quel dans le JS */
   --gold:           #D9930C;
   --gold-clair:     #FDF4E3;
 
@@ -94,7 +98,7 @@
   --shadow-md: 0 4px 16px rgba(20,19,43,.08), 0 1px 3px rgba(20,19,43,.05);
   --shadow-lg: 0 12px 36px rgba(20,19,43,.11), 0 2px 8px rgba(20,19,43,.05);
   --shadow-xl: 0 24px 64px rgba(20,19,43,.16), 0 4px 12px rgba(20,19,43,.07);
-  --ring-focus: 0 0 0 3px rgba(75,47,191,.32);
+  --ring-focus: 0 0 0 3px rgba(14,90,99,.32);
 
   /* Mouvement — deux courbes, trois durées, partout. */
   --ease-out:    cubic-bezier(.16, 1, .3, 1);
@@ -140,11 +144,11 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --p:              #9E86FF;
-    --p2:             #C3B2FF;
-    --light:          #241F45;
-    --aqua:           #2FD8BE;
-    --aqua-clair:     #12352F;
+    --p:              #4FB3B8;
+    --p2:             #7ECBCE;
+    --light:          #103238;
+    --aqua:           #56C97F;
+    --aqua-clair:     #16331F;
     --mint:           #2FD8BE;
     --gold:           #F5C542;
     --gold-clair:     #3A2C0C;
@@ -176,7 +180,7 @@
 
 /* Choix explicite de l'utilisateur — prévaut toujours sur la préférence système. */
 html[data-theme="dark"] {
-  --p:#9E86FF; --p2:#C3B2FF; --light:#241F45;
+  --p:#4FB3B8; --p2:#7ECBCE; --light:#241F45;
   --aqua:#2FD8BE; --aqua-clair:#12352F; --mint:#2FD8BE;
   --gold:#F5C542; --gold-clair:#3A2C0C;
   --bg:#0C0B18; --surface:#16152A; --surface-alt:#201E38;
@@ -374,7 +378,7 @@ i[data-lucide] {
 .skeleton-card::after {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(75,47,191,.09), transparent);
+  background: linear-gradient(90deg, transparent, rgba(14,90,99,.09), transparent);
   animation: chargement-balayage 1.5s ease-in-out infinite;
 }
 
@@ -769,8 +773,8 @@ select {
   position: relative; overflow: hidden;
   background:
     radial-gradient(ellipse 420px 340px at 92% -6%, rgba(245,197,66,.32), transparent 66%),
-    radial-gradient(ellipse 460px 380px at 2% 104%, rgba(0,168,145,.36), transparent 68%),
-    linear-gradient(160deg, #4B2FBF 0%, #34209B 60%, #1C1049 100%);
+    radial-gradient(ellipse 460px 380px at 2% 104%, rgba(46,158,91,.36), transparent 68%),
+    linear-gradient(160deg, #0E5A63 0%, #0A4750 60%, #04222A 100%);
 }
 .auth-box {
   position: relative; z-index: 1;
@@ -885,14 +889,14 @@ select {
   animation: check-pop var(--dur-base) var(--ease-spring);
 }
 
-.svc-card[data-svc="voiture"]  { background:#EEF0FF; color:#4338CA; }
+.svc-card[data-svc="voiture"]  { background:#E3F1F2; color:#0E5A63; }
 .svc-card[data-svc="canape"]   { background:#FDF1E7; color:#B45F27; }
-.svc-card[data-svc="matelas"]  { background:#F1ECFD; color:#5B34C9; }
+.svc-card[data-svc="matelas"]  { background:#E4EEF5; color:#1B5E86; }
 .svc-card[data-svc="terrasse"] { background:#FEF6E4; color:#B4740A; }
 .svc-card[data-svc="piscine"]  { background:#E2F8F5; color:#00796B; }
 .svc-card[data-svc="toiture"]  { background:#FBEFE2; color:#9A4C0B; }
 .svc-card[data-svc="vitres"]   { background:#E8F1FE; color:#1D4ED8; }
-.svc-card[data-svc="tapis"]    { background:#FBEDFB; color:#96288F; }
+.svc-card[data-svc="tapis"]    { background:#F3EAF3; color:#7A3A72; }
 .svc-card[data-svc="autre"] {
   grid-column: 1 / -1;
   display: flex; align-items: center; justify-content: center; gap: var(--gap-2);
@@ -905,21 +909,21 @@ select {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .svc-card[data-svc="voiture"]  { background:rgba(99,102,241,.15);  color:#A5B4FC; }
   :root:not([data-theme="light"]) .svc-card[data-svc="canape"]   { background:rgba(194,112,61,.15);  color:#F0B489; }
-  :root:not([data-theme="light"]) .svc-card[data-svc="matelas"]  { background:rgba(124,58,237,.18);  color:#C4B5FD; }
+  :root:not([data-theme="light"]) .svc-card[data-svc="matelas"]  { background:rgba(14,90,99,.30);  color:#8ED4D6; }
   :root:not([data-theme="light"]) .svc-card[data-svc="terrasse"] { background:rgba(217,119,6,.15);   color:#FBBF6C; }
-  :root:not([data-theme="light"]) .svc-card[data-svc="piscine"]  { background:rgba(0,168,145,.18);   color:#5EEAD4; }
+  :root:not([data-theme="light"]) .svc-card[data-svc="piscine"]  { background:rgba(46,158,91,.18);   color:#5EEAD4; }
   :root:not([data-theme="light"]) .svc-card[data-svc="toiture"]  { background:rgba(180,83,9,.18);    color:#FBBF6C; }
   :root:not([data-theme="light"]) .svc-card[data-svc="vitres"]   { background:rgba(37,99,235,.18);   color:#93C5FD; }
-  :root:not([data-theme="light"]) .svc-card[data-svc="tapis"]    { background:rgba(162,28,175,.18);  color:#E9A8F0; }
+  :root:not([data-theme="light"]) .svc-card[data-svc="tapis"]    { background:rgba(122,58,114,.22);  color:#D9AFD4; }
 }
 html[data-theme="dark"] .svc-card[data-svc="voiture"]  { background:rgba(99,102,241,.15);  color:#A5B4FC; }
 html[data-theme="dark"] .svc-card[data-svc="canape"]   { background:rgba(194,112,61,.15);  color:#F0B489; }
-html[data-theme="dark"] .svc-card[data-svc="matelas"]  { background:rgba(124,58,237,.18);  color:#C4B5FD; }
+html[data-theme="dark"] .svc-card[data-svc="matelas"]  { background:rgba(14,90,99,.30);  color:#8ED4D6; }
 html[data-theme="dark"] .svc-card[data-svc="terrasse"] { background:rgba(217,119,6,.15);   color:#FBBF6C; }
-html[data-theme="dark"] .svc-card[data-svc="piscine"]  { background:rgba(0,168,145,.18);   color:#5EEAD4; }
+html[data-theme="dark"] .svc-card[data-svc="piscine"]  { background:rgba(46,158,91,.18);   color:#5EEAD4; }
 html[data-theme="dark"] .svc-card[data-svc="toiture"]  { background:rgba(180,83,9,.18);    color:#FBBF6C; }
 html[data-theme="dark"] .svc-card[data-svc="vitres"]   { background:rgba(37,99,235,.18);   color:#93C5FD; }
-html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(162,28,175,.18);  color:#E9A8F0; }
+html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,114,.22);  color:#D9AFD4; }
 
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -1648,6 +1652,62 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .retour-auth i, .retour-auth svg { display: block; width: 19px; height: 19px; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   50. EN-TÊTE DES ÉCRANS INTÉRIEURS
+   Sur un accueil, l'ampleur sert : première impression, carte qui chevauche.
+   Sur un profil ou une liste, il n'y a plus rien à annoncer — l'utilisateur
+   sait où il est et veut atteindre une ligne. L'en-tête redevient une barre.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.entete-interne {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) var(--gap-4) 12px;
+  /* Un flou léger quand le contenu passe dessous : la barre reste lisible
+     sans devenir opaque, et l'on garde le sentiment de profondeur que le
+     bandeau apportait autrement. */
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+/* color-mix n'est pas partout : on retombe sur une surface pleine. */
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .entete-interne { background: var(--surface); }
+}
+
+.entete-interne-rang {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 30px;
+}
+.entete-interne-marque {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 15px; font-weight: 600; color: var(--p);
+}
+.entete-interne-actions { display: flex; gap: 8px; }
+.entete-interne-ico {
+  width: 30px; height: 30px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-alt); border: none; border-radius: 50%;
+  color: var(--text-secondary); cursor: pointer; position: relative;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.entete-interne-ico:hover { background: var(--border); }
+.entete-interne-ico i, .entete-interne-ico svg { display: block; width: 16px; height: 16px; }
+
+/* Le titre est en Fraunces et à gauche : c'est un titre de page, pas une
+   étiquette d'onglet. La différence tient à la casse et à l'alignement. */
+.entete-interne-titre {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 23px; font-weight: 700; letter-spacing: -.3px;
+  color: var(--text);
+  margin-top: 7px;
+}
+.entete-interne-sous {
+  font-size: 12.5px; color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    49. ACCUEIL VISITEUR — PARCOURS, AIGUILLAGE, ACTIONS
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -2360,7 +2420,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-spring);
 }
-.bouton-document:hover { background: #E6E1FB; }
+.bouton-document:hover { background: #D6E9EA; }
 .bouton-document:active { transform: scale(.97); }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -3261,7 +3321,7 @@ textarea { min-height: 92px; padding-top: 13px; }
      nom de l'app lui-même : le moment le plus logique pour ce clin d'œil au nom de la marque,
      jamais répété ailleurs pour ne pas user l'effet. Se referme tout seul après une seconde (la
      fermeture est déclenchée depuis le bloc JS principal, plus bas, pour n'en garder qu'un seul). -->
-<div id="splash-screen" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#6D28D9,#3B1878 65%,#2A1150);transition:opacity .5s var(--ease-out),visibility .5s">
+<div id="splash-screen" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#0E5A63,#073E45 65%,#04222A);transition:opacity .5s var(--ease-out),visibility .5s">
   <div class="gleam-effet" style="font-family:'Fraunces',Georgia,serif;font-size:38px;font-weight:600;color:#fff;letter-spacing:-.02em">Gleam</div>
 </div>
 <div class="toast" id="toast"></div>
@@ -3687,10 +3747,12 @@ textarea { min-height: 92px; padding-top: 13px; }
      Un écran vide avec « connectez-vous » décourage. Celui-ci montre un exemple
      clairement étiqueté : on comprend à quoi sert l'écran avant de s'inscrire. -->
 <div class="screen" id="s-guest-messages">
-  <div class="home-hero">
-    <div class="home-hero-top"><span class="logo-sm">✨ Gleam</span></div>
-    <h2>Messages</h2>
-    <p>Échangez avec votre prestataire avant, pendant et après la prestation.</p>
+  <div class="entete-interne">
+    <div class="entete-interne-rang">
+      <span class="entete-interne-marque">✨ Gleam</span>
+    </div>
+    <div class="entete-interne-titre">Messages</div>
+    <div class="entete-interne-sous">Échangez avec votre prestataire avant, pendant et après la prestation.</div>
   </div>
   <div class="home-content">
     <div class="exemple-invite">
@@ -3725,10 +3787,12 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- MES DEMANDES — VISITEUR -->
 <div class="screen" id="s-guest-demandes">
-  <div class="home-hero">
-    <div class="home-hero-top"><span class="logo-sm">✨ Gleam</span></div>
-    <h2>Mes demandes</h2>
-    <p>Suivez vos prestations, du devis au paiement.</p>
+  <div class="entete-interne">
+    <div class="entete-interne-rang">
+      <span class="entete-interne-marque">✨ Gleam</span>
+    </div>
+    <div class="entete-interne-titre">Mes demandes</div>
+    <div class="entete-interne-sous">Suivez vos prestations, du devis au paiement.</div>
   </div>
   <div class="home-content">
     <div class="exemple-invite">
@@ -3760,10 +3824,12 @@ textarea { min-height: 92px; padding-top: 13px; }
      de revenir. Il a maintenant son écran, avec la navigation, comme les
      trois autres. -->
 <div class="screen" id="s-guest-profil">
-  <div class="home-hero">
-    <div class="home-hero-top"><span class="logo-sm">✨ Gleam</span></div>
-    <h2>Bienvenue</h2>
-    <p>Créez votre compte pour suivre vos demandes et échanger avec votre prestataire.</p>
+  <div class="entete-interne">
+    <div class="entete-interne-rang">
+      <span class="entete-interne-marque">✨ Gleam</span>
+    </div>
+    <div class="entete-interne-titre">Bienvenue</div>
+    <div class="entete-interne-sous">Créez votre compte pour suivre vos demandes et échanger avec votre prestataire.</div>
   </div>
   <div class="home-content">
     <div class="bloc-invite" style="text-align:left">
@@ -4855,7 +4921,7 @@ function accorderBarreEtat(){
     StatusBar.setStyle({ style: sombre ? 'DARK' : 'LIGHT' });
     // Même teinte que le haut du dégradé : la barre système prolonge le
     // bandeau au lieu de trancher avec lui.
-    if(plateformeNative() === 'android') StatusBar.setBackgroundColor({ color:'#241466' });
+    if(plateformeNative() === 'android') StatusBar.setBackgroundColor({ color:'#062E34' });
   }catch(e){}
 }
 
@@ -8972,7 +9038,7 @@ function initCarteZoneIntervention(){
   }).addTo(carteZoneIntervention);
 
   markerZoneIntervention=L.marker(positionDepart,{draggable:true}).addTo(carteZoneIntervention);
-  cercleZoneIntervention=L.circle(positionDepart,{radius:rayonDepart*1000,color:'#6D28D9',fillColor:'#6D28D9',fillOpacity:0.12,weight:2}).addTo(carteZoneIntervention);
+  cercleZoneIntervention=L.circle(positionDepart,{radius:rayonDepart*1000,color:'#0E5A63',fillColor:'#0E5A63',fillOpacity:0.12,weight:2}).addTo(carteZoneIntervention);
 
   markerZoneIntervention.on('dragend',function(){
     var pos=markerZoneIntervention.getLatLng();
@@ -9170,8 +9236,8 @@ function buildDevisHtml(v){
     '@page{size:A4;margin:18mm 16mm}'+
     '*{box-sizing:border-box}'+
     'body{font-family:\'Segoe UI\',Helvetica,Arial,sans-serif;max-width:760px;margin:0 auto;padding:30px 24px;color:#1F2937;font-size:14px;line-height:1.5}'+
-    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #4B2FBF}'+
-    '.marque{font-size:27px;font-weight:800;color:#4B2FBF;letter-spacing:-0.4px}'+
+    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #0E5A63}'+
+    '.marque{font-size:27px;font-weight:800;color:#0E5A63;letter-spacing:-0.4px}'+
     '.marque-sub{font-size:11.5px;color:#6B7280;margin-top:4px;max-width:280px}'+
     '.doc-info{text-align:right}'+
     '.doc-titre{font-size:19px;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.5px}'+
@@ -9188,15 +9254,15 @@ function buildDevisHtml(v){
     '.desc{font-size:14px}.sub-desc{font-size:12px;color:#6B7280;margin-top:3px}'+
     '.qte{text-align:center;color:#6B7280;width:60px}'+
     '.montant{text-align:right;font-weight:700;width:110px;white-space:nowrap}'+
-    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#4B2FBF;border-top:2px solid #111827;margin-top:4px}'+
+    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#0E5A63;border-top:2px solid #111827;margin-top:4px}'+
     '.validite{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;margin-top:18px;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:#92400E}'+
     '.pied{margin-top:44px;padding-top:18px;border-top:1px solid #E5E7EB}'+
     '.pied p{font-size:11px;color:#9CA3AF;line-height:1.7;margin:0 0 6px}'+
     '@media print{body{padding:0}.bouton-impression,.bouton-retour-document{display:none!important}.parties,.total-ligne,.validite,.repartition,.pied{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}'+
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
-    '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
+    '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#0E5A63;color:#fff;line-height:1.5}'+
     '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
-    '.mentions-legales{margin-top:22px;padding-top:16px;border-top:1px solid #E5E7EB}.mention-ligne{font-size:10.5px;line-height:1.5;color:#6B7280;margin-bottom:5px}.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
+    '.mentions-legales{margin-top:22px;padding-top:16px;border-top:1px solid #E5E7EB}.mention-ligne{font-size:10.5px;line-height:1.5;color:#6B7280;margin-bottom:5px}.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#0E5A63;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(14,90,99,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#0E5A63;color:#0E5A63}'+
     '@media screen and (max-width:640px){body{padding:18px 14px;font-size:13.5px}.entete{flex-direction:column;gap:14px;padding-bottom:16px;margin-bottom:20px}.doc-info{text-align:left}.marque{font-size:23px}.marque-sub{max-width:none}.parties{flex-direction:column;gap:14px;margin-bottom:20px}.partie{width:100%}table{font-size:12.5px}td,th{padding:8px 6px}.sub-desc{font-size:11px}.qte{display:none}th.qte{display:none}.bouton-impression,.bouton-retour-document{position:static;width:100%;margin:0 0 10px;box-shadow:none;justify-content:center}body{padding-top:18px}.barre-actions-document{display:flex;flex-direction:column;margin-bottom:18px}}</style></head><body>'+
 
     '<div class="entete">'+
@@ -9263,8 +9329,8 @@ function buildFactureHtml(d,vuePro){
     '@page{size:A4;margin:18mm 16mm}'+
     '*{box-sizing:border-box}'+
     'body{font-family:\'Segoe UI\',Helvetica,Arial,sans-serif;max-width:760px;margin:0 auto;padding:30px 24px;color:#1F2937;font-size:14px;line-height:1.5}'+
-    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #4B2FBF}'+
-    '.marque{font-size:27px;font-weight:800;color:#4B2FBF;letter-spacing:-0.4px}'+
+    '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #0E5A63}'+
+    '.marque{font-size:27px;font-weight:800;color:#0E5A63;letter-spacing:-0.4px}'+
     '.marque-sub{font-size:11.5px;color:#6B7280;margin-top:4px;max-width:280px}'+
     '.doc-info{text-align:right}'+
     '.doc-titre{font-size:19px;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.5px}'+
@@ -9281,9 +9347,9 @@ function buildFactureHtml(d,vuePro){
     '.desc{font-size:14px}.sub-desc{font-size:12px;color:#6B7280;margin-top:3px}'+
     '.qte{text-align:center;color:#6B7280;width:60px}'+
     '.montant{text-align:right;font-weight:700;width:110px;white-space:nowrap}'+
-    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#4B2FBF;border-top:2px solid #111827;margin-top:4px}'+
-    '.repartition{background:#F5F3FF;border-radius:10px;padding:16px 18px;margin-top:18px}'+
-    '.repartition-titre{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6D28D9;font-weight:700;margin-bottom:10px}'+
+    '.total-ligne{display:flex;justify-content:flex-end;gap:40px;padding:14px 0;font-size:20px;font-weight:800;color:#0E5A63;border-top:2px solid #111827;margin-top:4px}'+
+    '.repartition{background:#EDF5F5;border-radius:10px;padding:16px 18px;margin-top:18px}'+
+    '.repartition-titre{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#0E5A63;font-weight:700;margin-bottom:10px}'+
     '.repartition-ligne{display:flex;justify-content:space-between;font-size:13px;color:#4B5563;padding:4px 0}'+
     '.repartition-net{font-weight:800;color:#111827;font-size:15px;border-top:1px solid #D1D5DB;margin-top:6px;padding-top:10px}'+
     '.pied{margin-top:44px;padding-top:18px;border-top:1px solid #E5E7EB}'+
@@ -9291,9 +9357,9 @@ function buildFactureHtml(d,vuePro){
     '.paiement-info{font-size:12px;color:#4B5563;margin-top:22px;display:flex;gap:8px;align-items:center}'+
     '@media print{body{padding:0}.bouton-impression,.bouton-retour-document{display:none!important}.parties,.total-ligne,.validite,.repartition,.pied{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}'+
     '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
-    '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
+    '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#0E5A63;color:#fff;line-height:1.5}'+
     '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
-    '.mentions-legales{margin-top:22px;padding-top:16px;border-top:1px solid #E5E7EB}.mention-ligne{font-size:10.5px;line-height:1.5;color:#6B7280;margin-bottom:5px}.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
+    '.mentions-legales{margin-top:22px;padding-top:16px;border-top:1px solid #E5E7EB}.mention-ligne{font-size:10.5px;line-height:1.5;color:#6B7280;margin-bottom:5px}.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#0E5A63;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(14,90,99,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#0E5A63;color:#0E5A63}'+
     '@media screen and (max-width:640px){body{padding:18px 14px;font-size:13.5px}.entete{flex-direction:column;gap:14px;padding-bottom:16px;margin-bottom:20px}.doc-info{text-align:left}.marque{font-size:23px}.marque-sub{max-width:none}.parties{flex-direction:column;gap:14px;margin-bottom:20px}.partie{width:100%}table{font-size:12.5px}td,th{padding:8px 6px}.sub-desc{font-size:11px}.qte{display:none}th.qte{display:none}.bouton-impression,.bouton-retour-document{position:static;width:100%;margin:0 0 10px;box-shadow:none;justify-content:center}body{padding-top:18px}.barre-actions-document{display:flex;flex-direction:column;margin-bottom:18px}}</style></head><body>'+
 
     '<div class="entete">'+
