@@ -4076,6 +4076,63 @@ function switchTab(t){
   }
 }
 function isPro(){const t=(currentUser&&currentUser.type||'').toLowerCase().trim();return t==='pro'||t==='societe'||t==='professionnel'}
+// ─────────────────────────────────────────────────────────────────────────────
+// MÉMOIRE DE TRÈS COURTE DURÉE POUR LES REQUÊTES DE DÉMARRAGE
+//
+// À l'ouverture, plusieurs fonctions demandent la même chose au même moment
+// sans le savoir : les tarifs sont réclamés trois fois, le statut des paiements
+// deux fois. Mesuré, cela fait 13 requêtes dont 5 inutiles — soit près d'une
+// seconde et demie perdue sur un réseau mobile.
+//
+// Ici, une requête GET déjà en vol vers la même adresse renvoie la MÊME
+// promesse au lieu d'en lancer une seconde. La réponse reste utilisable trois
+// secondes, le temps que la salve de démarrage se termine.
+//
+// Ce n'est pas un cache applicatif. Au-delà de trois secondes tout repart au
+// serveur : une donnée modifiée ne peut pas rester périmée à l'écran. C'est
+// exactement le défaut qu'on vient de corriger sur la zone, et qu'il serait
+// absurde de généraliser pour gagner quelques requêtes.
+// ─────────────────────────────────────────────────────────────────────────────
+var memoireRequetes = {};
+var DUREE_MEMOIRE_MS = 3000;
+
+function fetchGroupe(url, options){
+  var opts = options || {};
+  // Seules les lectures sont regroupées. Regrouper une écriture reviendrait à
+  // en perdre une : deux enregistrements successifs doivent partir deux fois.
+  if(opts.method && opts.method.toUpperCase() !== 'GET') return fetch(url, opts);
+
+  var entree = memoireRequetes[url];
+  if(entree && (Date.now() - entree.date) < DUREE_MEMOIRE_MS){
+    return entree.promesse.then(function(brut){
+      return new Response(brut.texte, { status: brut.statut, headers: brut.entetes });
+    });
+  }
+
+  // On mémorise le TEXTE et le statut, pas l'objet Response. Le clonage d'une
+  // réponse a des subtilités — un corps déjà lu, un flux dérivé — qui rendaient
+  // la seconde lecture vide : le parcours de démarrage croyait alors que les
+  // tarifs n'étaient pas saisis. Reconstruire une réponse neuve à chaque
+  // appelant supprime toute ambiguïté.
+  var promesse = fetch(url, opts).then(function(r){
+    return r.text().then(function(texte){
+      return { texte: texte, statut: r.status, entetes: { 'Content-Type': r.headers.get('Content-Type') || 'application/json' } };
+    });
+  }).catch(function(e){
+    delete memoireRequetes[url];
+    throw e;
+  });
+
+  memoireRequetes[url] = { promesse: promesse, date: Date.now() };
+  return promesse.then(function(brut){
+    return new Response(brut.texte, { status: brut.statut, headers: brut.entetes });
+  });
+}
+
+// À la déconnexion comme au changement de compte, la mémoire doit repartir de
+// zéro : les réponses d'un utilisateur ne doivent jamais servir à un autre.
+function viderMemoireRequetes(){ memoireRequetes = {}; }
+
 function authHeaders(){
   const t=localStorage.getItem('gleam_token');
   const base={'Content-Type':'application/json'};
@@ -4214,6 +4271,9 @@ async function doRegister(){
 }
 
 function enterApp(){
+  // Changement de compte : aucune réponse ne doit survivre d'un utilisateur
+  // à l'autre.
+  viderMemoireRequetes();
   const name=(currentUser&&(currentUser.firstName||currentUser.prenom||currentUser.email))||'';
   if(isPro()){
     document.getElementById('pro-greeting').textContent='Bonjour '+name+' 👋';
@@ -4353,7 +4413,7 @@ async function supprimerCompte(){
     setTimeout(doLogout,1200);
   }catch(e){toast(friendlyNetworkError(e))}
 }
-function doLogout(){stopChatPoll();stopUnreadPoll();stopDataPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
+function doLogout(){viderMemoireRequetes();stopChatPoll();stopUnreadPoll();stopDataPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
 
 // ── HELPERS ──
 // Icônes vectorielles (Lucide) à la place des emojis, pour un rendu professionnel et cohérent
@@ -5586,7 +5646,7 @@ async function chargerTableauDeBordPro(){
   try{
     var [gains,devis]=await Promise.all([
       fetch(API+'/api/paiements/mes-gains',{headers:authHeaders()}).then(safeJson).catch(function(){return{}}),
-      fetch(API+'/api/devis/mes-devis',{headers:authHeaders()}).then(safeJson).catch(function(){return[]})
+      fetchGroupe(API+'/api/devis/mes-devis',{headers:authHeaders()}).then(safeJson).catch(function(){return[]})
     ]);
     var liste=Array.isArray(devis)?devis:[];
     var acceptes=liste.filter(function(v){return v.statut==='accepte'}).length;
@@ -5695,7 +5755,7 @@ async function chargerAccesRapides(){
   // pastille du tout.
   var tarifsSaisis=false;
   try{
-    const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/societes/tarifs',{headers:authHeaders()});
     const d=await safeJson(r);
     tarifsSaisis=!!((d&&d.tarifs&&Object.keys(d.tarifs).length)||
                     (d&&d.tarifs_unitaires&&Object.keys(d.tarifs_unitaires).length));
@@ -5750,8 +5810,8 @@ async function chargerParcoursDemarrage(){
   var tarifsSaisis=false,paiementsPrets=false;
   try{
     var [tarifs,connect]=await Promise.all([
-      fetch(API+'/api/societes/tarifs',{headers:authHeaders()}).then(safeJson).catch(function(){return{}}),
-      fetch(API+'/api/paiements/connect/statut',{headers:authHeaders()}).then(safeJson).catch(function(){return{}})
+      fetchGroupe(API+'/api/societes/tarifs',{headers:authHeaders()}).then(safeJson).catch(function(){return{}}),
+      fetchGroupe(API+'/api/paiements/connect/statut',{headers:authHeaders()}).then(safeJson).catch(function(){return{}})
     ]);
     tarifsSaisis=!!((tarifs.tarifs&&Object.keys(tarifs.tarifs).length)||
                     (tarifs.tarifs_unitaires&&Object.keys(tarifs.tarifs_unitaires).length));
@@ -5831,7 +5891,7 @@ async function _ancienRappelConfigurationPro(){
   if(typeof currentUser.latitude!=='number'||typeof currentUser.rayon_intervention_km!=='number')
     manques.push({texte:'votre zone d\'intervention',action:"ouvrirZoneIntervention()",bouton:'Régler ma zone'});
   try{
-    const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/societes/tarifs',{headers:authHeaders()});
     if(r.ok){
       const t=await safeJson(r);
       var aucun=(!t.tarifs||!Object.keys(t.tarifs).length)&&(!t.tarifs_unitaires||!Object.keys(t.tarifs_unitaires).length);
@@ -5857,7 +5917,7 @@ async function _ancienRappelConfigurationPro(){
 
 async function loadProDevisCount(){
   try{
-    const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/devis/mes-devis',{headers:authHeaders()});
     if(!r.ok)return;
     const data=await safeJson(r);
     document.getElementById('stat-devis').textContent=data.length||0;
@@ -5901,7 +5961,7 @@ async function loadProDevis(silent){
   var c0=document.getElementById('pro-devis-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
-    const r=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/devis/mes-devis',{headers:authHeaders()});
     const c=document.getElementById('pro-devis-list');
     if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
     if(!r.ok){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div>';return}
@@ -6131,7 +6191,7 @@ var tarifsProEnCache = null;
 async function chargerTarifsPro(){
   if(tarifsProEnCache)return tarifsProEnCache;
   try{
-    const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/societes/tarifs',{headers:authHeaders()});
     if(!r.ok)return null;
     tarifsProEnCache=await safeJson(r);
     return tarifsProEnCache;
@@ -6144,7 +6204,7 @@ async function chargerReputationPro(){
   var box=document.getElementById('reputation-pro');
   if(!box||!currentUser)return;
   try{
-    var devis=await fetch(API+'/api/devis/mes-devis',{headers:authHeaders()}).then(safeJson).catch(function(){return[]});
+    var devis=await fetchGroupe(API+'/api/devis/mes-devis',{headers:authHeaders()}).then(safeJson).catch(function(){return[]});
     var liste=Array.isArray(devis)?devis:[];
     var acceptes=liste.filter(function(v){return v.statut==='accepte'}).length;
     var repondus=liste.filter(function(v){return v.statut!=='envoye'}).length;
@@ -6834,7 +6894,7 @@ async function loadProTarifs(){
   c.innerHTML=html;
   if(window.lucide)lucide.createIcons();
   try{
-    const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/societes/tarifs',{headers:authHeaders()});
     if(!r.ok)return;
     const d=await safeJson(r);
     var tarifs=d.tarifs||{};
@@ -6933,7 +6993,7 @@ async function saveTarifs(){
   var btn=document.getElementById('save-tarifs-btn');
   btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
-    const r=await fetch(API+'/api/societes/tarifs',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({tarifs,tarifs_unitaires:tarifsUnitaires,prestations})});
+    const r=await fetchGroupe(API+'/api/societes/tarifs',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({tarifs,tarifs_unitaires:tarifsUnitaires,prestations})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));return}
     toast('💾 Tarifs enregistrés !');
@@ -7653,7 +7713,7 @@ async function checkConnectStatut(){
   var badge=document.getElementById('connect-statut-badge');
   if(!badge)return;
   try{
-    const r=await fetch(API+'/api/paiements/connect/statut',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/paiements/connect/statut',{headers:authHeaders()});
     const d=await safeJson(r);
     if(d.statut==='pret')badge.innerHTML='<span style="color:var(--mint);font-size:11px;font-weight:700">✓ Prêt</span>';
     else if(d.statut==='en_cours')badge.innerHTML='<span style="color:var(--gold);font-size:11px;font-weight:700">En cours</span>';
@@ -8062,6 +8122,17 @@ async function enregistrerZoneIntervention(){
     toast('✅ '+d.message);
     if(currentUser){currentUser.latitude=pos.lat;currentUser.longitude=pos.lng;currentUser.rayon_intervention_km=rayon}
     fermerModale();
+    // La valeur était bien enregistrée, mais rien ne redessinait ce qui
+    // l'affiche : la pastille et le parcours gardaient l'ancienne jusqu'au
+    // prochain rechargement complet.
+    // Un seul appel : chargerParcoursDemarrage() décide lui-même s'il faut
+    // afficher le parcours ou les accès rapides, et appelle le second au besoin.
+    // Lancer les deux en parallèle les faisait se marcher dessus — le plus lent
+    // écrasait le résultat du plus rapide, et la pastille disparaissait.
+    chargerParcoursDemarrage();
+    // La zone détermine quelles demandes parviennent au prestataire : la liste
+    // doit refléter le nouveau rayon tout de suite.
+    if(typeof loadProDemandes==='function')loadProDemandes();
   }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
 }
 function ouvrirConfirmerEmail(){
