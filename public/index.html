@@ -1648,6 +1648,92 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .retour-auth i, .retour-auth svg { display: block; width: 19px; height: 19px; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   49. ACCUEIL VISITEUR — PARCOURS, AIGUILLAGE, ACTIONS
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Les trois étapes. Un <ol> et non des <div> : c'est une séquence, l'ordre
+   porte du sens, et un lecteur d'écran doit l'annoncer comme telle. */
+.parcours-visiteur {
+  list-style: none;
+  margin: 0 0 var(--gap-5);
+  padding: 0;
+  position: relative;
+}
+.etape-visiteur {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding-bottom: 18px;
+  position: relative;
+}
+.etape-visiteur:last-child { padding-bottom: 0; }
+
+/* Un filet relie les rangs : la séquence se lit comme un chemin, pas comme
+   trois éléments côte à côte. Il s'arrête avant le dernier. */
+.etape-visiteur:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 15px; top: 34px; bottom: 4px;
+  width: 1px;
+  background: linear-gradient(180deg, var(--border-fort), var(--border));
+}
+
+.etape-rang {
+  flex-shrink: 0;
+  width: 31px; height: 31px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--p);
+  border: 1.5px solid var(--light);
+  border-radius: 50%;
+  font-size: 13px; font-weight: 800;
+  /* Sur le filet, donc au-dessus. */
+  position: relative; z-index: 1;
+}
+.etape-corps strong { display: block; font-size: 14.5px; color: var(--text); }
+.etape-corps p {
+  font-size: 13px; line-height: 1.5; color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+/* L'aiguillage vers les professionnels, dans le bandeau. Assez visible pour
+   qu'on le trouve, assez discret pour ne pas détourner un client. */
+.lien-metier {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 16px;
+  padding: 9px 15px 9px 12px;
+  background: rgba(255,255,255,.11);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: var(--r-pill);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  color: rgba(255,255,255,.92);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.lien-metier:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.28); }
+.lien-metier:active { transform: scale(.98); }
+.lien-metier i, .lien-metier svg { display: block; width: 15px; height: 15px; }
+/* La flèche avance au survol : elle annonce un départ, pas une ouverture. */
+.lien-metier .fleche-metier {
+  width: 13px; height: 13px; opacity: .7;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.lien-metier:hover .fleche-metier { transform: translateX(3px); }
+
+/* L'action secondaire. Sans fond ni ombre : elle est présente pour ceux qui la
+   cherchent, et ne dispute rien à l'action principale. */
+.btn-fantome {
+  display: block; width: 100%;
+  margin-top: 10px; padding: 14px;
+  background: none; border: none;
+  font-family: inherit; font-size: 14.5px; font-weight: 700;
+  color: var(--p); cursor: pointer;
+  border-radius: var(--r-md);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.btn-fantome:hover { background: var(--light); }
+.btn-fantome:active { transform: scale(.99); }
+
+/* ────────────────────────────────────────────────────────────────────────────
    48. MOUVEMENT RÉDUIT
    Certaines personnes désactivent les animations pour des raisons médicales —
    troubles vestibulaires, migraines. Le système le signale ; on l'écoute.
@@ -3175,6 +3261,16 @@ textarea { min-height: 92px; padding-top: 13px; }
     </div>
     <h2>Bonjour 👋</h2>
     <p>Découvrez Gleam, créez un compte quand vous serez prêt à réserver.</p>
+    <!-- L'aiguillage vers l'autre public tient ici, et nulle part ailleurs.
+         Placé en bas de page, un professionnel devait défiler l'intégralité
+         d'un contenu qui ne s'adresse pas à lui. Placé dans le flux client, il
+         l'interrompait.
+         Dans le bandeau : visible sans défiler, discret, hors du chemin. -->
+    <button class="lien-metier" onclick="show('s-guest-pro')">
+      <i data-lucide="wrench"></i>
+      <span>Vous êtes professionnel&nbsp;?</span>
+      <i data-lucide="arrow-right" class="fleche-metier"></i>
+    </button>
   </div>
   <div class="home-hero-card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
@@ -3183,6 +3279,35 @@ textarea { min-height: 92px; padding-top: 13px; }
     </div>
   </div>
   <div class="home-content" style="padding-top:0">
+    <!-- L'explication AVANT le choix. On montrait huit tuiles de prestations à
+         quelqu'un qui ne savait pas encore ce qu'est Gleam : un choix avant une
+         explication. L'ordre suit maintenant celui d'une conversation — voici
+         ce que nous faisons, voici ce que vous pouvez demander. -->
+    <div class="section-title">Comment ça marche</div>
+    <ol class="parcours-visiteur">
+      <li class="etape-visiteur">
+        <span class="etape-rang">1</span>
+        <div class="etape-corps">
+          <strong>Décrivez votre besoin</strong>
+          <p>Le type de prestation, la surface, votre créneau.</p>
+        </div>
+      </li>
+      <li class="etape-visiteur">
+        <span class="etape-rang">2</span>
+        <div class="etape-corps">
+          <strong>Recevez des devis clairs</strong>
+          <p>Des professionnels vérifiés de votre zone répondent avec un prix précis.</p>
+        </div>
+      </li>
+      <li class="etape-visiteur">
+        <span class="etape-rang">3</span>
+        <div class="etape-corps">
+          <strong>Choisissez, c'est fait</strong>
+          <p>Vous acceptez le devis qui vous convient, réglez en ligne en toute sécurité.</p>
+        </div>
+      </li>
+    </ol>
+
     <div class="section-title">Nos prestations</div>
     <div class="services-grid">
       <div class="svc-card" data-svc="voiture" onclick="toggleSvc(this,'voiture')"><i data-lucide="car" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Voiture</div></div>
@@ -3196,37 +3321,11 @@ textarea { min-height: 92px; padding-top: 13px; }
       <div class="svc-card" data-svc="autre" onclick="toggleSvc(this,'autre')"><i data-lucide="plus-circle" style="width:28px;height:28px;margin-bottom:6px"></i><div class="svc-name">Autre</div></div>
     </div>
     <button class="modal-send-btn" id="continue-svc-btn-invite" style="display:none;margin-bottom:24px" onclick="startMultiServiceFlow()">Continuer (<span id="svc-count-invite">0</span> sélectionnée(s))</button>
-    <div class="field-group" style="margin-top:24px">
-      <div class="section-title" style="margin-bottom:14px">Comment ça marche</div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">1</div>
-          <div><strong style="font-size:14px">Décrivez votre besoin</strong><p style="font-size:13px;color:var(--text-secondary);margin-top:2px">Le type de prestation, la surface, votre créneau.</p></div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">2</div>
-          <div><strong style="font-size:14px">Recevez des devis clairs</strong><p style="font-size:13px;color:var(--text-secondary);margin-top:2px">Des professionnels vérifiés de votre zone répondent avec un prix précis.</p></div>
-        </div>
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0">3</div>
-          <div><strong style="font-size:14px">Choisissez, c'est fait</strong><p style="font-size:13px;color:var(--text-secondary);margin-top:2px">Vous acceptez le devis qui vous convient, réglez en ligne en toute sécurité.</p></div>
-        </div>
-      </div>
-    </div>
+    <!-- Les deux actions ferment la page : on a expliqué, on a laissé choisir,
+         on propose. Dans cet ordre. -->
     <button class="btn" style="margin-top:28px" onclick="afficherEcranAuth('register')">Créer un compte gratuitement</button>
-    <button class="btn" style="margin-top:10px;background:none;color:var(--p);box-shadow:none" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
+    <button class="btn-fantome" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
 
-    <!-- Aiguillage vers l'autre public. Un professionnel qui arrive ici ne
-         trouvait rien qui s'adresse à lui, et devait deviner qu'il fallait
-         créer un compte pour découvrir ce qu'on lui proposait. -->
-    <div class="passerelle" onclick="show('s-guest-pro')">
-      <div class="passerelle-icone"><i data-lucide="wrench"></i></div>
-      <div class="passerelle-texte">
-        <strong>Vous êtes un professionnel du nettoyage ?</strong>
-        <span>Découvrez les demandes près de chez vous et estimez vos revenus</span>
-      </div>
-      <i data-lucide="chevron-right" style="width:18px;height:18px;color:var(--gray);flex-shrink:0"></i>
-    </div>
   </div>
     <div class="pied-de-page-legal">
     <a onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales &amp; CGU')">Mentions légales</a>
