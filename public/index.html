@@ -1650,36 +1650,89 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
    jamais une rangée avec des éléments qui trient la liste.
    ──────────────────────────────────────────────────────────────────────────── */
 
+/* Deux tuiles à parts égales, jamais de défilement horizontal : une rangée
+   qu'on doit faire glisser cache la moitié de son contenu. */
 .rangee-acces {
-  display: flex; gap: 8px;
-  overflow-x: auto; -webkit-overflow-scrolling: touch;
-  padding: 2px 0 6px;
-  scrollbar-width: none;
+  display: grid;
+  /* minmax(0, 1fr) et non 1fr : « 1fr » signifie minmax(AUTO, 1fr), donc la
+     colonne ne peut pas descendre sous la largeur minimale de son contenu.
+     « 15 km autour de vous » imposait ainsi 226 px à la première tuile et
+     144 px à la seconde, et la rangée débordait de son conteneur.
+     minmax(0, 1fr) autorise la colonne à rétrécir ; la troncature fait le reste. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
 }
-.rangee-acces::-webkit-scrollbar { display: none; }
 
 .acces-rapide {
-  flex-shrink: 0;
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 9px 13px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  font-family: inherit; font-size: 13px; font-weight: 600;
-  color: var(--text-secondary);
-  white-space: nowrap; cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px;
+  background: var(--surface-alt);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-family: inherit;
+  text-align: left; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
-.acces-rapide:hover { border-color: var(--border-fort); color: var(--text); }
-.acces-rapide:active { transform: scale(.97); }
-.acces-rapide i, .acces-rapide svg { display: block; width: 15px; height: 15px; flex-shrink: 0; }
-.acces-rapide .chevron-acces { width: 13px; height: 13px; color: var(--gray); margin-left: -2px; }
+.acces-rapide:hover { border-color: var(--border-fort); }
+.acces-rapide:active { transform: scale(.98); }
+
+.ico-acces {
+  flex-shrink: 0; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border-radius: 8px;
+  color: var(--text-secondary);
+}
+.acces-rapide .ico-acces i,
+.acces-rapide .ico-acces svg { display: block; width: 15px; height: 15px; }
+
+.acces-rapide { min-width: 0; }
+.texte-acces { min-width: 0; flex: 1; }
+/* Le libellé nomme, la valeur informe : « Zone d'intervention » puis
+   « 15 km autour de vous ». Un seul mot ne dirait rien de ce qui est réglé. */
+.libelle-acces {
+  display: block;
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--gray);
+  /* Jamais sur deux lignes : la tuile perdrait sa hauteur régulière. */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.valeur-acces {
+  display: block;
+  font-size: 13px; font-weight: 700; color: var(--text);
+  margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* Ambre, jamais rouge : c'est un réglage qui manque, pas une erreur. */
-.acces-rapide.alerte {
-  background: var(--amber-clair); border-color: transparent; color: var(--amber);
+.acces-rapide.alerte { background: var(--amber-clair); }
+.acces-rapide.alerte .ico-acces { background: rgba(255,255,255,.65); color: var(--amber); }
+.acces-rapide.alerte .libelle-acces { color: var(--amber); opacity: .8; }
+.acces-rapide.alerte .valeur-acces { color: var(--amber); }
+
+/* ── Page interne : aide, mentions légales ─────────────────────────────── */
+.entete-page-interne {
+  display: flex; align-items: center; gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) var(--gap-4) 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 16px; font-weight: 700; color: var(--text);
 }
-.acces-rapide.alerte .chevron-acces { color: var(--amber); }
+.retour-page-interne {
+  flex-shrink: 0; width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-alt); border: none; border-radius: 50%;
+  color: var(--text-secondary); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.retour-page-interne:hover { background: var(--border); }
+.retour-page-interne i, .retour-page-interne svg { display: block; width: 18px; height: 18px; }
+
+#cadre-page-interne {
+  flex: 1; width: 100%; border: none; background: var(--bg);
+  min-height: 0;
+}
+#s-page-interne.active { display: flex; flex-direction: column; }
 
 /* ────────────────────────────────────────────────────────────────────────────
    42. GÉRER MON COMPTE — page où vit la suppression
@@ -3239,6 +3292,23 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
 </div>
 
+<!-- PAGE INTERNE — aide, mentions légales, CGU
+     Ces pages s'ouvraient par window.open(..., '_blank'). Dans une application
+     installée sur l'écran d'accueil, il n'y a pas d'onglet : iOS superpose une
+     vue sans barre d'adresse, et le geste de retour la referme — parfois en
+     emportant ce qu'il y a dessous.
+     Elles s'affichent désormais DANS l'application, avec un vrai bouton de
+     retour. Le contenu reste le même fichier : une seule source à maintenir. -->
+<div class="screen" id="s-page-interne">
+  <div class="entete-page-interne">
+    <button class="retour-page-interne" onclick="fermerPageInterne()" aria-label="Retour">
+      <i data-lucide="arrow-left"></i>
+    </button>
+    <span id="titre-page-interne">Aide</span>
+  </div>
+  <iframe id="cadre-page-interne" title="Page d'information" src="about:blank"></iframe>
+</div>
+
 <!-- HOME PRO -->
 <div class="screen" id="s-pro-home">
   <div class="home-hero">
@@ -3355,10 +3425,10 @@ textarea { min-height: 92px; padding-top: 13px; }
 
     <div class="profile-section-titre">Aide &amp; légal</div>
     <div class="profile-menu">
-      <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="ouvrirPageInterne('aide.html','Centre d\'aide')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:20px;height:20px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="ouvrirGestionCompte()"><span class="pi-icon"><i data-lucide="settings" style="width:20px;height:20px"></i></span><span class="pi-text">Gérer mon compte</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales & CGU')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
     </div>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
@@ -3474,10 +3544,10 @@ textarea { min-height: 92px; padding-top: 13px; }
 
     <div class="profile-section-titre">Support &amp; légal</div>
     <div class="profile-menu">
-      <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:18px;height:18px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="ouvrirPageInterne('aide.html','Centre d\'aide')"><span class="pi-icon"><i data-lucide="help-circle" style="width:18px;height:18px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:18px;height:18px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="ouvrirGestionCompte()"><span class="pi-icon"><i data-lucide="settings" style="width:20px;height:20px"></i></span><span class="pi-text">Gérer mon compte</span><span class="pi-arrow">›</span></div>
-      <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:18px;height:18px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales & CGU')"><span class="pi-icon"><i data-lucide="file-text" style="width:18px;height:18px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
     </div>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
@@ -5550,6 +5620,33 @@ async function chargerTableauDeBordPro(){
 // Elle s'efface tant que le parcours de démarrage est affiché : deux invitations
 // à faire la même chose, l'une sous l'autre, se neutralisent.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PAGES INTERNES — aide, mentions légales, CGU
+//
+// On mémorise l'écran d'où l'on vient pour y revenir exactement, plutôt que de
+// renvoyer tout le monde à l'accueil : revenir ailleurs qu'à l'endroit qu'on a
+// quitté est désorientant.
+// ─────────────────────────────────────────────────────────────────────────────
+var ecranAvantPageInterne=null;
+
+function ouvrirPageInterne(fichier,titre){
+  var actif=document.querySelector('.screen.active');
+  ecranAvantPageInterne=actif?actif.id:null;
+  document.getElementById('titre-page-interne').textContent=titre;
+  document.getElementById('cadre-page-interne').src=fichier;
+  show('s-page-interne');
+  if(window.lucide)lucide.createIcons();
+}
+
+function fermerPageInterne(){
+  // On vide le cadre : sans cela, la page reste chargée en mémoire et son
+  // défilement est conservé à la réouverture suivante, ce qui donne
+  // l'impression d'un écran figé.
+  document.getElementById('cadre-page-interne').src='about:blank';
+  show(ecranAvantPageInterne||(isPro()?'s-pro-profile':'s-profile'));
+  ecranAvantPageInterne=null;
+}
+
 async function chargerAccesRapides(){
   var box=document.getElementById('acces-rapides');
   if(!box||!currentUser||!isPro())return;
@@ -5558,33 +5655,50 @@ async function chargerAccesRapides(){
   if(parcours&&parcours.innerHTML.trim()){ box.innerHTML=''; return; }
 
   var zoneReglee=typeof currentUser.rayon_intervention_km==='number';
-  var docsARenvoyer=0;
+  // On lit l'état réel des tarifs plutôt que de supposer : une pastille qui
+  // annonce « Configurés » alors que rien ne l'est serait pire que pas de
+  // pastille du tout.
+  var tarifsSaisis=false;
   try{
-    const r=await fetch(API+'/api/documents',{headers:authHeaders()});
+    const r=await fetch(API+'/api/societes/tarifs',{headers:authHeaders()});
     const d=await safeJson(r);
-    (d&&d.documents||[]).forEach(function(item){
-      (item.faces||[]).forEach(function(f){ if(f.document&&f.document.statut==='refuse')docsARenvoyer++ });
-    });
+    tarifsSaisis=!!((d&&d.tarifs&&Object.keys(d.tarifs).length)||
+                    (d&&d.tarifs_unitaires&&Object.keys(d.tarifs_unitaires).length));
   }catch(e){}
 
+  // Deux réglages seulement, et pour une raison précise : ce sont les deux qui
+  // décident de ce que le prestataire REÇOIT. La zone détermine quelles demandes
+  // lui parviennent ; les tarifs, à quel prix et s'il apparaît dans l'estimation
+  // montrée aux clients avant leur inscription.
+  //
+  // « Documents » et « Aide » ont été retirés : de l'administratif consulté trois
+  // fois par an, et une page qu'on cherche dans le profil quand on est bloqué.
+  // Ni l'un ni l'autre ne change ce qui arrive aujourd'hui. Les documents
+  // gardent d'ailleurs leur pastille rouge dans le profil quand un justificatif
+  // est refusé — l'information ne se perd pas, elle change de place.
   var acces=[
-    { icone:'map-pin',
-      texte:zoneReglee?('Zone : '+currentUser.rayon_intervention_km+' km'):'Zone à définir',
+    // Libellés courts : la tuile fait 160 px sur un écran de 393. « Zone
+    // d'intervention » passait sur deux lignes et « 15 km autour de vous » se
+    // tronquait à « 15 km aut… ». L'icône dit le reste.
+    { icone:'map-pin', libelle:'Zone',
+      valeur:zoneReglee?(currentUser.rayon_intervention_km+' km'):'À définir',
       // ouvrirZoneIntervention(), pas goProTab('pro-zone') : cet onglet n'existe
       // pas, et show(undefined) masquait tous les écrans d'un coup.
       alerte:!zoneReglee, action:'ouvrirZoneIntervention()' },
-    { icone:'euro', texte:'Mes tarifs', action:'goProTab(\'pro-tarifs\')' },
-    { icone:'file-check',
-      texte:docsARenvoyer?('Documents · '+docsARenvoyer+' à renvoyer'):'Mes documents',
-      alerte:docsARenvoyer>0, action:'ouvrirDocumentsPro()' },
-    { icone:'help-circle', texte:'Aide', action:'window.open(\'aide.html\',\'_blank\')' }
+    { icone:'euro', libelle:'Tarifs',
+      valeur:tarifsSaisis?'Configurés':'À définir',
+      alerte:!tarifsSaisis, action:'goProTab(\'pro-tarifs\')' }
   ];
 
+  // Deux pastilles seulement : elles se partagent la largeur au lieu de défiler.
+  // Une rangée qu'on doit faire glisser cache la moitié de son contenu.
   box.innerHTML='<div class="rangee-acces">'+acces.map(function(a){
     return '<button class="acces-rapide'+(a.alerte?' alerte':'')+'" onclick="'+a.action+'">'+
-      '<i data-lucide="'+a.icone+'"></i>'+
-      '<span>'+escapeHtml(a.texte)+'</span>'+
-      '<i data-lucide="chevron-right" class="chevron-acces"></i>'+
+      '<span class="ico-acces"><i data-lucide="'+a.icone+'"></i></span>'+
+      '<span class="texte-acces">'+
+        '<span class="libelle-acces">'+escapeHtml(a.libelle)+'</span>'+
+        '<span class="valeur-acces">'+escapeHtml(a.valeur)+'</span>'+
+      '</span>'+
     '</button>';
   }).join('')+'</div>';
   if(window.lucide)lucide.createIcons();
