@@ -3781,11 +3781,49 @@ textarea { min-height: 92px; padding-top: 13px; }
 <script>
 const API='https://gleam-production-9b95.up.railway.app';
 
-// Écran de démarrage — se referme tout seul, une seule fois par ouverture de l'app.
-setTimeout(function(){
-  var splash=document.getElementById('splash-screen');
-  if(splash){splash.style.opacity='0';splash.style.visibility='hidden';setTimeout(function(){splash.remove()},500)}
-},1000);
+// ─────────────────────────────────────────────────────────────────────────────
+// ÉCRAN DE DÉMARRAGE
+//
+// Il se retirait après 1000 ms fixes, que l'application soit prête ou non. Sur
+// une connexion lente, il partait pendant que les écrans s'assemblaient encore :
+// le prestataire voyait sa page se remplir morceau par morceau.
+//
+// Il attend désormais que l'application soit prête, entre deux bornes :
+//
+//   plancher   600 ms   en dessous, l'écran clignote plus qu'il ne rassure
+//   plafond   4000 ms   au-delà, on retire quoi qu'il arrive
+//
+// Le plafond n'est pas décoratif. Sans lui, un serveur muet laisserait le
+// visiteur devant un écran violet sans rien à toucher — le piège de l'écran
+// blanc d'hier, dans l'autre sens.
+// ─────────────────────────────────────────────────────────────────────────────
+var PLANCHER_DEMARRAGE_MS = 600;
+var PLAFOND_DEMARRAGE_MS = 4000;
+var debutDemarrage = Date.now();
+var ecranDemarrageRetire = false;
+
+function retirerEcranDemarrage(){
+  if(ecranDemarrageRetire)return;
+  ecranDemarrageRetire = true;
+  var splash = document.getElementById('splash-screen');
+  if(!splash)return;
+  splash.style.opacity = '0';
+  splash.style.visibility = 'hidden';
+  setTimeout(function(){ if(splash.parentNode)splash.remove() }, 500);
+}
+
+// Appelée dès que l'écran d'arrivée est réellement affiché. Le plancher évite
+// le clignotement sur une connexion rapide ; sans lui, l'écran apparaîtrait et
+// disparaîtrait en 80 ms, ce qui donne une impression de saccade, pas de vitesse.
+function signalerApplicationPrete(){
+  if(ecranDemarrageRetire)return;
+  var ecoule = Date.now() - debutDemarrage;
+  var reste = Math.max(0, PLANCHER_DEMARRAGE_MS - ecoule);
+  setTimeout(retirerEcranDemarrage, reste);
+}
+
+// Filet de sécurité : quoi qu'il arrive, l'écran part.
+setTimeout(retirerEcranDemarrage, PLAFOND_DEMARRAGE_MS);
 
 // Bascule manuelle de thème — mémorisée d'une visite à l'autre, sans jamais dépendre uniquement
 // de la préférence système. Sans choix explicite de l'utilisateur, l'app suit le système (déjà
@@ -10054,20 +10092,28 @@ async function restaurerSession(tok){
     r=await fetch(API+'/api/auth/me',{headers:{'Authorization':'Bearer '+tok},cache:'no-store'});
   }catch(e){
     // Réseau indisponible : on ne conclut rien. Surtout pas une déconnexion.
+    // Et on retire l'écran tout de suite : prolonger l'attente n'apporterait
+    // rien, l'accueil visiteur est prêt à s'afficher.
+    signalerApplicationPrete();
     return;
   }
 
   if(r.status===401||r.status===403){
     localStorage.removeItem('gleam_token');
+    signalerApplicationPrete();
     return;
   }
   // 304, 5xx, ou toute autre réponse inattendue : la session est conservée.
-  if(!r.ok)return;
+  if(!r.ok){ signalerApplicationPrete(); return; }
 
   var u=await safeJson(r).catch(function(){return null});
-  if(!u||!u.id)return;
+  if(!u||!u.id){ signalerApplicationPrete(); return; }
 
   currentUser=u;enterApp();
+  // Deux images successives : la première applique les changements de classe,
+  // la seconde garantit qu'ils sont réellement peints. Retirer l'écran entre
+  // les deux laisserait apparaître un instant de page nue.
+  requestAnimationFrame(function(){ requestAnimationFrame(signalerApplicationPrete) });
   // Retour depuis la configuration Stripe Connect (paiements du pro)
   if(window.location.hash==='#paiements-retour'){
     toast('✅ Configuration des paiements enregistrée !',4000);
@@ -10083,9 +10129,14 @@ initNavInvite();
 var tok=localStorage.getItem('gleam_token');
 if(tok){
   restaurerSession(tok);
-}else if(/[?&#]parrain=/.test(window.location.href)){
-  show('s-auth');
-  switchTab('register');
+}else{
+  // Sans jeton, l'accueil visiteur est entièrement statique : rien à charger,
+  // rien à attendre. Le plancher suffit à éviter le clignotement.
+  if(/[?&#]parrain=/.test(window.location.href)){
+    show('s-auth');
+    switchTab('register');
+  }
+  signalerApplicationPrete();
 }
 
 // Enregistre le service worker dès le chargement de la page (pas seulement au moment d'activer
