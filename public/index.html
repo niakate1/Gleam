@@ -2839,6 +2839,24 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   border-radius: var(--r-sm);
   padding: var(--gap-4);
 }
+/* L'hypothèse se lit avant le calcul, et ne ressemble pas à une note de bas
+   de page : c'est la condition sous laquelle tout ce qui suit est vrai. */
+.simu-hypothese {
+  font-size: 12px; font-weight: 700; color: var(--gray);
+  text-transform: uppercase; letter-spacing: .04em;
+  padding-bottom: 8px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+/* La ligne d'opération est décalée : elle prolonge la précédente au lieu de
+   présenter un nouveau montant sorti de nulle part. */
+.simu-operation { padding-left: 14px; position: relative; }
+.simu-operation::before {
+  content: '';
+  position: absolute; left: 3px; top: 12px;
+  width: 6px; height: 1px; background: var(--border-fort);
+}
+.simu-plafond { color: var(--amber) !important; font-weight: 700; }
+
 .simu-ligne { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
 .simu-ligne span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); }
 .simu-net {
@@ -3381,7 +3399,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 
       <label>Nombre d'interventions par semaine</label>
       <div class="simu-curseur">
-        <input type="range" id="simu-volume" min="1" max="25" value="6" oninput="majSimulateur()">
+        <input type="range" id="simu-volume" min="1" max="25" value="3" oninput="majSimulateur()">
         <div class="simu-valeur"><span id="simu-volume-txt">6</span> par semaine</div>
       <div class="simu-detail" id="simu-volume-detail"></div>
       </div>
@@ -4460,7 +4478,7 @@ function choisirPrestationSimulee(cle){
 function majSimulateur(){
   var boite = document.getElementById('simu-resultat');
   if(!boite)return;
-  var volume = parseInt((document.getElementById('simu-volume')||{}).value,10)||6;
+  var volume = parseInt((document.getElementById('simu-volume')||{}).value,10)||3;
   var txt = document.getElementById('simu-volume-txt');
   if(txt) txt.textContent = volume;
 
@@ -4479,14 +4497,33 @@ function majSimulateur(){
 
   if(txt) txt.textContent = volume;
   var detail = document.getElementById('simu-volume-detail');
-  if(detail) detail.textContent = 'soit environ ' + heures(heuresSemaine) + ' de travail par semaine';
+  if(detail){
+    // Au maximum du curseur, on nomme ce que ce maximum représente. Un chiffre
+    // en bout d'échelle sans étiquette se lit comme un objectif atteignable ;
+    // « semaine complète » dit que c'est une limite, pas une moyenne.
+    var curseurMax = parseInt((document.getElementById('simu-volume')||{}).max, 10) || 0;
+    var pleine = volume >= curseurMax;
+    detail.textContent = 'soit environ ' + heures(heuresSemaine) + ' de travail par semaine'
+      + (pleine ? ' — une semaine complète' : '');
+    detail.classList.toggle('simu-plafond', pleine);
+  }
+
+  // Le montant hebdomadaire précède le mensuel, et la multiplication par 4,33
+  // apparaît en clair. Auparavant on passait de « 6 par semaine » à un total
+  // mensuel sans que rien n'explique le saut : le lecteur devait croire un
+  // chiffre qu'il ne pouvait pas vérifier.
+  var brutSemaine = presta.panier * volume;
 
   boite.innerHTML =
-    '<div class="simu-ligne"><span>'+volume+' × '+presta.nom.toLowerCase()+', '+heures(presta.heures)+' l\'unité</span><span>'+euros(presta.panier)+'</span></div>'+
-    '<div class="simu-ligne"><span>Chiffre d\'affaires mensuel</span><span>'+euros(brut)+'</span></div>'+
+    // L'hypothèse AVANT le résultat. La lire après aurait été une note de bas
+    // de page ; la lire avant change la façon dont on lit le chiffre.
+    '<div class="simu-hypothese">Si vous remplissez ces créneaux chaque semaine&nbsp;:</div>'+
+    '<div class="simu-ligne"><span>'+volume+' × '+presta.nom.toLowerCase()+' à '+euros(presta.panier)+'</span><span>'+euros(brutSemaine)+' / semaine</span></div>'+
+    '<div class="simu-ligne simu-operation"><span>× 4,33 semaines par mois</span><span>'+euros(brut)+' / mois</span></div>'+
     '<div class="simu-ligne"><span>Commission Gleam (15 %)</span><span>− '+euros(commission)+'</span></div>'+
     '<div class="simu-net"><span class="titre">Gleam vous verse</span><span class="montant">'+euros(verse)+'</span></div>'+
-    '<div class="simu-detail">Montant brut, avant vos charges et impôts — ils dépendent de votre statut.</div>';
+    '<div class="simu-detail">Montant brut, avant vos charges et impôts — ils dépendent de votre statut. '+
+    'Une place de marché ne garantit pas un volume&nbsp;: ce calcul montre ce que représenterait ce rythme, pas ce que vous gagnerez.</div>';
 }
 
 // Exemples inspirés de demandes réelles de la plateforme, reformulés.
