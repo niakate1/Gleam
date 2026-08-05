@@ -1040,10 +1040,25 @@ app.get('/api/push/vapid-public-key', (req, res) => {
 // silencieusement un abonnement existant avec le même endpoint plutôt que d'en créer un doublon.
 app.post('/api/push/subscribe', auth, async (req, res) => {
   try {
-    const { endpoint, keys } = req.body;
+    const { endpoint, keys, plateforme, jeton_natif } = req.body;
+
+    // Deux formes d'abonnement arrivent sur cette route. Le navigateur envoie un
+    // endpoint et deux clés de chiffrement ; une application iOS ou Android
+    // envoie un simple jeton d'appareil, sans clés. Les distinguer ici évite une
+    // seconde route et une seconde table à tenir synchronisées.
+    if (plateforme === 'ios' || plateforme === 'android') {
+      if (!jeton_natif) return res.status(400).json({ error: 'Jeton d\'appareil manquant.' });
+      await supabase.from('push_subscriptions').upsert({
+        user_id: req.user.id, plateforme, jeton_natif,
+        endpoint: null, keys_p256dh: null, keys_auth: null
+      }, { onConflict: 'jeton_natif' });
+      console.log('🔔 Appareil ' + plateforme + ' enregistré pour ' + req.user.id);
+      return res.json({ message: 'Notifications activées.' });
+    }
+
     if (!endpoint || !keys || !keys.p256dh || !keys.auth) return res.status(400).json({ error: 'Abonnement invalide.' });
     await supabase.from('push_subscriptions').upsert({
-      user_id: req.user.id, endpoint, keys_p256dh: keys.p256dh, keys_auth: keys.auth
+      user_id: req.user.id, plateforme: 'web', endpoint, keys_p256dh: keys.p256dh, keys_auth: keys.auth
     }, { onConflict: 'endpoint' });
     res.json({ message: 'Notifications activées.' });
   } catch (e) {
