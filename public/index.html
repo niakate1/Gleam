@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gleam ✨</title>
 <link rel="manifest" href="/manifest.json">
@@ -8921,7 +8921,7 @@ function buildDevisHtml(v){
   var dateValiditeStr=dateValidite.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   var numero='DEV-'+(v.id||'').toString().slice(0,8).toUpperCase();
 
-  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Devis '+numero+'</title>'+
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Devis '+numero+'</title>'+
     '<style>'+
     '@page{size:A4;margin:18mm 16mm}'+
     '*{box-sizing:border-box}'+
@@ -8953,7 +8953,7 @@ function buildDevisHtml(v){
     '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
     '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
     '.mentions-legales{margin-top:22px;padding-top:16px;border-top:1px solid #E5E7EB}.mention-ligne{font-size:10.5px;line-height:1.5;color:#6B7280;margin-bottom:5px}.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
-    '</style></head><body>'+
+    '@media screen and (max-width:640px){body{padding:18px 14px;font-size:13.5px}.entete{flex-direction:column;gap:14px;padding-bottom:16px;margin-bottom:20px}.doc-info{text-align:left}.marque{font-size:23px}.marque-sub{max-width:none}.parties{flex-direction:column;gap:14px;margin-bottom:20px}.partie{width:100%}table{font-size:12.5px}td,th{padding:8px 6px}.sub-desc{font-size:11px}.qte{display:none}th.qte{display:none}.bouton-impression,.bouton-retour-document{position:static;width:100%;margin:0 0 10px;box-shadow:none;justify-content:center}body{padding-top:18px}.barre-actions-document{display:flex;flex-direction:column;margin-bottom:18px}}</style></head><body>'+
 
     '<div class="entete">'+
       '<div><div class="marque">Gleam</div><div class="marque-sub">Plateforme de mise en relation pour des services de nettoyage à domicile</div></div>'+
@@ -9014,7 +9014,7 @@ function buildFactureHtml(d,vuePro){
       '<div class="repartition-ligne repartition-net"><span>Montant net vous revenant</span><span>'+d.montant_pro.toFixed(2)+' €</span></div>'+
     '</div>':'';
 
-  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>'+titre+' '+escapeHtml(d.numero)+'</title>'+
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+titre+' '+escapeHtml(d.numero)+'</title>'+
     '<style>'+
     '@page{size:A4;margin:18mm 16mm}'+
     '*{box-sizing:border-box}'+
@@ -9050,7 +9050,7 @@ function buildFactureHtml(d,vuePro){
     '.validite-marque,.paiement-marque{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;padding:3px 8px;border-radius:4px;background:#4B2FBF;color:#fff;line-height:1.5}'+
     '.paiement-marque{background:#E5E7EB;color:#4B5563}'+
     '.mentions-legales{margin-top:22px;padding-top:16px;border-top:1px solid #E5E7EB}.mention-ligne{font-size:10.5px;line-height:1.5;color:#6B7280;margin-bottom:5px}.bouton-impression{position:fixed;bottom:22px;right:22px;z-index:9;padding:11px 20px;border:none;border-radius:9px;background:#4B2FBF;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(75,47,191,.3)}@media screen{body{padding-top:78px}}.bouton-retour-document{position:fixed;top:18px;left:18px;z-index:9;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border:1px solid #E2E2EE;border-radius:9px;background:#fff;color:#4A4966;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(20,19,43,.10)}.bouton-retour-document:hover{border-color:#4B2FBF;color:#4B2FBF}'+
-    '</style></head><body>'+
+    '@media screen and (max-width:640px){body{padding:18px 14px;font-size:13.5px}.entete{flex-direction:column;gap:14px;padding-bottom:16px;margin-bottom:20px}.doc-info{text-align:left}.marque{font-size:23px}.marque-sub{max-width:none}.parties{flex-direction:column;gap:14px;margin-bottom:20px}.partie{width:100%}table{font-size:12.5px}td,th{padding:8px 6px}.sub-desc{font-size:11px}.qte{display:none}th.qte{display:none}.bouton-impression,.bouton-retour-document{position:static;width:100%;margin:0 0 10px;box-shadow:none;justify-content:center}body{padding-top:18px}.barre-actions-document{display:flex;flex-direction:column;margin-bottom:18px}}</style></head><body>'+
 
     '<div class="entete">'+
       '<div><div class="marque">Gleam</div><div class="marque-sub">Plateforme de mise en relation pour des services de nettoyage à domicile</div></div>'+
