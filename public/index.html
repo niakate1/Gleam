@@ -1609,6 +1609,41 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .case-attestation input { width: auto; margin: 2px 0 0; flex-shrink: 0; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   44. OPTIONS À CHOIX MULTIPLE — UNE SEULE COLONNE
+   Les options supplémentaires portent des libellés longs : « Habitacle très
+   sale / encrassé », « Rangement d'effets personnels ». Dans une colonne de
+   168 px ils se coupent en deux lignes, et un nombre impair laisse un bouton
+   seul avec un trou béant à sa droite.
+   Elles passent sur une colonne, icône à gauche — la disposition des réglages
+   d'iOS, celle qu'on lit sans effort.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.options-grid:has(> .opt-btn[data-option-val]) { grid-template-columns: 1fr; }
+
+.options-grid:has(> .opt-btn[data-option-val]) .opt-btn {
+  /* display:flex déclaré explicitement : getComputedStyle renvoie
+     flex-direction « row » même sur un élément qui n'est pas flex du tout.
+     La mesure semblait donc correcte alors que la règle ne s'appliquait pas. */
+  display: flex;
+  flex-direction: row; align-items: center; justify-content: flex-start;
+  /* nowrap est indispensable : le bouton est en flex-wrap: wrap pour sa
+     disposition en colonne d'origine. En ligne, le texte repassait sous
+     l'emoji — la direction était bien « row », mais le retour à la ligne
+     annulait l'effet. */
+  flex-wrap: nowrap;
+  gap: 12px;
+  min-height: 0; padding: 13px 15px;
+  text-align: left; line-height: 1.35;
+}
+/* L'emoji retrouve une taille de pictogramme et cesse d'occuper sa propre
+   ligne : c'est ce qui doublait la hauteur de chaque bouton. */
+.options-grid:has(> .opt-btn[data-option-val]) .opt-btn > span:first-child {
+  flex-shrink: 0; width: 26px;
+  font-size: 19px; line-height: 1;
+  margin: 0; text-align: center;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    43. ACCUEIL PRESTATAIRE — HIÉRARCHIE
    Le prestataire ouvre l'application pour une seule raison : voir s'il y a du
    travail. Tout ce qui n'y répond pas descend d'un cran.
