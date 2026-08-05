@@ -2062,6 +2062,16 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   flex: 1 0 auto;
 }
 
+/* Le profil visiteur ne contient que deux boutons. Alignés en haut, ils
+   laissaient six cents pixels de vide en dessous — un vide que le bandeau
+   masquait avant qu'on le raccourcisse : on ne l'a pas créé, on l'a révélé.
+   Les centrer verticalement assume un écran dépouillé plutôt que de le
+   remplir d'entrées qu'on avait délibérément retirées. */
+#s-guest-profil .home-content {
+  display: flex; flex-direction: column; justify-content: center;
+}
+#s-guest-profil .bloc-invite { width: 100%; }
+
 /* Le taux reste parfaitement lisible, mais cesse d'être le plus gros chiffre
    de l'écran. Un prestataire doit pouvoir le trouver sans qu'on le lui jette
    au visage. */
@@ -8847,6 +8857,12 @@ async function sendChatMsg(){
 }
 
 // ── PAIEMENT ──
+// Empêche un second appel pendant qu'un paiement se prépare. Ce n'est pas la
+// vraie protection — un rechargement de page la contourne — mais elle évite
+// le cas le plus fréquent : le double appui sur un réseau lent, quand le
+// bouton ne réagit pas assez vite et qu'on insiste.
+var paiementEnPreparation = false;
+
 async function openPayment(devisId,montant){
   currentDevisId=devisId;
   document.getElementById('payment-sub').textContent='Montant : '+montant+' € TTC';
