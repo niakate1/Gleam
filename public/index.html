@@ -1609,6 +1609,72 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .case-attestation input { width: auto; margin: 2px 0 0; flex-shrink: 0; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   41. ACCÈS RAPIDES — ACCUEIL PRESTATAIRE
+   Des raccourcis, pas des filtres : le chevron le dit, et ils ne partagent
+   jamais une rangée avec des éléments qui trient la liste.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.rangee-acces {
+  display: flex; gap: 8px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding: 2px 0 6px;
+  scrollbar-width: none;
+}
+.rangee-acces::-webkit-scrollbar { display: none; }
+
+.acces-rapide {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.acces-rapide:hover { border-color: var(--border-fort); color: var(--text); }
+.acces-rapide:active { transform: scale(.97); }
+.acces-rapide i, .acces-rapide svg { display: block; width: 15px; height: 15px; flex-shrink: 0; }
+.acces-rapide .chevron-acces { width: 13px; height: 13px; color: var(--gray); margin-left: -2px; }
+
+/* Ambre, jamais rouge : c'est un réglage qui manque, pas une erreur. */
+.acces-rapide.alerte {
+  background: var(--amber-clair); border-color: transparent; color: var(--amber);
+}
+.acces-rapide.alerte .chevron-acces { color: var(--amber); }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   42. GÉRER MON COMPTE — page où vit la suppression
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.avertissement-compte {
+  background: var(--surface-alt);
+  border-left: 2px solid var(--border-fort);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: var(--gap-4);
+  margin-bottom: var(--gap-4);
+  font-size: 13px; line-height: 1.55; color: var(--text-secondary);
+}
+.avertissement-compte strong { color: var(--text); font-weight: 700; }
+.avertissement-compte ul { margin: 10px 0 0; padding-left: 18px; }
+.avertissement-compte li { margin-bottom: 5px; }
+
+/* Bouton discret, en contour : la suppression ne s'annonce pas, elle se
+   confirme. Un aplat rouge pleine largeur invite au geste au lieu d'y faire
+   réfléchir. */
+.btn-supprimer-discret {
+  width: 100%; padding: 13px;
+  background: none;
+  border: 1.5px solid var(--border); border-radius: var(--r-md);
+  font-family: inherit; font-size: 13.5px; font-weight: 600;
+  color: var(--gray); cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.btn-supprimer-discret:hover { border-color: var(--red); color: var(--red); }
+
+/* ────────────────────────────────────────────────────────────────────────────
    40. CHOIX DU RÔLE À L'INSCRIPTION
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -3150,6 +3216,11 @@ textarea { min-height: 92px; padding-top: 13px; }
          prestataire reçoit et s'il compte dans l'estimation affichée aux clients. -->
     <div id="pro-rappel-config"></div>
 
+    <!-- Accès rapides. Ce ne sont PAS des filtres : ils mènent ailleurs, d'où
+         les chevrons. Les mélanger avec des filtres ferait quitter l'écran à
+         qui croit trier sa liste. -->
+    <div id="acces-rapides"></div>
+
     <!-- Les deux cartes chiffrées qui se trouvaient ici disaient ce que la liste
          juste en dessous montre déjà, et ce que l'onglet Devis compte par
          ailleurs. Les compteurs restent alimentés, mais hors écran : d'autres
@@ -3250,9 +3321,9 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="profile-menu">
       <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:20px;height:20px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" onclick="ouvrirGestionCompte()"><span class="pi-icon"><i data-lucide="settings" style="width:20px;height:20px"></i></span><span class="pi-text">Gérer mon compte</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
     </div>
-    <button class="btn-delete" style="width:100%;margin-top:14px" onclick="supprimerCompte()"><i data-lucide="trash-2" style="width:15px;height:15px;vertical-align:-3px"></i> Supprimer mon compte</button>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="bottom-nav">
@@ -3369,9 +3440,9 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="profile-menu">
       <div class="profile-item" onclick="window.open('aide.html','_blank')"><span class="pi-icon"><i data-lucide="help-circle" style="width:18px;height:18px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:18px;height:18px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" onclick="ouvrirGestionCompte()"><span class="pi-icon"><i data-lucide="settings" style="width:20px;height:20px"></i></span><span class="pi-text">Gérer mon compte</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="window.open('mentions-legales.html','_blank')"><span class="pi-icon"><i data-lucide="file-text" style="width:18px;height:18px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
     </div>
-    <button class="btn-delete" style="width:100%;margin-top:14px" onclick="supprimerCompte()"><i data-lucide="trash-2" style="width:15px;height:15px;vertical-align:-3px"></i> Supprimer mon compte</button>
     <button class="logout-btn" onclick="doLogout()">Se déconnecter</button>
   </div>
   <div class="bottom-nav">
@@ -4003,6 +4074,7 @@ function enterApp(){
     if(itemConfirmerEmailP)itemConfirmerEmailP.style.display=(currentUser&&currentUser.email_verifie===false)?'flex':'none';
     majAffichageNotifications();
     majPastilleDocuments();
+    chargerAccesRapides();
     renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
     renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
     chargerReputationPro();
@@ -4087,6 +4159,29 @@ function enterApp(){
     reprendreApresConnexion=false;
   }
 }
+// La suppression ne vit plus au bas du profil, à côté de « Se déconnecter » :
+// ce voisinage était le vrai danger. Elle demande maintenant trois gestes, et
+// s'ouvre sur ce qu'elle emporte avec elle.
+function ouvrirGestionCompte(){
+  document.getElementById('modal-body').innerHTML=
+    '<div class="modal-title">Gérer mon compte</div>'+
+    '<div class="avertissement-compte">'+
+      '<strong>Supprimer votre compte est définitif.</strong>'+
+      '<ul>'+
+        '<li>Vos demandes et devis en cours sont annulés</li>'+
+        '<li>Vos conversations sont fermées</li>'+
+        '<li>Vos avis restent visibles, de façon anonyme</li>'+
+        '<li>Vos factures sont conservées, la loi nous y oblige</li>'+
+      '</ul>'+
+    '</div>'+
+    '<p style="font-size:13px;line-height:1.5;color:var(--text-secondary);margin-bottom:16px">'+
+      'Si vous souhaitez simplement faire une pause, vous pouvez vous rendre indisponible '+
+      'depuis votre profil — votre compte reste intact.'+
+    '</p>'+
+    '<button class="btn-supprimer-discret" onclick="supprimerCompte()">Supprimer définitivement mon compte</button>';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
 async function supprimerCompte(){
   // Une seule demande, mais qui exige un geste délibéré. Deux confirmations
   // successives et quasi identiques entraînaient le réflexe de valider sans lire.
@@ -5399,6 +5494,55 @@ async function chargerTableauDeBordPro(){
 // Le parcours disparaît dès qu'il est complet — il accompagne, il ne surveille
 // pas. Un bandeau qui resterait affiché après coup deviendrait du bruit.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACCÈS RAPIDES — accueil prestataire
+//
+// Chaque pastille affiche son ÉTAT, pas seulement son intitulé : « Zone : 15 km »
+// dit en un coup d'œil ce que « Zone » laisserait chercher. Non réglé, elle passe
+// en ambre et nomme ce qui manque.
+//
+// Elle s'efface tant que le parcours de démarrage est affiché : deux invitations
+// à faire la même chose, l'une sous l'autre, se neutralisent.
+// ─────────────────────────────────────────────────────────────────────────────
+async function chargerAccesRapides(){
+  var box=document.getElementById('acces-rapides');
+  if(!box||!currentUser||!isPro())return;
+
+  var parcours=document.getElementById('pro-rappel-config');
+  if(parcours&&parcours.innerHTML.trim()){ box.innerHTML=''; return; }
+
+  var zoneReglee=typeof currentUser.rayon_intervention_km==='number';
+  var docsARenvoyer=0;
+  try{
+    const r=await fetch(API+'/api/documents',{headers:authHeaders()});
+    const d=await safeJson(r);
+    (d&&d.documents||[]).forEach(function(item){
+      (item.faces||[]).forEach(function(f){ if(f.document&&f.document.statut==='refuse')docsARenvoyer++ });
+    });
+  }catch(e){}
+
+  var acces=[
+    { icone:'map-pin',
+      texte:zoneReglee?('Zone : '+currentUser.rayon_intervention_km+' km'):'Zone à définir',
+      alerte:!zoneReglee, action:'goProTab(\'pro-zone\')' },
+    { icone:'euro', texte:'Mes tarifs', action:'goProTab(\'pro-tarifs\')' },
+    { icone:'file-check',
+      texte:docsARenvoyer?('Documents · '+docsARenvoyer+' à renvoyer'):'Mes documents',
+      alerte:docsARenvoyer>0, action:'ouvrirDocumentsPro()' },
+    { icone:'help-circle', texte:'Aide', action:'window.open(\'aide.html\',\'_blank\')' }
+  ];
+
+  box.innerHTML='<div class="rangee-acces">'+acces.map(function(a){
+    return '<button class="acces-rapide'+(a.alerte?' alerte':'')+'" onclick="'+a.action+'">'+
+      '<i data-lucide="'+a.icone+'"></i>'+
+      '<span>'+escapeHtml(a.texte)+'</span>'+
+      '<i data-lucide="chevron-right" class="chevron-acces"></i>'+
+    '</button>';
+  }).join('')+'</div>';
+  if(window.lucide)lucide.createIcons();
+}
+
 async function chargerParcoursDemarrage(){
   var box=document.getElementById('pro-rappel-config');
   if(!box||!currentUser||!isPro())return;
@@ -5439,7 +5583,15 @@ async function chargerParcoursDemarrage(){
   ];
 
   var faites=etapes.filter(function(e){return e.fait}).length;
-  if(faites===etapes.length){ box.innerHTML=''; return; }
+  if(faites===etapes.length){
+    box.innerHTML='';
+    // Le parcours disparaît : les accès rapides prennent le relais.
+    chargerAccesRapides();
+    return;
+  }
+  // Tant que le parcours s'affiche, les accès rapides s'effacent.
+  var rapides=document.getElementById('acces-rapides');
+  if(rapides)rapides.innerHTML='';
 
   var prochaine=etapes.filter(function(e){return !e.fait})[0];
 
