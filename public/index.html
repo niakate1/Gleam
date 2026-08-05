@@ -180,12 +180,14 @@
 
 /* Choix explicite de l'utilisateur — prévaut toujours sur la préférence système. */
 html[data-theme="dark"] {
-  --p:#4FB3B8; --p2:#7ECBCE; --light:#241F45;
+  --p:#4FB3B8; --p2:#7ECBCE; --light:#0F2E33;
   --aqua:#2FD8BE; --aqua-clair:#12352F; --mint:#2FD8BE;
   --gold:#F5C542; --gold-clair:#3A2C0C;
-  --bg:#0C0B18; --surface:#16152A; --surface-alt:#201E38;
-  --border:#2E2C4A; --border-fort:#423F63;
-  --text:#EDECF5; --text-secondary:#C2C0D6; --gray:#8F8DA8;
+  /* Les neutres étaient teintés de violet — reste de l'ancienne marque. Un
+     thème sombre violacé sous une marque pétrole donne deux applications. */
+  --bg:#080F11; --surface:#111C1F; --surface-alt:#18272B;
+  --border:#25383D; --border-fort:#365055;
+  --text:#E9EFF0; --text-secondary:#B6C6C8; --gray:#7E9296;
   --green:#34D399; --green-clair:#10352A;
   --red:#F87171; --red-clair:#3B1A1A;
   --amber:#FBBF4C; --amber-clair:#3A2C0C;
@@ -194,7 +196,7 @@ html[data-theme="dark"] {
   --shadow-md:0 4px 16px rgba(0,0,0,.5);
   --shadow-lg:0 12px 36px rgba(0,0,0,.6);
   --shadow-xl:0 24px 64px rgba(0,0,0,.7);
-  --ring-focus:0 0 0 3px rgba(158,134,255,.42);
+  --ring-focus:0 0 0 3px rgba(79,179,184,.42);
 }
 
 
@@ -1650,6 +1652,19 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 .retour-auth:hover { background: rgba(255,255,255,.24); }
 .retour-auth i, .retour-auth svg { display: block; width: 19px; height: 19px; }
+
+/* Un état vide qui explique, plutôt que trois zéros qui inquiètent. */
+.reputation-vide {
+  background: var(--surface-alt);
+  border-radius: var(--r-md);
+  padding: var(--gap-4);
+  margin-bottom: var(--gap-4);
+}
+.reputation-vide strong { display: block; font-size: 13.5px; color: var(--text); }
+.reputation-vide span {
+  display: block; font-size: 12.5px; line-height: 1.5;
+  color: var(--text-secondary); margin-top: 4px;
+}
 
 /* ────────────────────────────────────────────────────────────────────────────
    53. EN-TÊTE D'ÉTAT — ACCUEIL CLIENT, ET RETOUR DE LA DÉCOUVERTE
@@ -5317,6 +5332,14 @@ function goProTab(tab){
     tab='pro-home';
   }
   show(map[tab]);
+  // Les indicateurs n'étaient calculés qu'à la connexion : en revenant sur le
+  // profil après avoir envoyé un devis, on voyait encore les anciens chiffres.
+  if(tab==='pro-profile'&&typeof chargerReputationPro==='function'){
+    chargerReputationPro();
+    if(typeof renderNoteGlobale==='function')
+      renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
+  }
+  if(tab==='pro-home'&&typeof majEnteteProChiffres==='function') majEnteteProChiffres();
   const idx={'pro-home':0,'pro-messages':1,'pro-devis':2,'pro-profile':3}[tab];
   if(idx!==undefined)document.querySelectorAll('#'+map[tab]+' .bnav-item').forEach((b,i)=>b.classList.toggle('active',i===idx));
   if(tab==='pro-home'){loadProDemandes();chargerTableauDeBordPro();verifierConfigurationPro()}
@@ -7564,6 +7587,18 @@ async function chargerReputationPro(){
       return v.statut==='accepte'&&v.demande&&v.demande.statut==='terminee';
     }).length;
     var fiabilite=typeof currentUser.taux_fiabilite==='number'?currentUser.taux_fiabilite:100;
+
+    // Sans aucun devis envoyé, la rangée affichait « 0 / — / 100 % » : trois
+    // cases qui ressemblent à un défaut d'affichage plutôt qu'à une situation.
+    // Un nouveau prestataire doit comprendre qu'il n'a pas encore d'historique,
+    // pas croire que l'écran est cassé.
+    if(liste.length===0){
+      box.innerHTML='<div class="reputation-vide">'+
+        '<strong>Votre réputation se construira ici</strong>'+
+        '<span>Prestations terminées, taux d\'acceptation et fiabilité apparaîtront dès votre premier devis envoyé.</span>'+
+      '</div>';
+      return;
+    }
 
     box.innerHTML='<div class="reputation">'+
       '<div><strong>'+termines+'</strong><span>Prestations terminées</span></div>'+
