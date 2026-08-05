@@ -1,8 +1,28 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<!-- FEUILLE CRITIQUE — elle doit rester la première chose du document.
+     Le fichier fait 629 Ko : entre l'ouverture et l'analyse de la feuille
+     principale, le navigateur affiche sa couleur par défaut, c'est-à-dire du
+     blanc. Sur un écran sombre, cet éclair se voit.
+     Ces quelques lignes sont analysées en une fraction de milliseconde et
+     posent la couleur de la marque avant tout le reste. Le premier pixel
+     affiché n'est plus blanc.
+     Ne pas déplacer, ne pas fusionner avec la feuille principale. -->
+<style id="style-critique">
+  html { background: #062E34; }
+  body { background: #F6F6FB; margin: 0; }
+  /* L'écran de démarrage est peint immédiatement, avant même que la feuille
+     principale ne soit lue. */
+  #splash-screen {
+    position: fixed; inset: 0; z-index: 99999;
+    background: linear-gradient(160deg, #0E5A63, #073E45 65%, #04222A);
+  }
+  @media (prefers-color-scheme: dark) { body { background: #080F11; } }
+</style>
 <title>Gleam ✨</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#062E34">
@@ -1667,6 +1687,23 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   54. GESTES TACTILES
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Le double appui agrandit la page — un geste du navigateur, hérité du web,
+   qui n'a pas de sens dans une application. On le déclenche souvent par
+   maladresse, sur un bouton qui ne réagit pas assez vite.
+   `manipulation` le désactive SANS toucher au zoom à deux doigts : le geste
+   maladroit disparaît, le geste volontaire reste.
+   C'est la différence avec `user-scalable=no`, qu'on trouve partout et qui
+   prive les personnes malvoyantes d'agrandir quoi que ce soit. */
+button, .btn, .opt-btn, .svc-card, .tab-pill, .bnav-item,
+.profile-item, .ligne, .passerelle, .acces-rapide, a, label, select,
+input[type="checkbox"], input[type="radio"], .toggle-switch {
+  touch-action: manipulation;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    53. EN-TÊTE D'ÉTAT — ACCUEIL CLIENT, ET RETOUR DE LA DÉCOUVERTE
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -2857,7 +2894,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   color: var(--text-secondary); margin: 0 0 5px;
 }
 .carte-tarif .saisie { position: relative; }
-.carte-tarif .saisie input { padding-right: 46px; height: 44px; font-size: 15px; }
+.carte-tarif .saisie input { padding-right: 46px; height: 44px; font-size: 16px; }
 .carte-tarif .saisie .unite {
   position: absolute; right: 12px; top: 0; height: 44px;
   display: flex; align-items: center;
