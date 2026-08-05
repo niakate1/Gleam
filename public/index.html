@@ -4293,6 +4293,10 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="profile-section-titre">Aide &amp; légal</div>
     <div class="profile-menu">
       <div class="profile-item" onclick="ouvrirPageInterne('aide.html','Centre d\'aide')"><span class="pi-icon"><i data-lucide="help-circle" style="width:20px;height:20px"></i></span><span class="pi-text">Aide</span><span class="pi-arrow">›</span></div>
+      <!-- La bascule d'apparence n'existait que dans le profil client. Un
+           prestataire qui travaille tôt le matin ou tard le soir n'avait aucun
+           moyen de passer en sombre depuis son espace. -->
+      <div class="profile-item" onclick="basculerTheme()"><span class="pi-icon"><i id="theme-toggle-icon-pro" data-lucide="moon" style="width:20px;height:20px"></i></span><span class="pi-text">Apparence claire / sombre</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="ouvrirContactSupport()"><span class="pi-icon"><i data-lucide="life-buoy" style="width:20px;height:20px"></i></span><span class="pi-text">Contacter le support</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="ouvrirGestionCompte()"><span class="pi-icon"><i data-lucide="settings" style="width:20px;height:20px"></i></span><span class="pi-text">Gérer mon compte</span><span class="pi-arrow">›</span></div>
       <div class="profile-item" onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales & CGU')"><span class="pi-icon"><i data-lucide="file-text" style="width:20px;height:20px"></i></span><span class="pi-text">Mentions légales & CGU</span><span class="pi-arrow">›</span></div>
@@ -4571,12 +4575,16 @@ function basculerTheme(){
   appliquerTheme(estSombreActuellement?'light':'dark');
 }
 function majIconeTheme(){
-  var icone=document.getElementById('theme-toggle-icon');
-  if(!icone)return;
+  // Deux icônes désormais : celle du profil client et celle du profil
+  // prestataire. N'en mettre qu'une à jour laisserait l'autre figée sur
+  // « lune » alors que le mode sombre est actif.
+  var icones=[document.getElementById('theme-toggle-icon'),
+              document.getElementById('theme-toggle-icon-pro')].filter(Boolean);
+  if(!icones.length)return;
   var actuel=localStorage.getItem('gleam-theme');
   var systemeSombre=window.matchMedia('(prefers-color-scheme: dark)').matches;
   var estSombre=actuel?actuel==='dark':systemeSombre;
-  icone.setAttribute('data-lucide',estSombre?'sun':'moon');
+  icones.forEach(function(e){ e.setAttribute('data-lucide',estSombre?'sun':'moon') });
   if(window.lucide)lucide.createIcons();
 }
 (function(){
