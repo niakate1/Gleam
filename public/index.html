@@ -1609,6 +1609,32 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .case-attestation input { width: auto; margin: 2px 0 0; flex-shrink: 0; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   46. ÉTAT HORS-LIGNE ET AJUSTEMENTS NATIFS
+   ──────────────────────────────────────────────────────────────────────────── */
+
+#bandeau-hors-ligne {
+  position: fixed; left: 0; right: 0;
+  top: calc(env(safe-area-inset-top, 0px));
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 10px var(--gap-4);
+  background: var(--amber); color: #fff;
+  font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  text-align: center;
+  /* Il glisse depuis le haut plutôt que d'apparaître : une bande qui surgit
+     ressemble à une erreur, une bande qui descend ressemble à une information. */
+  transform: translateY(-100%);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+#bandeau-hors-ligne.visible { transform: translateY(0); }
+#bandeau-hors-ligne i, #bandeau-hors-ligne svg { display: block; width: 15px; height: 15px; flex-shrink: 0; }
+
+/* En natif, la barre d'état système occupe déjà le haut : le bandeau violet
+   doit s'y prolonger au lieu de s'arrêter sur une bande blanche. */
+.natif .home-hero { padding-top: calc(env(safe-area-inset-top, 0px) + var(--gap-5)); }
+.natif .bottom-nav { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6px); }
+
+/* ────────────────────────────────────────────────────────────────────────────
    45. MODE DÉCOUVERTE — ÉCRANS D'INVITATION
    Un écran vide avec « connectez-vous » décourage. Chacun montre un exemple
    clairement étiqueté, pour qu'on comprenne à quoi sert l'écran avant de
@@ -3395,6 +3421,13 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
 </div>
 
+<!-- Bandeau hors-ligne. Une page blanche quand le réseau tombe, c'est ce qui
+     fait dire à un examinateur qu'il s'agit d'un site web. -->
+<div id="bandeau-hors-ligne">
+  <i data-lucide="wifi-off"></i>
+  <span>Pas de connexion. Vos données s'afficheront dès le retour du réseau.</span>
+</div>
+
 <!-- PAGE INTERNE — aide, mentions légales, CGU
      Ces pages s'ouvraient par window.open(..., '_blank'). Dans une application
      installée sur l'écran d'accueil, il n'y a pas d'onglet : iOS superpose une
@@ -4405,6 +4438,192 @@ function fetchGroupe(url, options){
 // À la déconnexion comme au changement de compte, la mémoire doit repartir de
 // zéro : les réponses d'un utilisateur ne doivent jamais servir à un autre.
 function viderMemoireRequetes(){ memoireRequetes = {}; }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PONT NATIF
+//
+// Quand Gleam tourne dans son enveloppe iOS ou Android, l'objet Capacitor est
+// présent et donne accès aux fonctions du système. Sur le web, il est absent
+// et tout retombe sur le comportement actuel.
+//
+// Aucune fonction ici n'est décorative. La règle 4.2 d'Apple sanctionne
+// précisément les ajouts cosmétiques — un examinateur reconnaît une
+// notification branchée pour la forme d'une notification qui sert à quelque
+// chose. Chacune de celles-ci répond à un besoin réel du métier.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function estNatif(){
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+
+function plateformeNative(){
+  if(!estNatif())return 'web';
+  try{ return window.Capacitor.getPlatform() }catch(e){ return 'web' }
+}
+
+function pluginNatif(nom){
+  try{ return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[nom]) || null }
+  catch(e){ return null }
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────
+// La fonction la plus convaincante pour un examinateur, et la plus utile pour
+// vos prestataires : une demande qui arrive pendant qu'ils travaillent.
+//
+// Le web utilise un « endpoint » et deux clés de chiffrement ; le natif, un
+// simple jeton d'appareil. Le serveur accepte les deux depuis la migration
+// « jetons_natifs_notifications ».
+async function activerNotificationsNatives(){
+  var Push = pluginNatif('PushNotifications');
+  if(!Push)return { ok:false, motif:'pont absent' };
+
+  try{
+    var perm = await Push.checkPermissions();
+    if(perm.receive !== 'granted') perm = await Push.requestPermissions();
+    if(perm.receive !== 'granted') return { ok:false, motif:'refusé par l\'utilisateur' };
+
+    // L'enregistrement est asynchrone : le jeton arrive par événement, pas en
+    // retour d'appel. Attendre la promesse de register() ne donnerait rien.
+    var jeton = await new Promise(function(resoudre, rejeter){
+      var minuteur = setTimeout(function(){ rejeter(new Error('délai dépassé')) }, 12000);
+      Push.addListener('registration', function(t){ clearTimeout(minuteur); resoudre(t.value) });
+      Push.addListener('registrationError', function(e){ clearTimeout(minuteur); rejeter(new Error(e.error||'échec')) });
+      Push.register();
+    });
+
+    const r = await fetch(API+'/api/push/subscribe',{
+      method:'POST', headers:authHeaders(),
+      body:JSON.stringify({ plateforme:plateformeNative(), jeton_natif:jeton })
+    });
+    if(!r.ok)return { ok:false, motif:'enregistrement refusé' };
+
+    // Une notification touchée doit mener quelque part. Sans cela, elle n'est
+    // qu'une alerte — et c'est exactement ce qu'un examinateur juge cosmétique.
+    Push.addListener('pushNotificationActionPerformed', function(action){
+      var d = (action && action.notification && action.notification.data) || {};
+      if(d.demande_id && typeof ouvrirDetailDemande==='function') ouvrirDetailDemande(d.demande_id);
+      else if(d.ecran && typeof show==='function') show(d.ecran);
+    });
+
+    return { ok:true };
+  }catch(e){
+    return { ok:false, motif:(e && e.message) || 'erreur' };
+  }
+}
+
+// ── Appareil photo ─────────────────────────────────────────────────────────
+// Sur le web, capture="environment" ouvre l'appareil photo du navigateur. En
+// natif, on obtient le vrai appareil photo système : plein écran, avec le
+// recadrage et la qualité que l'utilisateur connaît.
+async function photoNative(){
+  var Camera = pluginNatif('Camera');
+  if(!Camera)return null;
+  try{
+    var photo = await Camera.getPhoto({
+      quality: 80,
+      allowEditing: false,
+      resultType: 'dataUrl',
+      // 1600 px suffisent pour lire une attestation ou juger d'un canapé, et
+      // divisent le poids par cinq par rapport à une photo brute.
+      width: 1600,
+      correctOrientation: true,
+      source: 'PROMPT'          // laisse choisir entre appareil photo et galerie
+    });
+    return photo && photo.dataUrl ? photo.dataUrl : null;
+  }catch(e){
+    return null;               // annulation par l'utilisateur : ce n'est pas une erreur
+  }
+}
+
+// ── Retour haptique ────────────────────────────────────────────────────────
+// Une vibration brève à la confirmation d'un devis accepté ou d'un paiement.
+// Rien de spectaculaire, mais c'est le genre de détail qui distingue une
+// application d'une page web — et il ne coûte rien.
+function vibrer(intensite){
+  var Haptics = pluginNatif('Haptics');
+  if(!Haptics)return;
+  try{
+    if(intensite === 'succes') Haptics.notification({ type:'SUCCESS' });
+    else if(intensite === 'erreur') Haptics.notification({ type:'ERROR' });
+    else Haptics.impact({ style:'MEDIUM' });
+  }catch(e){}
+}
+
+// ── Barre d'état ───────────────────────────────────────────────────────────
+// Le bandeau violet de l'accueil se prolonge sous l'heure et la batterie, au
+// lieu de s'arrêter net sur une bande blanche.
+function accorderBarreEtat(){
+  var StatusBar = pluginNatif('StatusBar');
+  if(!StatusBar)return;
+  try{
+    var sombre = document.documentElement.getAttribute('data-theme') === 'dark';
+    StatusBar.setStyle({ style: sombre ? 'DARK' : 'LIGHT' });
+    if(plateformeNative() === 'android') StatusBar.setBackgroundColor({ color:'#4B2FBF' });
+  }catch(e){}
+}
+
+// ── Bouton retour Android ──────────────────────────────────────────────────
+// Sans cela, le bouton retour physique ferme l'application depuis n'importe
+// quel écran. C'est le premier reproche des testeurs Android, et un motif de
+// mauvaise note.
+function brancherRetourAndroid(){
+  var App = pluginNatif('App');
+  if(!App || plateformeNative() !== 'android')return;
+  try{
+    App.addListener('backButton', function(){
+      var modale = document.getElementById('modal-overlay');
+      if(modale && modale.classList.contains('open')){ modale.classList.remove('open'); return; }
+      var page = document.getElementById('s-page-interne');
+      if(page && page.classList.contains('active')){ fermerPageInterne(); return; }
+      var actif = document.querySelector('.screen.active');
+      var accueil = currentUser ? (isPro() ? 's-pro-home' : 's-home') : 's-guest';
+      if(actif && actif.id !== accueil){ show(accueil); return; }
+      App.exitApp();
+    });
+  }catch(e){}
+}
+
+// ── Hors-ligne ─────────────────────────────────────────────────────────────
+// Une page blanche quand le réseau tombe, c'est ce qui fait dire à un
+// examinateur qu'il s'agit d'un site web. Un écran qui explique et propose de
+// réessayer, c'est ce qui fait dire l'inverse.
+function afficherEtatHorsLigne(horsLigne){
+  var bandeau = document.getElementById('bandeau-hors-ligne');
+  if(!bandeau)return;
+  bandeau.classList.toggle('visible', !!horsLigne);
+}
+
+function brancherHorsLigne(){
+  window.addEventListener('offline', function(){ afficherEtatHorsLigne(true) });
+  window.addEventListener('online', function(){
+    afficherEtatHorsLigne(false);
+    // Au retour du réseau, on recharge ce que l'utilisateur regarde plutôt que
+    // de le laisser devant des données périmées.
+    if(currentUser && typeof enterApp==='function') enterApp();
+  });
+  if(!navigator.onLine) afficherEtatHorsLigne(true);
+
+  var Network = pluginNatif('Network');
+  if(!Network)return;
+  try{
+    Network.addListener('networkStatusChange', function(etat){ afficherEtatHorsLigne(!etat.connected) });
+    Network.getStatus().then(function(etat){ afficherEtatHorsLigne(!etat.connected) });
+  }catch(e){}
+}
+
+// ── Mise en route ──────────────────────────────────────────────────────────
+function initialiserPontNatif(){
+  brancherHorsLigne();
+  if(!estNatif())return;
+  document.documentElement.classList.add('natif', 'natif-'+plateformeNative());
+  accorderBarreEtat();
+  brancherRetourAndroid();
+  var SplashScreen = pluginNatif('SplashScreen');
+  // L'écran de démarrage natif se retire quand le nôtre prend le relais, pour
+  // qu'il n'y ait jamais deux écrans de chargement l'un après l'autre.
+  if(SplashScreen){ try{ SplashScreen.hide() }catch(e){} }
+}
 
 function authHeaders(){
   const t=localStorage.getItem('gleam_token');
@@ -6872,7 +7091,12 @@ async function deposerDocument(champ){
 
   try{
     var contenu;
-    if(fichier.type==='application/pdf'){
+    // En natif, l'appareil photo système a déjà produit l'image : on ne repasse
+    // pas par le champ de fichier.
+    if(champ.dataset.contenuNatif){
+      contenu=champ.dataset.contenuNatif;
+      delete champ.dataset.contenuNatif;
+    }else if(fichier.type==='application/pdf'){
       if(fichier.size>8*1024*1024){toast('Fichier trop lourd (8 Mo maximum).');return}
       contenu=await new Promise(function(res,rej){
         var l=new FileReader();
@@ -6905,6 +7129,7 @@ async function deposerDocument(champ){
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d&&d.error||''));return}
 
+    vibrer('succes');
     toast('Document déposé, il sera vérifié rapidement.');
     chargerDocumentsPro();
     chargerParcoursDemarrage();
@@ -6998,6 +7223,7 @@ async function envoyerDevis(demandeId){
     const r=await fetch(API+'/api/devis',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,prix_ttc:parseFloat(prix),description:msg})});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}return}
+    vibrer('succes');
     toast('✅ Devis envoyé au client !');
     loadProDemandes();loadProDevisCount();
   }catch(e){toast(friendlyNetworkError(e));if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}}
@@ -10162,6 +10388,7 @@ async function restaurerSession(tok){
 // La navigation du visiteur existe avant tout affichage : sans elle, l'accueil
 // s'ouvre sans barre du bas et l'application ressemble à une page de vente.
 initNavInvite();
+initialiserPontNatif();
 
 var tok=localStorage.getItem('gleam_token');
 if(tok){
