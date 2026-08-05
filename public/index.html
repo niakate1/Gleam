@@ -1609,6 +1609,42 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .case-attestation input { width: auto; margin: 2px 0 0; flex-shrink: 0; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   43. ACCUEIL PRESTATAIRE — HIÉRARCHIE
+   Le prestataire ouvre l'application pour une seule raison : voir s'il y a du
+   travail. Tout ce qui n'y répond pas descend d'un cran.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* La rangée déborde jusqu'aux bords de la carte pour que le défilement
+   horizontal se devine, et un filet la sépare de ce qui suit. */
+#acces-rapides:not(:empty) {
+  margin: 0 calc(-1 * var(--gap-4)) var(--gap-4);
+  padding: 0 var(--gap-4) var(--gap-4);
+  border-bottom: 1px solid var(--border);
+}
+
+/* La disponibilité est l'action la plus fréquente de cet écran : elle mérite sa
+   propre ligne, avec un filet qui la sépare du reste plutôt qu'un fond gris qui
+   la noie. */
+.ligne-disponibilite {
+  margin-top: var(--gap-4);
+  padding-top: var(--gap-4);
+  border: none;
+  border-top: 1px solid var(--border) !important;
+  background: none !important;
+  border-radius: 0;
+}
+
+/* Le titre de section n'annonce plus une liste de vingt éléments : il compte
+   ce qu'il y a, et le dit sobrement. */
+#s-pro-home .section-title {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--gray);
+  margin: var(--gap-5) 0 var(--gap-3);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    41. ACCÈS RAPIDES — ACCUEIL PRESTATAIRE
    Des raccourcis, pas des filtres : le chevron le dit, et ils ne partagent
    jamais une rangée avec des éléments qui trient la liste.
@@ -3211,15 +3247,15 @@ textarea { min-height: 92px; padding-top: 13px; }
     <p id="pro-hero-sous"></p>
   </div>
   <div class="home-hero-card">
+    <!-- Les accès rapides ouvrent la carte, séparés du reste par un filet.
+         Ils étaient posés juste avant elle : la carte remonte de 36 px pour
+         chevaucher le bandeau — un effet voulu — et les recouvrait à moitié. -->
+    <div id="acces-rapides"></div>
+
     <!-- Rappel de configuration : n'apparaît que si la zone d'intervention ou les
          tarifs manquent. Ces deux réglages déterminent quelles demandes le
          prestataire reçoit et s'il compte dans l'estimation affichée aux clients. -->
     <div id="pro-rappel-config"></div>
-
-    <!-- Accès rapides. Ce ne sont PAS des filtres : ils mènent ailleurs, d'où
-         les chevrons. Les mélanger avec des filtres ferait quitter l'écran à
-         qui croit trier sa liste. -->
-    <div id="acces-rapides"></div>
 
     <!-- Les deux cartes chiffrées qui se trouvaient ici disaient ce que la liste
          juste en dessous montre déjà, et ce que l'onglet Devis compte par
@@ -3230,7 +3266,7 @@ textarea { min-height: 92px; padding-top: 13px; }
     <!-- Tableau de bord — calculé à partir de routes qui existaient déjà, mais
          dont aucun écran ne montrait la synthèse. -->
     <div id="pro-tableau-bord"></div>
-    <div class="dispo-toggle" style="margin-top:12px;border:none;background:var(--surface-alt)">
+    <div class="dispo-toggle ligne-disponibilite">
       <div><div class="dispo-text">Disponibilité</div><div class="dispo-sub" id="dispo-sub">Vous êtes disponible</div></div>
       <button class="toggle-switch on" id="dispo-toggle" role="switch" aria-checked="true"
               aria-label="Basculer votre disponibilité" onclick="toggleDispo()"></button>
@@ -3967,6 +4003,7 @@ function friendlyNetworkError(e){
   return'Erreur réseau. Réessayez dans un instant.';
 }
 
+// Même protection que goProTab : aucun onglet ne doit pouvoir vider l'écran.
 function goTab(tab){
   stopChatPoll();
   const map={home:'s-home',messages:'s-messages',devis:'s-devis',profile:'s-profile'};
@@ -3980,6 +4017,14 @@ function goTab(tab){
 function goProTab(tab){
   stopChatPoll();
   const map={'pro-home':'s-pro-home','pro-messages':'s-pro-messages','pro-devis':'s-pro-devis','pro-profile':'s-pro-profile','pro-tarifs':'s-pro-tarifs'};
+  // Une clé inconnue donnait show(undefined), qui masque tous les écrans sans
+  // en afficher aucun : bâche blanche, et plus rien de cliquable pour en sortir.
+  // Un onglet qui ne mène nulle part est un défaut ; un écran dont on ne peut
+  // pas sortir est un piège. On retombe sur l'accueil, et on le journalise.
+  if(!map[tab]){
+    console.warn('goProTab — onglet inconnu : '+tab+' — retour à l\'accueil');
+    tab='pro-home';
+  }
   show(map[tab]);
   const idx={'pro-home':0,'pro-messages':1,'pro-devis':2,'pro-profile':3}[tab];
   if(idx!==undefined)document.querySelectorAll('#'+map[tab]+' .bnav-item').forEach((b,i)=>b.classList.toggle('active',i===idx));
@@ -5525,7 +5570,9 @@ async function chargerAccesRapides(){
   var acces=[
     { icone:'map-pin',
       texte:zoneReglee?('Zone : '+currentUser.rayon_intervention_km+' km'):'Zone à définir',
-      alerte:!zoneReglee, action:'goProTab(\'pro-zone\')' },
+      // ouvrirZoneIntervention(), pas goProTab('pro-zone') : cet onglet n'existe
+      // pas, et show(undefined) masquait tous les écrans d'un coup.
+      alerte:!zoneReglee, action:'ouvrirZoneIntervention()' },
     { icone:'euro', texte:'Mes tarifs', action:'goProTab(\'pro-tarifs\')' },
     { icone:'file-check',
       texte:docsARenvoyer?('Documents · '+docsARenvoyer+' à renvoyer'):'Mes documents',
@@ -7801,6 +7848,28 @@ function deplacerZoneIntervention(lat,lng,zoom){
   if(cercleZoneIntervention)cercleZoneIntervention.setLatLng(pos);
 }
 function initCarteZoneIntervention(){
+  // Leaflet vient d'un CDN. S'il n'a pas pu se charger — réseau capricieux,
+  // domaine bloqué, tunnel d'entreprise — `L` est indéfini et tout ce qui suit
+  // lève une exception. Le prestataire verrait alors une fenêtre à moitié
+  // construite, sans comprendre pourquoi.
+  //
+  // On dégrade proprement : la carte disparaît, le curseur de rayon et la
+  // recherche d'adresse continuent de fonctionner. Régler sa zone reste
+  // possible sans carte ; c'est même ainsi que la plupart le feront.
+  if(typeof L==='undefined'){
+    var conteneur=document.getElementById('carte-zone-intervention');
+    if(conteneur){
+      conteneur.style.height='auto';
+      conteneur.style.border='none';
+      conteneur.innerHTML='<div style="padding:16px;background:var(--surface-alt);border-radius:12px;'+
+        'font-size:12.5px;line-height:1.5;color:var(--text-secondary)">'+
+        'La carte n\'a pas pu se charger. Vous pouvez quand même définir votre zone '+
+        'en saisissant votre adresse ci-dessus et en réglant le rayon ci-dessous.</div>';
+    }
+    console.warn('Leaflet indisponible — la zone se règle sans carte.');
+    return;
+  }
+
   var positionDepart=[48.8566,2.3522]; // Paris par défaut, si le pro n'a encore rien configuré
   if(currentUser&&typeof currentUser.latitude==='number'&&typeof currentUser.longitude==='number'){
     positionDepart=[currentUser.latitude,currentUser.longitude];
