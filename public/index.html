@@ -6272,11 +6272,89 @@ async function chargerTableauDeBordPro(){
 // ─────────────────────────────────────────────────────────────────────────────
 var ecranAvantPageInterne=null;
 
+// Les pages annexes ont été écrites pour un onglet séparé : chacune porte son
+// propre en-tête « ← Retour à l'app ». Affichée dans l'application, cet en-tête
+// s'ajoute au nôtre — deux barres de retour empilées — et son bouton fait
+// naviguer le CADRE vers l'accueil, ce qui recharge l'application à l'intérieur
+// d'elle-même. D'où la troisième barre.
+//
+// On ne modifie pas les pages : consultées seules, depuis un lien ou un moteur
+// de recherche, ce bouton leur est utile. On neutralise seulement ce qui gêne,
+// et uniquement quand elles sont affichées ici.
+// Ce qui compte comme « bouton de retour » dans l'en-tête d'une page annexe.
+// Volontairement large : le filtre de position empêche les faux positifs, et
+// une formulation oubliée laisserait réapparaître deux barres empilées.
+var MOTS_DE_RETOUR = /^(\s*[←‹«⟵<]\s*)?(retour|revenir|retourner|fermer|quitter|close|back)\b|^[←‹«⟵✕✖×xX]$/i;
+
+function nettoyerPageInterne(cadre){
+  var doc;
+  try{ doc=cadre.contentDocument }catch(e){ return }   // page d'un autre domaine
+  if(!doc||!doc.body)return;
+
+  // 1. L'en-tête de la page. On remonte au conteneur du lien de retour plutôt
+  //    que de masquer le lien seul : le logo resterait, orphelin.
+  //
+  //    DEUX critères, tous les deux nécessaires :
+  //      · la POSITION — dans les 160 premiers pixels, donc dans l'en-tête
+  //      · le SENS — un texte qui évoque un retour, ou une flèche seule
+  //
+  //    Le critère de position fait le gros du travail. Un lien « politique de
+  //    retour » au milieu d'un article ne sera jamais masqué : il n'est pas en
+  //    haut. Sans lui, élargir le vocabulaire deviendrait dangereux.
+  //
+  //    Ma version précédente ne reconnaissait qu'une formulation — celle des
+  //    mentions légales — et laissait l'en-tête du centre d'aide en place.
+  var liens=doc.querySelectorAll('a, button');
+  for(var i=0;i<liens.length;i++){
+    var lien=liens[i];
+    var texte=(lien.textContent||'').replace(/\s+/g,' ').trim();
+
+    var haut=lien.getBoundingClientRect().top;
+    if(haut>160)continue;                       // pas dans l'en-tête
+
+    if(!MOTS_DE_RETOUR.test(texte))continue;    // pas un retour
+    if(texte.length>40)continue;                // une phrase, pas un bouton
+
+    var conteneur=lien;
+    // On remonte tant que le parent tient sur une seule ligne visuelle : c'est
+    // l'en-tête. On s'arrête avant <body> quoi qu'il arrive.
+    for(var n=0;n<4 && conteneur.parentElement && conteneur.parentElement!==doc.body;n++){
+      var p=conteneur.parentElement;
+      if(p.getBoundingClientRect().height>120)break;
+      conteneur=p;
+    }
+    conteneur.style.display='none';
+  }
+
+  // 2. Les liens qui feraient sortir du cadre. Sans cela, toucher « Retour à
+  //    l'app » chargerait l'application entière à l'intérieur du cadre.
+  doc.addEventListener('click',function(ev){
+    var a=ev.target && ev.target.closest ? ev.target.closest('a') : null;
+    if(!a)return;
+    var href=a.getAttribute('href')||'';
+    // Les ancres internes (#section) restent utiles : on ne touche qu'aux liens
+    // qui quittent la page.
+    if(href.startsWith('#'))return;
+    // Toutes les façons de désigner l'accueil de l'application. « ./ » et une
+    // chaîne vide en font partie : un lien vide recharge la page courante, ce
+    // qui remettrait l'en-tête que l'on vient de masquer.
+    if(href==='' || href==='/' || href==='./' || href==='.' ||
+       href.indexOf('index.html')>=0 || href===location.origin+'/'){
+      ev.preventDefault();
+      fermerPageInterne();
+    }
+  },true);
+}
+
 function ouvrirPageInterne(fichier,titre){
   var actif=document.querySelector('.screen.active');
   ecranAvantPageInterne=actif?actif.id:null;
   document.getElementById('titre-page-interne').textContent=titre;
-  document.getElementById('cadre-page-interne').src=fichier;
+  var cadre=document.getElementById('cadre-page-interne');
+  // onload plutôt qu'un délai : la page peut mettre du temps à arriver, et
+  // nettoyer trop tôt ne trouverait rien à masquer.
+  cadre.onload=function(){ nettoyerPageInterne(cadre) };
+  cadre.src=fichier;
   show('s-page-interne');
   if(window.lucide)lucide.createIcons();
 }
@@ -6285,7 +6363,9 @@ function fermerPageInterne(){
   // On vide le cadre : sans cela, la page reste chargée en mémoire et son
   // défilement est conservé à la réouverture suivante, ce qui donne
   // l'impression d'un écran figé.
-  document.getElementById('cadre-page-interne').src='about:blank';
+  var cadreAFermer=document.getElementById('cadre-page-interne');
+  cadreAFermer.onload=null;   // sinon le nettoyage se rejouerait sur about:blank
+  cadreAFermer.src='about:blank';
   show(ecranAvantPageInterne||(isPro()?'s-pro-profile':'s-profile'));
   ecranAvantPageInterne=null;
 }
