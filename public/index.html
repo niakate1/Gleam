@@ -1652,6 +1652,78 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .retour-auth i, .retour-auth svg { display: block; width: 19px; height: 19px; }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   51. EN-TÊTE D'ÉTAT — ACCUEIL PRESTATAIRE
+   Motif des applications de travail : ce qui compte n'est pas le nom de
+   l'écran mais la situation de celui qui l'ouvre.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.entete-pro {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) var(--gap-4) 12px;
+}
+.entete-pro-rang { display: flex; align-items: center; gap: 10px; }
+
+.entete-pro-avatar {
+  width: 36px; height: 36px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--light); color: var(--p);
+  border: none; border-radius: 50%;
+  font-family: inherit; font-size: 13px; font-weight: 800;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.entete-pro-avatar:active { transform: scale(.94); }
+
+.entete-pro-qui { min-width: 0; }
+.entete-pro-qui strong {
+  display: block; font-size: 15px; font-weight: 800; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.entete-pro-qui span { display: block; font-size: 11.5px; color: var(--gray); margin-top: 1px; }
+
+/* L'interrupteur de disponibilité. Vert quand on est joignable, gris sinon :
+   la couleur porte l'information, le mot la confirme. Un interrupteur seul
+   laisserait deviner ce que « allumé » veut dire. */
+.entete-pro-dispo {
+  margin-left: auto; flex-shrink: 0;
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 12px 7px 10px;
+  background: var(--aqua-clair); border: none; border-radius: var(--r-pill);
+  font-family: inherit; font-size: 11.5px; font-weight: 800; color: var(--aqua);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.entete-pro-dispo i {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--aqua); display: block; flex-shrink: 0;
+}
+.entete-pro-dispo.indispo { background: var(--surface-alt); color: var(--gray); }
+.entete-pro-dispo.indispo i { background: var(--border-fort); }
+.entete-pro-dispo:active { transform: scale(.97); }
+
+.entete-pro-chiffres { display: flex; gap: 8px; margin-top: 12px; }
+.entete-pro-chiffre {
+  flex: 1; min-width: 0;
+  background: var(--surface-alt); border-radius: var(--r-sm);
+  padding: 9px 11px;
+}
+.entete-pro-chiffre b {
+  display: block;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 18px; font-weight: 700; color: var(--p);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.entete-pro-chiffre span {
+  display: block; font-size: 9.5px; font-weight: 800; color: var(--gray);
+  text-transform: uppercase; letter-spacing: .04em; margin-top: 1px;
+}
+
+/* La carte ne chevauche plus un bandeau : elle reprend une marge normale. */
+#s-pro-home .home-hero-card { margin-top: var(--gap-4); }
+
+/* ────────────────────────────────────────────────────────────────────────────
    50. EN-TÊTE DES ÉCRANS INTÉRIEURS
    Sur un accueil, l'ampleur sert : première impression, carte qui chevauche.
    Sur un profil ou une liste, il n'y a plus rien à annoncer — l'utilisateur
@@ -3856,10 +3928,30 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- HOME PRO -->
 <div class="screen" id="s-pro-home">
-  <div class="home-hero">
-    <div class="home-hero-top"><span class="logo-sm">✨ Gleam Pro</span><span class="user-badge" id="pro-name-badge">Pro</span></div>
-    <h2 id="pro-greeting">Bonjour 👋</h2>
-    <p id="pro-hero-sous"></p>
+  <!-- En-tête d'état. Pour quelqu'un qui ouvre l'application entre deux
+       interventions, ce qui compte n'est pas le nom de l'écran mais sa
+       situation : disponible ou non, ce qu'il a gagné, ce qui l'attend.
+       Aucune icône décorative : la recherche et les notifications n'existent
+       pas encore dans Gleam, et deux boutons qui ne font rien paraissent
+       bâclés, pas soignés. -->
+  <div class="entete-pro">
+    <div class="entete-pro-rang">
+      <button class="entete-pro-avatar" onclick="goProTab('pro-profile')" aria-label="Mon profil">
+        <span id="pro-avatar-initiales">—</span>
+      </button>
+      <div class="entete-pro-qui">
+        <strong id="pro-greeting">Bonjour</strong>
+        <span id="pro-hero-sous"></span>
+      </div>
+      <!-- L'interrupteur descendait à 368 px, sous le tableau de bord. C'est le
+           geste le plus répété de l'application ; il fallait défiler pour
+           l'atteindre. -->
+      <button class="entete-pro-dispo" id="pro-dispo-puce" onclick="basculerDisponibiliteDepuisEntete()">
+        <i></i><span id="pro-dispo-libelle">Disponible</span>
+      </button>
+    </div>
+    <div class="entete-pro-chiffres" id="pro-chiffres-entete"></div>
+    <span class="user-badge" id="pro-name-badge" hidden>Pro</span>
   </div>
   <div class="home-hero-card">
     <!-- Les accès rapides ouvrent la carte, séparés du reste par un filet.
@@ -5143,6 +5235,7 @@ function enterApp(){
     majAffichageNotifications();
     majPastilleDocuments();
     chargerAccesRapides();
+    majEnteteProChiffres();
     renderProfileAvatar('pro-profile-avatar-inner',currentUser&&currentUser.photo,'🏢');
     renderNoteGlobale('pro-profile-note',currentUser&&currentUser.note_moyenne);
     chargerReputationPro();
@@ -6680,6 +6773,81 @@ function fermerPageInterne(){
   ecranAvantPageInterne=null;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// EN-TÊTE D'ÉTAT DU PRESTATAIRE
+//
+// Trois chiffres, et pas un de plus. Chacun répond à une question qu'il se pose
+// vraiment en ouvrant l'application : ai-je du travail, combien ai-je gagné,
+// comment suis-je noté.
+// ─────────────────────────────────────────────────────────────────────────────
+function initialesDe(u){
+  if(!u)return '—';
+  var a=(u.prenom||'').trim().charAt(0), b=(u.nom||'').trim().charAt(0);
+  return ((a+b).toUpperCase()) || '—';
+}
+
+function majEnteteProDisponibilite(){
+  var puce=document.getElementById('pro-dispo-puce');
+  var libelle=document.getElementById('pro-dispo-libelle');
+  if(!puce)return;
+  // La disponibilité vit dans la variable `disponible`, pas sur currentUser.
+  // Lire la mauvaise source donnait une puce qui ne bougeait jamais.
+  var dispo=(typeof disponible!=='undefined') ? !!disponible : (currentUser&&currentUser.disponible!==false);
+  puce.classList.toggle('indispo',!dispo);
+  libelle.textContent=dispo?'Disponible':'Indisponible';
+  puce.setAttribute('aria-pressed',String(dispo));
+}
+
+// L'interrupteur de la carte reste la source de vérité : on le déclenche
+// plutôt que de dupliquer sa logique, sinon les deux se désynchroniseraient.
+function basculerDisponibiliteDepuisEntete(){
+  // On appelle la fonction d'origine plutôt que de simuler un clic : elle
+  // porte l'appel au serveur et le retour en arrière en cas d'échec.
+  if(typeof toggleDispo==='function'){ toggleDispo(); }
+  setTimeout(majEnteteProDisponibilite,60);
+}
+
+async function majEnteteProChiffres(){
+  var boite=document.getElementById('pro-chiffres-entete');
+  if(!boite||!currentUser||!isPro())return;
+
+  var initiales=document.getElementById('pro-avatar-initiales');
+  if(initiales)initiales.textContent=initialesDe(currentUser);
+  var salut=document.getElementById('pro-greeting');
+  if(salut)salut.textContent=(currentUser.prenom||'Bonjour');
+  var sous=document.getElementById('pro-hero-sous');
+  if(sous)sous.textContent='Prestataire'+(currentUser.siret?' vérifié':'');
+  majEnteteProDisponibilite();
+
+  var demandes=0, gains=0;
+  try{
+    const r=await fetchGroupe(API+'/api/demandes/all',{headers:authHeaders()});
+    const d=await safeJson(r);
+    demandes=Array.isArray(d)?d.length:0;
+  }catch(e){}
+  try{
+    const r=await fetchGroupe(API+'/api/paiements/mes-gains',{headers:authHeaders()});
+    const d=await safeJson(r);
+    // On additionne ce qui a été libéré ce mois-ci, pas le cumul : « ce mois »
+    // doit vouloir dire ce mois.
+    var maintenant=new Date();
+    (Array.isArray(d)?d:[]).forEach(function(p){
+      var date=new Date(p.libere_le||p.created_at);
+      if(date.getMonth()===maintenant.getMonth()&&date.getFullYear()===maintenant.getFullYear()){
+        gains+=parseFloat(p.montant_societe||0);
+      }
+    });
+  }catch(e){}
+
+  var note=currentUser.note_moyenne;
+  var noteAffichee=(note&&parseFloat(note)>0)?parseFloat(note).toFixed(1).replace('.',','):'—';
+
+  boite.innerHTML=
+    '<div class="entete-pro-chiffre"><b>'+demandes+'</b><span>demandes</span></div>'+
+    '<div class="entete-pro-chiffre"><b>'+Math.round(gains)+' €</b><span>ce mois</span></div>'+
+    '<div class="entete-pro-chiffre"><b>'+noteAffichee+'</b><span>note</span></div>';
+}
+
 async function chargerAccesRapides(){
   var box=document.getElementById('acces-rapides');
   if(!box||!currentUser||!isPro())return;
@@ -7956,12 +8124,14 @@ async function toggleDispo(){
   inter.classList.toggle('on',disponible);
   inter.setAttribute('aria-checked',disponible?'true':'false');
   document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
+  majEnteteProDisponibilite();
   try{
     const r=await fetch(API+'/api/societes/disponibilite',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({disponible})});
     if(!r.ok){
       disponible=!disponible;
       document.getElementById('dispo-toggle').classList.toggle('on',disponible);
       document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
+      majEnteteProDisponibilite();
       toast('Erreur, réessayez.');return;
     }
   }catch(e){
