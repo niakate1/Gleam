@@ -1748,6 +1748,38 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .entete-interne, .entete-compte, .navbar, .page-header { --fond-goutte: var(--surface); }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   56. APRÈS ACCEPTATION — LE PAIEMENT D'ABORD
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.bloc-action-paiement { margin-top: 12px; }
+.bloc-action-paiement .btn-principal-devis { width: 100%; }
+
+/* La discussion s'ouvre après le paiement. On l'ANNONCE plutôt que de la
+   faire disparaître : un bouton absent se lit comme un défaut, une phrase qui
+   dit quand il reviendra se lit comme une règle. */
+.discussion-apres-paiement {
+  display: flex; align-items: center; gap: 7px;
+  margin-top: 8px;
+  font-size: 11.5px; line-height: 1.4; color: var(--gray);
+}
+.discussion-apres-paiement i, .discussion-apres-paiement svg {
+  width: 13px; height: 13px; flex-shrink: 0;
+}
+
+/* La phrase de réassurance est le seul argument qui fait payer : elle dit que
+   l'argent n'est pas versé tout de suite. Sans elle, le client se demande ce
+   qu'il se passe s'il paie et que personne ne vient. */
+.rassurance-paiement {
+  display: flex; align-items: flex-start; gap: 7px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,.07);
+  font-size: 11.5px; line-height: 1.45; color: var(--text-secondary);
+}
+.rassurance-paiement i, .rassurance-paiement svg {
+  width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; color: var(--aqua);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    55. ÉTAT VIDE QUI AMORCE
    « Aucune demande pour l'instant » constate un vide et n'ouvre rien.
    Quelqu'un qui vient de créer un compte le lit comme « il n'y a rien ici ».
@@ -6470,11 +6502,33 @@ function renderDevisClientCards(){
       }else if(v.statut==='accepte'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement requis</span>';
         cardStyle='border-color:var(--amber);background:var(--amber-clair);';
-        actions='<div style="margin-top:12px;display:flex;gap:8px">'+
-          '<button class="btn-secondaire-devis" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">'+
-            '<i data-lucide="message-circle"></i> Discuter</button>'+
+        // Deux boutons de même largeur se neutralisaient : le client hésitait,
+        // et l'hésitation devant un paiement ne se solde presque jamais par un
+        // paiement.
+        //
+        // Le paiement devient la seule action évidente. La discussion reste
+        // accessible, mais en lien discret : un client a souvent une question
+        // légitime avant de payer — un créneau à décaler, un détail du tarif —
+        // et lui interdire de la poser ne le ferait pas payer plus vite. Il
+        // abandonnerait, ou il vous appellerait.
+        actions='<div class="bloc-action-paiement">'+
           '<button class="btn-principal-devis paiement" onclick="openPayment(\''+safeVId+'\','+Number(v.prix_ttc)+')">'+
             '<i data-lucide="credit-card"></i> Payer '+escapeHtml(v.prix_ttc)+'\u20ac</button>'+
+          // La discussion s'ouvre APRÈS le paiement. Le choix est le vôtre, et il
+          // se défend : une seule action, aucune hésitation possible.
+          //
+          // Elle est ANNONCÉE et non simplement absente. Un bouton qui
+          // disparaît sans explication se lit comme un défaut ; une phrase qui
+          // dit quand il reviendra se lit comme une règle. C'est aussi ce qui
+          // rend le choix défendable devant un examinateur d'App Store.
+          '<div class="rassurance-paiement">'+
+            '<i data-lucide="shield-check"></i>'+
+            'Votre paiement est conservé jusqu\'à la fin de la prestation. Le prestataire n\'est réglé qu\'après votre validation.'+
+          '</div>'+
+          '<div class="discussion-apres-paiement">'+
+            '<i data-lucide="message-circle"></i>'+
+            'La discussion avec votre prestataire s\'ouvre dès le paiement.'+
+          '</div>'+
         '</div>';
       }else if(v.statut==='expire_sans_paiement'){
         // Nouveau statut serveur : le devis avait été accepté mais jamais réglé, et le
