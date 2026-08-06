@@ -21,6 +21,20 @@
     position: fixed; inset: 0; z-index: 99999;
     background: linear-gradient(160deg, #0E5A63, #073E45 65%, #04222A);
   }
+  /* La goutte monte de huit pixels en apparaissant. Sans ce mouvement elle
+     surgit, ce qui se remarque ; avec, elle arrive. Le nom la suit de 120 ms :
+     on lit la marque, puis son nom.
+     Les deux animations sont déclarées ici, dans la feuille critique, pour la
+     même raison que le SVG — elles doivent exister au premier pixel. */
+  @keyframes demarrage-monte {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  #splash-screen svg { animation: demarrage-monte .5s cubic-bezier(.16,1,.3,1) both; }
+  #splash-screen .gleam-effet { animation: demarrage-monte .5s cubic-bezier(.16,1,.3,1) .12s both; }
+  @media (prefers-reduced-motion: reduce) {
+    #splash-screen svg, #splash-screen .gleam-effet { animation: none; }
+  }
   @media (prefers-color-scheme: dark) { body { background: #080F11; } }
 </style>
 <title>Gleam ✨</title>
@@ -1687,6 +1701,88 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .reputation-vide span {
   display: block; font-size: 12.5px; line-height: 1.5;
   color: var(--text-secondary); margin-top: 4px;
+}
+
+/* Une étiquette discrète qui dit ce que le libellé ne dit pas : qu'on peut
+   cocher plusieurs réponses. Sans elle, personne n'essaie — on suppose qu'un
+   groupe de boutons est exclusif, parce qu'il l'est presque toujours. */
+.etiquette-multi {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 2px 8px;
+  background: var(--light); color: var(--p);
+  border-radius: var(--r-pill);
+  font-size: 10.5px; font-weight: 700;
+  text-transform: none; letter-spacing: 0;
+  vertical-align: 1px;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   56. LA MARQUE
+   Une goutte vectorielle plutôt qu'un emoji. Un emoji se dessine
+   différemment sur iOS, Android et Windows, et ne prend jamais la couleur de
+   la marque : sur un bandeau sombre il restait jaune, sur fond blanc il
+   disparaissait à moitié.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.marque-goutte {
+  display: inline-block;
+  width: .92em; height: .92em;
+  vertical-align: -.11em;
+  margin-right: .12em;
+  /* currentColor : la goutte prend la couleur du texte qui l'entoure, donc
+     blanche sur le bandeau et pétrole dans les en-têtes clairs. Un seul
+     dessin pour tous les contextes. */
+  color: inherit;
+}
+/* L'éclat intérieur doit être de la couleur du FOND, pas du texte : il est
+   évidé, pas posé dessus. On le déclare par contexte. */
+.home-hero, .entete-pro, .entete-client, .h-actuel { --fond-goutte: #0A4750; }
+.entete-interne, .entete-compte, .navbar, .page-header { --fond-goutte: var(--surface); }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   55. ÉTAT VIDE QUI AMORCE
+   « Aucune demande pour l'instant » constate un vide et n'ouvre rien.
+   Quelqu'un qui vient de créer un compte le lit comme « il n'y a rien ici ».
+   Sur une place de marché, c'est ce qui le fait partir sans revenir.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.etat-vide-amorce {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--gap-5) var(--gap-4);
+  box-shadow: var(--shadow-sm);
+}
+.eva-titre {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 17px; font-weight: 700; color: var(--text);
+}
+.eva-texte {
+  font-size: 13px; line-height: 1.55; color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+/* Trois repères plutôt qu'une phrase de plus : ils répondent aux questions
+   qu'on se pose avant d'oser une première demande — est-ce que ça m'engage,
+   est-ce que ça coûte, est-ce que je peux refuser. */
+.eva-reperes {
+  display: flex; gap: 8px;
+  margin-top: var(--gap-4);
+  padding-top: var(--gap-4);
+  border-top: 1px solid var(--border);
+}
+.eva-reperes > div { flex: 1; min-width: 0; }
+.eva-reperes b {
+  display: block;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 15px; font-weight: 700; color: var(--p);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.eva-reperes span {
+  display: block; font-size: 10px; font-weight: 700; color: var(--gray);
+  text-transform: uppercase; letter-spacing: .03em; margin-top: 2px;
+  line-height: 1.3;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -3596,7 +3692,23 @@ textarea { min-height: 92px; padding-top: 13px; }
      jamais répété ailleurs pour ne pas user l'effet. Se referme tout seul après une seconde (la
      fermeture est déclenchée depuis le bloc JS principal, plus bas, pour n'en garder qu'un seul). -->
 <div id="splash-screen" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#0E5A63,#073E45 65%,#04222A);transition:opacity .5s var(--ease-out),visibility .5s">
-  <div class="gleam-effet" style="font-family:'Fraunces',Georgia,serif;font-size:38px;font-weight:600;color:#fff;letter-spacing:-.02em">Gleam</div>
+  <!-- La goutte au-dessus du nom, et non à côté : côte à côte elle devient un
+       ornement du mot, empilée elle se lit d'abord. C'est le seul moment où le
+       logo apparaît seul et en grand — sur l'icône il est minuscule, dans les
+       en-têtes il fait quatorze pixels.
+
+       Le SVG est écrit en ligne avec ses dimensions en dur : cet écran est
+       peint AVANT que la feuille principale ne soit lue, et une classe définie
+       plus bas arriverait trop tard. La goutte apparaîtrait alors avec un
+       instant de décalage — exactement le défaut qu'on a corrigé ce matin. -->
+  <div style="display:flex;flex-direction:column;align-items:center;gap:18px">
+    <svg class="goutte-demarrage" width="78" height="78" viewBox="0 0 100 100" aria-hidden="true"
+         style="display:block;filter:drop-shadow(0 6px 22px rgba(0,0,0,.28))">
+      <path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="#fff"/>
+      <path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="#0A4750"/>
+    </svg>
+    <div class="gleam-effet" style="font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:600;color:#fff;letter-spacing:-.02em">Gleam</div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -3608,7 +3720,7 @@ textarea { min-height: 92px; padding-top: 13px; }
      jamais avant. -->
 <div class="screen active" id="s-guest">
   <div class="home-hero">
-    <div class="home-hero-top"><span class="logo-sm">✨ Gleam</span>
+    <div class="home-hero-top"><span class="logo-sm"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam</span>
       <button class="user-badge" style="border:none;cursor:pointer" onclick="afficherEcranAuth('login')">Se connecter</button>
     </div>
     <h2>Bonjour 👋</h2>
@@ -3701,7 +3813,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <i data-lucide="arrow-left"></i>
     </button>
     <div class="home-hero-top">
-      <span class="logo-sm">✨ Gleam Pro</span>
+      <span class="logo-sm"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam Pro</span>
       <button class="user-badge" style="border:none;cursor:pointer" onclick="afficherEcranAuth('login')">Se connecter</button>
     </div>
     <h2>Votre métier, nos clients</h2>
@@ -3804,7 +3916,7 @@ textarea { min-height: 92px; padding-top: 13px; }
   </button>
   <div class="auth-wrap">
     <div class="auth-box">
-      <div class="logo"><h1 class="gleam-signature">✨ Gleam</h1><p>Le nettoyage, brillamment simple</p></div>
+      <div class="logo"><h1 class="gleam-signature"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam</h1><p>Le nettoyage, brillamment simple</p></div>
       <div class="tabs">
         <button class="tab active" onclick="switchTab('login')">Connexion</button>
         <button class="tab" onclick="switchTab('register')">Inscription</button>
@@ -4004,7 +4116,15 @@ textarea { min-height: 92px; padding-top: 13px; }
     </div>
     <button class="modal-send-btn" id="continue-svc-btn" style="display:none;margin-bottom:24px" onclick="startMultiServiceFlow()">Continuer (<span id="svc-count">0</span> sélectionnée(s))</button>
     <div class="section-title">Mes dernières demandes</div>
-    <div id="recent-demands"><div class="empty-state"><span>📋</span><p>Aucune demande pour l'instant.</p></div></div>
+    <div id="recent-demands"><div class="etat-vide-amorce">
+      <div class="eva-titre">Votre première demande</div>
+      <p class="eva-texte">Décrivez ce qu'il faut nettoyer. Des professionnels vérifiés de votre zone vous répondent avec un prix ferme — vous ne payez qu'après la prestation.</p>
+      <div class="eva-reperes">
+        <div><b>0 €</b><span>à l'avance</span></div>
+        <div><b>Gratuit</b><span>recevoir des devis</span></div>
+        <div><b>Sans engagement</b><span>vous choisissez</span></div>
+      </div>
+    </div></div>
   </div>
   <div class="bottom-nav">
     <button class="bnav-item active" onclick="goTab('home')"><i data-lucide="home" style="width:22px;height:22px"></i>Accueil</button>
@@ -4045,7 +4165,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 <div class="screen" id="s-guest-messages">
   <div class="entete-interne">
     <div class="entete-interne-rang">
-      <span class="entete-interne-marque">✨ Gleam</span>
+      <span class="entete-interne-marque"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam</span>
     </div>
     <div class="entete-interne-titre">Messages</div>
     <div class="entete-interne-sous">Vos échanges avec votre prestataire.</div>
@@ -4085,7 +4205,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 <div class="screen" id="s-guest-demandes">
   <div class="entete-interne">
     <div class="entete-interne-rang">
-      <span class="entete-interne-marque">✨ Gleam</span>
+      <span class="entete-interne-marque"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam</span>
     </div>
     <div class="entete-interne-titre">Mes demandes</div>
     <div class="entete-interne-sous">Du devis au paiement.</div>
@@ -4122,7 +4242,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 <div class="screen" id="s-guest-profil">
   <div class="entete-interne">
     <div class="entete-interne-rang">
-      <span class="entete-interne-marque">✨ Gleam</span>
+      <span class="entete-interne-marque"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam</span>
     </div>
     <div class="entete-interne-titre">Bienvenue</div>
     <div class="entete-interne-sous">Suivez vos demandes et échangez avec votre prestataire.</div>
@@ -4465,7 +4585,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- SUCCESS -->
 <div class="screen" id="s-success">
-  <div class="navbar"><span class="logo-sm">✨ Gleam</span></div>
+  <div class="navbar"><span class="logo-sm"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam</span></div>
   <div class="success-screen">
     <div class="success-icon gleam-signature">✨</div>
     <h2>Demande envoyée</h2>
@@ -10622,6 +10742,13 @@ async function updateEstimationMaintenant(){
     // Ajoute tout coefficient sélectionné dans le formulaire courant (taille, matière, portée, intervention...),
     // quelle que soit la catégorie — chaque coefficient n'est utilisé par le serveur que s'il est pertinent.
     COEF_KEYS.forEach(function(key){
+      // Pour la matière, plusieurs boutons peuvent être sélectionnés : on
+      // retient le plus exigeant. Pour tous les autres coefficients, un seul
+      // l'est, et le premier trouvé est le bon.
+      if(key === 'matiere'){
+        var dominante = matiereTapisDominante(document.getElementById('modal-body'));
+        if(dominante){ url += '&matiere=' + encodeURIComponent(dominante); return; }
+      }
       var btn=document.querySelector('[data-coef-key="'+key+'"].sel');
       if(btn)url+='&'+key+'='+encodeURIComponent(btn.getAttribute('data-coef-val'));
     });
@@ -10945,13 +11072,13 @@ function calculerSurfaceVitresDepuisCompteur(){
 
 var DETAIL_TAPIS_BASE='Dépoussiérage en profondeur • Shampoing ou nettoyage à sec adapté à la matière • Détachage courant • Désodorisation légère';
 function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><div class="modal-sub">Matière et surface</div>'+
-  '<div class="field-group"><label>Matière du tapis</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="synthetique" onclick="selOpt(this)">Synthétique</button>'+
-  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="coton" onclick="selOpt(this)">Coton</button>'+
-  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="jute_sisal" onclick="selOpt(this)">Jute / Sisal</button>'+
-  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="berbere" onclick="selOpt(this)">Berbère</button>'+
-  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="laine" onclick="selOpt(this)">Laine</button>'+
-  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-coef-val="soie" onclick="selOpt(this)">Soie / Tapis d\'Orient</button></div>'+
+  '<div class="field-group"><label>Matière des tapis <span class="etiquette-multi">plusieurs choix possibles</span></label><div class="options-grid">'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="synthetique" onclick="selMatiere(this)">Synthétique</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="coton" onclick="selMatiere(this)">Coton</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="jute_sisal" onclick="selMatiere(this)">Jute / Sisal</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="berbere" onclick="selMatiere(this)">Berbère</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="laine" onclick="selMatiere(this)">Laine</button>'+
+  '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="soie" onclick="selMatiere(this)">Soie / Tapis d\'Orient</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TAPIS_BASE+'</div></div>'+
   '<div class="field-group"><label>Vos tapis</label>'+
   '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — indiquez combien vous en avez de chaque taille (plusieurs tapis possibles).</div>'+
@@ -11021,6 +11148,46 @@ function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><
   '<div class="field-group"><label>De quoi s\'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: Bateau, jacuzzi..."></div>'+
   '<div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel..." style="resize:none"></textarea></div>'+
   dateTimeBlock(isLastInFlow())+sendBtn('autre')}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MATIÈRES DE TAPIS — SÉLECTION MULTIPLE
+//
+// Un client qui a un tapis en laine et un tapis synthétique devait faire deux
+// demandes : deux séries de devis, deux paiements, deux déplacements du
+// prestataire pour la même adresse.
+//
+// Le rang classe les matières de la moins exigeante à la plus délicate. Il
+// sert à choisir le coefficient de l'estimation quand plusieurs sont
+// sélectionnées : c'est la plus exigeante qui commande le matériel, le temps
+// et donc le prix.
+// ─────────────────────────────────────────────────────────────────────────────
+var RANG_MATIERE_TAPIS = {
+  synthetique: 1, coton: 2, jute_sisal: 3, berbere: 4, laine: 5, soie: 6
+};
+
+function selMatiere(btn){
+  var racine = btn.closest('#modal-body') || document;
+  btn.classList.toggle('sel');
+  // Au moins une matière doit rester choisie : sans aucune, l'estimation
+  // n'aurait aucun coefficient et le prestataire ne saurait pas quoi prévoir.
+  var choisies = racine.querySelectorAll('[data-group="tapis-mat"].sel');
+  if(!choisies.length){ btn.classList.add('sel'); return; }
+  updateEstimation();
+}
+
+// Renvoie la matière la plus exigeante parmi celles sélectionnées. Une
+// estimation basse suivie d'un devis plus cher est une déception ; l'inverse
+// est une bonne surprise.
+function matiereTapisDominante(racine){
+  var choisies = (racine || document).querySelectorAll('[data-group="tapis-mat"].sel');
+  var meilleure = null, rangMax = -1;
+  Array.prototype.forEach.call(choisies, function(b){
+    var v = b.getAttribute('data-coef-val');
+    var r = RANG_MATIERE_TAPIS[v] || 0;
+    if(r > rangMax){ rangMax = r; meilleure = v; }
+  });
+  return meilleure;
+}
 
 function selOpt(btn){
   var group=btn.getAttribute('data-group');
