@@ -5446,6 +5446,12 @@ function brancherRetourAndroid(){
   if(!App || plateformeNative() !== 'android')return;
   try{
     App.addListener('backButton', function(){
+      // La photo plein écran passe avant tout le reste : c'est la couche la
+      // plus haute, et c'est elle que le geste de retour doit fermer.
+      if(window.__pilesRetour && window.__pilesRetour.length){
+        window.__pilesRetour[window.__pilesRetour.length-1]();
+        return;
+      }
       var modale = document.getElementById('modal-overlay');
       if(modale && modale.classList.contains('open')){ modale.classList.remove('open'); return; }
       var page = document.getElementById('s-page-interne');
@@ -6012,7 +6018,12 @@ function renderPhotoPreviews(photosList,containerId){
   photosList.forEach(function(src){
     var div=document.createElement('div');
     div.className='photo-preview';
-    div.onclick=function(){window.open(src,'_blank')};
+    // ouvrirPhotoPleinEcran plutôt que window.open : dans une application
+    // installée sur l'écran d'accueil, l'ouverture d'un onglet fait sortir de
+    // l'application et affiche l'adresse brute de Supabase en haut de l'écran.
+    // La fonction existait déjà pour les photos avant/après — elle n'était
+    // simplement pas utilisée ici.
+    div.onclick=function(){ouvrirPhotoPleinEcran(src)};
     var img=document.createElement('img');
     img.src=src;
     div.appendChild(img);
@@ -6128,11 +6139,34 @@ function localDateISO(d){
 // (restriction de sécurité), ce qui empêchait d'ouvrir les photos avant/après.
 function ouvrirPhotoPleinEcran(src){
   var overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeInUp .2s ease-out';
-  overlay.onclick=function(){overlay.remove()};
-  overlay.innerHTML='<img src="'+src+'" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain">'+
-    '<button style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,.15);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer" aria-label="Fermer">✕</button>';
+  // Le remplissage tient compte de l'encoche : le bouton de fermeture était
+  // posé à 20 px du haut, donc SOUS l'encoche sur un iPhone récent — on le
+  // voyait à moitié, et on le manquait au doigt.
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;'+
+    'display:flex;align-items:center;justify-content:center;'+
+    'padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 20px);'+
+    'animation:fadeInUp .2s ease-out';
+  overlay.onclick=function(){fermer()};
+  // L'adresse est échappée : une photo dont le nom contiendrait une apostrophe
+  // ou un guillemet casserait le balisage, et l'image ne s'afficherait pas.
+  overlay.innerHTML='<img src="'+escapeHtml(src)+'" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain">'+
+    '<button style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;'+
+    'background:rgba(255,255,255,.16);border:none;color:#fff;width:40px;height:40px;'+
+    'border-radius:50%;font-size:20px;cursor:pointer;backdrop-filter:blur(8px)" aria-label="Fermer">✕</button>';
   document.body.appendChild(overlay);
+
+  // Le geste de retour d'Android doit fermer la photo, pas quitter l'écran
+  // derrière. Sans cela, un prestataire qui regarde une photo et appuie sur
+  // retour se retrouve deux écrans en arrière.
+  function fermer(){
+    overlay.remove();
+    document.removeEventListener('keydown', surEchap);
+    if(window.__pilesRetour) window.__pilesRetour = window.__pilesRetour.filter(function(f){return f!==fermer});
+  }
+  function surEchap(e){ if(e.key==='Escape') fermer(); }
+  document.addEventListener('keydown', surEchap);
+  window.__pilesRetour = window.__pilesRetour || [];
+  window.__pilesRetour.push(fermer);
 }
 function emptyStateHtml(opts){
   var svg='<svg class="empty-illustration" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">'+
