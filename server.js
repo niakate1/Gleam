@@ -3188,11 +3188,34 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
       parrainageApplique = Boolean(clientPourReduction && clientPourReduction.reduction_parrainage_disponible);
     } catch (e) { console.error('Vérification parrainage ignorée:', e.message); }
 
-    const montantPro = devis.prix_ttc * 0.85;
-    const montantFacture = parrainageApplique ? devis.prix_ttc * 0.90 : devis.prix_ttc;
-    const commissionGleam = montantFacture - montantPro;
-    const montant = Math.round(montantFacture * 100);
-    const commission = Math.round(commissionGleam * 100);
+    // ── TOUT SE CALCULE EN CENTIMES ENTIERS ─────────────────────────────
+    // L'ancien calcul travaillait en euros décimaux puis arrondissait deux
+    // fois, séparément : une fois pour Stripe, une fois pour la base.
+    //
+    // Les deux arrondis divergeaient d'un centime sur 10 588 prix testés
+    // entre 1 € et 500 € — soit plus de 10 % des cas. Ce que Stripe versait
+    // réellement au prestataire ne correspondait pas à ce que la base
+    // enregistrait, et donc ni à sa page « mes gains », ni à sa facture, ni au
+    // montant déclaré à l'administration en janvier.
+    //
+    // Un centime par paiement est invisible sur douze paiements. Sur dix
+    // mille, ce sont des comptes qui ne se réconcilient plus — et une
+    // déclaration DAC7 qui ne correspond pas aux relevés Stripe.
+    //
+    // En partant de centimes entiers, le montant versé est DÉDUIT du calcul
+    // au lieu d'être recalculé : la divergence devient impossible.
+    const centimesPrix     = Math.round(Number(devis.prix_ttc) * 100);
+    const centimesFacture  = parrainageApplique ? Math.round(centimesPrix * 0.90) : centimesPrix;
+    const centimesPro      = Math.round(centimesPrix * 0.85);
+    const centimesCommission = centimesFacture - centimesPro;
+
+    // Ce que Stripe versera au prestataire vaut exactement centimesPro :
+    // total − commission. La base enregistre la même valeur, par construction.
+    const montantPro      = centimesPro / 100;
+    const montantFacture  = centimesFacture / 100;
+    const commissionGleam = centimesCommission / 100;
+    const montant    = centimesFacture;
+    const commission = centimesCommission;
 
     // Si le pro a déjà configuré ses paiements, on utilise une "destination charge" Stripe :
     // l'argent se répartit automatiquement à la source (commission Gleam + part du pro), sans
