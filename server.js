@@ -255,6 +255,17 @@ app.use((err, req, res, next) => {
 });
 
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 900, standardHeaders: true, legacyHeaders: false });
+// Les routes publiques n'exigent pas de compte — un visiteur doit pouvoir
+// estimer un prix, et l'inscription doit pouvoir vérifier un SIRET. Sans
+// limite, elles servent de relais gratuit : on interroge l'annuaire de l'État
+// à votre place jusqu'à ce que VOTRE adresse soit bloquée, ou on extrait toute
+// la grille tarifaire en quelques minutes.
+// 30 par minute laisse largement de quoi remplir un formulaire.
+const publicLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Trop de requêtes. Patientez une minute.' }
+});
+
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 app.use('/api/', globalLimiter);
 
@@ -2796,7 +2807,9 @@ app.post('/api/appels/demarrer', auth, async (req, res) => {
     const call = await twilioClient.calls.create({
       to: appelant.telephone,
       from: process.env.TWILIO_PHONE_NUMBER,
-      url: (process.env.FRONTEND_API_URL || '') + '/api/appels/twiml?numero_a_relier=' + encodeURIComponent(autrePartie.telephone)
+      url: (process.env.FRONTEND_API_URL || '') + '/api/appels/twiml?numero_a_relier='
+        + encodeURIComponent(autrePartie.telephone)
+        + '&jeton=' + signerNumeroAppel(autrePartie.telephone)
     });
 
     res.json({ message: 'Appel en cours, décrochez votre téléphone.', callSid: call.sid });
@@ -2811,6 +2824,19 @@ app.post('/api/appels/demarrer', auth, async (req, res) => {
 app.post('/api/appels/twiml', (req, res) => {
   const numeroARelier = req.query.numero_a_relier;
   res.type('text/xml');
+
+  // Sans signature valide, on raccroche. Le numéro n'est jamais composé.
+  const attendu = signerNumeroAppel(numeroARelier);
+  const fourni = String(req.query.jeton || '');
+  // La longueur est vérifiée AVANT la comparaison. Sans cela, `padEnd(32).slice(0,32)`
+  // tronquait un jeton trop long : « bonJeton » + « zzzz » redevenait « bonJeton »
+  // et passait. Mon propre test l'a trouvé — huit cas d'attaque, un seul passait.
+  if (fourni.length !== attendu.length || !crypto.timingSafeEqual(
+        Buffer.from(fourni), Buffer.from(attendu))) {
+    console.warn('⚠️  Webhook d\'appel refusé — signature absente ou invalide.');
+    return res.send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>');
+  }
+
   res.send(
     '<?xml version="1.0" encoding="UTF-8"?>' +
     '<Response><Say language="fr-FR">Mise en relation avec votre correspondant Gleam.</Say>' +
@@ -2818,6 +2844,26 @@ app.post('/api/appels/twiml', (req, res) => {
   );
 });
 function escapeXml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// ── SIGNATURE DES APPELS TWILIO ─────────────────────────────────────────────
+// Le webhook /api/appels/twiml est appelé PAR Twilio, donc il ne peut pas être
+// protégé par un jeton d'utilisateur. Sans autre garde, n'importe qui pouvait
+// lui demander de composer le numéro de son choix — facturé sur le compte
+// Gleam. C'est la fraude au péage, et elle est automatisée par des robots qui
+// balayent les URL publiques.
+//
+// On signe le numéro au moment où le serveur crée l'appel, et le webhook
+// vérifie la signature. Sans JWT_SECRET, aucune URL valide ne peut être
+// fabriquée.
+//
+// Pourquoi pas twilio.validateRequest() : la méthode officielle reconstruit
+// l'URL exacte de la requête, et derrière un proxy comme Railway elle échoue
+// si X-Forwarded-Proto n'est pas pris en compte. Un webhook de téléphonie qui
+// rejette les appels légitimes est pire que le problème d'origine.
+function signerNumeroAppel(numero) {
+  return crypto.createHmac('sha256', process.env.JWT_SECRET || '')
+    .update(String(numero || '')).digest('hex').slice(0, 32);
+}
 
 // Détecte un numéro de téléphone français reconstitué en ne gardant que les chiffres d'un texte
 // (ex: "0633" + "233367" mis bout à bout donne bien "0633233367", un numéro valide, même si
@@ -3853,7 +3899,7 @@ app.delete('/api/demandes/:id/masquer', auth, async (req, res) => {
 // sans compte : elle sert précisément au moment de l'inscription, avant qu'un
 // compte n'existe. Elle ne renvoie que des données publiques du répertoire
 // officiel — rien qui n'apparaisse déjà sur annuaire-entreprises.data.gouv.fr.
-app.get('/api/verification/siret', async (req, res) => {
+app.get('/api/verification/siret', publicLimiter, async (req, res) => {
   const resultat = await verifierSiretOfficiel(req.query.siret);
   res.json({
     statut: resultat.statut,
@@ -4634,7 +4680,7 @@ app.patch('/api/societes/tarifs', auth, async (req, res) => {
 // disponibles (jamais d'identité ni de donnée personnelle) — permet à un visiteur de voir une
 // estimation avant de créer un compte, cohérent avec le principe de le laisser découvrir avant
 // de lui demander un compte.
-app.get('/api/tarifs/estimation', async (req, res) => {
+app.get('/api/tarifs/estimation', publicLimiter, async (req, res) => {
   try {
     const prestation = req.query.prestation;
     const etat = req.query.etat || 'propre';
