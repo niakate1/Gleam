@@ -46,8 +46,15 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gleam">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<link rel="icon" href="/icon-192.png">
+<!-- apple-touch-icon en 180 px et non 192 : iOS agrandit une image de 192 px
+     pour remplir un emplacement de 180, et le résultat est flou sur les écrans
+     à haute densité. Un fichier à la bonne taille est net. -->
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+<!-- Le SVG passe avant les PNG quand le navigateur le sait : il reste net à
+     toutes les tailles, et pèse 5 Ko contre 150. -->
+<link rel="icon" type="image/svg+xml" href="/gleam-logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
