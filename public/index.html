@@ -1345,6 +1345,25 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
 .conv-time { font-size: 11.5px; color: var(--gray); flex-shrink: 0; }
 .conv-dot  { width: 8px; height: 8px; background: var(--red); border-radius: 50%; flex-shrink: 0; margin-left: 6px; }
 
+/* ── LA CONVERSATION NE DÉFILAIT PAS ────────────────────────────────────────
+   `.screen` porte `min-height: 100dvh` mais aucune hauteur MAXIMALE : l'écran
+   grandit avec son contenu. `.chat-screen { flex: 1 }` prenait donc toute
+   cette hauteur devenue immense, et `.chat-messages` n'avait jamais besoin de
+   défiler — il grandissait aussi.
+
+   Mesuré sur 40 messages : le conteneur faisait 2 824 px, scrollHeight égal à
+   clientHeight, défilement impossible. Les messages étaient tous rendus, mais
+   une partie sortait de l'écran sans qu'on puisse les atteindre.
+
+   On borne l'écran de discussion — et LUI SEUL. Les autres écrans doivent
+   continuer de grandir : c'est la page qui défile, et c'est voulu. */
+#s-chat.active {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
 .chat-screen   { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .chat-messages {
   flex: 1;
