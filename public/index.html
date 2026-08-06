@@ -116,14 +116,14 @@
   --gold-clair:     #FDF4E3;
 
   /* Neutres — légèrement refroidis pour s'accorder à l'indigo plutôt que gris pur */
-  --bg:             #F6F6FB;
+  --bg:             #F4F7F7;
   --surface:        #FFFFFF;
-  --surface-alt:    #EFEFF6;
-  --border:         #E2E2EE;
-  --border-fort:    #CFCFE0;
+  --surface-alt:    #E9EFEF;
+  --border:         #DCE5E5;
+  --border-fort:    #BECCCC;
   --text:           #14132B;
-  --text-secondary: #4A4966;
-  --gray:           #75748C;
+  --text-secondary: #44585C;
+  --gray:           #6E8285;
 
   /* Sémantiques */
   --green:          #0E9F6E;
@@ -1951,6 +1951,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   position: sticky; top: 0; z-index: 20;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 12px rgba(6, 46, 52, .05);
   padding: calc(env(safe-area-inset-top, 0px) + 8px) var(--gap-4) 12px;
 }
 .entete-client-rang { display: flex; align-items: center; gap: 10px; }
@@ -1973,7 +1974,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 .entete-client-chiffres { display: flex; gap: 8px; margin-top: 12px; }
 .entete-client-chiffre {
   flex: 1; min-width: 0;
-  background: var(--surface-alt); border-radius: var(--r-sm);
+  background: var(--light); border-radius: var(--r-sm);
   padding: 9px 11px;
 }
 /* Un devis reçu attend une décision : la tuile se teinte pour le dire.
@@ -2081,10 +2082,16 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
    l'écran mais la situation de celui qui l'ouvre.
    ──────────────────────────────────────────────────────────────────────────── */
 
+/* L'en-tête paraissait transparent : blanc sur un fond presque blanc, séparé
+   par un filet violacé qu'on ne voyait pas. Il n'était pas transparent — il
+   n'avait aucun poids.
+   Une ombre douce le décolle du contenu, et les tuiles de chiffres passent au
+   pétrole clair : elles se lisent comme un choix, plus comme un gris délavé. */
 .entete-pro {
   position: sticky; top: 0; z-index: 20;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 12px rgba(6, 46, 52, .05);
   padding: calc(env(safe-area-inset-top, 0px) + 8px) var(--gap-4) 12px;
 }
 .entete-pro-rang { display: flex; align-items: center; gap: 10px; }
@@ -2130,7 +2137,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 .entete-pro-chiffres { display: flex; gap: 8px; margin-top: 12px; }
 .entete-pro-chiffre {
   flex: 1; min-width: 0;
-  background: var(--surface-alt); border-radius: var(--r-sm);
+  background: var(--light); border-radius: var(--r-sm);
   padding: 9px 11px;
 }
 .entete-pro-chiffre b {
