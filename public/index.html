@@ -264,6 +264,7 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  min-height: 100svh;
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -451,7 +452,14 @@ i[data-lucide] {
    7. STRUCTURE D'ÉCRAN
    ──────────────────────────────────────────────────────────────────────────── */
 
-.screen { display: none; min-height: 100vh; min-height: 100dvh; flex-direction: column; }
+/* svh, PAS dvh. Sur Android, la barre d'adresse de Chrome se rétracte au
+   défilement : `dvh` suit cette variation, donc la hauteur MINIMALE de l'écran
+   change PENDANT qu'on fait défiler. La page se remet en page en plein geste —
+   c'est ce qui donne l'impression que ça saute ou que ça accroche.
+   `svh` correspond à la hauteur quand la barre est VISIBLE : elle ne bouge
+   jamais. L'écran reste au moins aussi haut que le plus petit affichage
+   possible, et grandit avec son contenu comme avant. */
+.screen { display: none; min-height: 100vh; min-height: 100svh; flex-direction: column; }
 .screen.active { display: flex; }
 
 .home-content, .pro-content, .profile-content {
@@ -1359,10 +1367,17 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
    continuer de grandir : c'est la page qui défile, et c'est voulu. */
 #s-chat.active {
   height: 100vh;
+  /* Ici `dvh` est le bon choix : la discussion doit occuper TOUT l'espace
+     réellement disponible, barre rétractée ou non — sinon le champ de saisie
+     se retrouverait masqué par le clavier ou par la barre d'adresse. */
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
 }
+/* Empêche le défilement de la discussion d'entraîner celui de la page en
+   dessous. Sur Android, arriver en haut ou en bas de la liste faisait défiler
+   le document entier et donnait la sensation que l'écran décrochait. */
+#s-chat.active .chat-messages { overscroll-behavior: contain; }
 
 .chat-screen   { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .chat-messages {
