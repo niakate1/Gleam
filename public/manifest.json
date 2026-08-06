@@ -1,25 +1,50 @@
 {
-  "name": "Gleam",
+  "name": "Gleam — Le nettoyage, brillamment simple",
   "short_name": "Gleam",
-  "description": "Le nettoyage, brillamment simple",
+  "description": "Trouvez un prestataire de nettoyage vérifié près de chez vous. Décrivez votre besoin, comparez les devis, payez en ligne en toute sécurité.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F9FAFB",
-  "theme_color": "#6D28D9",
+  "background_color": "#062E34",
+  "theme_color": "#062E34",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": [
+    "business",
+    "lifestyle",
+    "productivity"
+  ],
   "icons": [
+    {
+      "src": "/gleam-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
