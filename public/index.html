@@ -6950,16 +6950,44 @@ function renderProDemandesCards(){
 
 // Traduit un créneau en délai lisible. Le tri par urgence existait déjà dans
 // renderProDemandesCards ; il n'était simplement jamais rendu visible.
+// Nombre de jours du CALENDRIER entre deux instants, minuit à minuit.
+//
+// Compter les heures écoulées produisait des libellés faux : le 6 août à 15 h,
+// une prestation du 7 à 7 h donnait 16 heures d'écart — moins de 24 — donc
+// « Aujourd'hui ». Le badge est rouge et porte un réveil : un prestataire y
+// lisait qu'il avait raté le créneau, et écartait la demande.
+//
+// Le défaut s'aggravait le soir : à 23 h, une prestation du surlendemain à 6 h
+// affichait « Demain ».
+function joursCalendairesEntre(depart, arrivee){
+  var a=new Date(depart.getFullYear(), depart.getMonth(), depart.getDate());
+  var b=new Date(arrivee.getFullYear(), arrivee.getMonth(), arrivee.getDate());
+  // On passe par les millisecondes plutôt que par une soustraction de jours :
+  // les changements d'heure d'été font varier la durée d'une journée, et
+  // l'arrondi rattrape ce décalage d'une heure.
+  return Math.round((b-a)/86400000);
+}
+
 function libelleUrgence(creneau){
   var instant=creneauVersInstantLocal(creneau);
   if(!instant)return {texte:'Date à convenir',niveau:'calme',icone:'calendar'};
-  var heures=(instant-new Date())/3600000;
+  var maintenant=new Date();
+  var heures=(instant-maintenant)/3600000;
+  var jours=joursCalendairesEntre(maintenant, instant);
+
   if(heures<0)   return {texte:'Créneau dépassé',niveau:'pressee',icone:'alert-triangle'};
+  // « Dans 2 h » reste pour ce qui est vraiment imminent : c'est plus précis
+  // qu'« Aujourd'hui » quand il ne reste que quelques heures.
   if(heures<3)   return {texte:'Dans '+Math.max(1,Math.round(heures))+' h',niveau:'pressee',icone:'alarm-clock'};
-  if(heures<24)  return {texte:"Aujourd'hui "+formatHeure(instant),niveau:'pressee',icone:'alarm-clock'};
-  if(heures<48)  return {texte:'Demain '+formatHeure(instant),niveau:'proche',icone:'clock'};
-  var jours=Math.round(heures/24);
-  if(jours<=7)   return {texte:'Dans '+jours+' jours',niveau:'proche',icone:'clock'};
+  if(jours===0)  return {texte:"Aujourd'hui "+formatHeure(instant),niveau:'pressee',icone:'alarm-clock'};
+  if(jours===1)  return {texte:'Demain '+formatHeure(instant),niveau:'proche',icone:'clock'};
+  // Entre deux et six jours, le nom du jour parle mieux qu'un décompte : un
+  // prestataire organise sa semaine par jours, pas par nombre de nuits.
+  if(jours<7){
+    var nomJour=instant.toLocaleDateString('fr-FR',{weekday:'long'});
+    return {texte:nomJour.charAt(0).toUpperCase()+nomJour.slice(1)+' '+formatHeure(instant),
+            niveau:'proche',icone:'clock'};
+  }
   return {texte:'Dans '+jours+' jours',niveau:'calme',icone:'calendar'};
 }
 // Un créneau en millisecondes, ou Infinity s'il est absent ou illisible — ce
