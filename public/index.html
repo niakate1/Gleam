@@ -1747,6 +1747,53 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .home-hero, .entete-pro, .entete-client, .h-actuel { --fond-goutte: #0A4750; }
 .entete-interne, .entete-compte, .navbar, .page-header { --fond-goutte: var(--surface); }
 
+/* Compteur par matière de tapis. */
+.comptes-matiere { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.comptes-matiere label { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
+.aide-compte-matiere { font-size: 11.5px; color: var(--gray); margin: 3px 0 10px; line-height: 1.4; }
+.ligne-compte-matiere { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.ligne-compte-matiere span { flex: 1; font-size: 13px; color: var(--text-secondary); }
+.ligne-compte-matiere input {
+  width: 74px; flex-shrink: 0; text-align: center;
+  /* 16 px : en dessous, iOS agrandit la page à la mise au point. */
+  font-size: 16px; font-weight: 700;
+}
+
+/* Le prestataire attend le paiement : ni réussite ni échec, une étape. */
+.attente-paiement-pro {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 10px; padding: 11px 12px;
+  background: var(--amber-clair); border-radius: var(--r-sm);
+  font-size: 12px; line-height: 1.45; color: var(--amber);
+}
+.attente-paiement-pro i, .attente-paiement-pro svg {
+  width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px;
+}
+
+/* Le bloc de portabilité, dans « Gérer mon compte ». Sobre et informatif :
+   ce n'est pas une action qu'on veut encourager ni décourager, c'est un droit
+   qui doit être trouvable. */
+.bloc-mes-donnees {
+  background: var(--surface-alt);
+  border-radius: var(--r-md);
+  padding: var(--gap-4);
+  margin-bottom: var(--gap-4);
+}
+.bloc-mes-donnees strong { display: block; font-size: 14px; color: var(--text); }
+.bloc-mes-donnees p {
+  font-size: 12.5px; line-height: 1.5; color: var(--text-secondary);
+  margin: 5px 0 12px;
+}
+.btn-mes-donnees {
+  width: 100%; padding: 11px;
+  background: var(--surface); color: var(--p);
+  border: 1px solid var(--border-fort); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.btn-mes-donnees:hover:not(:disabled) { background: var(--light); }
+.btn-mes-donnees:disabled { opacity: .6; cursor: default; }
+
 /* ────────────────────────────────────────────────────────────────────────────
    56. APRÈS ACCEPTATION — LE PAIEMENT D'ABORD
    ──────────────────────────────────────────────────────────────────────────── */
@@ -5774,8 +5821,52 @@ function ouvrirGestionCompte(){
       'Si vous souhaitez simplement faire une pause, vous pouvez vous rendre indisponible '+
       'depuis votre profil — votre compte reste intact.'+
     '</p>'+
+    // Le droit à la portabilité (article 20 du RGPD) se place AVANT la
+    // suppression : quelqu'un qui s'apprête à partir doit pouvoir emporter ses
+    // données avant de les perdre, pas après.
+    '<div class="bloc-mes-donnees">'+
+      '<strong>Récupérer mes données</strong>'+
+      '<p>Téléchargez tout ce que Gleam conserve sur vous : profil, demandes, devis, paiements et évaluations. Format lisible par machine, conformément à la loi.</p>'+
+      '<button class="btn-mes-donnees" onclick="telechargerMesDonnees(this)">Télécharger mes données</button>'+
+    '</div>'+
     '<button class="btn-supprimer-discret" onclick="supprimerCompte()">Supprimer définitivement mon compte</button>';
   document.getElementById('modal-overlay').classList.add('open');
+}
+
+// Télécharge l'export RGPD. Le fichier est fabriqué dans le navigateur à
+// partir de la réponse : on ne peut pas ouvrir directement l'adresse, elle
+// exige un jeton d'authentification que le navigateur n'enverrait pas sur un
+// simple lien.
+async function telechargerMesDonnees(btn){
+  var libelle = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Préparation…';
+  try{
+    const r = await fetch(API+'/api/users/me/donnees', { headers: authHeaders() });
+    if(!r.ok){
+      const d = await safeJson(r);
+      toast(d && d.error ? d.error : 'Impossible de récupérer vos données pour le moment.');
+      return;
+    }
+    const donnees = await r.json();
+    const blob = new Blob([JSON.stringify(donnees, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const lien = document.createElement('a');
+    lien.href = url;
+    lien.download = 'mes-donnees-gleam-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(lien);
+    lien.click();
+    document.body.removeChild(lien);
+    // L'adresse temporaire est libérée : sans cela, le fichier reste en mémoire
+    // tant que l'onglet est ouvert.
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    toast('Vos données ont été téléchargées.');
+  }catch(e){
+    toast('Impossible de récupérer vos données pour le moment.');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = libelle;
+  }
 }
 
 async function supprimerCompte(){
@@ -7767,9 +7858,18 @@ function renderProDevisCards(){
         }
         extra+='</div>';
       }else if(v.statut==='accepte'){
-        badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement en attente</span>';
-        extra='<div style="display:flex;gap:8px;margin-top:10px">'+
-          '<button class="btn-accept" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>'+
+        // Le badge était VERT avec une coche — la couleur du « c'est fait ». Un
+        // prestataire y lisait que la prestation était confirmée, alors que le
+        // client n'avait pas payé et pouvait encore renoncer.
+        badge='<span class="devis-badge badge-pending"><i data-lucide="hourglass" style="width:12px;height:12px;vertical-align:-2px"></i> En attente du paiement du client</span>';
+        // La discussion s'ouvre au paiement, des DEUX côtés. Le client ne peut
+        // pas écrire avant d'avoir payé ; laisser le prestataire le faire
+        // créerait une conversation à sens unique.
+        extra='<div class="attente-paiement-pro">'+
+            '<i data-lucide="info"></i>'+
+            'Votre client a accepté votre devis. La prestation sera confirmée dès son paiement — vous pourrez alors échanger avec lui.'+
+          '</div>'+
+          '<div style="display:flex;gap:8px;margin-top:10px">'+
           '<button class="btn-refuse" onclick="annulerProDevis(\''+safeVId+'\',this)">🚫 Annuler</button>'+
         '</div>';
       }else if(v.statut==='expire_sans_paiement'){badge='<span class="devis-badge badge-refused"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> Expiré faute de paiement</span>'}
@@ -10719,7 +10819,11 @@ function goToPreviousStep(currentType){
   // Sauvegarde l'état actuel de l'étape en cours avant de reculer, pour ne rien perdre si l'utilisateur revient
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
-  var groupesMultiSelect=['voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
+  // 'tapis-mat' manquait : les six boutons peuvent être sélectionnés ensemble
+  // depuis hier, mais la collecte écrasait la valeur à chaque tour de boucle.
+  // Le prestataire ne recevait que la DERNIÈRE matière cliquée — il partait donc
+  // avec le mauvais matériel, ou refusait une demande qu'il aurait pu prendre.
+  var groupesMultiSelect=['voit-options','canape-options','matelas-options','terrasse-options','vitres-options','tapis-mat'];
   document.querySelectorAll('.opt-btn.sel').forEach(function(b){
     var group=b.getAttribute('data-group');
     if(!group)return;
@@ -10735,6 +10839,18 @@ function goToPreviousStep(currentType){
     if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
   }
   if(window.nbVitresCalcule)details['nb_vitres']=String(window.nbVitresCalcule);
+  // Le compte par matière : « Laine ×2, Synthétique ×1 ». Sans lui, le
+  // prestataire connaît les matières mais pas les quantités, et ne peut ni
+  // estimer son temps ni préparer son matériel.
+  var comptesMatiere=[];
+  document.querySelectorAll('#tapis-comptes-matiere input[data-matiere]').forEach(function(champ){
+    var n=parseInt(champ.value,10);
+    if(n>0){
+      var bouton=document.querySelector('[data-group="tapis-mat"][data-coef-val="'+champ.getAttribute('data-matiere')+'"]');
+      comptesMatiere.push((bouton?bouton.textContent.trim():champ.getAttribute('data-matiere'))+' \u00d7'+n);
+    }
+  });
+  if(comptesMatiere.length)details['tapis_par_matiere']=comptesMatiere.join(', ');
   multiFlow.results[multiFlow.current]={type:currentType,description:desc,details:details};
   multiFlow.current--;
   openServiceForm(multiFlow.queue[multiFlow.current]);
@@ -11202,6 +11318,7 @@ function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="berbere" onclick="selMatiere(this)">Berbère</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="laine" onclick="selMatiere(this)">Laine</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="soie" onclick="selMatiere(this)">Soie / Tapis d\'Orient</button></div>'+
+  '<div id="tapis-comptes-matiere" class="comptes-matiere" style="display:none"></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TAPIS_BASE+'</div></div>'+
   '<div class="field-group"><label>Vos tapis</label>'+
   '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — indiquez combien vous en avez de chaque taille (plusieurs tapis possibles).</div>'+
@@ -11288,6 +11405,38 @@ var RANG_MATIERE_TAPIS = {
   synthetique: 1, coton: 2, jute_sisal: 3, berbere: 4, laine: 5, soie: 6
 };
 
+// Affiche un compteur par matière dès qu'il y en a plusieurs. Sans lui, un
+// client avec deux tapis en laine et un synthétique cochait deux matières et
+// saisissait « 3 moyens » : le prestataire ne savait pas lequel était lequel,
+// et la laine ne se traite pas comme le synthétique.
+function majComptesParMatiere(racine){
+  var zone = (racine || document).querySelector('#tapis-comptes-matiere');
+  if(!zone) return;
+  var choisies = (racine || document).querySelectorAll('[data-group="tapis-mat"].sel');
+  if(choisies.length < 2){ zone.innerHTML=''; zone.style.display='none'; return; }
+
+  zone.style.display='block';
+  var ancien = {};
+  zone.querySelectorAll('input[data-matiere]').forEach(function(i){
+    ancien[i.getAttribute('data-matiere')] = i.value;
+  });
+
+  var lignes = '';
+  Array.prototype.forEach.call(choisies, function(b){
+    var cle = b.getAttribute('data-coef-val');
+    var nom = b.textContent.trim();
+    lignes += '<div class="ligne-compte-matiere">'+
+      '<span>'+nom+'</span>'+
+      '<input type="number" min="0" step="1" inputmode="numeric" data-matiere="'+cle+'" '+
+        'value="'+(ancien[cle]||'')+'" placeholder="0" oninput="updateEstimation()">'+
+    '</div>';
+  });
+  zone.innerHTML =
+    '<label>Combien de tapis dans chaque matière&nbsp;?</label>'+
+    '<div class="aide-compte-matiere">Le prestataire prépare son matériel à partir de cette information.</div>'+
+    lignes;
+}
+
 function selMatiere(btn){
   var racine = btn.closest('#modal-body') || document;
   btn.classList.toggle('sel');
@@ -11295,6 +11444,7 @@ function selMatiere(btn){
   // n'aurait aucun coefficient et le prestataire ne saurait pas quoi prévoir.
   var choisies = racine.querySelectorAll('[data-group="tapis-mat"].sel');
   if(!choisies.length){ btn.classList.add('sel'); return; }
+  majComptesParMatiere(racine);
   updateEstimation();
 }
 
@@ -11450,6 +11600,18 @@ async function sendDemand(type){
     if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
   }
   if(window.nbVitresCalcule)details['nb_vitres']=String(window.nbVitresCalcule);
+  // Le compte par matière : « Laine ×2, Synthétique ×1 ». Sans lui, le
+  // prestataire connaît les matières mais pas les quantités, et ne peut ni
+  // estimer son temps ni préparer son matériel.
+  var comptesMatiere=[];
+  document.querySelectorAll('#tapis-comptes-matiere input[data-matiere]').forEach(function(champ){
+    var n=parseInt(champ.value,10);
+    if(n>0){
+      var bouton=document.querySelector('[data-group="tapis-mat"][data-coef-val="'+champ.getAttribute('data-matiere')+'"]');
+      comptesMatiere.push((bouton?bouton.textContent.trim():champ.getAttribute('data-matiere'))+' \u00d7'+n);
+    }
+  });
+  if(comptesMatiere.length)details['tapis_par_matiere']=comptesMatiere.join(', ');
   // Vitres et tapis : on transmet le détail du comptage au pro, en distinguant bien ce qui vient
   // d'une estimation de notre part (moyennes par catégorie) de ce que le client a lui-même
   // déclaré en chiffre exact — jamais présenté comme un fait certain si ça n'en est pas un.
