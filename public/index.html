@@ -1770,13 +1770,34 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .comptes-matiere { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .comptes-matiere label { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
 .aide-compte-matiere { font-size: 11.5px; color: var(--gray); margin: 3px 0 10px; line-height: 1.4; }
-.ligne-compte-matiere { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
-.ligne-compte-matiere span { flex: 1; font-size: 13px; color: var(--text-secondary); }
-.ligne-compte-matiere input {
-  width: 74px; flex-shrink: 0; text-align: center;
-  /* 16 px : en dessous, iOS agrandit la page à la mise au point. */
-  font-size: 16px; font-weight: 700;
+/* Un bloc par matière : tailles et état. Plus lourd qu'un simple compteur,
+   mais c'est l'information dont le prestataire a réellement besoin — un grand
+   tapis en laine très sale et deux petits synthétiques propres ne se
+   préparent pas de la même façon. */
+.bloc-matiere {
+  background: var(--surface-alt);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  margin-bottom: 8px;
 }
+.titre-matiere { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+.cases-tailles { display: flex; gap: 7px; }
+.case-taille { flex: 1; min-width: 0; }
+.case-taille span {
+  display: block; font-size: 10.5px; font-weight: 700; color: var(--gray);
+  text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px;
+}
+.case-taille input {
+  width: 100%; text-align: center;
+  /* 16 px : en dessous, iOS agrandit la page à la mise au point. */
+  font-size: 16px; font-weight: 700; padding: 8px 4px;
+}
+.etat-matiere { display: flex; align-items: center; gap: 9px; margin-top: 9px; }
+.etat-matiere span {
+  font-size: 11.5px; font-weight: 700; color: var(--gray);
+  text-transform: uppercase; letter-spacing: .03em; flex-shrink: 0;
+}
+.etat-matiere select { flex: 1; font-size: 16px; padding: 8px 10px; }
 
 /* Le prestataire attend le paiement : ni réussite ni échec, une étape. */
 .attente-paiement-pro {
@@ -9070,6 +9091,27 @@ function goToChat(demandeId,otherName){
     else{subEl.style.display='none';subEl.textContent=''}
   }
   document.getElementById('chat-messages').innerHTML='';
+  // La signature d'affichage doit être oubliée EN MÊME TEMPS que le conteneur
+  // est vidé. Sinon, en revenant sur une conversation déjà consultée,
+  // loadChatMessages retrouve les mêmes messages, conclut « rien n'a changé »
+  // et repart sans rien afficher — devant un conteneur qu'on vient de vider.
+  // La conversation s'affichait une fois, puis restait vide à chaque retour.
+  if(typeof lastDataSignatures==='object') delete lastDataSignatures['chat-'+demandeId];
+
+  // La barre de saisie est reconstruite à chaque ouverture. Elle est remplacée
+  // par un message quand la prestation est terminée — et n'était jamais
+  // restaurée : après avoir ouvert une conversation close, toutes les suivantes
+  // s'ouvraient sans champ de saisie.
+  var barre=document.querySelector('.chat-input-bar');
+  // Reproduit à l'identique la barre du document : même identifiant de champ,
+  // même classe de bouton. Un balisage approchant aurait cassé sendChatMsg(),
+  // qui cherche #chat-input, et les styles de #chat-send-btn.
+  if(barre) barre.innerHTML=
+    '<input type="text" id="chat-input" placeholder="\u00c9crivez votre message..." '+
+      'onkeypress="if(event.key===\'Enter\')sendChatMsg()">'+
+    '<button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMsg()" '+
+      'aria-label="Envoyer le message">\u27a4</button>';
+
   show('s-chat');
   loadChatMessages();
   stopChatPoll();
@@ -9191,8 +9233,12 @@ async function loadChatMessages(){
     const r=await fetch(API+'/api/messages/'+currentChatDemandeId,{headers:authHeaders()});
     if(!r.ok)return;
     const data=await safeJson(r);
-    if(!hasDataChanged('chat-'+currentChatDemandeId,data))return;
     const c=document.getElementById('chat-messages');
+    // On ne court-circuite que si l'affichage précédent est TOUJOURS LÀ. Une
+    // signature identique ne veut rien dire devant un conteneur vide : c'est
+    // ce raccourci qui laissait la conversation blanche au retour.
+    if(c && c.children.length && !hasDataChanged('chat-'+currentChatDemandeId,data))return;
+    hasDataChanged('chat-'+currentChatDemandeId,data);
     var atBottom=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
     var html='';
     if(!data||!data.length){html='<div class="empty-state" style="padding:30px"><span>💬</span><p>Démarrez la conversation !</p></div>'}
@@ -10861,15 +10907,29 @@ function goToPreviousStep(currentType){
   // Le compte par matière : « Laine ×2, Synthétique ×1 ». Sans lui, le
   // prestataire connaît les matières mais pas les quantités, et ne peut ni
   // estimer son temps ni préparer son matériel.
-  var comptesMatiere=[];
-  document.querySelectorAll('#tapis-comptes-matiere input[data-matiere]').forEach(function(champ){
-    var n=parseInt(champ.value,10);
-    if(n>0){
-      var bouton=document.querySelector('[data-group="tapis-mat"][data-coef-val="'+champ.getAttribute('data-matiere')+'"]');
-      comptesMatiere.push((bouton?bouton.textContent.trim():champ.getAttribute('data-matiere'))+' \u00d7'+n);
-    }
+  // « Laine : 1 moyen, 1 grand — très sale · Synthétique : 2 petits — propre »
+  // Le prestataire sait quoi emporter et combien de temps prévoir.
+  var parMatiere={};
+  document.querySelectorAll('#tapis-comptes-matiere [data-matiere]').forEach(function(el){
+    var cle=el.getAttribute('data-matiere'), champ=el.getAttribute('data-champ');
+    parMatiere[cle]=parMatiere[cle]||{};
+    parMatiere[cle][champ]=el.value;
   });
-  if(comptesMatiere.length)details['tapis_par_matiere']=comptesMatiere.join(', ');
+  var lignesDetail=[];
+  Object.keys(parMatiere).forEach(function(cle){
+    var d=parMatiere[cle];
+    var bouton=document.querySelector('[data-group="tapis-mat"][data-coef-val="'+cle+'"]');
+    var nom=bouton?bouton.textContent.trim():cle;
+    var morceaux=[];
+    [['petit','petit'],['moyen','moyen'],['grand','grand']].forEach(function(t){
+      var n=parseInt(d[t[0]],10)||0;
+      if(n>0) morceaux.push(n+' '+t[1]+(n>1?'s':''));
+    });
+    if(!morceaux.length) return;
+    var etat=(typeof LIBELLE_ETAT_TAPIS!=='undefined'&&LIBELLE_ETAT_TAPIS[d.etat])||'';
+    lignesDetail.push(nom+' : '+morceaux.join(', ')+(etat?' \u2014 '+etat.toLowerCase():''));
+  });
+  if(lignesDetail.length)details['tapis_par_matiere']=lignesDetail.join(' \u00b7 ');
   multiFlow.results[multiFlow.current]={type:currentType,description:desc,details:details};
   multiFlow.current--;
   openServiceForm(multiFlow.queue[multiFlow.current]);
@@ -11339,7 +11399,7 @@ function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="soie" onclick="selMatiere(this)">Soie / Tapis d\'Orient</button></div>'+
   '<div id="tapis-comptes-matiere" class="comptes-matiere" style="display:none"></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TAPIS_BASE+'</div></div>'+
-  '<div class="field-group"><label>Vos tapis</label>'+
+  '<div class="field-group" id="tapis-tailles-global"><label>Vos tapis</label>'+
   '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — indiquez combien vous en avez de chaque taille (plusieurs tapis possibles).</div>'+
   '<div style="display:flex;flex-direction:column;gap:10px">'+
     compteurTapisHtml('petit','Petit','Descente de lit, couloir')+
@@ -11428,32 +11488,100 @@ var RANG_MATIERE_TAPIS = {
 // client avec deux tapis en laine et un synthétique cochait deux matières et
 // saisissait « 3 moyens » : le prestataire ne savait pas lequel était lequel,
 // et la laine ne se traite pas comme le synthétique.
+// Du moins au plus exigeant. Sert à choisir l'état retenu pour le prix quand
+// les matières n'ont pas le même : c'est le plus sale qui commande le temps
+// passé et le produit employé.
+var RANG_ETAT_TAPIS = { propre:1, moyen:2, sale:3, tres_sale:4 };
+var LIBELLE_ETAT_TAPIS = { propre:'Propre', moyen:'Normal', sale:'Sale', tres_sale:'Très sale' };
+var TAILLES_TAPIS = [['petit','Petit'],['moyen','Moyen'],['grand','Grand']];
+
+// Une ligne par matière : tailles ET état. Le simple compteur d'hier demandait
+// COMBIEN sans demander LESQUELS — un grand tapis en laine très sale et deux
+// petits synthétiques propres se réduisaient à « 3 tapis, état moyen ».
 function majComptesParMatiere(racine){
   var zone = (racine || document).querySelector('#tapis-comptes-matiere');
   if(!zone) return;
   var choisies = (racine || document).querySelectorAll('[data-group="tapis-mat"].sel');
-  if(choisies.length < 2){ zone.innerHTML=''; zone.style.display='none'; return; }
+  var blocGlobal = (racine || document).querySelector('#tapis-tailles-global');
 
-  zone.style.display='block';
+  if(choisies.length < 2){
+    zone.innerHTML=''; zone.style.display='none';
+    // Avec une seule matière, le bloc global suffit et reste la source.
+    if(blocGlobal) blocGlobal.style.display='';
+    return;
+  }
+
+  // On conserve ce qui était déjà saisi avant de reconstruire.
   var ancien = {};
-  zone.querySelectorAll('input[data-matiere]').forEach(function(i){
-    ancien[i.getAttribute('data-matiere')] = i.value;
+  zone.querySelectorAll('[data-matiere]').forEach(function(el){
+    var cle = el.getAttribute('data-matiere');
+    ancien[cle] = ancien[cle] || {};
+    ancien[cle][el.getAttribute('data-champ')] = el.value;
   });
 
   var lignes = '';
   Array.prototype.forEach.call(choisies, function(b){
     var cle = b.getAttribute('data-coef-val');
     var nom = b.textContent.trim();
-    lignes += '<div class="ligne-compte-matiere">'+
-      '<span>'+nom+'</span>'+
-      '<input type="number" min="0" step="1" inputmode="numeric" data-matiere="'+cle+'" '+
-        'value="'+(ancien[cle]||'')+'" placeholder="0" oninput="updateEstimation()">'+
+    var d = ancien[cle] || {};
+    var cases = TAILLES_TAPIS.map(function(t){
+      return '<label class="case-taille"><span>'+t[1]+'</span>'+
+        '<input type="number" min="0" step="1" inputmode="numeric" '+
+          'data-matiere="'+cle+'" data-champ="'+t[0]+'" '+
+          'value="'+(d[t[0]]||'')+'" placeholder="0" oninput="recalculerTapis()"></label>';
+    }).join('');
+    var options = Object.keys(RANG_ETAT_TAPIS).map(function(e){
+      return '<option value="'+e+'"'+(d.etat===e?' selected':'')+'>'+LIBELLE_ETAT_TAPIS[e]+'</option>';
+    }).join('');
+    lignes += '<div class="bloc-matiere">'+
+      '<div class="titre-matiere">'+nom+'</div>'+
+      '<div class="cases-tailles">'+cases+'</div>'+
+      '<label class="etat-matiere"><span>État</span>'+
+        '<select data-matiere="'+cle+'" data-champ="etat" onchange="recalculerTapis()">'+options+'</select>'+
+      '</label>'+
     '</div>';
   });
+
+  zone.style.display='block';
   zone.innerHTML =
-    '<label>Combien de tapis dans chaque matière&nbsp;?</label>'+
-    '<div class="aide-compte-matiere">Le prestataire prépare son matériel à partir de cette information.</div>'+
+    '<label>Détail de vos tapis</label>'+
+    '<div class="aide-compte-matiere">Indiquez les tailles et l\'état pour chaque matière. Le prestataire prépare son matériel et son temps à partir de ces informations.</div>'+
     lignes;
+
+  // Le bloc global devient la somme des lignes : on le masque pour qu'il n'y
+  // ait qu'UNE source. Deux endroits où saisir la même chose finiraient par
+  // se contredire, et le prix suivrait le mauvais.
+  if(blocGlobal) blocGlobal.style.display='none';
+  recalculerTapis();
+}
+
+// Somme les lignes par matière dans les compteurs globaux, qui pilotent le
+// calcul de surface donc le prix. L'état retenu est le plus exigeant.
+function recalculerTapis(){
+  var zone = document.getElementById('tapis-comptes-matiere');
+  if(!zone || zone.style.display === 'none'){ calculerSurfaceTapisDepuisCompteur(); return; }
+
+  var totaux = { petit:0, moyen:0, grand:0 };
+  zone.querySelectorAll('input[data-champ]').forEach(function(i){
+    var t = i.getAttribute('data-champ');
+    if(totaux.hasOwnProperty(t)) totaux[t] += parseInt(i.value,10) || 0;
+  });
+  Object.keys(totaux).forEach(function(t){
+    var champ = document.getElementById('f-tapis-'+t);
+    if(champ) champ.value = totaux[t];
+  });
+
+  var pire = null, rangMax = 0;
+  zone.querySelectorAll('select[data-champ="etat"]').forEach(function(s){
+    var r = RANG_ETAT_TAPIS[s.value] || 0;
+    if(r > rangMax){ rangMax = r; pire = s.value; }
+  });
+  if(pire){
+    document.querySelectorAll('#modal-body [data-group="etat"]').forEach(function(b){
+      b.classList.toggle('sel', b.getAttribute('data-etat-val') === pire);
+    });
+  }
+  calculerSurfaceTapisDepuisCompteur();
 }
 
 function selMatiere(btn){
@@ -11622,15 +11750,29 @@ async function sendDemand(type){
   // Le compte par matière : « Laine ×2, Synthétique ×1 ». Sans lui, le
   // prestataire connaît les matières mais pas les quantités, et ne peut ni
   // estimer son temps ni préparer son matériel.
-  var comptesMatiere=[];
-  document.querySelectorAll('#tapis-comptes-matiere input[data-matiere]').forEach(function(champ){
-    var n=parseInt(champ.value,10);
-    if(n>0){
-      var bouton=document.querySelector('[data-group="tapis-mat"][data-coef-val="'+champ.getAttribute('data-matiere')+'"]');
-      comptesMatiere.push((bouton?bouton.textContent.trim():champ.getAttribute('data-matiere'))+' \u00d7'+n);
-    }
+  // « Laine : 1 moyen, 1 grand — très sale · Synthétique : 2 petits — propre »
+  // Le prestataire sait quoi emporter et combien de temps prévoir.
+  var parMatiere={};
+  document.querySelectorAll('#tapis-comptes-matiere [data-matiere]').forEach(function(el){
+    var cle=el.getAttribute('data-matiere'), champ=el.getAttribute('data-champ');
+    parMatiere[cle]=parMatiere[cle]||{};
+    parMatiere[cle][champ]=el.value;
   });
-  if(comptesMatiere.length)details['tapis_par_matiere']=comptesMatiere.join(', ');
+  var lignesDetail=[];
+  Object.keys(parMatiere).forEach(function(cle){
+    var d=parMatiere[cle];
+    var bouton=document.querySelector('[data-group="tapis-mat"][data-coef-val="'+cle+'"]');
+    var nom=bouton?bouton.textContent.trim():cle;
+    var morceaux=[];
+    [['petit','petit'],['moyen','moyen'],['grand','grand']].forEach(function(t){
+      var n=parseInt(d[t[0]],10)||0;
+      if(n>0) morceaux.push(n+' '+t[1]+(n>1?'s':''));
+    });
+    if(!morceaux.length) return;
+    var etat=(typeof LIBELLE_ETAT_TAPIS!=='undefined'&&LIBELLE_ETAT_TAPIS[d.etat])||'';
+    lignesDetail.push(nom+' : '+morceaux.join(', ')+(etat?' \u2014 '+etat.toLowerCase():''));
+  });
+  if(lignesDetail.length)details['tapis_par_matiere']=lignesDetail.join(' \u00b7 ');
   // Vitres et tapis : on transmet le détail du comptage au pro, en distinguant bien ce qui vient
   // d'une estimation de notre part (moyennes par catégorie) de ce que le client a lui-même
   // déclaré en chiffre exact — jamais présenté comme un fait certain si ça n'en est pas un.
