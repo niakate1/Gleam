@@ -4710,7 +4710,15 @@ app.get('/api/tarifs/estimation', publicLimiter, async (req, res) => {
           message: 'Indiquez une quantité pour obtenir une estimation.'
         });
       }
-      const { data: prosUnit } = await supabase.from('users').select('tarifs_unitaires').eq('type', 'pro').eq('disponible', true);
+      const { data: prosUnit } = await supabase.from('users').select('tarifs_unitaires').eq('type', 'pro').eq('disponible', true)
+      // Plafond de sécurité. Cette route est PUBLIQUE et appelée à chaque frappe
+      // dans le formulaire d'estimation : elle lit les tarifs de tous les
+      // prestataires disponibles pour en calculer une moyenne.
+      //
+      // Ce n'est pas de la pagination — une moyenne sur mille prestataires est
+      // déjà représentative, et un millier de plus ne la déplacerait pas. C'est
+      // une garde : si la table grossit, le serveur ne s'écroule pas.
+      .limit(1000);
       const { prix: prixUnitaire, reel, nbPros } = prixPourPalier(config, prestation, tierValue, (prosUnit || []).map(p => p.tarifs_unitaires && p.tarifs_unitaires[prestation]));
 
       const coefMatiereUnite = (config.tierKey !== 'matiere' && config.coefMatiere && matiere && config.coefMatiere.hasOwnProperty(matiere)) ? config.coefMatiere[matiere] : 1.0;
@@ -4947,8 +4955,50 @@ setInterval(relancerDemandesSansDevis, 15 * 60 * 1000);
 setTimeout(relancerDemandesSansDevis, 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, function() {
+// ── FILETS DE SÉCURITÉ DU PROCESSUS ─────────────────────────────────────────
+// Express 4 n'attrape PAS les rejets d'une route asynchrone : une promesse
+// rejetée dans un `async (req, res) => {}` ne passe jamais par le gestionnaire
+// d'erreur. Et depuis Node 15, un rejet non géré TERMINE le processus.
+//
+// Neuf routes de ce serveur sont asynchrones sans try/catch. Si Supabase ne
+// répond pas sur l'une d'elles, le serveur s'arrête — et tous les utilisateurs
+// en cours perdent leur session, pas seulement celui qui a déclenché l'appel.
+//
+// Railway redémarre, mais un redémarrage prend plusieurs secondes et se
+// reproduit à chaque occurrence. On journalise et on continue de servir.
+process.on('unhandledRejection', function(raison) {
+  console.error('⚠️  Promesse rejetée sans gestionnaire :', raison);
+  if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+    try { Sentry.captureException(raison); } catch (e) {}
+  }
+});
+
+// Une exception synchrone non attrapée laisse le processus dans un état
+// incertain : on journalise, puis on s'arrête proprement plutôt que de servir
+// des réponses imprévisibles. Railway redémarrera.
+process.on('uncaughtException', function(err) {
+  console.error('🔴 Exception non attrapée :', err);
+  if (typeof Sentry !== 'undefined' && Sentry.captureException) {
+    try { Sentry.captureException(err); } catch (e) {}
+  }
+  setTimeout(function() { process.exit(1); }, 1000);
+});
+
+const serveurHttp = app.listen(PORT, function() {
   console.log('✨ Gleam API démarrée sur le port ' + PORT);
   console.log('   Environnement : ' + (process.env.NODE_ENV || 'development'));
+});
+
+// Railway envoie SIGTERM avant de couper le conteneur. Sans arrêt propre, les
+// requêtes en cours sont interrompues net — y compris un paiement au milieu de
+// sa confirmation.
+process.on('SIGTERM', function() {
+  console.log('SIGTERM reçu — arrêt en cours, les requêtes en cours sont servies.');
+  serveurHttp.close(function() {
+    console.log('Serveur arrêté proprement.');
+    process.exit(0);
+  });
+  // Si une requête traîne au-delà de dix secondes, on n'attend pas davantage.
+  setTimeout(function() { process.exit(0); }, 10000);
 });
 // END FINAL
