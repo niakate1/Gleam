@@ -3087,6 +3087,42 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
     }
     if (!devis_id) return res.status(400).json({ error: 'Devis requis.' });
 
+    // ── GARDE CONTRE LA DOUBLE INTENTION ────────────────────────────────
+    // Deux appuis rapprochés sur le bouton de paiement créaient deux
+    // intentions Stripe pour le même devis. En mode test c'était sans
+    // conséquence ; en production, le client peut être débité deux fois.
+    //
+    // On RÉUTILISE l'intention en attente au lieu de refuser : un client dont
+    // la première tentative a échoué en silence — réseau coupé, application
+    // fermée — doit pouvoir réessayer, pas se heurter à un « paiement déjà en
+    // cours » qu'il ne comprendrait pas.
+    const { data: intentionEnCours } = await supabase.from('paiements')
+      .select('id, stripe_payment_intent_id')
+      .eq('devis_id', devis_id)
+      .eq('statut', 'en_attente')
+      .maybeSingle();
+
+    if (intentionEnCours && intentionEnCours.stripe_payment_intent_id) {
+      try {
+        const existante = await stripe.paymentIntents.retrieve(intentionEnCours.stripe_payment_intent_id);
+        // Une intention encore ouverte se réutilise telle quelle. Si elle a
+        // été annulée ou a échoué chez Stripe, on la laisse et on en crée une
+        // neuve : la réutiliser mènerait à un paiement impossible à finaliser.
+        if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(existante.status)) {
+          console.log('↩️  Intention réutilisée pour le devis ' + devis_id + ' (' + existante.status + ')');
+          return res.json({
+            client_secret: existante.client_secret,
+            paiement_id: intentionEnCours.id,
+            publishable_key: process.env.STRIPE_PUBLISHABLE_KEY,
+            reutilisee: true
+          });
+        }
+      } catch (e) {
+        // Intention introuvable chez Stripe : on continue et on en crée une.
+        console.warn('Intention en attente illisible, création d\'une nouvelle :', e.message);
+      }
+    }
+
     const { data: devis } = await supabase.from('devis').select('*').eq('id', devis_id).single();
     if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
 
@@ -3122,7 +3158,40 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
     try {
       const { data } = await supabase.from('users').select('stripe_account_id').eq('id', devis.societe_id).single();
       proPourPaiement = data;
-      proConfigure = Boolean(proPourPaiement && proPourPaiement.stripe_account_id);
+
+      // ── EXISTER NE SUFFIT PAS ────────────────────────────────────────────
+      // On vérifiait seulement que l'identifiant du compte Connect était
+      // présent. Or un compte créé mais dont l'inscription n'est pas terminée
+      // ne peut pas recevoir de virement : Stripe REFUSE alors de créer
+      // l'intention, et tout le paiement échoue.
+      //
+      // Le message d'erreur était générique — « Impossible de démarrer le
+      // paiement » — alors que le client n'y était pour rien et que sa carte
+      // était valide.
+      //
+      // On demande donc à Stripe si le compte peut réellement recevoir. S'il
+      // ne le peut pas, le paiement se fait quand même : l'argent arrive chez
+      // Gleam et le virement au prestataire se fera à la main. C'était déjà
+      // l'intention du code — la vérification était simplement incomplète.
+      if (proPourPaiement && proPourPaiement.stripe_account_id) {
+        try {
+          const compte = await stripe.accounts.retrieve(proPourPaiement.stripe_account_id);
+          const transfertsActifs = compte.capabilities && compte.capabilities.transfers === 'active';
+          proConfigure = Boolean(compte.charges_enabled && transfertsActifs);
+          if (!proConfigure) {
+            console.warn('⚠️  Compte Connect ' + proPourPaiement.stripe_account_id +
+              ' pas encore opérationnel (charges_enabled=' + compte.charges_enabled +
+              ', transfers=' + (compte.capabilities && compte.capabilities.transfers) +
+              ') — paiement sans répartition automatique.');
+          }
+        } catch (e) {
+          // Compte introuvable — typiquement un compte de TEST utilisé avec des
+          // clés de PRODUCTION, ou l'inverse. Le paiement continue sans
+          // répartition plutôt que d'échouer entièrement.
+          console.warn('⚠️  Compte Connect illisible (' + e.message + ') — paiement sans répartition automatique.');
+          proConfigure = false;
+        }
+      }
     } catch (e) { console.error('Vérification Stripe Connect ignorée:', e.message); }
 
     const paramsIntent = {
@@ -3153,7 +3222,13 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
 
     res.json({ client_secret: intent.client_secret, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY, reduction_parrainage: parrainageApplique });
   } catch (e) {
-    console.error('Erreur création intention de paiement:', e);
+    // Le message de Stripe est journalisé en entier : sans lui, on cherche une
+    // panne de paiement à l'aveugle. Le type et le code permettent de
+    // distinguer un refus de carte d'un défaut de configuration.
+    console.error('Erreur création intention de paiement:', {
+      message: e.message, type: e.type, code: e.code, param: e.param,
+      devis_id: req.body && req.body.devis_id
+    });
     res.status(500).json({ error: 'Impossible de démarrer le paiement pour l\'instant. Réessayez dans un instant ou contactez le support si le problème persiste.' });
   }
 });
