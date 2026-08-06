@@ -1197,6 +1197,103 @@ app.patch('/api/users/photo', auth, async (req, res) => {
 // (nécessaire pour la comptabilité, le suivi de fiabilité, et les litiges éventuels), tout en
 // révoquant définitivement l'accès de connexion — cohérent avec l'approche "archiver plutôt
 // que supprimer" déjà retenue ailleurs dans l'app.
+// ══════════════════════════════════════════════════════════════════════════
+// EXPORT RGPD — ARTICLE 20, DROIT À LA PORTABILITÉ
+//
+// Chaque utilisateur peut récupérer ses données dans un format lisible par
+// machine. Le délai légal de réponse est d'un mois ; cette route répond en
+// quelques secondes.
+//
+// Limitée à 3 exports par heure : une demande de portabilité est un acte
+// rare, et la route lit neuf tables d'un coup.
+// ══════════════════════════════════════════════════════════════════════════
+const exportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 3, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Vous avez déjà demandé vos données récemment. Réessayez dans une heure.' }
+});
+
+app.get('/api/users/me/donnees', auth, exportLimiter, async (req, res) => {
+  try {
+    const moi = req.user.id;
+    const lire = async (table, filtre) => {
+      try {
+        let q = supabase.from(table).select('*');
+        q = filtre(q);
+        const { data } = await q;
+        return data || [];
+      } catch (e) {
+        console.error('Export RGPD, table ' + table + ' :', e.message);
+        return [];
+      }
+    };
+
+    const [profil, demandes, devis, messages, paiementsClient, paiementsPro,
+           evalDonnees, evalRecues, favoris, documents, notifications] = await Promise.all([
+      lire('users',        q => q.eq('id', moi)),
+      lire('demandes',     q => q.eq('client_id', moi)),
+      lire('devis',        q => q.eq('societe_id', moi)),
+      // Uniquement les messages ÉCRITS par l'utilisateur. Exporter les
+      // réponses de l'autre partie divulguerait les données d'un tiers :
+      // ce serait une violation du RGPD, pas une conformité.
+      lire('messages',     q => q.eq('expediteur_id', moi)),
+      lire('paiements',    q => q.eq('client_id', moi)),
+      lire('paiements',    q => q.eq('societe_id', moi)),
+      lire('evaluations',  q => q.eq('evaluateur_id', moi)),
+      lire('evaluations',  q => q.eq('evalue_id', moi)),
+      lire('favoris',      q => q.or('client_id.eq.' + moi + ',pro_id.eq.' + moi)),
+      lire('documents_pro',q => q.eq('pro_id', moi)),
+      lire('push_subscriptions', q => q.eq('user_id', moi))
+    ]);
+
+    // Les champs internes n'ont aucun sens hors du système et exposeraient sa
+    // structure. On les retire de l'export.
+    const nettoyer = (lignes, aRetirer) => (lignes || []).map(l => {
+      const copie = Object.assign({}, l);
+      (aRetirer || []).forEach(c => { delete copie[c]; });
+      return copie;
+    });
+
+    const p = (profil || [])[0] || {};
+
+    res.setHeader('Content-Disposition',
+      'attachment; filename="mes-donnees-gleam-' + new Date().toISOString().slice(0, 10) + '.json"');
+    res.json({
+      _a_propos: {
+        genere_le: new Date().toISOString(),
+        fondement: 'Article 20 du RGPD — droit à la portabilité des données',
+        format: 'JSON, structuré et lisible par machine',
+        remarque: "Cet export contient les données que vous avez fournies ou générées. " +
+                  "Les messages reçus d'autres utilisateurs ne sont pas inclus : ils " +
+                  "contiennent les données personnelles de tiers."
+      },
+      profil: {
+        prenom: p.prenom, nom: p.nom, email: p.email, telephone: p.telephone,
+        type: p.type, adresse: p.adresse, siret: p.siret,
+        raison_sociale: p.raison_sociale, note_moyenne: p.note_moyenne,
+        inscrit_le: p.created_at
+      },
+      demandes:            nettoyer(demandes, ['client_id']),
+      devis_envoyes:       nettoyer(devis, ['societe_id']),
+      messages_envoyes:    nettoyer(messages, ['expediteur_id']),
+      paiements_effectues: nettoyer(paiementsClient, ['client_id', 'societe_id', 'stripe_payment_intent_id']),
+      paiements_recus:     nettoyer(paiementsPro, ['client_id', 'societe_id', 'stripe_payment_intent_id']),
+      evaluations_donnees: nettoyer(evalDonnees, ['evaluateur_id', 'evalue_id']),
+      evaluations_recues:  nettoyer(evalRecues, ['evaluateur_id', 'evalue_id']),
+      favoris:             nettoyer(favoris, ['client_id', 'pro_id']),
+      // Les documents sont des fichiers : on liste ce qu'ils sont et quand ils
+      // ont été déposés, pas leur contenu binaire.
+      documents_deposes: (documents || []).map(d => ({
+        type: d.type, statut: d.statut, depose_le: d.created_at,
+        expire_le: d.date_expiration
+      })),
+      appareils_notifies: (notifications || []).length
+    });
+  } catch (e) {
+    console.error('Erreur export RGPD:', e);
+    res.status(500).json({ error: 'Impossible de générer vos données pour le moment.' });
+  }
+});
+
 app.post('/api/users/me/supprimer', auth, async (req, res) => {
   try {
     // Bloque la suppression tant qu'une prestation active (payée, en cours, ou en attente de
