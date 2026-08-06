@@ -473,7 +473,10 @@ i[data-lucide] {
 .home-hero {
   position: relative;
   overflow: hidden;
-  padding: calc(var(--gap-4) + var(--pad-haut)) var(--gap-4) 54px;
+  /* 34 px au lieu de 54 en bas. Les 54 px servaient à ce que la carte
+     blanche remonte de 36 px et chevauche le dégradé — l'effet tient avec 34,
+     et l'accueil visiteur perd 20 px sans qu'on voie la différence. */
+  padding: calc(var(--gap-4) + var(--pad-haut)) var(--gap-4) 34px;
   background:
     /* UN reflet, et un seul. Une écharpe de lumière oblique en haut à droite,
        blanche et non colorée : c'est un reflet sur une surface propre, pas un
@@ -525,7 +528,7 @@ i[data-lucide] {
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
   margin: -36px var(--gap-4) var(--gap-5);
-  padding: var(--gap-4);
+  padding: 14px var(--gap-4);
 }
 
 .greeting h2 { font-size: 22px; font-weight: 800; margin-bottom: var(--gap-1); }
@@ -877,7 +880,7 @@ select {
 }
 .svc-card {
   position: relative;
-  padding: 15px 6px;
+  padding: 11px 6px;
   border: 2px solid transparent;
   border-radius: var(--r-md);
   background: var(--surface-alt);
@@ -1954,13 +1957,18 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
    étiquette d'onglet. La différence tient à la casse et à l'alignement. */
 .entete-interne-titre {
   font-family: 'Fraunces', Georgia, serif;
-  font-size: 23px; font-weight: 700; letter-spacing: -.3px;
+  /* 20 px et non 23 : sur un écran intérieur, le titre situe, il n'annonce
+     pas. Trois pixels de moins, et la marge du haut réduite de moitié. */
+  font-size: 20px; font-weight: 700; letter-spacing: -.3px;
   color: var(--text);
-  margin-top: 7px;
+  margin-top: 4px;
 }
 .entete-interne-sous {
-  font-size: 12.5px; color: var(--text-secondary);
-  margin-top: 2px;
+  font-size: 12px; color: var(--text-secondary);
+  margin-top: 1px;
+  /* Une ligne, jamais deux. Un sous-titre qui déborde double la hauteur de
+     l'en-tête pour une phrase qu'on ne lit pas deux fois. */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -1976,8 +1984,8 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   position: relative;
 }
 .etape-visiteur {
-  display: flex; gap: 14px; align-items: flex-start;
-  padding-bottom: 18px;
+  display: flex; gap: 13px; align-items: flex-start;
+  padding-bottom: 14px;
   position: relative;
 }
 .etape-visiteur:last-child { padding-bottom: 0; }
@@ -3604,7 +3612,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <button class="user-badge" style="border:none;cursor:pointer" onclick="afficherEcranAuth('login')">Se connecter</button>
     </div>
     <h2>Bonjour 👋</h2>
-    <p>Découvrez Gleam, créez un compte quand vous serez prêt à réserver.</p>
+    <p>Créez un compte quand vous serez prêt à réserver.</p>
     <!-- L'aiguillage vers l'autre public tient ici, et nulle part ailleurs.
          Placé en bas de page, un professionnel devait défiler l'intégralité
          d'un contenu qui ne s'adresse pas à lui. Placé dans le flux client, il
@@ -3640,14 +3648,14 @@ textarea { min-height: 92px; padding-top: 13px; }
         <span class="etape-rang">2</span>
         <div class="etape-corps">
           <strong>Recevez des devis clairs</strong>
-          <p>Des professionnels vérifiés de votre zone répondent avec un prix précis.</p>
+          <p>Des professionnels vérifiés de votre zone, avec un prix précis.</p>
         </div>
       </li>
       <li class="etape-visiteur">
         <span class="etape-rang">3</span>
         <div class="etape-corps">
           <strong>Choisissez, c'est fait</strong>
-          <p>Vous acceptez le devis qui vous convient, réglez en ligne en toute sécurité.</p>
+          <p>Vous acceptez le devis qui vous convient et réglez en ligne.</p>
         </div>
       </li>
     </ol>
@@ -4040,7 +4048,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <span class="entete-interne-marque">✨ Gleam</span>
     </div>
     <div class="entete-interne-titre">Messages</div>
-    <div class="entete-interne-sous">Échangez avec votre prestataire avant, pendant et après la prestation.</div>
+    <div class="entete-interne-sous">Vos échanges avec votre prestataire.</div>
   </div>
   <div class="home-content">
     <div class="exemple-invite">
@@ -4080,7 +4088,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <span class="entete-interne-marque">✨ Gleam</span>
     </div>
     <div class="entete-interne-titre">Mes demandes</div>
-    <div class="entete-interne-sous">Suivez vos prestations, du devis au paiement.</div>
+    <div class="entete-interne-sous">Du devis au paiement.</div>
   </div>
   <div class="home-content">
     <div class="exemple-invite">
@@ -4117,7 +4125,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <span class="entete-interne-marque">✨ Gleam</span>
     </div>
     <div class="entete-interne-titre">Bienvenue</div>
-    <div class="entete-interne-sous">Créez votre compte pour suivre vos demandes et échanger avec votre prestataire.</div>
+    <div class="entete-interne-sous">Suivez vos demandes et échangez avec votre prestataire.</div>
   </div>
   <div class="home-content">
     <div class="bloc-invite" style="text-align:left">
