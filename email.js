@@ -150,6 +150,27 @@ const templates = {
     }),
   }),
 
+  // Le créneau demandé est passé sans qu'aucune prestation n'ait eu lieu. Le
+  // client attendait des devis qui ne viendront plus : sans ce message, sa
+  // demande disparaît en silence et il n'a aucune raison d'en refaire une.
+  //
+  // Le message dit la cause, pas seulement le fait. « Votre demande a expiré »
+  // laisse croire à un défaut de la plateforme ; « le créneau est passé »
+  // explique, et le bouton propose la suite.
+  demande_expiree: (d) => ({
+    subject: `Votre demande de ${d.prestation} n'a pas trouvé de prestataire`,
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Le créneau que vous aviez choisi pour votre demande de <strong>${d.prestation}</strong> — ${d.creneau} — est maintenant passé.</p>
+             <p>${d.avaitDevis
+               ? `Vous aviez reçu des devis, mais aucun n'a été réglé avant l'heure prévue.`
+               : `Aucun prestataire disponible n'a pu répondre à temps sur votre secteur.`}</p>
+             <p>Votre demande a été close. Vous pouvez en créer une nouvelle avec une autre date — les mêmes informations vous seront proposées, vous n'aurez qu'à choisir un créneau.</p>`,
+      ctaLabel: 'Refaire ma demande',
+      ctaUrl: `${APP_URL}#nouvelle-demande`,
+    }),
+  }),
+
   // Suspension de compte pro suite à des annulations répétées d'un devis déjà accepté
   compte_suspendu: (d) => ({
     subject: `Votre compte Gleam a été suspendu`,
