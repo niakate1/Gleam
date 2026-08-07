@@ -11553,7 +11553,7 @@ async function updateEstimationMaintenant(){
 // Chaque texte dit ce qui est FAIT, pas ce qui est promis : le prestataire
 // doit pouvoir s'y tenir, et le client doit pouvoir le lui opposer.
 var DETAIL_PRESTATIONS={
-  canape:'Aspiration en profondeur (assise, dossier, accoudoirs, dessous des coussins) • Traitement des taches courantes • Shampouinage ou nettoyage vapeur selon la matière • Séchage accéléré',
+  canape:'Aspiration en profondeur de l\'assise, du dossier et des accoudoirs • Traitement des taches courantes • Shampouinage ou nettoyage vapeur selon la matière • Séchage accéléré',
   matelas:'Aspiration des deux faces • Traitement anti-acariens de base • Détachage des marques courantes • Désinfection vapeur • Séchage accéléré',
   tapis:'Dépoussiérage et aspiration en profondeur • Shampouinage adapté à la matière • Détachage des marques courantes • Séchage',
   vitres:'Nettoyage des deux faces • Encadrements et rebords • Rainures et joints • Finition sans traces',
@@ -11575,9 +11575,23 @@ function afficherDetailNettoyage(type){
   if(box)box.innerHTML='<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_NETTOYAGE_VOITURE[type]+'</div>';
   // Le shampouinage sièges/tapis n'a de sens que si l'intérieur est concerné — les
   // professionnels du secteur le réservent d'ailleurs explicitement aux prestations intérieures.
-  var shampBtn=document.getElementById('opt-shampouinage');
+  // Toutes les options qui ne concernent QUE l'habitacle. Les proposer après
+  // un choix « extérieur seul » n'a aucun sens : il n'y a ni poils, ni
+  // habitacle, ni effets personnels, ni volume fermé où traiter une odeur sur
+  // une carrosserie. Seul le shampouinage se masquait ; les quatre autres
+  // restaient proposées à quelqu'un qui venait de dire le contraire.
+  var OPTIONS_INTERIEUR_VOITURE = ['opt-shampouinage','opt-poils','opt-encrasse',
+                                   'opt-rangement','opt-odeur'];
   var pertinent=(type==='interieur'||type==='complet');
-  if(shampBtn)shampBtn.style.display=pertinent?'':'none';
+  OPTIONS_INTERIEUR_VOITURE.forEach(function(id){
+    var b=document.getElementById(id);
+    if(!b)return;
+    b.style.display=pertinent?'':'none';
+    // Une option masquée doit aussi être DÉSÉLECTIONNÉE : sans cela, un client
+    // qui coche « poils d'animaux » puis repasse en extérieur l'envoie quand
+    // même au prestataire, sans plus pouvoir la retirer.
+    if(!pertinent)b.classList.remove('sel');
+  });
 
   // Une option qui ressemble à ce qui est déjà inclus doit dire ce qu'elle
   // ajoute. Sans cette phrase, le client croit payer deux fois la même chose
@@ -11598,10 +11612,10 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
     '<strong>Shampouinage</strong> — en option : la mousse est injectée dans la fibre puis réaspirée, '+
     'avec les taches et les odeurs incrustées. Utile sur un siège taché, pas sur un siège simplement poussiéreux.'+
   '</div>'+
-  '<button class="opt-btn" data-group="voit-options" data-option-val="poils_animaux" onclick="toggleOption(this)"><span>🐾</span>Poils d\'animaux</button>'+
-  '<button class="opt-btn" data-group="voit-options" data-option-val="tres_sale" onclick="toggleOption(this)"><span>🤢</span>Habitacle très sale / encrassé</button>'+
-  '<button class="opt-btn" data-group="voit-options" data-option-val="rangement" onclick="toggleOption(this)"><span>🧳</span>Rangement d\'effets personnels</button>'+
-  '<button class="opt-btn" data-group="voit-options" data-option-val="anti_odeur" onclick="toggleOption(this)"><span>💨</span>Traitement anti-odeur</button></div></div>'+
+  '<button class="opt-btn" id="opt-poils" data-group="voit-options" data-option-val="poils_animaux" onclick="toggleOption(this)"><span>🐾</span>Poils d\'animaux</button>'+
+  '<button class="opt-btn" id="opt-encrasse" data-group="voit-options" data-option-val="tres_sale" onclick="toggleOption(this)"><span>🤢</span>Habitacle très sale / encrassé</button>'+
+  '<button class="opt-btn" id="opt-rangement" data-group="voit-options" data-option-val="rangement" onclick="toggleOption(this)"><span>🧳</span>Rangement d\'effets personnels</button>'+
+  '<button class="opt-btn" id="opt-odeur" data-group="voit-options" data-option-val="anti_odeur" onclick="toggleOption(this)"><span>💨</span>Traitement anti-odeur</button></div></div>'+
   '<div class="field-group"><label>Type de véhicule</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
   // Sans ce bouton, le palier berline existerait dans la grille du prestataire
@@ -11626,8 +11640,7 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
 // plupart des professionnels du secteur — recherche de marché à l'appui.
 var DETAIL_CANAPE_BASE='Aspiration approfondie • Nettoyage vapeur ou injection-extraction • Détachage courant';
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
-  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.canape+'</span></div>'+
-  '<div class="field-group"><label>Type</label><div class="options-grid">'+
+  '<div class="field-group"><label>Type</label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.canape+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span>➖</span>Droit</button>'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="angle" onclick="selOpt(this)"><span>📐</span>Angle</button>'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="u_panoramique" onclick="selOpt(this)"><span>🧲</span>En U / Panoramique</button>'+
@@ -11653,8 +11666,7 @@ function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé<
 
 var DETAIL_MATELAS_BASE='Aspiration en profondeur • Nettoyage vapeur ou injection-extraction • <strong>Recto ET verso systématiquement traités</strong> • Traitement anti-acariens standard';
 function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
-  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.matelas+'</span></div>'+
-  '<div class="field-group"><label>Taille</label><div class="options-grid">'+
+  '<div class="field-group"><label>Taille</label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.matelas+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">90x190 cm</button>'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">140x190 cm</button>'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="C" onclick="selOpt(this)">160x200 cm</button>'+
@@ -11670,9 +11682,8 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
 
 var DETAIL_TERRASSE_BASE='Balayage et dégagement • Nettoyage haute pression ou brossage adapté au revêtement • Démoussage • Rinçage';
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
-  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.terrasse+'</span></div>'+
   quantiteBlock('Surface exacte (en m²)','Ex: 34')+
-  '<div class="field-group"><label>Type de sol</label><div class="options-grid">'+
+  '<div class="field-group"><label>Type de sol</label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.terrasse+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)"><i data-lucide="grid-3x3" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Carrelage</button>'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="bois_composite" onclick="selOpt(this)"><i data-lucide="trees" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Bois/composite</button>'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="beton" onclick="selOpt(this)"><i data-lucide="square" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Béton</button>'+
@@ -11683,8 +11694,7 @@ function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrass
   etatBlock()+descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
 
 function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Quel type d\'intervention souhaitez-vous ?</div>'+
-  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.piscine+'</span></div>'+
-  '<div class="field-group"><label>Type d\'intervention</label><div class="options-grid">'+
+  '<div class="field-group"><label>Type d\'intervention</label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.piscine+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="entretien" onclick="selOpt(this)">Entretien simple<br><span style="font-weight:400;font-size:11px">(pH, skimmer, contrôle)</span></button>'+
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="complet" onclick="selOpt(this)">Nettoyage complet<br><span style="font-weight:400;font-size:11px">(parois, fond, filtre)</span></button>'+
   '<button class="opt-btn full" data-group="pisc-int" data-coef-key="intervention" data-coef-val="eau_verte" onclick="selOpt(this)">Eau verte / remise en état</button></div></div>'+
@@ -11701,8 +11711,7 @@ function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</d
   etatBlock()+descBlock('Ex: Eau verte...')+dateTimeBlock(isLastInFlow())+sendBtn('piscine')}
 
 function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
-  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.toiture+'</span></div>'+
-  '<div class="field-group"><label>Type de toiture</label><div class="options-grid">'+
+  '<div class="field-group"><label>Type de toiture</label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.toiture+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="tuiles" onclick="selOpt(this)"><i data-lucide="home" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Tuiles</button>'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="ardoises" onclick="selOpt(this)"><i data-lucide="layers" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Ardoises</button>'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="fibrociment" onclick="selOpt(this)"><i data-lucide="square" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Fibrociment</button>'+
@@ -11712,8 +11721,7 @@ function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</d
 
 var DETAIL_VITRES_BASE='Nettoyage des vitres, cadres et rebords • Produit anti-traces • Rez-de-chaussée et étages standards accessibles';
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
-  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.vitres+'</span></div>'+
-  '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
+  '<div class="field-group"><label>Type de bien</label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.vitres+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this);afficherQuantiteVitres(\'maison\')"><span>🏠</span>Maison</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this);afficherQuantiteVitres(\'appartement\')"><span>🏘️</span>Appartement</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this);afficherQuantiteVitres(\'commerce\')"><span>🏪</span>Commerce</button>'+
@@ -11861,8 +11869,7 @@ function calculerSurfaceVitresDepuisCompteur(){
 
 var DETAIL_TAPIS_BASE='Dépoussiérage en profondeur • Shampoing ou nettoyage à sec adapté à la matière • Détachage courant • Désodorisation légère';
 function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><div class="modal-sub">Matière et surface</div>'+
-  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.tapis+'</span></div>'+
-  '<div class="field-group"><label>Matière des tapis <span class="etiquette-multi">plusieurs choix possibles</span></label><div class="options-grid">'+
+  '<div class="field-group"><label>Matière des tapis <span class="etiquette-multi">plusieurs choix possibles</span></label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.tapis+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="synthetique" onclick="selMatiere(this)">Synthétique</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="coton" onclick="selMatiere(this)">Coton</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="jute_sisal" onclick="selMatiere(this)">Jute / Sisal</button>'+
