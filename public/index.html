@@ -14,6 +14,9 @@
      Ne pas déplacer, ne pas fusionner avec la feuille principale. -->
 <style id="style-critique">
   html { background: #062E34; }
+  /* Valeur de repli : sans elle, la barre du bas serait positionnée à
+     « bottom: » vide avant l'exécution du script. */
+  :root { --decalage-barre: 0px; }
   body { background: #F6F6FB; margin: 0; }
   /* L'écran de démarrage est peint immédiatement, avant même que la feuille
      principale ne soit lue. */
@@ -464,7 +467,36 @@ i[data-lucide] {
    `svh` correspond à la hauteur quand la barre est VISIBLE : elle ne bouge
    jamais. L'écran reste au moins aussi haut que le plus petit affichage
    possible, et grandit avec son contenu comme avant. */
-.screen { display: none; min-height: 100vh; min-height: 100svh; flex-direction: column; }
+/* ── LE REBOND ÉLASTIQUE D'iOS ──────────────────────────────────────────────
+   Épinglée sur l'écran d'accueil d'un iPhone, l'application n'a plus de barre
+   d'adresse — mais le DOCUMENT ENTIER reste élastique. Toucher le bas de
+   l'écran le fait rebondir, et sur iOS un élément en `position: fixed` rebondit
+   AVEC lui. C'est le soulèvement de la barre du bas, et il se déclenche
+   exactement au geste que vous décrivez : appuyer sur les icônes.
+
+   La réponse est structurelle : le document ne défile plus du tout. C'est
+   l'écran actif qui défile, à l'intérieur d'une hauteur fixe. Un élément fixé
+   n'a alors plus rien avec quoi rebondir.
+
+   C'est l'architecture de toutes les applications installables sérieuses, et
+   celle qu'iOS attend d'une application épinglée. */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  /* Coupe le rebond au niveau du document, pour les navigateurs qui le gèrent. */
+  overscroll-behavior: none;
+}
+
+.screen {
+  display: none;
+  /* L'écran occupe toute la hauteur disponible et devient LE conteneur de
+     défilement. `min-height` laissait le document grandir ; `height` le borne. */
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  flex-direction: column;
+}
 .screen.active { display: flex; }
 
 .home-content, .pro-content, .profile-content {
@@ -642,8 +674,15 @@ i[data-lucide] {
    sans eux, la barre s'étalerait sur toute la largeur d'un écran d'ordinateur
    alors que l'application est centrée sur 560 px. */
 .bottom-nav {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  /* Fixée à la fenêtre, hors du conteneur qui défile. Comme le document ne
+     bouge plus, elle ne peut plus rebondir avec lui. */
+  position: fixed; z-index: 100;
+  /* --decalage-barre vaut zéro la plupart du temps, et la hauteur de la barre
+     d'adresse d'Android quand elle est visible. Sans lui, la barre du bas
+     passe derrière elle. */
+  bottom: var(--decalage-barre, 0px); left: 0; right: 0;
   max-width: 560px; margin: 0 auto;
+  transition: bottom .12s linear;
   display: grid; grid-template-columns: repeat(4, 1fr);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   backdrop-filter: saturate(180%) blur(16px);
@@ -1413,6 +1452,10 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
    On borne l'écran de discussion — et LUI SEUL. Les autres écrans doivent
    continuer de grandir : c'est la page qui défile, et c'est voulu. */
 #s-chat.active {
+  /* `.screen` porte désormais height:100% : cette règle ne sert plus qu'à
+     empêcher la discussion de défiler au niveau de l'écran, puisque c'est
+     .chat-messages qui doit le faire. */
+  overflow: hidden;
   height: 100vh;
   /* Ici `dvh` est le bon choix : la discussion doit occuper TOUT l'espace
      réellement disponible, barre rétractée ou non — sinon le champ de saisie
@@ -4958,6 +5001,47 @@ function majIconeTheme(){
   if(themeMemorise)document.documentElement.setAttribute('data-theme',themeMemorise);
 })();
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA BARRE DU BAS ET LA FENÊTRE VISUELLE D'ANDROID
+//
+// `position: fixed` colle un élément à la fenêtre DE MISE EN PAGE. Sur Android,
+// ce n'est pas la même chose que la fenêtre VISIBLE : quand la barre d'adresse
+// de Chrome réapparaît — et elle réapparaît dès qu'on touche le bas de l'écran
+// — elle recouvre les soixante derniers pixels sans que la mise en page change.
+//
+// La barre reste donc à sa place dans le document, mais se retrouve DERRIÈRE
+// la barre d'adresse, ou décalée si le navigateur compense. C'est le
+// soulèvement qu'on voit en appuyant sur les icônes du bas, et c'est
+// précisément le geste qui fait réapparaître la barre d'adresse.
+//
+// visualViewport donne la vraie zone visible. On décale la barre de l'écart
+// entre les deux fenêtres — zéro la plupart du temps, soixante pixels pendant
+// que la barre d'adresse est là.
+// ─────────────────────────────────────────────────────────────────────────────
+(function(){
+  var vv = window.visualViewport;
+  if (!vv) return;   // navigateurs anciens : le comportement d'avant, sans pire
+
+  var enAttente = false;
+  function ajusterBarres(){
+    enAttente = false;
+    // Ce que la fenêtre visible laisse dépasser sous elle.
+    var dessous = Math.max(0, (innerHeight - vv.height - vv.offsetTop));
+    document.documentElement.style.setProperty('--decalage-barre', dessous + 'px');
+  }
+  function planifier(){
+    // On passe par requestAnimationFrame : ces événements se déclenchent en
+    // rafale pendant le défilement, et recalculer à chaque fois ferait
+    // saccader ce qu'on essaie justement de stabiliser.
+    if (enAttente) return;
+    enAttente = true;
+    requestAnimationFrame(ajusterBarres);
+  }
+  vv.addEventListener('resize', planifier);
+  vv.addEventListener('scroll', planifier);
+  ajusterBarres();
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSOLE DE DIAGNOSTIC
