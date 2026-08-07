@@ -11438,9 +11438,13 @@ function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="berbere" onclick="selMatiere(this)">Berbère</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="laine" onclick="selMatiere(this)">Laine</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="soie" onclick="selMatiere(this)">Soie / Tapis d\'Orient</button></div>'+
-  '<div id="tapis-comptes-matiere" class="comptes-matiere" style="display:none"></div>'+
+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TAPIS_BASE+'</div></div>'+
   '<div class="field-group" id="tapis-tailles-global"><label>Vos tapis</label>'+
+  // La grille par matière vit DANS cette étape. Avant, elle était une zone
+  // séparée et masquer le bloc de tailles laissait l'étape « Vos tapis »
+  // entièrement vide — une question sur huit qui n'affichait rien.
+  '<div id="tapis-comptes-matiere" class="comptes-matiere" style="display:none"></div>'+
   '<div style="font-size:11.5px;color:var(--gray);margin-bottom:10px">Pas besoin de mesurer — indiquez combien vous en avez de chaque taille (plusieurs tapis possibles).</div>'+
   '<div style="display:flex;flex-direction:column;gap:10px">'+
     compteurTapisHtml('petit','Petit','Descente de lit, couloir')+
@@ -11545,10 +11549,14 @@ function majComptesParMatiere(racine){
   var choisies = (racine || document).querySelectorAll('[data-group="tapis-mat"].sel');
   var blocGlobal = (racine || document).querySelector('#tapis-tailles-global');
 
+  // Les compteurs de taille eux-mêmes, pas le bloc qui les contient : masquer
+  // le bloc viderait l'étape « Vos tapis » et laisserait une question blanche.
+  var compteursTaille = (racine || document).querySelectorAll(
+    '#tapis-tailles-global > div:not(#tapis-comptes-matiere)');
+
   if(choisies.length < 2){
     zone.innerHTML=''; zone.style.display='none';
-    // Avec une seule matière, le bloc global suffit et reste la source.
-    if(blocGlobal) blocGlobal.style.display='';
+    compteursTaille.forEach(function(d){ d.style.display=''; });
     return;
   }
 
@@ -11589,10 +11597,11 @@ function majComptesParMatiere(racine){
     '<div class="aide-compte-matiere">Indiquez les tailles et l\'état pour chaque matière. Le prestataire prépare son matériel et son temps à partir de ces informations.</div>'+
     lignes;
 
-  // Le bloc global devient la somme des lignes : on le masque pour qu'il n'y
-  // ait qu'UNE source. Deux endroits où saisir la même chose finiraient par
-  // se contredire, et le prix suivrait le mauvais.
-  if(blocGlobal) blocGlobal.style.display='none';
+  // Les compteurs de taille deviennent la somme des lignes : on les masque pour
+  // qu'il n'y ait qu'UNE source. Deux endroits où saisir la même chose
+  // finiraient par se contredire, et le prix suivrait le mauvais.
+  // Le bloc, lui, reste : c'est le contenu de l'étape « Vos tapis ».
+  compteursTaille.forEach(function(d){ d.style.display='none'; });
   recalculerTapis();
 }
 
