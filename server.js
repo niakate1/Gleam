@@ -1958,7 +1958,11 @@ async function expirerDemandesEnRetard(demandes) {
       const dateCreneau = creneauVersInstant(d.creneau);
       if (dateCreneau) {
         const heuresDepassement = (maintenant - dateCreneau) / (1000 * 60 * 60);
-        if (heuresDepassement > 3) {
+        // Une heure, pas trois. Le délai couvre un retard réel du prestataire
+        // ou un paiement de dernière minute — au-delà, la prestation n'aura
+        // pas lieu, et laisser la demande visible fait perdre du temps au
+        // prestataire comme au client.
+        if (heuresDepassement > 1) {
           aExpirer.push(d.id);
           if (d.statut === 'acceptee') aExpirerAcceptees.push(d.id);
         }
@@ -1968,6 +1972,52 @@ async function expirerDemandesEnRetard(demandes) {
   if (aExpirer.length) {
     await supabase.from('demandes').update({ statut: 'expiree' }).in('id', aExpirer);
     demandes.forEach(d => { if (aExpirer.includes(d.id)) d.statut = 'expiree'; });
+
+    // ── PRÉVENIR LE CLIENT ──────────────────────────────────────────────
+    // Sans ce message, la demande disparaît en silence : le client attend des
+    // devis qui ne viendront jamais et n'a aucune raison d'en refaire une.
+    // C'est la façon la plus sûre de perdre quelqu'un qui était prêt à payer.
+    //
+    // L'envoi ne bloque jamais l'expiration elle-même : si l'e-mail échoue, la
+    // demande reste close. L'inverse — garder une demande morte parce qu'un
+    // courriel n'est pas parti — serait bien pire.
+    try {
+      const expirees = demandes.filter(d => aExpirer.includes(d.id));
+      const clientIds = [...new Set(expirees.map(d => d.client_id).filter(Boolean))];
+      if (clientIds.length) {
+        const { data: clients } = await supabase.from('users')
+          .select('id, prenom, email').in('id', clientIds);
+        const parId = {};
+        (clients || []).forEach(c => { parId[c.id] = c; });
+
+        // Un devis reçu mais non réglé n'est pas la même histoire qu'un secteur
+        // sans prestataire disponible. Le message le dit.
+        const { data: devisExistants } = await supabase.from('devis')
+          .select('demande_id').in('demande_id', aExpirer);
+        const avecDevis = new Set((devisExistants || []).map(v => v.demande_id));
+
+        for (const d of expirees) {
+          const client = parId[d.client_id];
+          if (!client) continue;
+          const donnees = {
+            prenom: client.prenom || '',
+            prestation: d.prestation || d.type_prestation || 'nettoyage',
+            creneau: d.creneau || 'la date prévue',
+            demandeId: d.id,
+            avaitDevis: avecDevis.has(d.id)
+          };
+          sendEmail('demande_expiree', client.email, donnees)
+            .catch(err => console.error('Email expiration demande:', err.message));
+          envoyerNotificationPush(d.client_id, {
+            titre: 'Votre demande a expiré',
+            corps: 'Le créneau du ' + donnees.creneau + ' est passé. Vous pouvez refaire une demande à une autre date.',
+            url: '/#nouvelle-demande'
+          }).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.error('Notification d\'expiration ignorée:', err.message);
+    }
   }
   if (aExpirerAcceptees.length) {
     // Annule le(s) devis "accepté" resté(s) sans paiement, pour ne pas laisser un devis "accepté"
