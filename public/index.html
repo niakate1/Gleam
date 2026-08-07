@@ -1899,6 +1899,20 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 .inclus-prestation strong { display: block; color: var(--text); margin-bottom: 4px; }
 
+/* Une étape sans aucun choix à proposer est retirée du parcours. `!important`
+   parce que l'assistant écrit style.display sur les étapes : sans lui, elle
+   réapparaîtrait au premier changement d'écran. */
+.assistant-etape.etape-ignoree { display: none !important; }
+
+/* La bascule de disponibilité ne dit pas la même chose que les autres.
+   Une notification désactivée est un choix sans conséquence ; un prestataire
+   indisponible ne reçoit plus AUCUNE demande. Le gris ne signalait rien —
+   on ne voyait pas qu'on s'était coupé du service.
+   L'ambre dit « attention », sans dire « erreur » : c'est un état volontaire,
+   mais qu'il faut voir. */
+#dispo-toggle { background: var(--amber); }
+#dispo-toggle.on { background: var(--green); }
+
 /* Une option qui ressemble à ce qui est déjà inclus doit dire ce qu'elle
    ajoute. Le ton est informatif, pas commercial : on explique une différence
    de technique, on ne pousse pas à la vente. */
@@ -10952,14 +10966,24 @@ function activerAssistantEtapes(){
   majBarreProgression();
   ajouterBoutonSuivant();
 }
+// Nom appelé depuis le formulaire voiture quand une étape devient sans objet.
+function majProgressionAssistant(){ majBarreProgression(); }
+
 function majBarreProgression(){
   var barre=document.getElementById('assistant-progression');
   if(!barre||!assistantEtapes.length)return;
-  var total=assistantEtapes.length;
-  var pct=Math.round(((assistantIndexActuel+1)/total)*100);
+  // On ne compte que les étapes réellement posées. Annoncer « 2 sur 11 » quand
+  // deux d'entre elles sont sautées fait croire à un formulaire plus long
+  // qu'il n'est — et le compteur se met à faire des bonds inexpliqués.
+  var utiles=[];
+  assistantEtapes.forEach(function(e,i){ if(!etapeAssistantIgnoree(e)) utiles.push(i); });
+  var total=utiles.length || assistantEtapes.length;
+  var rang=utiles.indexOf(assistantIndexActuel);
+  var courante=(rang>=0?rang:0)+1;
+  var pct=Math.round((courante/total)*100);
   barre.innerHTML=
     '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray);font-weight:700;margin-bottom:6px">'+
-      '<span>Question '+(assistantIndexActuel+1)+' sur '+total+'</span>'+
+      '<span>Question '+courante+' sur '+total+'</span>'+
     '</div>'+
     '<div style="height:5px;background:var(--surface-alt);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--p);border-radius:3px;transition:width .25s"></div></div>';
 }
@@ -11003,22 +11027,43 @@ function ajouterBoutonSuivant(){
     etape.appendChild(nav);
   });
 }
+// Une étape porteuse de « etape-ignoree » n'a plus rien à proposer — les
+// options d'intérieur d'une voiture dont on ne lave que l'extérieur, par
+// exemple. La masquer ne suffisait pas : la navigation s'y arrêtait quand
+// même, et on tombait sur un écran vide, sans titre et sans bouton.
+function etapeAssistantIgnoree(etape){
+  return !!etape && etape.classList.contains('etape-ignoree');
+}
+// Cherche la prochaine étape utile dans un sens donné. Renvoie -1 s'il n'y en
+// a plus : on reste alors où l'on est plutôt que de sortir du formulaire.
+function prochaineEtapeUtile(depart, sens){
+  var i = depart + sens;
+  while(i >= 0 && i < assistantEtapes.length){
+    if(!etapeAssistantIgnoree(assistantEtapes[i])) return i;
+    i += sens;
+  }
+  return -1;
+}
+
 function assistantEtapeSuivante(){
   if(!assistantEtapes.length)return;
   var etapeActuelle=assistantEtapes[assistantIndexActuel];
   var erreur=validerEtapeAssistant(etapeActuelle);
   if(erreur){toast('❌ '+erreur);return}
-  if(assistantIndexActuel>=assistantEtapes.length-1)return;
+  var cible=prochaineEtapeUtile(assistantIndexActuel, 1);
+  if(cible<0)return;
   etapeActuelle.style.display='none';
-  assistantIndexActuel++;
+  assistantIndexActuel=cible;
   assistantEtapes[assistantIndexActuel].style.display='block';
   majBarreProgression();
   document.getElementById('modal-body').scrollTop=0;
 }
 function assistantEtapePrecedente(){
-  if(!assistantEtapes.length||assistantIndexActuel<=0)return;
+  if(!assistantEtapes.length)return;
+  var cible=prochaineEtapeUtile(assistantIndexActuel, -1);
+  if(cible<0)return;
   assistantEtapes[assistantIndexActuel].style.display='none';
-  assistantIndexActuel--;
+  assistantIndexActuel=cible;
   assistantEtapes[assistantIndexActuel].style.display='block';
   majBarreProgression();
   document.getElementById('modal-body').scrollTop=0;
@@ -11599,7 +11644,11 @@ function afficherDetailNettoyage(type){
   var etapeOptions=document.getElementById('etape-options-voiture');
   if(etapeOptions){
     var conteneur=etapeOptions.closest('.assistant-etape')||etapeOptions;
-    conteneur.style.display=pertinent?'':'none';
+    // On passe par une CLASSE, jamais par style.display. L'assistant pilote
+    // lui-même l'affichage des étapes : en remettant display:'' je rendais
+    // visible une étape qu'il avait masquée, et deux écrans se superposaient —
+    // d'où les deux boutons « Suivant » sur la même page.
+    conteneur.classList.toggle('etape-ignoree', !pertinent);
     if(typeof majProgressionAssistant==='function')majProgressionAssistant();
   }
 
