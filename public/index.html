@@ -1888,6 +1888,30 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   transition: color var(--dur-fast) var(--ease-out);
 }
 
+/* Ce que la prestation de base recouvre, annoncé AVANT les options. Un client
+   qui ne sait pas ce qu'il achète ne peut pas juger si une option lui sert. */
+.inclus-prestation {
+  background: var(--surface-alt);
+  border-radius: var(--r-sm);
+  padding: 12px 13px;
+  margin-bottom: var(--gap-4);
+  font-size: 12.5px; line-height: 1.6; color: var(--text-secondary);
+}
+.inclus-prestation strong { display: block; color: var(--text); margin-bottom: 4px; }
+
+/* Une option qui ressemble à ce qui est déjà inclus doit dire ce qu'elle
+   ajoute. Le ton est informatif, pas commercial : on explique une différence
+   de technique, on ne pousse pas à la vente. */
+.note-option {
+  background: var(--surface-alt);
+  border-left: 3px solid var(--border-fort);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 11px 13px;
+  margin-top: 10px;
+  font-size: 12px; line-height: 1.55; color: var(--text-secondary);
+}
+.note-option strong { color: var(--text); }
+
 /* Compteur par matière de tapis. */
 .comptes-matiere { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .comptes-matiere label { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
@@ -6413,7 +6437,7 @@ function afficherDetailsVoiturePro(p){
   if(palier&&GUIDE_PRO_NETTOYAGE_VOITURE[palier]){
     var etapes=GUIDE_PRO_NETTOYAGE_VOITURE[palier].slice();
     if(Array.isArray(d['voit-options'])&&d['voit-options'].some(function(o){return o.indexOf('Shampouinage')>=0})){
-      etapes.push('Shampouinage sièges et tapis (option choisie par le client)');
+      etapes.push('Shampouinage en profondeur des sièges et tapis (option choisie par le client)');
     }
     guideHtml='<div style="background:var(--light);border-radius:8px;padding:10px;margin-top:6px">'+
       '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">📋 Étapes à suivre</div>'+
@@ -11520,8 +11544,29 @@ async function updateEstimationMaintenant(){
 // Détail de ce qu'inclut chaque type de nettoyage voiture — basé sur les prestations réellement
 // proposées par les services comparables en France (Yoojo, Wash&Check, AutoCleans), pour rester
 // juste et concret plutôt que vague.
+// ── CE QUI EST INCLUS, POUR CHAQUE PRESTATION ──────────────────────────────
+// La voiture était la SEULE à annoncer son contenu. Pour un canapé, un
+// matelas ou une terrasse, le client choisissait des options sans savoir ce
+// que la prestation de base recouvrait — il ne pouvait même pas repérer une
+// contradiction, il naviguait à l'aveugle.
+//
+// Chaque texte dit ce qui est FAIT, pas ce qui est promis : le prestataire
+// doit pouvoir s'y tenir, et le client doit pouvoir le lui opposer.
+var DETAIL_PRESTATIONS={
+  canape:'Aspiration en profondeur (assise, dossier, accoudoirs, dessous des coussins) • Traitement des taches courantes • Shampouinage ou nettoyage vapeur selon la matière • Séchage accéléré',
+  matelas:'Aspiration des deux faces • Traitement anti-acariens de base • Détachage des marques courantes • Désinfection vapeur • Séchage accéléré',
+  tapis:'Dépoussiérage et aspiration en profondeur • Shampouinage adapté à la matière • Détachage des marques courantes • Séchage',
+  vitres:'Nettoyage des deux faces • Encadrements et rebords • Rainures et joints • Finition sans traces',
+  terrasse:'Nettoyage haute pression ou brossage selon le revêtement • Traitement des mousses et lichens • Rinçage complet',
+  piscine:'Nettoyage du fond et des parois • Écumage de la surface • Nettoyage des skimmers et du panier de pompe • Contrôle du niveau d\'eau',
+  toiture:'Démoussage • Nettoyage des gouttières • Rinçage • Évacuation des déchets'
+};
+
 var DETAIL_NETTOYAGE_VOITURE={
-  interieur:'Aspiration complète (habitacle + coffre inclus) • Dépoussiérage plastiques et tableau de bord • Nettoyage des sièges (tissu ou cuir, produit adapté) • Nettoyage des vitres intérieures',
+  // « Nettoyage de surface » et non « nettoyage » : le client lisait qu'on
+  // nettoyait déjà les sièges, puis qu'on lui vendait le shampouinage des
+  // sièges. Nommer la différence supprime la contradiction sans rien retirer.
+  interieur:'Aspiration complète des sols, tapis, habitacle et coffre • Dépoussiérage des plastiques et du tableau de bord • Nettoyage <strong>de surface</strong> des sièges (essuyage au produit adapté, tissu ou cuir) • Nettoyage des vitres intérieures',
   exterieur:'Lavage main de la carrosserie • Nettoyage jantes et pneus • Nettoyage des vitres extérieures • Application d\'une cire de finition',
   complet:'L\'intégralité du nettoyage intérieur et extérieur — généralement plus avantageux que les deux séparément'
 };
@@ -11531,7 +11576,14 @@ function afficherDetailNettoyage(type){
   // Le shampouinage sièges/tapis n'a de sens que si l'intérieur est concerné — les
   // professionnels du secteur le réservent d'ailleurs explicitement aux prestations intérieures.
   var shampBtn=document.getElementById('opt-shampouinage');
-  if(shampBtn)shampBtn.style.display=(type==='interieur'||type==='complet')?'':'none';
+  var pertinent=(type==='interieur'||type==='complet');
+  if(shampBtn)shampBtn.style.display=pertinent?'':'none';
+
+  // Une option qui ressemble à ce qui est déjà inclus doit dire ce qu'elle
+  // ajoute. Sans cette phrase, le client croit payer deux fois la même chose
+  // et renonce — ou accepte en se sentant floué.
+  var noteShamp=document.getElementById('note-shampouinage');
+  if(noteShamp)noteShamp.style.display=pertinent?'':'none';
 }
 function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
@@ -11540,7 +11592,12 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this);afficherDetailNettoyage(\'complet\')"><span>✨</span>Intérieur + Extérieur</button></div>'+
   '<div id="detail-nettoyage-box"></div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
-  '<button class="opt-btn full" id="opt-shampouinage" style="display:none" data-group="voit-options" data-option-val="shampouinage" onclick="toggleOption(this)"><span>🧴</span>Shampouinage sièges et tapis</button>'+
+  '<button class="opt-btn full" id="opt-shampouinage" style="display:none" data-group="voit-options" data-option-val="shampouinage" onclick="toggleOption(this)"><span>🧴</span>Shampouinage en profondeur des sièges et tapis</button>'+
+  '<div id="note-shampouinage" class="note-option" style="display:none">'+
+    '<strong>Nettoyage de surface</strong> — inclus : aspiration et essuyage au produit adapté.<br>'+
+    '<strong>Shampouinage</strong> — en option : la mousse est injectée dans la fibre puis réaspirée, '+
+    'avec les taches et les odeurs incrustées. Utile sur un siège taché, pas sur un siège simplement poussiéreux.'+
+  '</div>'+
   '<button class="opt-btn" data-group="voit-options" data-option-val="poils_animaux" onclick="toggleOption(this)"><span>🐾</span>Poils d\'animaux</button>'+
   '<button class="opt-btn" data-group="voit-options" data-option-val="tres_sale" onclick="toggleOption(this)"><span>🤢</span>Habitacle très sale / encrassé</button>'+
   '<button class="opt-btn" data-group="voit-options" data-option-val="rangement" onclick="toggleOption(this)"><span>🧳</span>Rangement d\'effets personnels</button>'+
@@ -11569,6 +11626,7 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
 // plupart des professionnels du secteur — recherche de marché à l'appui.
 var DETAIL_CANAPE_BASE='Aspiration approfondie • Nettoyage vapeur ou injection-extraction • Détachage courant';
 function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
+  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.canape+'</span></div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span>➖</span>Droit</button>'+
   '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="angle" onclick="selOpt(this)"><span>📐</span>Angle</button>'+
@@ -11595,6 +11653,7 @@ function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé<
 
 var DETAIL_MATELAS_BASE='Aspiration en profondeur • Nettoyage vapeur ou injection-extraction • <strong>Recto ET verso systématiquement traités</strong> • Traitement anti-acariens standard';
 function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
+  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.matelas+'</span></div>'+
   '<div class="field-group"><label>Taille</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">90x190 cm</button>'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">140x190 cm</button>'+
@@ -11611,6 +11670,7 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
 
 var DETAIL_TERRASSE_BASE='Balayage et dégagement • Nettoyage haute pression ou brossage adapté au revêtement • Démoussage • Rinçage';
 function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
+  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.terrasse+'</span></div>'+
   quantiteBlock('Surface exacte (en m²)','Ex: 34')+
   '<div class="field-group"><label>Type de sol</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)"><i data-lucide="grid-3x3" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Carrelage</button>'+
@@ -11623,6 +11683,7 @@ function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrass
   etatBlock()+descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
 
 function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Quel type d\'intervention souhaitez-vous ?</div>'+
+  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.piscine+'</span></div>'+
   '<div class="field-group"><label>Type d\'intervention</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="entretien" onclick="selOpt(this)">Entretien simple<br><span style="font-weight:400;font-size:11px">(pH, skimmer, contrôle)</span></button>'+
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="complet" onclick="selOpt(this)">Nettoyage complet<br><span style="font-weight:400;font-size:11px">(parois, fond, filtre)</span></button>'+
@@ -11640,6 +11701,7 @@ function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</d
   etatBlock()+descBlock('Ex: Eau verte...')+dateTimeBlock(isLastInFlow())+sendBtn('piscine')}
 
 function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
+  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.toiture+'</span></div>'+
   '<div class="field-group"><label>Type de toiture</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="tuiles" onclick="selOpt(this)"><i data-lucide="home" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Tuiles</button>'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="ardoises" onclick="selOpt(this)"><i data-lucide="layers" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Ardoises</button>'+
@@ -11650,6 +11712,7 @@ function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</d
 
 var DETAIL_VITRES_BASE='Nettoyage des vitres, cadres et rebords • Produit anti-traces • Rez-de-chaussée et étages standards accessibles';
 function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
+  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.vitres+'</span></div>'+
   '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this);afficherQuantiteVitres(\'maison\')"><span>🏠</span>Maison</button>'+
   '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this);afficherQuantiteVitres(\'appartement\')"><span>🏘️</span>Appartement</button>'+
@@ -11798,6 +11861,7 @@ function calculerSurfaceVitresDepuisCompteur(){
 
 var DETAIL_TAPIS_BASE='Dépoussiérage en profondeur • Shampoing ou nettoyage à sec adapté à la matière • Détachage courant • Désodorisation légère';
 function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><div class="modal-sub">Matière et surface</div>'+
+  '<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.tapis+'</span></div>'+
   '<div class="field-group"><label>Matière des tapis <span class="etiquette-multi">plusieurs choix possibles</span></label><div class="options-grid">'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="synthetique" onclick="selMatiere(this)">Synthétique</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="coton" onclick="selMatiere(this)">Coton</button>'+
