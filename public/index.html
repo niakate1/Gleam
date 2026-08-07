@@ -190,18 +190,23 @@
     --light:          #103238;
     --aqua:           #56C97F;
     --aqua-clair:     #16331F;
-    --mint:           #2FD8BE;
+    --mint:           #56C97F;
     --gold:           #F5C542;
     --gold-clair:     #3A2C0C;
 
-    --bg:             #0C0B18;
-    --surface:        #16152A;
-    --surface-alt:    #201E38;
-    --border:         #2E2C4A;
-    --border-fort:    #423F63;
-    --text:           #EDECF5;
-    --text-secondary: #C2C0D6;
-    --gray:           #8F8DA8;
+    /* Ces neutres étaient restés violacés. C'est le thème sombre AUTOMATIQUE :
+       il s'applique quand le téléphone est en mode sombre, sans que
+       l'utilisateur ait rien choisi dans Gleam. Le bloc [data-theme="dark"],
+       lui, avait bien été corrigé — d'où l'incohérence entre un mode sombre
+       activé à la main, en pétrole, et le même mode subi, en violet. */
+    --bg:             #080F11;
+    --surface:        #111C1F;
+    --surface-alt:    #18272B;
+    --border:         #25383D;
+    --border-fort:    #365055;
+    --text:           #E9EFF0;
+    --text-secondary: #B6C6C8;
+    --gray:           #7E9296;
 
     --green:          #34D399;
     --green-clair:    #10352A;
@@ -1294,7 +1299,7 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
   position: absolute; top: 3px; right: 3px;
   width: 20px; height: 20px;
   border: none; border-radius: 50%;
-  background: rgba(12,11,24,.7);
+  background: rgba(6,20,23,.72);
   color: #fff; font-size: 12px; line-height: 1;
   cursor: pointer;
 }
@@ -1578,7 +1583,7 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
   max-width: min(90%, 420px);
   padding: 13px 18px;
   border-radius: var(--r-md);
-  background: #201E38;
+  background: #14262A;
   color: #fff;
   font-size: 14px; font-weight: 600;
   text-align: left; line-height: 1.4;
@@ -1589,7 +1594,7 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast-success { background: #075E4A; }
 .toast-error   { background: #7F1D1D; }
-.toast-warning { background: #201E38; }
+.toast-warning { background: #14262A; }
 
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -3012,7 +3017,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   transform: translateX(-50%) translateY(14px);
   width: min(calc(100% - 32px), 420px);
   display: flex; flex-direction: column; gap: 10px;
-  background: #201E38; color: #fff;
+  background: #14262A; color: #fff;
   border-radius: var(--r-md);
   padding: 13px 16px;
   box-shadow: var(--shadow-xl);
@@ -3540,22 +3545,36 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 
 /* Réputation, dans le bandeau du profil prestataire. Fond translucide plutôt
    qu'opaque : elle appartient à l'en-tête, elle ne s'y superpose pas. */
+/* ── LE BLOC DE RÉPUTATION ÉTAIT ILLISIBLE ──────────────────────────────────
+   Il avait été dessiné POUR l'ancien bandeau violet : texte blanc et fonds en
+   rgba(255,255,255,…), c'est-à-dire du blanc translucide sur une couleur
+   foncée.
+
+   En le sortant de l'en-tête avant-hier, je l'ai posé sur un fond clair sans
+   toucher à ses couleurs. Du blanc sur du blanc : les trois chiffres
+   existaient, s'affichaient, et ne se voyaient pas. C'est le « bandeau
+   transparent » que vous signaliez depuis deux jours.
+
+   Il reprend les couleurs du reste de l'application. */
 .reputation {
   display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 1px; margin-top: 16px;
-  background: rgba(255,255,255,.18);
-  border-radius: var(--r-sm);
-  overflow: hidden;
+  gap: 8px; margin-top: 16px; margin-bottom: var(--gap-4);
 }
-.reputation > div { background: rgba(255,255,255,.12); padding: 10px 6px; }
+.reputation > div {
+  background: var(--light); border-radius: var(--r-sm);
+  padding: 11px 8px; text-align: center;
+}
 .reputation strong {
   display: block;
   font-family: 'Fraunces', Georgia, serif;
   font-variation-settings: 'opsz' 32;
-  font-size: 18px; font-weight: 600; color: #fff;
+  font-size: 19px; font-weight: 700; color: var(--p);
   font-variant-numeric: tabular-nums;
 }
-.reputation span { display: block; font-size: 10.5px; color: rgba(255,255,255,.78); margin-top: 3px; line-height: 1.3; }
+.reputation span {
+  display: block; font-size: 10px; font-weight: 700;
+  color: var(--gray); text-transform: uppercase; letter-spacing: .03em;
+  margin-top: 3px; line-height: 1.3; }
 .bord-pro .valeur {
   font-family: 'Fraunces', Georgia, serif;
   font-variation-settings: 'opsz' 36;
