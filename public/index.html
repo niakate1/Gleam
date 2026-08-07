@@ -600,8 +600,50 @@ i[data-lucide] {
 }
 .back-btn:hover { background: var(--surface-alt); }
 
+/* En position fixe, la barre RECOUVRE le bas du contenu : le dernier bouton
+   d'une liste devenait inatteignable. On réserve sa hauteur — 58 px plus la
+   zone de sécurité du téléphone — sur tout écran qui en porte une. */
+/* La compensation porte sur le DERNIER élément avant la barre, quel qu'il
+   soit. Ne viser que les conteneurs de contenu laissait le pied de page légal
+   — « Mentions légales · Confidentialité » — passer dessous : il vit à côté
+   d'eux, pas dedans. */
+.screen:has(.bottom-nav) .home-content,
+.screen:has(.bottom-nav) .pro-content,
+.screen:has(.bottom-nav) .profile-content,
+.screen:has(.bottom-nav) .devis-list,
+.screen:has(.bottom-nav) .pied-de-page-legal,
+.screen:has(.bottom-nav) > *:nth-last-child(2) {
+  padding-bottom: calc(58px + var(--pad-bas) + var(--gap-4));
+}
+/* :has() n'est pas compris partout. Sans repli, le contenu passerait sous la
+   barre sur les navigateurs anciens — on réserve alors la place au niveau de
+   l'écran lui-même, ce qui est moins fin mais toujours juste. */
+@supports not selector(:has(*)) {
+  .home-content, .pro-content, .profile-content, .devis-list,
+  .pied-de-page-legal {
+    padding-bottom: calc(58px + var(--pad-bas) + var(--gap-4));
+  }
+}
+
+/* ── LA BARRE DU BAS SE SOULEVAIT ──────────────────────────────────────────
+   Elle était en `sticky`, ce qui la colle au bas du CONTENU, pas au bas de
+   l'ÉCRAN. Tant que le contenu remplit la fenêtre, les deux coïncident.
+
+   Mais `.screen` est dimensionné en `svh` — la hauteur quand la barre
+   d'adresse d'Android est VISIBLE. Dès qu'elle se rétracte, la fenêtre gagne
+   une soixantaine de pixels que l'écran ne prend pas : le contenu devient plus
+   court que la zone visible, et la barre se retrouve suspendue au-dessus du
+   bas. C'est le soulèvement que vous voyez, et il vient de ma correction `svh`.
+
+   `fixed` la fixe à la FENÊTRE. Elle ne dépend plus de la hauteur du contenu
+   ni de celle de l'écran, et ne peut plus se soulever.
+
+   La largeur maximale et le centrage reprennent ceux de `.screen.active` :
+   sans eux, la barre s'étalerait sur toute la largeur d'un écran d'ordinateur
+   alors que l'application est centrée sur 560 px. */
 .bottom-nav {
-  position: sticky; bottom: 0; z-index: 100;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  max-width: 560px; margin: 0 auto;
   display: grid; grid-template-columns: repeat(4, 1fr);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   backdrop-filter: saturate(180%) blur(16px);
