@@ -1786,6 +1786,23 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .home-hero, .entete-pro, .entete-client, .h-actuel { --fond-goutte: #0A4750; }
 .entete-interne, .entete-compte, .navbar, .page-header { --fond-goutte: var(--surface); }
 
+/* Le séparateur du pied de page sert aussi de déclencheur au diagnostic.
+   Il mesurait 4 × 17 px : impossible à viser sept fois de suite avec un doigt.
+   Le remplissage porte la zone tactile à 44 px — la taille recommandée par
+   Apple — SANS changer ce qu'on voit : le point reste un point.
+   Les marges négatives annulent l'espace ajouté, pour que le pied de page
+   garde exactement la même allure. */
+.point-diagnostic {
+  display: inline-block;
+  padding: 14px 20px;
+  margin: -14px -14px;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
 /* Compteur par matière de tapis. */
 .comptes-matiere { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .comptes-matiere label { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
@@ -3960,7 +3977,10 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
     <div class="pied-de-page-legal">
     <a onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales &amp; CGU')">Mentions légales</a>
-    <span aria-hidden="true">·</span>
+    <!-- Sept appuis ouvrent la console de diagnostic. Sept, comme sur le
+         numero de build d'Android : le geste est connu de ceux qui le
+         connaissent, invisible pour les autres. -->
+    <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
   </div>
   <div class="bottom-nav" id="nav-guest-accueil"></div>
@@ -4362,7 +4382,10 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
     <div class="pied-de-page-legal">
     <a onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales &amp; CGU')">Mentions légales</a>
-    <span aria-hidden="true">·</span>
+    <!-- Sept appuis ouvrent la console de diagnostic. Sept, comme sur le
+         numero de build d'Android : le geste est connu de ceux qui le
+         connaissent, invisible pour les autres. -->
+    <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
   </div>
   <div class="bottom-nav" id="nav-guest-messages"></div>
@@ -4394,7 +4417,10 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
     <div class="pied-de-page-legal">
     <a onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales &amp; CGU')">Mentions légales</a>
-    <span aria-hidden="true">·</span>
+    <!-- Sept appuis ouvrent la console de diagnostic. Sept, comme sur le
+         numero de build d'Android : le geste est connu de ceux qui le
+         connaissent, invisible pour les autres. -->
+    <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
   </div>
   <div class="bottom-nav" id="nav-guest-demandes"></div>
@@ -4431,7 +4457,10 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
     <div class="pied-de-page-legal">
     <a onclick="ouvrirPageInterne('mentions-legales.html','Mentions légales &amp; CGU')">Mentions légales</a>
-    <span aria-hidden="true">·</span>
+    <!-- Sept appuis ouvrent la console de diagnostic. Sept, comme sur le
+         numero de build d'Android : le geste est connu de ceux qui le
+         connaissent, invisible pour les autres. -->
+    <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
   </div>
   <div class="bottom-nav" id="nav-guest-profil"></div>
@@ -4886,6 +4915,218 @@ function majIconeTheme(){
   var themeMemorise=localStorage.getItem('gleam-theme');
   if(themeMemorise)document.documentElement.setAttribute('data-theme',themeMemorise);
 })();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSOLE DE DIAGNOSTIC
+//
+// Une console DANS l'application : pas de câble, pas d'ordinateur, rien à
+// installer. On ouvre l'écran qui bugue et on lit ce qui se passe, sur le
+// téléphone, au moment où ça se passe.
+//
+// Pourquoi pas Eruda ou vConsole : elles se chargent depuis un CDN. Une
+// dépendance de plus, 100 Ko, et un script tiers qui aurait accès aux jetons
+// de connexion de vos utilisateurs. Ces lignes-ci pèsent 6 Ko et ne dépendent
+// de rien.
+// ═══════════════════════════════════════════════════════════════════════════
+var appuisDiagnostic = 0, dernierAppuiDiagnostic = 0;
+function compterAppuisDiagnostic(){
+  var maintenant = Date.now();
+  // Les appuis doivent s'enchaîner : au-delà d'une seconde et demie, on
+  // repart de zéro. Sans cela, sept appuis étalés sur une journée
+  // finiraient par ouvrir la console chez un vrai client.
+  if (maintenant - dernierAppuiDiagnostic > 1500) appuisDiagnostic = 0;
+  dernierAppuiDiagnostic = maintenant;
+  appuisDiagnostic++;
+
+  // Sans retour, on ne sait pas si on tape au bon endroit — on abandonne en
+  // croyant que ça ne marche pas. À partir du troisième appui, le point
+  // change de couleur : c'est discret, et ça suffit à dire « continuez ».
+  if (appuisDiagnostic >= 3 && appuisDiagnostic < 7) {
+    document.querySelectorAll('.point-diagnostic').forEach(function(p){
+      p.style.color = 'var(--p)';
+    });
+    // Une vibration courte sur les appareils qui la gèrent : le doigt sait
+    // avant l'œil.
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+  }
+
+  if (appuisDiagnostic >= 7) {
+    appuisDiagnostic = 0;
+    document.querySelectorAll('.point-diagnostic').forEach(function(p){ p.style.color = ''; });
+    ouvrirConsoleGleam();
+  }
+}
+
+// Le point reprend sa couleur si l'on s'arrête en chemin.
+setInterval(function(){
+  if (appuisDiagnostic > 0 && Date.now() - dernierAppuiDiagnostic > 1500) {
+    appuisDiagnostic = 0;
+    document.querySelectorAll('.point-diagnostic').forEach(function(p){ p.style.color = ''; });
+  }
+}, 800);
+
+// Les appels réseau, gardés pour la console. On enveloppe fetch plutôt que de
+// modifier chaque appel : une seule interception, aucun risque d'en oublier.
+var journalReseau = [];
+(function(){
+  var fetchOrigine = window.fetch;
+  window.fetch = function(){
+    var debut = performance.now();
+    var url = String(arguments[0] && arguments[0].url || arguments[0] || '');
+    return fetchOrigine.apply(this, arguments).then(function(r){
+      journalReseau.push({ url: url.replace(/^https?:\/\/[^/]+/, ''), code: r.status,
+        ms: Math.round(performance.now() - debut), quand: new Date().toISOString() });
+      if (journalReseau.length > 20) journalReseau.shift();
+      return r;
+    }).catch(function(e){
+      journalReseau.push({ url: url.replace(/^https?:\/\/[^/]+/, ''), code: 'échec',
+        ms: Math.round(performance.now() - debut), quand: new Date().toISOString() });
+      if (journalReseau.length > 20) journalReseau.shift();
+      throw e;
+    });
+  };
+})();
+
+// Sauts et blocages pendant le défilement — c'est ce qui manquait pour
+// diagnostiquer le problème Android.
+var incidentsDefilement = [];
+(function(){
+  var dernierY = 0, dernierT = 0, hauteursVues = {};
+  addEventListener('scroll', function(){
+    var y = Math.round(scrollY), t = performance.now();
+    hauteursVues[innerHeight] = true;
+    if (dernierT) {
+      var dt = t - dernierT, dy = y - dernierY;
+      if (Math.abs(dy) > 240 && dt < 60)
+        incidentsDefilement.push('saut de ' + dy + ' px en ' + Math.round(dt) + ' ms');
+      if (dt > 400 && Math.abs(dy) < 3)
+        incidentsDefilement.push('blocage de ' + Math.round(dt) + ' ms');
+      if (incidentsDefilement.length > 15) incidentsDefilement.shift();
+    }
+    dernierY = y; dernierT = t;
+  }, { passive: true });
+  window.hauteursVues = hauteursVues;
+})();
+
+function ouvrirConsoleGleam(){
+  var d = document.createElement('div');
+  d.id = 'console-gleam';
+  d.style.cssText = 'position:fixed;inset:0;z-index:99998;background:#0B1416;color:#C8F0EE;' +
+    'font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.6;' +
+    'padding:calc(env(safe-area-inset-top,0px) + 12px) 12px calc(env(safe-area-inset-bottom,0px) + 12px);' +
+    'overflow-y:auto;-webkit-overflow-scrolling:touch';
+
+  var ua = navigator.userAgent;
+  var mesure = document.createElement('div');
+  mesure.style.cssText = 'position:absolute;visibility:hidden';
+  document.body.appendChild(mesure);
+  var hauteur = function(u){ mesure.style.height = u; return Math.round(mesure.getBoundingClientRect().height); };
+  var vh = hauteur('100vh'), svh = hauteur('100svh'), dvh = hauteur('100dvh');
+  mesure.remove();
+
+  var deborde = document.documentElement.scrollWidth > innerWidth + 1;
+  var titre = function(t){ return '<div style="color:#7FD9D0;font-weight:700;margin:14px 0 5px">' + t + '</div>'; };
+  var ligne = function(t, alerte){ return '<div' + (alerte ? ' style="color:#FFB86B"' : '') + '>' + t + '</div>'; };
+
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<strong style="color:#fff;font-size:14px">Diagnostic Gleam</strong>' +
+      '<button onclick="document.getElementById(\'console-gleam\').remove()" ' +
+        'style="background:#173C42;border:none;color:#C8F0EE;padding:7px 13px;border-radius:8px;' +
+        'font-family:inherit;font-size:12px">Fermer</button></div>';
+
+  html += titre('APPAREIL');
+  html += ligne('  ' + ((ua.match(/Android [\d.]+/) || ua.match(/OS \d+_\d+/) || ['système inconnu'])[0]));
+  html += ligne('  ' + ((ua.match(/(Chrome|CriOS|Safari|Firefox)\/[\d.]+/) || ['navigateur inconnu'])[0]));
+  html += ligne('  écran ' + screen.width + '×' + screen.height + ' · densité ' + (devicePixelRatio || 1));
+  html += ligne('  fenêtre ' + innerWidth + '×' + innerHeight);
+  html += ligne('  installée sur l\'écran d\'accueil : ' +
+    (matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'oui' : 'non'));
+  html += ligne('  connexion : ' + (navigator.onLine ? 'en ligne' : 'HORS LIGNE'), !navigator.onLine);
+
+  html += titre('AFFICHAGE');
+  html += ligne('  100vh=' + vh + '  100svh=' + svh + '  100dvh=' + dvh);
+  if (svh === 0) html += ligne('  ⚠ svh non reconnu — navigateur ancien', true);
+  html += ligne('  largeur document ' + document.documentElement.scrollWidth + ' / ' + innerWidth +
+    (deborde ? '  ⚠ DÉBORDE' : ''), deborde);
+  html += ligne('  hauteurs de fenêtre vues : ' + Object.keys(window.hauteursVues || {}).join(', '));
+
+  html += titre('DÉFILEMENT — ' + incidentsDefilement.length + ' incident(s)');
+  html += incidentsDefilement.length
+    ? incidentsDefilement.map(function(i){ return ligne('  ' + i, true); }).join('')
+    : ligne('  aucun saut ni blocage détecté');
+
+  html += titre('ERREURS — ' + (typeof journalErreurs !== 'undefined' ? journalErreurs.length : 0));
+  if (typeof journalErreurs !== 'undefined' && journalErreurs.length) {
+    html += journalErreurs.slice(-12).map(function(e){
+      return ligne('  [' + e.type + '] ' + e.message.slice(0, 80) + '  (' + e.ecran + ')', true);
+    }).join('');
+  } else html += ligne('  aucune erreur enregistrée');
+
+  html += titre('RÉSEAU — ' + journalReseau.length + ' dernier(s) appel(s)');
+  html += journalReseau.length
+    ? journalReseau.slice(-12).map(function(r){
+        var lent = r.ms > 1500 || r.code === 'échec' || r.code >= 400;
+        return ligne('  ' + String(r.code).padEnd(6) + r.ms + ' ms  ' + r.url.slice(0, 46), lent);
+      }).join('')
+    : ligne('  aucun appel enregistré');
+
+  html += titre('COMPTE');
+  html += ligne('  ' + (typeof currentUser !== 'undefined' && currentUser
+    ? (currentUser.type || '?') + ' · ' + (currentUser.prenom || '')
+    : 'non connecté'));
+  html += ligne('  écran actif : ' + ((document.querySelector('.screen.active') || {}).id || '—'));
+
+  html += '<div style="margin-top:18px;color:#6E8285">Copiez cet écran et envoyez-le. ' +
+    'Rien n\'est transmis automatiquement : tout reste sur cet appareil.</div>';
+
+  d.innerHTML = html;
+  document.body.appendChild(d);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JOURNAL DE BORD — les erreurs de l'application, gardées sur l'appareil
+//
+// Sentry surveille le serveur, pas le navigateur. Une erreur JavaScript côté
+// application ne laissait donc AUCUNE trace : l'écran se figeait, et il n'y
+// avait rien à lire pour comprendre.
+//
+// Ces vingt lignes gardent les cinquante dernières erreurs sur l'appareil.
+// Elles ne partent nulle part — aucun service externe, aucune donnée envoyée.
+// Il suffit de taper journalGleam() dans la console pour tout voir, ou
+// d'ouvrir « Journal technique » depuis le profil.
+// ─────────────────────────────────────────────────────────────────────────────
+var journalErreurs = [];
+function noterErreur(type, message, detail){
+  journalErreurs.push({
+    quand: new Date().toISOString(),
+    type: type,
+    message: String(message || '').slice(0, 300),
+    ou: detail || '',
+    ecran: (document.querySelector('.screen.active') || {}).id || '—'
+  });
+  if (journalErreurs.length > 50) journalErreurs.shift();
+}
+window.addEventListener('error', function(e){
+  // Les images qui ne chargent pas déclenchent aussi cet événement : on les
+  // distingue, sinon le journal se remplit de bruit.
+  if (e.target && e.target !== window && e.target.tagName) {
+    noterErreur('ressource', (e.target.src || e.target.href || '').slice(-60), e.target.tagName);
+    return;
+  }
+  noterErreur('erreur', e.message, (e.filename || '').split('/').pop() + ':' + e.lineno);
+}, true);
+window.addEventListener('unhandledrejection', function(e){
+  // Une promesse rejetée sans gestionnaire ne remonte nulle part et ne casse
+  // rien de visible — mais l'action demandée n'a pas eu lieu. C'est la cause
+  // la plus fréquente d'un bouton « qui ne fait rien ».
+  noterErreur('promesse', (e.reason && e.reason.message) || e.reason, '');
+});
+window.journalGleam = function(){
+  if (!journalErreurs.length) { console.log('Aucune erreur enregistrée.'); return []; }
+  console.table(journalErreurs);
+  return journalErreurs;
+};
 
 // Intercepte TOUTES les requêtes réseau de l'app : si une réponse 401 (session expirée/invalide)
 // arrive sur une requête authentifiée, l'utilisateur est prévenu et déconnecté proprement —
