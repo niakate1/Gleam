@@ -522,6 +522,20 @@ html, body {
    En rendant ces zones transparentes au défilement, tout remonte à l'écran :
    la carte de disponibilité s'efface en défilant, l'en-tête reste collé grâce
    à son `sticky`, et la liste dispose de toute la hauteur. */
+/* ── PLUS RIEN NE SE FAIT ÉCRASER ──────────────────────────────────────────
+   `.screen` est une colonne flexible de hauteur fixe. Ses enfants ont donc
+   `flex-shrink: 1` par défaut : quand leur total dépasse la hauteur, ils se
+   compriment tous pour tenir.
+
+   En passant .home-content à `flex: 0 0 auto`, j'ai retiré ce contenu du
+   partage — et toute la compression s'est reportée sur le bandeau d'accueil,
+   écrasé de 209 px à 50. Son titre « Bonjour » débordait donc en dessous, où
+   la carte blanche le recouvrait : le texte était là, mesurable, invisible.
+
+   Personne ne doit se comprimer. L'écran défile, il n'a pas à faire tenir son
+   contenu dans une hauteur — il n'a qu'à le laisser s'étendre. */
+.screen > * { flex-shrink: 0; }
+
 .home-content, .pro-content, .profile-content {
   /* `flex: 1` figeait la hauteur de ces zones à l'espace restant, et leur
      contenu débordait EN DESSOUS de leur boîte. Le remplissage bas restait
@@ -678,6 +692,15 @@ html, body {
    Depuis que l'écran est le conteneur qui défile, c'est LUI qui doit réserver
    la place. Une seule règle, et plus rien ne peut passer dessous — quel que
    soit l'endroit où l'élément se trouve dans la page. */
+/* Le repère de version, dans le pied de page légal. Assez lisible pour être
+   photographié, assez discret pour ne pas attirer l'œil. */
+.marque-version {
+  display: block; width: 100%;
+  margin-top: 6px;
+  font-size: 10px; color: var(--border-fort);
+  font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+
 /* Le remplissage doit porter sur les CONTENEURS, pas sur l'écran.
    Depuis que ces zones sont en `overflow: visible`, leur contenu déborde de
    l'écran — et un débordement ignore le remplissage bas du parent. Le bouton
@@ -4153,6 +4176,11 @@ textarea { min-height: 92px; padding-top: 13px; }
          connaissent, invisible pour les autres. -->
     <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
+    <!-- Repère de version. Sans lui, impossible de savoir si l'écran qu'on
+         regarde vient du fichier qu'on croit avoir déployé — et on cherche
+         pendant des jours un défaut déjà corrigé. Il tient en huit caractères
+         gris clair, personne ne le remarque. -->
+    <span class="marque-version">v26.08.08-7bff77b</span>
   </div>
   <div class="bottom-nav" id="nav-guest-accueil"></div>
 </div>
@@ -4558,6 +4586,11 @@ textarea { min-height: 92px; padding-top: 13px; }
          connaissent, invisible pour les autres. -->
     <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
+    <!-- Repère de version. Sans lui, impossible de savoir si l'écran qu'on
+         regarde vient du fichier qu'on croit avoir déployé — et on cherche
+         pendant des jours un défaut déjà corrigé. Il tient en huit caractères
+         gris clair, personne ne le remarque. -->
+    <span class="marque-version">v26.08.08-7bff77b</span>
   </div>
   <div class="bottom-nav" id="nav-guest-messages"></div>
 </div>
@@ -4593,6 +4626,11 @@ textarea { min-height: 92px; padding-top: 13px; }
          connaissent, invisible pour les autres. -->
     <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
+    <!-- Repère de version. Sans lui, impossible de savoir si l'écran qu'on
+         regarde vient du fichier qu'on croit avoir déployé — et on cherche
+         pendant des jours un défaut déjà corrigé. Il tient en huit caractères
+         gris clair, personne ne le remarque. -->
+    <span class="marque-version">v26.08.08-7bff77b</span>
   </div>
   <div class="bottom-nav" id="nav-guest-demandes"></div>
 </div>
@@ -4633,6 +4671,11 @@ textarea { min-height: 92px; padding-top: 13px; }
          connaissent, invisible pour les autres. -->
     <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
+    <!-- Repère de version. Sans lui, impossible de savoir si l'écran qu'on
+         regarde vient du fichier qu'on croit avoir déployé — et on cherche
+         pendant des jours un défaut déjà corrigé. Il tient en huit caractères
+         gris clair, personne ne le remarque. -->
+    <span class="marque-version">v26.08.08-7bff77b</span>
   </div>
   <div class="bottom-nav" id="nav-guest-profil"></div>
 </div>
