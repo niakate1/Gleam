@@ -1997,6 +1997,77 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 .note-option strong { color: var(--text); }
 
+/* ── LES CIBLES TROP PETITES POUR UN DOIGT ──────────────────────────────────
+   Apple et Google recommandent 44 px de côté. Mesuré : « Se connecter » fait
+   27 px de haut, les liens du pied de page 18 px. On les manque, on réessaie,
+   et sur un bouton de connexion c'est la première impression de l'application.
+
+   Le remplissage agrandit la ZONE SENSIBLE ; les marges négatives annulent
+   l'espace ajouté pour que rien ne bouge à l'œil. Même procédé que pour le
+   point de diagnostic. */
+.user-badge {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+}
+.pied-de-page-legal a {
+  display: inline-block;
+  padding: 11px 6px;
+  margin: -11px -6px;
+  touch-action: manipulation;
+}
+/* La passerelle « Vous êtes professionnel ? » : 35 px, trop juste pour un
+   lien qui change de rôle dans l'application. */
+.passerelle, .lien-metier {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Les onglets de filtre et l'avatar : 36 px, soit quatre de moins que le
+   seuil. Quatre pixels ne se voient pas, mais ils font la différence entre
+   une tape qui passe et une tape qui glisse. */
+.tab-pill, .segment-tab, .filtre-onglet {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.entete-client-avatar, .entete-pro-avatar, .avatar-mini {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+/* Le bouton photo à 20×20 px, les bascules à 50×28, la puce de disponibilité
+   à 106×28. La bascule et la puce gardent leur taille visible — c'est leur
+   forme qui les rend lisibles — mais leur zone sensible atteint 44 px. */
+/* ── AGRANDIR LA ZONE SENSIBLE SANS TOUCHER À LA FORME ──────────────────────
+   Ces éléments ont une taille FIXE : bouton photo 20×20, bascule 50×28, puce
+   de disponibilité 106×28. Avec `box-sizing: border-box`, un remplissage est
+   absorbé à l'intérieur et n'agrandit rien.
+
+   Un pseudo-élément en position absolue étend la zone cliquable au-delà des
+   bords, sans occuper une seule ligne de mise en page. La forme reste
+   exactement celle qu'on voit — c'est le doigt qui gagne de la place. */
+.avatar-upload-btn,
+.toggle-switch,
+.puce-dispo, .entete-pro-dispo, .chip-dispo {
+  position: relative;
+  touch-action: manipulation;
+}
+.avatar-upload-btn::after,
+.toggle-switch::before,
+.puce-dispo::after, .entete-pro-dispo::after, .chip-dispo::after {
+  content: '';
+  position: absolute;
+  /* 44 px au total quelle que soit la taille de départ : l'écart se répartit
+     de part et d'autre. */
+  inset: min(0px, calc((44px - 100%) / -2));
+  top: -12px; bottom: -12px; left: -12px; right: -12px;
+  border-radius: inherit;
+}
+
 /* Compteur par matière de tapis. */
 .comptes-matiere { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .comptes-matiere label { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
@@ -6762,7 +6833,10 @@ function renderNoteGlobale(elId,noteMoyenne){
   if(!el)return;
   if(noteMoyenne===null||noteMoyenne===undefined||noteMoyenne===0){el.style.display='none';return}
   var noteTxt=Number(noteMoyenne).toFixed(2).replace('.',',');
-  el.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.18);padding:5px 14px;border-radius:20px;font-weight:800;font-size:15px;color:#fff"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold)"></i> '+noteTxt+' <span style="font-weight:500;font-size:12px;opacity:.85">/ 5</span></span>';
+  // Blanc translucide sur blanc : la pastille était dessinée pour l'ancien
+  // bandeau violet, et l'en-tête de compte est devenu blanc. La note était
+  // illisible — contraste mesuré à 1:1.
+  el.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px;background:var(--light);padding:5px 14px;border-radius:20px;font-weight:800;font-size:15px;color:var(--p)"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold)"></i> '+noteTxt+' <span style="font-weight:600;font-size:12px;color:var(--text-secondary)">/ 5</span></span>';
   el.style.display='block';
   if(window.lucide)lucide.createIcons();
 }
@@ -11023,7 +11097,7 @@ function activerAssistantEtapes(){
     // La case de comptage des fenêtres (vitres) reste vide tant que le type de bien n'a pas été
     // choisi — elle doit malgré tout garder sa propre étape, sans quoi elle se retrouverait fondue
     // dans l'étape précédente au moment du découpage initial.
-    if(tag.id==='vitres-quantite-box')return false;
+    if(tag.id==='vitres-quantite-box')return false;   // garde sa propre étape
     if(tag.classList.contains('field-group'))return false;
     if(tag.querySelector('label'))return false;
     return true;
@@ -11067,6 +11141,10 @@ function activerAssistantEtapes(){
   assistantEtapes.forEach(function(w){body.appendChild(w)});
   majBarreProgression();
   ajouterBoutonSuivant();
+  // Les étapes existent maintenant : celles qui n'ont rien à montrer peuvent
+  // être retirées du parcours. Appelé ici, et pas dans le formulaire, parce
+  // qu'avant ce point closest('.assistant-etape') ne trouve rien.
+  if(typeof initEtapeVitres==='function')initEtapeVitres();
 }
 // Nom appelé depuis le formulaire voiture quand une étape devient sans objet.
 function majProgressionAssistant(){ majBarreProgression(); }
@@ -11914,9 +11992,27 @@ function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div
 // local (bail, plans) — la saisie directe reste donc la bonne méthode dans ce cas, la variabilité
 // des vitrines commerciales étant trop grande pour rentrer dans des catégories fixes.
 var SURFACE_TYPES_FENETRES={petite:0.5,standard:1.3,portefenetre:2.8,baie:4.5};
+// Appelée une fois l'assistant construit : la case des quantités est vide tant
+// qu'aucun type de bien n'est choisi, et son étape afficherait un écran sans
+// titre ni champ. On la retire du parcours jusqu'à ce qu'elle serve.
+function initEtapeVitres(){
+  var box=document.getElementById('vitres-quantite-box');
+  if(!box)return;
+  var cont=box.closest('.assistant-etape')||box;
+  if(!box.innerHTML.trim()){
+    cont.classList.add('etape-ignoree');
+    if(typeof majBarreProgression==='function')majBarreProgression();
+  }
+}
+
 function afficherQuantiteVitres(typeBien){
   var box=document.getElementById('vitres-quantite-box');
   if(!box)return;
+
+  // Un type de bien est choisi : l'étape reprend sa place dans le parcours.
+  var conteneurVitres = box.closest('.assistant-etape') || box;
+  conteneurVitres.classList.remove('etape-ignoree');
+  if(typeof majBarreProgression==='function')majBarreProgression();
   if(typeBien==='commerce'||typeBien==='bureaux'){
     box.innerHTML=quantiteBlock('Surface vitrée exacte (en m²)','Ex: 12');
     return;
