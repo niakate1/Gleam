@@ -25,27 +25,45 @@ const APP_URL = process.env.FRONTEND_URL || 'https://gleam-app.fr/';
 // Gabarit HTML commun (header / footer identiques pour tous les emails)
 // ---------------------------------------------------------------------------
 
+// ── LA GOUTTE, EN SVG INLINE ────────────────────────────────────────────────
+// Pas une image : Outlook, Gmail et Apple Mail bloquent les images distantes
+// tant que le destinataire ne les autorise pas. Un logo en PNG resterait donc
+// invisible dans la plupart des boîtes, et le bandeau paraîtrait vide.
+//
+// Le SVG inline s'affiche sans autorisation et sans requête réseau. Il pèse
+// quatre cents octets.
+//
+// Outlook sur Windows ne le gère pas : il affichera le mot « Gleam » seul, sur
+// le bandeau pétrole. La lettre reste lisible, la marque reconnaissable.
+const LOGO_EMAIL = `<svg width="26" height="26" viewBox="0 0 100 100" style="vertical-align:middle;margin-right:8px" xmlns="http://www.w3.org/2000/svg">
+  <path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="#ffffff"/>
+  <path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="#0A4750"/>
+</svg>`;
+
 function wrapTemplate({ title, body, ctaLabel, ctaUrl }) {
   return `
   <div style="font-family: Arial, Helvetica, sans-serif; max-width: 560px; margin: 0 auto; background: #ffffff;">
-    <div style="background: #4B2FBF; padding: 24px; text-align: center;">
-      <h1 style="color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 1px;">Gleam</h1>
+    <!-- Le dégradé reprend celui de l'application. Les clients de messagerie qui
+         ne le gèrent pas retombent sur la couleur unie déclarée avant lui. -->
+    <div style="background: #0E5A63; background: linear-gradient(160deg, #062E34 0%, #0A4750 62%, #0E5A63 100%); padding: 26px 24px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 22px; letter-spacing: .5px; font-weight: bold;">${LOGO_EMAIL}Gleam</h1>
     </div>
-    <div style="padding: 32px 28px; color: #1f2937; font-size: 15px; line-height: 1.6;">
-      <h2 style="font-size: 18px; color: #4B2FBF; margin-top: 0;">${title}</h2>
+    <div style="padding: 32px 28px; color: #131A1C; font-size: 15px; line-height: 1.6;">
+      <h2 style="font-size: 18px; color: #0E5A63; margin-top: 0;">${title}</h2>
       ${body}
       ${
         ctaUrl
           ? `<div style="text-align:center; margin-top: 28px;">
-               <a href="${ctaUrl}" style="background:#4B2FBF; color:#ffffff; text-decoration:none; padding: 12px 28px; border-radius: 6px; font-weight: bold; display:inline-block;">
+               <a href="${ctaUrl}" style="background:#0E5A63; color:#ffffff; text-decoration:none; padding: 14px 30px; border-radius: 8px; font-weight: bold; display:inline-block;">
                  ${ctaLabel}
                </a>
              </div>`
           : ''
       }
     </div>
-    <div style="background:#f3f4f6; padding:16px; text-align:center; font-size:12px; color:#6b7280;">
-      Gleam · gleam-app.fr · Cet email a été envoyé automatiquement, merci de ne pas y répondre.
+    <div style="background:#E9EFEF; padding:18px; text-align:center; font-size:12px; color:#44585C; line-height:1.6;">
+      <strong style="color:#0E5A63;">Gleam</strong> · <a href="https://gleam-app.fr" style="color:#44585C;">gleam-app.fr</a><br>
+      Message automatique, merci de ne pas y répondre.
     </div>
   </div>`;
 }
@@ -209,7 +227,7 @@ const templates = {
              <p><strong>Concernant :</strong> ${d.signaleNom}</p>
              <p><strong>Motif :</strong> ${d.motif}</p>
              <p><strong>Description :</strong><br>${d.description}</p>
-             <p style="background:#F5F3FF;border-radius:8px;padding:12px"><strong>🔍 Preuves disponibles :</strong><br>${d.preuves}</p>
+             <p style="background:#E3F1F2;border-radius:8px;padding:12px"><strong>🔍 Preuves disponibles :</strong><br>${d.preuves}</p>
              <p style="font-size:12px;color:#6B7280">Identifiant du signalement : ${d.signalementId}</p>`,
     }),
   }),
@@ -223,7 +241,7 @@ const templates = {
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
       body: `<p>Votre prestation récurrente (${d.prestation}) a bien été réalisée — la prochaine est déjà programmée automatiquement :</p>
-             <p style="font-size:18px;font-weight:700;color:#4B2FBF;text-align:center;margin:20px 0">${d.date} à ${d.heure}</p>
+             <p style="font-size:18px;font-weight:700;color:#0E5A63;text-align:center;margin:20px 0">${d.date} à ${d.heure}</p>
              <p>Vous pouvez la modifier, la mettre en pause, ou l'annuler à tout moment depuis l'application.</p>`,
     }),
   }),
@@ -233,7 +251,7 @@ const templates = {
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
       body: `<p>Voici votre code pour choisir un nouveau mot de passe :</p>
-             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#4B2FBF;text-align:center;margin:20px 0">${d.code}</p>
+             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#0E5A63;text-align:center;margin:20px 0">${d.code}</p>
              <p>Ce code est valable 30 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>`,
     }),
   }),
@@ -245,7 +263,7 @@ const templates = {
     html: wrapTemplate({
       title: `Bienvenue ${d.prenom} !`,
       body: `<p>Merci de vous être inscrit sur Gleam. Voici votre code pour confirmer votre adresse email :</p>
-             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#4B2FBF;text-align:center;margin:20px 0">${d.code}</p>
+             <p style="font-size:32px;font-weight:800;letter-spacing:4px;color:#0E5A63;text-align:center;margin:20px 0">${d.code}</p>
              <p>Ce code est valable 24 heures. Vous pouvez le saisir depuis votre profil, dans la rubrique "Confirmer mon email" — pas d'urgence, vous pouvez continuer à utiliser Gleam normalement en attendant.</p>`,
     }),
   }),
@@ -309,7 +327,7 @@ const templates = {
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
       body: `<p>Vous avez reçu un nouveau message de <strong>${d.expediteurNom}</strong> concernant la prestation <strong>${d.prestation}</strong>.</p>
-             <p style="background:#f3f4f6; padding:12px 16px; border-radius:6px; font-style:italic;">
+             <p style="background:#E9EFEF; padding:12px 16px; border-radius:6px; font-style:italic;">
                « ${d.apercu} »
              </p>`,
       ctaLabel: 'Répondre',
