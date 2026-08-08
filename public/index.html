@@ -523,10 +523,24 @@ html, body {
    la carte de disponibilité s'efface en défilant, l'en-tête reste collé grâce
    à son `sticky`, et la liste dispose de toute la hauteur. */
 .home-content, .pro-content, .profile-content {
-  flex: 1;
-  min-height: 0;
+  /* `flex: 1` figeait la hauteur de ces zones à l'espace restant, et leur
+     contenu débordait EN DESSOUS de leur boîte. Le remplissage bas restait
+     alors à l'intérieur d'une boîte qui s'arrêtait bien avant : le bouton
+     « Se déconnecter » se retrouvait 58 px sous la barre, sans que rien ne
+     puisse le remonter.
+     `flex: 0 0 auto` les laisse prendre la hauteur de leur contenu. C'est
+     l'écran qui défile désormais — ces zones n'ont plus à se partager la
+     hauteur, elles n'ont qu'à la déclarer. */
+  flex: 0 0 auto;
   overflow: visible;
-  padding: var(--gap-4);
+  /* Les côtés séparément, JAMAIS le raccourci `padding`. Il réinitialise
+     padding-bottom, et écrasait donc la place réservée à la barre du bas
+     déclarée plus haut — le bouton « Se déconnecter » repassait dessous.
+     Une règle plus loin dans la feuille gagne à spécificité égale. */
+  padding-top: var(--gap-4);
+  padding-left: var(--gap-4);
+  padding-right: var(--gap-4);
+  padding-bottom: calc(58px + var(--pad-bas) + var(--gap-4));
 }
 
 .page-header { padding: calc(var(--gap-5) + var(--pad-haut)) var(--gap-4) var(--gap-3); }
@@ -655,27 +669,41 @@ html, body {
 /* En position fixe, la barre RECOUVRE le bas du contenu : le dernier bouton
    d'une liste devenait inatteignable. On réserve sa hauteur — 58 px plus la
    zone de sécurité du téléphone — sur tout écran qui en porte une. */
-/* La compensation porte sur le DERNIER élément avant la barre, quel qu'il
-   soit. Ne viser que les conteneurs de contenu laissait le pied de page légal
-   — « Mentions légales · Confidentialité » — passer dessous : il vit à côté
-   d'eux, pas dedans. */
+/* ── LA PLACE DE LA BARRE SE RÉSERVE SUR L'ÉCRAN, PAS SUR SON CONTENU ───────
+   Je visais jusqu'ici les conteneurs internes — .profile-content, .devis-list,
+   le pied de page. Mais tout ne vit pas dedans : le bouton « Se déconnecter »
+   est posé directement dans l'écran, et il se retrouvait caché de 58 px sous la
+   barre du bas, sur le profil client comme sur celui du prestataire.
+
+   Depuis que l'écran est le conteneur qui défile, c'est LUI qui doit réserver
+   la place. Une seule règle, et plus rien ne peut passer dessous — quel que
+   soit l'endroit où l'élément se trouve dans la page. */
+/* Le remplissage doit porter sur les CONTENEURS, pas sur l'écran.
+   Depuis que ces zones sont en `overflow: visible`, leur contenu déborde de
+   l'écran — et un débordement ignore le remplissage bas du parent. Le bouton
+   « Se déconnecter » se retrouvait donc sous la barre, de 58 px exactement,
+   alors que l'écran réservait bien ses 74 px.
+
+   On réserve la place à l'intérieur de chaque zone qui déborde, et sur le pied
+   de page légal qui vit à côté d'elles. */
 .screen:has(.bottom-nav) .home-content,
 .screen:has(.bottom-nav) .pro-content,
 .screen:has(.bottom-nav) .profile-content,
 .screen:has(.bottom-nav) .devis-list,
-.screen:has(.bottom-nav) .pied-de-page-legal,
-.screen:has(.bottom-nav) > *:nth-last-child(2) {
+.screen:has(.bottom-nav) .pied-de-page-legal {
   padding-bottom: calc(58px + var(--pad-bas) + var(--gap-4));
 }
-/* :has() n'est pas compris partout. Sans repli, le contenu passerait sous la
-   barre sur les navigateurs anciens — on réserve alors la place au niveau de
-   l'écran lui-même, ce qui est moins fin mais toujours juste. */
 @supports not selector(:has(*)) {
   .home-content, .pro-content, .profile-content, .devis-list,
   .pied-de-page-legal {
     padding-bottom: calc(58px + var(--pad-bas) + var(--gap-4));
   }
 }
+/* :has() n'est pas compris partout. Sans repli, le contenu passerait sous la
+   barre sur les navigateurs anciens — on réserve alors la place au niveau de
+   l'écran lui-même, ce qui est moins fin mais toujours juste. */
+/* L'ancien repli visait les conteneurs internes : il ferait doublon avec la
+   règle ci-dessus, et ajouterait 130 px de vide au bas de chaque écran. */
 
 /* ── LA BARRE DU BAS SE SOULEVAIT ──────────────────────────────────────────
    Elle était en `sticky`, ce qui la colle au bas du CONTENU, pas au bas de
