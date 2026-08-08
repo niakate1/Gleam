@@ -5542,12 +5542,33 @@ async function envoyerDemandeEnAttente(){
     const r=await fetch(API+'/api/demandes',{method:'POST',headers:authHeaders(),body:JSON.stringify(corps)});
     const d=await safeJson(r);
     if(!r.ok){
-      // On ne perd pas la saisie en silence : le formulaire se rouvre.
+      // On ne perd pas la saisie en silence. Mais la file est refermée : la
+      // laisser ouverte ferait reprendre l'assistant à mi-parcours, sur une
+      // demande qui n'existe pas.
+      multiFlow={active:false,queue:[],current:0,results:[]};
+      var modaleEchec=document.getElementById('modal-overlay');
+      if(modaleEchec)modaleEchec.classList.remove('open');
       toast('Votre demande n\'a pas pu partir : '+((d&&d.error)||'')+' Réessayez depuis l\'accueil.',7000);
       return false;
     }
+    // ── LE MÊME NETTOYAGE QUE LE CHEMIN NORMAL ──────────────────────────
+    // Ce chemin remettait à zéro les photos, les prestations et les
+    // coordonnées — mais oubliait `multiFlow`, la file des prestations en
+    // cours de saisie.
+    //
+    // Résultat : après connexion, l'application croyait un formulaire encore
+    // en cours et rouvrait l'assistant à l'étape suivante. Le client, dont la
+    // demande venait pourtant de partir, se voyait redemander l'emplacement du
+    // véhicule qu'il avait déjà choisi.
+    //
+    // Deux chemins qui font la même chose doivent nettoyer la même chose. Le
+    // second était une copie incomplète du premier.
     photos=[];selectedServices=[];
     adresseChoisieLat=null;adresseChoisieLng=null;
+    multiFlow={active:false,queue:[],current:0,results:[]};
+    proPrefereChoisi=null;recurrenceChoisie=null;
+    var modale=document.getElementById('modal-overlay');
+    if(modale)modale.classList.remove('open');
     if(typeof majAffichageSelectionPrestations==='function')majAffichageSelectionPrestations();
     if(typeof afficherConfirmationEnvoi==='function')afficherConfirmationEnvoi(d);
     else toast('✅ Votre demande a bien été envoyée.');
@@ -11494,7 +11515,9 @@ function goToPreviousStep(currentType){
 }
 
 function etatBlock(){
-  return '<div class="field-group"><label>🧽 État actuel</label><div class="options-grid">'+
+  // `id` sur le groupe : le formulaire tapis doit pouvoir le retirer du
+  // parcours quand la grille par matière pose déjà la question.
+  return '<div class="field-group" id="etape-etat-global"><label>🧽 État actuel</label><div class="options-grid">'+
     '<button class="opt-btn sel" data-group="etat" data-etat-val="propre" onclick="selOpt(this)"><i data-lucide="sparkles" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Propre</button>'+
     '<button class="opt-btn" data-group="etat" data-etat-val="moyen" onclick="selOpt(this)"><i data-lucide="meh" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Moyennement sale</button>'+
     '<button class="opt-btn" data-group="etat" data-etat-val="sale" onclick="selOpt(this)"><i data-lucide="frown" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Sale</button>'+
@@ -12130,9 +12153,19 @@ function majComptesParMatiere(racine){
   var compteursTaille = (racine || document).querySelectorAll(
     '#tapis-tailles-global > div:not(#tapis-comptes-matiere)');
 
+  // L'étape « État actuel » pose la même question que la grille par matière.
+  // Avec plusieurs matières, on la retire du parcours : la garder, c'est
+  // demander deux fois l'état, avec deux réponses possibles qui se
+  // contrediraient — et c'est la grille qui doit gagner, elle est plus précise.
+  var etapeEtat = (racine || document).querySelector('#etape-etat-global');
+  var conteneurEtat = etapeEtat && (etapeEtat.closest('.assistant-etape') || etapeEtat);
+
   if(choisies.length < 2){
     zone.innerHTML=''; zone.style.display='none';
     compteursTaille.forEach(function(d){ d.style.display=''; });
+    // Une seule matière : l'état global redevient la seule question posée.
+    if(conteneurEtat) conteneurEtat.classList.remove('etape-ignoree');
+    if(typeof majBarreProgression==='function') majBarreProgression();
     return;
   }
 
@@ -12178,6 +12211,8 @@ function majComptesParMatiere(racine){
   // finiraient par se contredire, et le prix suivrait le mauvais.
   // Le bloc, lui, reste : c'est le contenu de l'étape « Vos tapis ».
   compteursTaille.forEach(function(d){ d.style.display='none'; });
+  if(conteneurEtat) conteneurEtat.classList.add('etape-ignoree');
+  if(typeof majBarreProgression==='function') majBarreProgression();
   recalculerTapis();
 }
 
