@@ -499,14 +499,34 @@ html, body {
 }
 .screen.active { display: flex; }
 
+/* ── LA CARTE DE DISPONIBILITÉ FAISAIT DOUBLON ──────────────────────────────
+   L'en-tête prestataire porte DÉJÀ la disponibilité, sous forme de puce
+   cliquable : « ● Disponible » appelle basculerDisponibiliteDepuisEntete().
+   La carte en dessous offrait exactement la même bascule, pour 136 px — sur un
+   écran de 664 où l'en-tête en prend 74. Un quart de la hauteur avant la
+   première demande, pour un réglage déjà accessible d'un doigt.
+
+   J'avais d'abord tenté de la resserrer : la marge négative que je retirais
+   servait en réalité à remonter la carte, et le contenu commençait 24 px plus
+   BAS qu'avant. Retirer la carte est la seule réponse qui gagne vraiment de la
+   place — et elle supprime un doublon plutôt qu'un ornement. */
+#s-pro-home .home-hero-card { display: none; }
+
+/* ── UN SEUL CONTENEUR QUI DÉFILE ───────────────────────────────────────────
+   Ces zones défilaient elles-mêmes, à l'intérieur de l'écran qui défile déjà.
+   Deux conteneurs imbriqués, donc deux hauteurs à partager : l'en-tête (74 px)
+   et la carte de disponibilité (144 px) restaient figés au-dessus, et la liste
+   des demandes n'avait plus que 406 px sur 664 — dont 74 de remplissage.
+   Il restait de quoi voir deux cartes, et « défiler de quelques centimètres ».
+
+   En rendant ces zones transparentes au défilement, tout remonte à l'écran :
+   la carte de disponibilité s'efface en défilant, l'en-tête reste collé grâce
+   à son `sticky`, et la liste dispose de toute la hauteur. */
 .home-content, .pro-content, .profile-content {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  min-height: 0;
+  overflow: visible;
   padding: var(--gap-4);
-  padding-bottom: var(--gap-6);
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
 }
 
 .page-header { padding: calc(var(--gap-5) + var(--pad-haut)) var(--gap-4) var(--gap-3); }
