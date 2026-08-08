@@ -499,18 +499,25 @@ html, body {
 }
 .screen.active { display: flex; }
 
-/* ── LA CARTE DE DISPONIBILITÉ FAISAIT DOUBLON ──────────────────────────────
-   L'en-tête prestataire porte DÉJÀ la disponibilité, sous forme de puce
-   cliquable : « ● Disponible » appelle basculerDisponibiliteDepuisEntete().
-   La carte en dessous offrait exactement la même bascule, pour 136 px — sur un
-   écran de 664 où l'en-tête en prend 74. Un quart de la hauteur avant la
-   première demande, pour un réglage déjà accessible d'un doigt.
+/* ── SEULE LA BASCULE FAISAIT DOUBLON, PAS LA CARTE ─────────────────────────
+   L'en-tête porte déjà la disponibilité sous forme de puce cliquable. La ligne
+   de bascule dans la carte offrait la même chose, pour 74 px.
 
-   J'avais d'abord tenté de la resserrer : la marge négative que je retirais
-   servait en réalité à remonter la carte, et le contenu commençait 24 px plus
-   BAS qu'avant. Retirer la carte est la seule réponse qui gagne vraiment de la
-   place — et elle supprime un doublon plutôt qu'un ornement. */
-#s-pro-home .home-hero-card { display: none; }
+   J'ai d'abord masqué la CARTE ENTIÈRE. C'était trop : elle contenait aussi les
+   accès rapides — « Régler ma zone » et « Mes tarifs » — et le rappel de
+   configuration. Le prestataire n'avait plus aucun moyen de voir ni de régler
+   son rayon d'intervention depuis l'accueil.
+
+   On ne masque donc que la ligne de bascule. La carte reste, allégée de 74 px,
+   et retrouve son rôle : donner accès aux deux réglages qui décident de ce que
+   le prestataire reçoit. */
+#s-pro-home .ligne-disponibilite { display: none; }
+/* Sans la bascule, la carte peut se resserrer : son remplissage servait à
+   aérer une ligne haute qui n'existe plus. */
+#s-pro-home .home-hero-card { padding: 12px var(--gap-4); }
+/* Et si elle se retrouve vide — accès rapides masqués pendant le parcours de
+   configuration —, elle disparaît plutôt que de laisser un bloc blanc. */
+#s-pro-home .home-hero-card:empty { display: none; }
 
 /* ── UN SEUL CONTENEUR QUI DÉFILE ───────────────────────────────────────────
    Ces zones défilaient elles-mêmes, à l'intérieur de l'écran qui défile déjà.
@@ -2005,7 +2012,15 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
    Le remplissage agrandit la ZONE SENSIBLE ; les marges négatives annulent
    l'espace ajouté pour que rien ne bouge à l'œil. Même procédé que pour le
    point de diagnostic. */
-.user-badge {
+/* `display: inline-flex` écrasait l'attribut `hidden` : un élément masqué par
+   `hidden` a `display: none` par la feuille de style du navigateur, et toute
+   règle d'auteur le remplace. Le badge #pro-name-badge, qui contient le nom du
+   prestataire et doit rester invisible, réapparaissait sous les trois chiffres.
+   Le nom s'affichait donc deux fois.
+
+   `:not([hidden])` rend la règle inopérante sur ce qui est masqué. C'est la
+   forme correcte pour toute règle de mise en page appliquée largement. */
+.user-badge:not([hidden]) {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
@@ -2018,7 +2033,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 /* La passerelle « Vous êtes professionnel ? » : 35 px, trop juste pour un
    lien qui change de rôle dans l'application. */
-.passerelle, .lien-metier {
+:is(.passerelle, .lien-metier):not([hidden]) {
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -2028,7 +2043,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 /* Les onglets de filtre et l'avatar : 36 px, soit quatre de moins que le
    seuil. Quatre pixels ne se voient pas, mais ils font la différence entre
    une tape qui passe et une tape qui glisse. */
-.tab-pill, .segment-tab, .filtre-onglet {
+:is(.tab-pill, .segment-tab, .filtre-onglet):not([hidden]) {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
