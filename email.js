@@ -171,6 +171,21 @@ const templates = {
     }),
   }),
 
+  // La prestation a été faite, le client n'a jamais donné son code. On l'informe
+  // que le paiement est parti — et on lui rappelle qu'il peut encore signaler
+  // un problème : la validation solde le paiement, pas le litige.
+  prestation_validee_automatiquement: (d) => ({
+    subject: `Votre prestation de ${d.prestation} a été validée`,
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Votre prestation de <strong>${d.prestation}</strong> a été réalisée il y a plus de 48 heures, sans que le code de validation nous soit transmis.</p>
+             <p>Elle a donc été validée automatiquement, et le prestataire a été réglé.</p>
+             <p>Si quelque chose ne s'est pas passé comme prévu, vous pouvez encore nous le signaler depuis l'application : nous examinerons la situation.</p>`,
+      ctaLabel: 'Voir ma prestation',
+      ctaUrl: `${APP_URL}#mes-demandes`,
+    }),
+  }),
+
   // Suspension de compte pro suite à des annulations répétées d'un devis déjà accepté
   compte_suspendu: (d) => ({
     subject: `Votre compte Gleam a été suspendu`,
