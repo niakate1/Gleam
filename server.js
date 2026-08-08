@@ -1947,6 +1947,102 @@ async function signerPhotosDesDemandes(demandes) {
   return demandes;
 }
 
+// ── LA PRESTATION QUE PERSONNE NE CLÔT ──────────────────────────────────────
+// Le client donne un code au prestataire à la fin. S'il l'oublie, rentre chez
+// lui ou ne répond plus, la prestation reste « en cours » indéfiniment : le
+// prestataire n'est jamais payé, l'argent dort chez Stripe, et la demande
+// encombre les deux listes.
+//
+// Ce n'est pas un cas rare. C'est le cas NORMAL d'un client pressé qui a vu sa
+// voiture propre et qui est reparti.
+//
+// 48 heures après le début de la prestation, la validation se fait seule. Le
+// client est prévenu à 24 heures : sans avertissement, il découvrirait un
+// débit qu'il n'a rien validé ; avec, son silence vaut accord.
+//
+// La validation automatique solde le PAIEMENT, pas le litige : le signalement
+// reste ouvert, et vous gardez la main pour rembourser.
+const HEURES_AVANT_CLOTURE_AUTO = 48;
+const HEURES_AVANT_AVERTISSEMENT = 24;
+
+async function cloturerPrestationsOubliees() {
+  try {
+    const limite = new Date(Date.now() - HEURES_AVANT_CLOTURE_AUTO * 3600000).toISOString();
+    const { data: aClore } = await supabase.from('demandes')
+      .select('id, client_id, prestation, type_prestation, prestation_demarree_le')
+      .eq('statut', 'en_cours')
+      .not('prestation_demarree_le', 'is', null)
+      .lt('prestation_demarree_le', limite)
+      .limit(100);
+    if (!aClore || !aClore.length) return;
+
+    for (const d of aClore) {
+      try {
+        // Écriture conditionnelle : si le client valide au même instant, c'est
+        // SA validation qui gagne, et la clôture automatique ne s'applique pas.
+        const gagnee = await reserverLigne('demandes', d.id, ['en_cours'], 'terminee');
+        if (!gagnee) continue;
+
+        await supabase.from('demandes')
+          .update({ validation_automatique: true }).eq('id', d.id);
+
+        console.log('Prestation ' + d.id + ' validée automatiquement apres ' +
+                    HEURES_AVANT_CLOTURE_AUTO + ' h sans code.');
+
+        const { data: client } = await supabase.from('users')
+          .select('prenom, email').eq('id', d.client_id).maybeSingle();
+        if (client) {
+          sendEmail('prestation_validee_automatiquement', client.email, {
+            prenom: client.prenom || '',
+            prestation: d.prestation || d.type_prestation || 'nettoyage'
+          }).catch(err => console.error('Email clôture auto:', err.message));
+        }
+        envoyerNotificationPush(d.client_id, {
+          titre: 'Prestation validée',
+          corps: 'Sans retour de votre part, la prestation a été validée et le prestataire réglé.',
+          url: '/#mes-demandes'
+        }).catch(() => {});
+      } catch (err) {
+        console.error('Clôture automatique ' + d.id + ' :', err.message);
+      }
+    }
+  } catch (err) {
+    // Une clôture qui échoue ne doit jamais empêcher la lecture des demandes.
+    console.error('Clôture automatique ignorée:', err.message);
+  }
+}
+
+async function avertirValidationProche() {
+  try {
+    const debut = new Date(Date.now() - HEURES_AVANT_CLOTURE_AUTO * 3600000).toISOString();
+    const fin = new Date(Date.now() - HEURES_AVANT_AVERTISSEMENT * 3600000).toISOString();
+    const { data: aPrevenir } = await supabase.from('demandes')
+      .select('id, client_id, prestation, type_prestation')
+      .eq('statut', 'en_cours')
+      .not('prestation_demarree_le', 'is', null)
+      .gte('prestation_demarree_le', debut)
+      .lt('prestation_demarree_le', fin)
+      .is('avertissement_validation_envoye', null)
+      .limit(100);
+    if (!aPrevenir || !aPrevenir.length) return;
+
+    for (const d of aPrevenir) {
+      // Marqué AVANT l'envoi : un doublon d'e-mail est moins grave qu'un envoi
+      // répété à chaque lecture de la liste des demandes.
+      await supabase.from('demandes')
+        .update({ avertissement_validation_envoye: new Date().toISOString() })
+        .eq('id', d.id);
+      envoyerNotificationPush(d.client_id, {
+        titre: 'Validez votre prestation',
+        corps: 'Sans code de votre part sous 24 h, elle sera validée automatiquement.',
+        url: '/#mes-demandes'
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.error('Avertissement de validation ignoré:', err.message);
+  }
+}
+
 async function expirerDemandesEnRetard(demandes) {
   const maintenant = new Date();
   const aExpirer = [];
@@ -1969,6 +2065,13 @@ async function expirerDemandesEnRetard(demandes) {
       }
     }
   }
+  // Les prestations oubliées se traitent au même moment que les demandes
+  // expirées : à chaque lecture de liste. Sans tâche planifiée, c'est le seul
+  // battement de cœur dont dispose ce serveur — et il suffit, puisque la
+  // clôture n'a rien d'urgent à la minute près.
+  cloturerPrestationsOubliees().catch(() => {});
+  avertirValidationProche().catch(() => {});
+
   if (aExpirer.length) {
     await supabase.from('demandes').update({ statut: 'expiree' }).in('id', aExpirer);
     demandes.forEach(d => { if (aExpirer.includes(d.id)) d.statut = 'expiree'; });
@@ -2449,6 +2552,22 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
       return res.status(400).json({ error: 'Cette prestation est déjà terminée, elle ne peut plus être annulée.' });
     if (demande.statut !== 'acceptee' && demande.statut !== 'en_cours')
       return res.status(400).json({ error: 'Utilisez la suppression classique pour une demande pas encore acceptée.' });
+
+    // ── PLUS D'ANNULATION UNE FOIS LE PRESTATAIRE SUR PLACE ──────────────
+    // Il a fait la route, s'est garé, a sorti son matériel, et déclaré son
+    // arrivée avec photos et position GPS. Annuler à ce moment lui coûtait du
+    // temps et de l'essence pour rien, avec remboursement intégral du client.
+    //
+    // Le recours reste le signalement : il passe par vous et permet un
+    // arbitrage. C'est la différence entre un litige, qu'on instruit, et un
+    // désistement unilatéral, qu'on subit.
+    if (demande.prestation_demarree_le) {
+      return res.status(409).json({
+        error: 'Le prestataire est déjà sur place et a commencé la prestation. ' +
+               'Elle ne peut plus être annulée — si quelque chose ne va pas, ' +
+               'signalez-le depuis la conversation et nous interviendrons.'
+      });
+    }
 
     // Calcule précisément les heures restantes avant le créneau prévu, pour déterminer le palier
     // de frais applicable (voir rembourserPaiementSiPaye) — heuresRestantes reste `null` si aucun
