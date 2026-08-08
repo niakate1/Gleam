@@ -9477,6 +9477,19 @@ async function saveTarifs(){
     var etat=document.getElementById('etat-tarifs');
     if(etat){etat.textContent='Enregistré';etat.className='etat enregistre'}
     majResumeTarifs();majMarquesTarifs();
+
+    // ── LES PRESTATIONS COCHÉES DÉCIDENT DE CE QU'ON REÇOIT ─────────────
+    // Cocher « canapé » fait entrer les demandes de canapé dans la liste du
+    // prestataire. Rien ne le rafraîchissait : il enregistrait, revenait à
+    // l'accueil, et voyait le même compteur qu'avant.
+    //
+    // Comme pour la zone, la mémoire des requêtes doit être oubliée EN
+    // PREMIER : sans cela, tout se recharge et tout réaffiche l'ancien
+    // résultat pendant trois secondes.
+    if(typeof viderMemoireRequetes==='function')viderMemoireRequetes();
+    if(typeof loadProDemandes==='function')loadProDemandes();
+    if(typeof majEnteteProChiffres==='function')majEnteteProChiffres();
+    if(typeof chargerParcoursDemarrage==='function')chargerParcoursDemarrage();
   }catch(e){toast(friendlyNetworkError(e))}
   finally{btn.disabled=false;btn.textContent='Enregistrer mes tarifs'}
 }
@@ -10638,10 +10651,25 @@ async function enregistrerZoneIntervention(){
     // afficher le parcours ou les accès rapides, et appelle le second au besoin.
     // Lancer les deux en parallèle les faisait se marcher dessus — le plus lent
     // écrasait le résultat du plus rapide, et la pastille disparaissait.
+    // ── LA MÉMOIRE DES REQUÊTES DOIT ÊTRE OUBLIÉE D'ABORD ───────────────
+    // fetchGroupe garde les réponses GET pendant trois secondes pour éviter
+    // les appels en rafale. Or on vient de changer la zone : la liste des
+    // demandes qu'elle a mémorisée est celle de l'ANCIEN rayon.
+    //
+    // Sans cet oubli, tout se recharge — et tout affiche encore l'ancien
+    // résultat. C'est ce qui donnait l'impression que le chiffre ne bougeait
+    // pas : il bougeait, mais trois secondes plus tard, quand plus personne
+    // ne regardait.
+    if(typeof viderMemoireRequetes==='function')viderMemoireRequetes();
+
     chargerParcoursDemarrage();
     // La zone détermine quelles demandes parviennent au prestataire : la liste
     // doit refléter le nouveau rayon tout de suite.
     if(typeof loadProDemandes==='function')loadProDemandes();
+    // Et le compteur de l'en-tête, qui lit la même liste. Il n'était pas
+    // rafraîchi : la liste se mettait à jour, le chiffre au-dessus restait
+    // celui du rayon précédent.
+    if(typeof majEnteteProChiffres==='function')majEnteteProChiffres();
   }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
 }
 function ouvrirConfirmerEmail(){
