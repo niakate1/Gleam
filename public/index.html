@@ -6602,7 +6602,9 @@ function afficherDetailsMatelasPro(p){
   if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
   var etapes=GUIDE_PRO_MATELAS_BASE.slice();
   if(Array.isArray(d['matelas-options'])){
-    if(d['matelas-options'].some(function(o){return o.indexOf('punaises')>=0}))etapes.push('Traitement anti-punaises de lit renforcé (option choisie par le client)');
+    // L'étape « traitement anti-punaises » disparaît avec l'option : demander à
+  // un prestataire non certifié d'exécuter un protocole biocide serait pire que
+  // de le lui proposer.
     if(d['matelas-options'].some(function(o){return o.indexOf('Sommier')>=0}))etapes.push('Traiter aussi le sommier / tête de lit');
     if(d['matelas-options'].some(function(o){return o.indexOf('ancienne')>=0}))etapes.push('Prétraitement renforcé sur la tache signalée');
   }
@@ -11835,7 +11837,20 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
   '<button class="opt-btn full" data-group="mat-t" data-coef-key="taille" data-coef-val="E" onclick="selOpt(this)">200x200 cm (Empereur)</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_MATELAS_BASE+'</div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="matelas-options" data-option-val="anti_punaises" onclick="toggleOption(this)"><span>🛏️</span>Anti-punaises de lit</button>'+
+  // ── OPTION RETIRÉE : ANTI-PUNAISES DE LIT ─────────────────────────────
+  // Le traitement des punaises repose sur des insecticides classés TP18. Toute
+  // personne qui les emploie à titre professionnel doit détenir le Certibiocide
+  // — obligatoire depuis 2018, délivré après 21 h de formation et un examen,
+  // et attribué à une personne PHYSIQUE, pas à une entreprise.
+  //
+  // Proposer cette option sur un formulaire de nettoyage revenait à envoyer la
+  // demande à des prestataires non certifiés, donc à les mettre en infraction
+  // et à exposer le client : un biocide mal dosé finit répandu sur une literie.
+  //
+  // Ce n'est pas non plus le même prix ni le même métier : un traitement se
+  // facture 10 à 16 € le m² et porte sur le LOGEMENT, pas sur le matelas.
+  // Aucun coefficient sur une prestation à 60-125 € ne pouvait le représenter.
+
   '<button class="opt-btn" data-group="matelas-options" data-option-val="sommier" onclick="toggleOption(this)"><span>🪵</span>Sommier / tête de lit à traiter</button>'+
   '<button class="opt-btn full" data-group="matelas-options" data-option-val="tache_ancienne" onclick="toggleOption(this)"><span>🔴</span>Tache ancienne / tenace (urine, sang...)</button></div></div>'+
   quantiteBlock('Nombre exact de matelas','Ex: 2')+
