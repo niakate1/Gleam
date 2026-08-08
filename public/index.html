@@ -692,15 +692,6 @@ html, body {
    Depuis que l'écran est le conteneur qui défile, c'est LUI qui doit réserver
    la place. Une seule règle, et plus rien ne peut passer dessous — quel que
    soit l'endroit où l'élément se trouve dans la page. */
-/* Le repère de version, dans le pied de page légal. Assez lisible pour être
-   photographié, assez discret pour ne pas attirer l'œil. */
-.marque-version {
-  display: block; width: 100%;
-  margin-top: 6px;
-  font-size: 10px; color: var(--border-fort);
-  font-variant-numeric: tabular-nums; letter-spacing: .02em;
-}
-
 /* Le remplissage doit porter sur les CONTENEURS, pas sur l'écran.
    Depuis que ces zones sont en `overflow: visible`, leur contenu déborde de
    l'écran — et un débordement ignore le remplissage bas du parent. Le bouton
@@ -4185,11 +4176,6 @@ textarea { min-height: 92px; padding-top: 13px; }
          connaissent, invisible pour les autres. -->
     <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
-    <!-- Repère de version. Sans lui, impossible de savoir si l'écran qu'on
-         regarde vient du fichier qu'on croit avoir déployé — et on cherche
-         pendant des jours un défaut déjà corrigé. Il tient en huit caractères
-         gris clair, personne ne le remarque. -->
-    <span class="marque-version">v26.08.08-7bff77b</span>
   </div>
   <div class="bottom-nav" id="nav-guest-accueil"></div>
 </div>
@@ -4595,11 +4581,6 @@ textarea { min-height: 92px; padding-top: 13px; }
          connaissent, invisible pour les autres. -->
     <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
-    <!-- Repère de version. Sans lui, impossible de savoir si l'écran qu'on
-         regarde vient du fichier qu'on croit avoir déployé — et on cherche
-         pendant des jours un défaut déjà corrigé. Il tient en huit caractères
-         gris clair, personne ne le remarque. -->
-    <span class="marque-version">v26.08.08-7bff77b</span>
   </div>
   <div class="bottom-nav" id="nav-guest-messages"></div>
 </div>
@@ -4635,11 +4616,6 @@ textarea { min-height: 92px; padding-top: 13px; }
          connaissent, invisible pour les autres. -->
     <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
-    <!-- Repère de version. Sans lui, impossible de savoir si l'écran qu'on
-         regarde vient du fichier qu'on croit avoir déployé — et on cherche
-         pendant des jours un défaut déjà corrigé. Il tient en huit caractères
-         gris clair, personne ne le remarque. -->
-    <span class="marque-version">v26.08.08-7bff77b</span>
   </div>
   <div class="bottom-nav" id="nav-guest-demandes"></div>
 </div>
@@ -4680,11 +4656,6 @@ textarea { min-height: 92px; padding-top: 13px; }
          connaissent, invisible pour les autres. -->
     <span aria-hidden="true" onclick="compterAppuisDiagnostic()" class="point-diagnostic">·</span>
     <a onclick="ouvrirPageInterne('confidentialite.html','Confidentialité')">Confidentialité</a>
-    <!-- Repère de version. Sans lui, impossible de savoir si l'écran qu'on
-         regarde vient du fichier qu'on croit avoir déployé — et on cherche
-         pendant des jours un défaut déjà corrigé. Il tient en huit caractères
-         gris clair, personne ne le remarque. -->
-    <span class="marque-version">v26.08.08-7bff77b</span>
   </div>
   <div class="bottom-nav" id="nav-guest-profil"></div>
 </div>
@@ -5298,6 +5269,14 @@ function ouvrirConsoleGleam(){
       '<button onclick="document.getElementById(\'console-gleam\').remove()" ' +
         'style="background:#173C42;border:none;color:#C8F0EE;padding:7px 13px;border-radius:8px;' +
         'font-family:inherit;font-size:12px">Fermer</button></div>';
+
+  // La version était affichée dans le pied de page. En flex, son `width: 100%`
+  // écrasait « Mentions légales » et « Confidentialité » sur la gauche au lieu
+  // de les laisser centrés — un repère de débogage n'a pas à déformer un écran
+  // que tous les visiteurs voient.
+  // Sa place est ici : on l'ouvre quand on cherche, pas quand on visite.
+  html += titre('VERSION');
+  html += ligne('  v26.08.08-7bff77b');
 
   html += titre('APPAREIL');
   html += ligne('  ' + ((ua.match(/Android [\d.]+/) || ua.match(/OS \d+_\d+/) || ['système inconnu'])[0]));
