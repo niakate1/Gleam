@@ -350,6 +350,14 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
 .attente.longue { color: #B45309; font-weight: 700; }
 .actions-dossier { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .actions-dossier .action { flex: 1; min-width: 150px; }
+
+/* La version du serveur, à côté de la déconnexion. Assez lisible pour être
+   photographiée, assez discrète pour ne pas encombrer. */
+.version-serveur {
+  font-size: 11.5px; color: #8A9A9C; margin-right: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.version-serveur.ancien { color: #B45309; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -373,7 +381,7 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
 <div id="ecran-admin" class="masque">
   <div class="barre">
     <div class="marque serif">Gleam<span>Administration</span></div>
-    <button class="deconnexion" id="btn-sortir">Se déconnecter</button>
+    <span id="version-serveur" class="version-serveur"></span><button class="deconnexion" id="btn-sortir">Se déconnecter</button>
   </div>
 
   <main>
@@ -1122,6 +1130,28 @@ function carteDocument(doc) {
   }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Quelle version du serveur répond ?
+//
+// Nous avons corrigé deux fois le même défaut sans savoir si le fichier
+// déployé était le bon. Cette ligne tranche la question sans quitter l'écran.
+async function afficherVersionServeur() {
+  var cible = document.getElementById('version-serveur');
+  if (!cible) return;
+  try {
+    var v = await appel('/api/admin/version');
+    var manquantes = Object.keys(v.routes_recentes || {})
+      .filter(function(k){ return !v.routes_recentes[k]; });
+    cible.textContent = 'serveur v' + v.version +
+      (manquantes.length ? '  ·  ' + manquantes.length + ' correctif(s) absent(s)' : '');
+    cible.className = 'version-serveur' + (manquantes.length ? ' ancien' : '');
+  } catch (e) {
+    // Une route absente signifie que le déploiement n'a pas pris : c'est
+    // l'information la plus utile du moment, il faut la dire.
+    cible.textContent = 'serveur : version inconnue — déploiement à vérifier';
+    cible.className = 'version-serveur ancien';
+  }
+}
+
 async function chargerDossiers() {
   const c = $('liste-documents');
   c.innerHTML = '<p class="petit">Chargement…</p>';
@@ -1385,6 +1415,7 @@ document.querySelectorAll('.onglet').forEach((b) => {
     // La liste à plat reste accessible depuis un dossier, pour refuser une
     // pièce précise.
     if (b.dataset.vue === 'documents') { filtreDocuments = 'en_attente'; chargerDossiers(); }
+    afficherVersionServeur();
     if (b.dataset.vue === 'declaration') chargerDeclaration();
     if (b.dataset.vue === 'comptes') chargerComptes($('recherche').value.trim());
   };
