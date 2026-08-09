@@ -295,6 +295,34 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
   main{padding:20px 14px 50px}
   .chiffre .valeur{font-size:27px}
 }
+
+/* ── LA CONSÉQUENCE D'UN CLIC, ÉCRITE À CÔTÉ DU CLIC ──────────────────────
+   Un signalement ouvert suspend un versement. Le refermer le libère. Cette
+   information doit être là où la décision se prend, pas dans une note à part :
+   personne ne relit la documentation avant de cliquer. */
+.note-paiement {
+  background: #FFF7E6;
+  border-left: 3px solid #D97706;
+  border-radius: 0 8px 8px 0;
+  padding: 10px 12px;
+  margin: 10px 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #7A4A08;
+}
+.note-paiement strong { color: #5C3706; }
+.note-paiement.close {
+  background: #EEF6EE;
+  border-left-color: #2E9E5B;
+  color: #2A5C3C;
+}
+.actions-signalement { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions-signalement .action { flex: 1; min-width: 140px; }
+.action.secondaire {
+  background: transparent;
+  border: 1px solid #D5DDDD;
+  color: #44585C;
+}
 </style>
 </head>
 <body>
@@ -549,9 +577,25 @@ async function chargerSignalements() {
         '<div class="ligne">De : ' + nom(s.rapporteur) + '</div>' +
         (s.signale_id ? '<div class="ligne">Concerne : ' + nom(s.signale) + '</div>' : '') +
         (s.description ? '<div class="citation">' + echapper(s.description) + '</div>' : '') +
-        '<button class="action" onclick="basculerSignalement(\'' + s.id + '\',\'' +
-          (ouvert ? 'traite' : 'nouveau') + '\')">' +
-          (ouvert ? 'Marquer comme traité' : 'Rouvrir') + '</button>' +
+        // ── CE BOUTON COMMANDE UN PAIEMENT ────────────────────────────
+        // Un signalement ouvert suspend le versement au prestataire. Le
+        // refermer autorise l'argent à partir. Sans cette phrase, on clique
+        // « traité » comme on classe un courrier — sans savoir qu'on vient
+        // de débloquer un virement.
+        (ouvert
+          ? '<div class="note-paiement">Tant que ce signalement est ouvert, ' +
+            '<strong>le versement au prestataire est suspendu</strong>. ' +
+            'Le refermer autorise le paiement. Un remboursement éventuel se fait dans Stripe.</div>'
+          : '<div class="note-paiement close">Le versement au prestataire n\'est plus suspendu.</div>') +
+        '<div class="actions-signalement">' +
+          (ouvert
+            ? '<button class="action" onclick="basculerSignalement(\'' + s.id + '\',\'traite\')">' +
+                'Traité — libérer le paiement</button>' +
+              '<button class="action secondaire" onclick="basculerSignalement(\'' + s.id + '\',\'rejete\')">' +
+                'Non fondé</button>'
+            : '<button class="action secondaire" onclick="basculerSignalement(\'' + s.id + '\',\'nouveau\')">' +
+                'Rouvrir — suspendre à nouveau</button>') +
+        '</div>' +
       '</div>';
     }).join('');
   } catch (e) {
@@ -561,9 +605,17 @@ async function chargerSignalements() {
 }
 
 async function basculerSignalement(id, statut) {
+  // On confirme avant de rouvrir : reprendre le blocage d'un paiement déjà
+  // libéré n'a aucun effet si le versement est parti. Autant le dire.
+  if (statut === 'nouveau' && !confirm(
+      'Rouvrir ce signalement suspendra à nouveau le paiement.\n\n' +
+      'Si le versement a déjà été effectué, cette action ne le récupère pas — ' +
+      'passez par Stripe pour un remboursement.')) return;
   try {
     await appel('/api/admin/signalements/' + id, { method: 'PATCH', body: JSON.stringify({ statut }) });
-    avis(statut === 'traite' ? 'Signalement marqué comme traité.' : 'Signalement rouvert.', 'ok');
+    avis(statut === 'nouveau' ? 'Signalement rouvert, paiement suspendu.'
+       : statut === 'rejete'  ? 'Signalement classé sans suite, paiement libéré.'
+       : 'Signalement traité, paiement libéré.', 'ok');
     chargerSignalements();
   } catch (e) { if (e.message !== '401') avis(e.message, 'ko'); }
 }
