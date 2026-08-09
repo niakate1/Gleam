@@ -1816,7 +1816,7 @@ async function relancerDemandesSansDevis() {
         envoyerNotificationPush(demande.client_id, {
           titre: 'Votre demande attend toujours',
           corps: 'Élargir votre créneau augmenterait vos chances de recevoir un devis.',
-          url: '/'
+          url: '/#devis'
         }).catch(() => {});
       }
 
@@ -2862,7 +2862,7 @@ app.post('/api/devis', auth, async (req, res) => {
       envoyerNotificationPush(demande.client_id, {
         titre: 'Nouveau devis reçu',
         corps: 'Un devis de ' + parseFloat(prix_ttc) + '€ pour ' + demande.prestation,
-        url: '/'
+        url: '/#devis'
       });
     }
 
@@ -3026,7 +3026,7 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
       envoyerNotificationPush(devis.societe_id, {
         titre: 'Devis accepté ! 🎉',
         corps: 'Votre devis pour ' + demande.prestation + ' a été accepté',
-        url: '/'
+        url: '/#devis'
       });
     }
 
@@ -3322,7 +3322,7 @@ app.post('/api/messages', auth, async (req, res) => {
         envoyerNotificationPush(destinataireId, {
           titre: 'Nouveau message',
           corps: ((expediteur && expediteur.prenom) || 'Un utilisateur') + ' : ' + contenu.trim().slice(0, 80),
-          url: '/'
+          url: '/#messages'
         });
       }
     }
@@ -3800,7 +3800,7 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
       envoyerNotificationPush(paiement.societe_id, {
         titre: 'Paiement confirmé 💰',
         corps: 'Le client a payé pour ' + (demandeInfo ? demandeInfo.prestation : 'votre prestation'),
-        url: '/'
+        url: '/#devis'
       });
     }
   }
