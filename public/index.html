@@ -4882,8 +4882,8 @@ textarea { min-height: 92px; padding-top: 13px; }
         <input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')">
       </div>
       <div class="entete-compte-texte">
-        <h3 id="pro-profile-name">Professionnel</h3>
-        <p id="pro-profile-email">email@exemple.com</p>
+        <h3 id="pro-profile-name"></h3>
+        <p id="pro-profile-email"></p>
         <div id="pro-profile-note" style="display:none"></div>
       </div>
     </div>
@@ -5023,8 +5023,8 @@ textarea { min-height: 92px; padding-top: 13px; }
         <input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')">
       </div>
       <div class="entete-compte-texte">
-        <h3 id="profile-name">Utilisateur</h3>
-        <p id="profile-email">email@exemple.com</p>
+        <h3 id="profile-name"></h3>
+        <p id="profile-email"></p>
         <div id="profile-type-badge" style="display:none"></div>
         <div id="profile-note" style="display:none"></div>
       </div>
@@ -5509,7 +5509,22 @@ let selectedServices=[],multiFlow={active:false,queue:[],current:0,results:[]};
 let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisId=null;
 let isSubmittingPhotos=false;
 
+// Les écrans qui n'ont aucun sens sans session. Le HTML les contient déjà,
+// avec des valeurs de secours — « Utilisateur », « email@exemple.com » — qui
+// ne sont remplacées qu'une fois l'utilisateur connu.
+//
+// Le bouton « retour » du navigateur remet l'écran précédent SANS repasser par
+// la connexion : on se retrouvait devant un profil rempli de ces valeurs, qui
+// ressemble à un compte inconnu. Ce compte n'existe pas — c'est le gabarit.
+var ECRANS_CONNECTES = ['s-profile','s-pro-profile','s-devis','s-pro-devis',
+  's-messages','s-pro-messages','s-chat','s-detail','s-home','s-pro-home'];
+
 function show(id){
+  // Un écran réservé sans session renvoie à l'accueil visiteur. Mieux vaut une
+  // page qu'on reconnaît qu'un profil vide qui inquiète.
+  if(ECRANS_CONNECTES.indexOf(id)>=0 && !currentUser){
+    id = 's-guest';
+  }
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   // L'écran de découverte prestataire construit son contenu à la première
