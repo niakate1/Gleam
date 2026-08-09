@@ -4753,6 +4753,33 @@ function mediane(valeurs) {
   return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 }
 
+// Quelle version du serveur tourne réellement ?
+//
+// Nous avons perdu plusieurs échanges à corriger des défauts déjà corrigés,
+// sans moyen de savoir si le fichier déployé était le bon. Une empreinte
+// calculée au démarrage tranche la question en une seconde.
+const VERSION_SERVEUR = (function(){
+  try {
+    const crypto = require('crypto');
+    const contenu = require('fs').readFileSync(__filename, 'utf8');
+    return crypto.createHash('md5').update(contenu).digest('hex').slice(0, 7);
+  } catch (e) { return 'inconnue'; }
+})();
+const DEMARRE_LE = new Date().toISOString();
+
+app.get('/api/admin/version', adminAuth, (req, res) => {
+  res.json({
+    version: VERSION_SERVEUR,
+    demarre_le: DEMARRE_LE,
+    // Les routes récentes : leur présence dit si le déploiement a pris.
+    routes_recentes: {
+      dossiers: true,
+      cloture_automatique: typeof cloturerPrestationsOubliees === 'function',
+      photos_stockage: typeof lienPhotoProfil === 'function'
+    }
+  });
+});
+
 app.get('/api/admin/diagnostic', adminAuth, async (req, res) => {
   try {
     const [demandes, devis, signalements, ecartements, documents, evaluations] = await Promise.all([
@@ -4984,7 +5011,18 @@ app.get('/api/admin/dossiers', adminAuth, async (req, res) => {
       .select('id, pro_id, type, face, statut, motif_refus, created_at, date_expiration')
       .order('created_at', { ascending: false })
       .limit(5000);
-    if (error) return res.status(500).json({ error: 'Lecture impossible.' });
+    if (error) {
+      // « Lecture impossible » ne dit ni quelle table, ni quelle colonne. Nous
+      // avons perdu deux échanges à chercher un nom de colonne que le message
+      // aurait pu donner. L'administration est un écran réservé : le détail
+      // technique y est utile, pas dangereux.
+      console.error('Lecture des dossiers:', error);
+      return res.status(500).json({
+        error: 'Lecture impossible : ' + (error.message || 'cause inconnue'),
+        details: error.details || null,
+        indice: error.hint || null
+      });
+    }
 
     const proIds = [...new Set((documents || []).map(d => d.pro_id).filter(Boolean))];
     if (!proIds.length) return res.json({ dossiers: [], compteurs: { a_traiter: 0, complets: 0, incomplets: 0 } });
