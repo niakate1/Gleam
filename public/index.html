@@ -2097,6 +2097,17 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 }
 .rappel-devis-global strong { color: var(--p2); }
 
+/* Quand un lien de courriel mène à un élément précis d'une liste, on le
+   souligne un instant : sans cela, on arrive sur la bonne page sans savoir
+   lequel des huit éléments nous concerne. */
+.mise-en-avant {
+  animation: souligner 2.4s ease-out;
+}
+@keyframes souligner {
+  0%, 60%  { box-shadow: 0 0 0 3px var(--p), 0 4px 20px rgba(14,90,99,.22); }
+  100%     { box-shadow: 0 0 0 0 transparent; }
+}
+
 /* Compteur par matière de tapis. */
 .comptes-matiere { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .comptes-matiere label { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
@@ -12858,12 +12869,98 @@ async function restaurerSession(tok){
   // les deux laisserait apparaître un instant de page nue.
   requestAnimationFrame(function(){ requestAnimationFrame(signalerApplicationPrete) });
   // Retour depuis la configuration Stripe Connect (paiements du pro)
+  // Le lien d'un courriel ou d'une notification mène quelque part : on le suit
+  // maintenant que la session est chargée et que l'on sait qui est connecté.
+  traiterAncreEntrante();
+
   if(window.location.hash==='#paiements-retour'){
     toast('✅ Configuration des paiements enregistrée !',4000);
     setTimeout(checkConnectStatut,1500);
     history.replaceState(null,'',window.location.pathname);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LES LIENS DES COURRIELS ET DES NOTIFICATIONS
+//
+// Chaque courriel porte une ancre : #demande-<id>, #devis, #mes-demandes…
+// Personne ne les lisait. Un client recevait « Laissez un avis », cliquait, et
+// arrivait sur l'accueil — sans savoir de quelle prestation on lui parlait.
+//
+// Le routeur attend que la session soit chargée : ouvrir « ma demande » avant
+// de savoir qui est connecté ne mènerait nulle part non plus.
+//
+// L'ancre est CONSOMMÉE après usage. Sans cela, un rechargement de page
+// rouvrirait le même écran indéfiniment, et l'utilisateur ne pourrait plus
+// naviguer normalement.
+// ═══════════════════════════════════════════════════════════════════════════
+function traiterAncreEntrante(){
+  var ancre = (window.location.hash || '').replace(/^#/, '');
+  if (!ancre) return false;
+
+  // Le retour de configuration Stripe a son propre traitement, plus haut.
+  if (ancre === 'paiements-retour') return false;
+
+  // Sans session, on ne peut rien ouvrir. On garde l'ancre : elle sera relue
+  // après connexion, et le client atterrira où le courriel le menait.
+  if (!currentUser) return false;
+
+  function consommer(){
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); }
+    catch (e) { window.location.hash = ''; }
+  }
+
+  // Une demande précise : c'est le cas le plus fréquent — devis reçu, paiement
+  // confirmé, avis à laisser, nouveau message. Tous pointent ici.
+  var surDemande = ancre.match(/^demande-(.+)$/);
+  if (surDemande) {
+    var id = surDemande[1];
+    consommer();
+    // openDetail charge la demande lui-même et ouvre son écran : c'est
+    // exactement ce que le courriel promet, sans passer par une liste.
+    if (typeof openDetail === 'function') {
+      openDetail(id);
+      return true;
+    }
+    // Repli si la fonction change de nom : on ouvre au moins la bonne liste.
+    if (isPro()) goProTab('pro-devis'); else goTab('devis');
+    setTimeout(function(){
+      var carte = document.getElementById('demande-' + id) || document.getElementById('devis-' + id);
+      if (carte && carte.scrollIntoView) {
+        carte.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        carte.classList.add('mise-en-avant');
+        setTimeout(function(){ carte.classList.remove('mise-en-avant'); }, 2600);
+      }
+    }, 700);
+    return true;
+  }
+
+  var destinations = {
+    'demandes-disponibles': function(){ goProTab('pro-home'); },
+    'devis':                function(){ isPro() ? goProTab('pro-devis') : goTab('devis'); },
+    'mes-demandes':         function(){ isPro() ? goProTab('pro-devis') : goTab('devis'); },
+    'messages':             function(){ isPro() ? goProTab('pro-messages') : goTab('messages'); },
+    'profil':               function(){ isPro() ? goProTab('pro-profile') : goTab('profile'); },
+    'nouvelle-demande':     function(){ goTab('home'); },
+    'aide':                 function(){ if (typeof ouvrirContactSupport === 'function') ouvrirContactSupport();
+                                        else isPro() ? goProTab('pro-profile') : goTab('profile'); }
+  };
+
+  if (destinations[ancre]) {
+    consommer();
+    destinations[ancre]();
+    return true;
+  }
+
+  // Ancre inconnue : on la retire plutôt que de la laisser traîner dans
+  // l'adresse, où elle reviendrait à chaque rechargement.
+  consommer();
+  return false;
+}
+
+// Une ancre peut arriver alors que l'application est déjà ouverte : un
+// courriel cliqué depuis une autre fenêtre, une notification poussée.
+window.addEventListener('hashchange', function(){ traiterAncreEntrante(); });
 
 // La navigation du visiteur existe avant tout affichage : sans elle, l'accueil
 // s'ouvre sans barre du bas et l'application ressemble à une page de vente.
