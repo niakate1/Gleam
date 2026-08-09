@@ -5509,6 +5509,29 @@ let selectedServices=[],multiFlow={active:false,queue:[],current:0,results:[]};
 let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisId=null;
 let isSubmittingPhotos=false;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LE RETOUR DU NAVIGATEUR
+//
+// Quand on quitte l'application — pour laisser un avis, ouvrir un lien — puis
+// qu'on revient par le bouton « retour », le navigateur restitue la page
+// depuis son cache de session. Le script ne se rejoue PAS : restaurerSession()
+// n'est jamais appelée, et currentUser reste vide.
+//
+// Le jeton, lui, est toujours dans localStorage. L'utilisateur EST connecté,
+// mais l'application l'ignore : elle affiche l'accueil visiteur, ou pire, un
+// écran de profil dont les champs n'ont jamais été remplis.
+//
+// L'événement pageshow le signale : sa propriété `persisted` vaut vrai quand
+// la page vient du cache plutôt que d'un chargement neuf.
+window.addEventListener('pageshow', function(evenement){
+  if (!evenement.persisted) return;        // chargement normal : rien à faire
+  if (currentUser) return;                 // session déjà là : rien à faire
+  var jeton = localStorage.getItem('gleam_token');
+  if (!jeton) return;                      // pas connecté : l'accueil est correct
+  // On rétablit la session comme au démarrage. L'écran suivra.
+  if (typeof restaurerSession === 'function') restaurerSession(jeton);
+});
+
 // Les écrans qui n'ont aucun sens sans session. Le HTML les contient déjà,
 // avec des valeurs de secours — « Utilisateur », « email@exemple.com » — qui
 // ne sont remplacées qu'une fois l'utilisateur connu.
