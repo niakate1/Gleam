@@ -358,6 +358,17 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
   font-variant-numeric: tabular-nums;
 }
 .version-serveur.ancien { color: #B45309; font-weight: 700; }
+
+/* Les vignettes des pièces en attente, dans la carte du dossier. Assez grandes
+   pour juger de la lisibilité, assez petites pour en voir cinq d'un coup. */
+.vignettes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.vignette {
+  width: 76px; height: 76px; border-radius: 8px; overflow: hidden;
+  background: #F1F4F4; border: 1px solid #DCE5E5;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.vignette img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; display: block; }
+.vignette a { text-decoration: none; color: #0E5A63; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -1216,6 +1227,10 @@ async function chargerDossiers() {
           (attente === 0 ? "aujourd'hui" : attente + ' jour' + (attente > 1 ? 's' : '')) + '</div>'
         : '') +
       pieces + alertes +
+      // Les vignettes des pièces en attente, chargées à la demande. Sans elles,
+      // « Tout valider » demande de faire confiance sans avoir rien vu — et
+      // valider un dossier sans regarder les pièces n'a aucun sens.
+      '<div class="vignettes" id="vignettes-' + p.pro_id + '"></div>' +
       '<div class="actions-dossier">' +
         (p.complet && p.nb_en_attente
           ? '<button class="action" onclick="validerDossier(\'' + p.pro_id + '\',\'' +
@@ -1226,6 +1241,47 @@ async function chargerDossiers() {
       '</div>' +
     '</div>';
   }).join('');
+
+  // Les vignettes arrivent après la liste : on affiche les dossiers tout de
+  // suite, les images se remplissent ensuite. L'inverse ferait attendre
+  // l'écran entier pour des miniatures.
+  d.dossiers.forEach(function(p){ chargerVignettes(p.pro_id); });
+}
+
+// Les pièces en attente d'un prestataire, en petit, dans sa carte.
+//
+// Chaque lien est signé et valable cinq minutes : aucune adresse permanente ne
+// circule. Un clic ouvre l'image en grand.
+async function chargerVignettes(proId) {
+  var zone = document.getElementById('vignettes-' + proId);
+  if (!zone) return;
+  var dd;
+  try { dd = await appel('/api/admin/documents?pro_id=' + proId); }
+  catch (e) { return; }
+
+  var enAttente = (dd.documents || []).filter(function(x){ return x.statut === 'en_attente'; });
+  if (!enAttente.length) return;
+
+  zone.innerHTML = enAttente.map(function(doc){
+    return '<div class="vignette" id="vignette-' + doc.id + '" title="' +
+      echapper(doc.type_libelle + (doc.face_libelle ? ' — ' + doc.face_libelle : '')) + '">' +
+      '<span class="petit">…</span></div>';
+  }).join('');
+
+  enAttente.forEach(async function(doc){
+    var box = document.getElementById('vignette-' + doc.id);
+    if (!box) return;
+    try {
+      var f = await appel('/api/admin/documents/' + doc.id + '/fichier');
+      if (!f || !f.url) { box.innerHTML = '<span class="petit">?</span>'; return; }
+      if (f.type_mime === 'application/pdf') {
+        box.innerHTML = '<a href="' + f.url + '" target="_blank" rel="noopener" class="petit">PDF</a>';
+      } else {
+        box.innerHTML = '<img src="' + f.url + '" alt="" ' +
+          'onclick="window.open(this.src,\'_blank\')">';
+      }
+    } catch (e) { box.innerHTML = '<span class="petit">?</span>'; }
+  });
 }
 
 // Valider les pièces en attente d'un prestataire, en une fois.
@@ -1266,6 +1322,19 @@ async function chargerDocuments() {
     c.innerHTML = '<button class="action secondaire" style="margin-bottom:12px" ' +
         'onclick="filtreDocuments=\'en_attente\';chargerDossiers()">← Retour aux dossiers</button>' +
       dd.documents.map(carteDocument).join('');
+
+    // Les trois lignes que j'avais oubliées en écrivant cette branche.
+    //
+    // carteDocument ne fait que dessiner la carte : elle laisse un conteneur
+    // vide pour l'image, que chargerApercu remplit ensuite avec un lien signé
+    // valable cinq minutes. Sans cet appel, la carte s'affiche et l'aperçu
+    // reste blanc — exactement ce que vous voyez.
+    //
+    // Et sans les deux suivantes, les boutons Valider et Refuser sont dessinés
+    // mais ne répondent à rien : ils sont branchés ici, pas dans la carte.
+    dd.documents.forEach((doc) => chargerApercu(doc.id));
+    c.querySelectorAll('[data-valider]').forEach((b) => { b.onclick = () => decider(b.dataset.valider, 'valide'); });
+    c.querySelectorAll('[data-refuser]').forEach((b) => { b.onclick = () => ouvrirRefus(b.dataset.refuser); });
     return;
   }
 
