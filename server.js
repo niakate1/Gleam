@@ -1038,7 +1038,11 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
 app.get('/api/auth/me', auth, async (req, res) => {
   const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
   if (!data) return res.status(404).json({ error: 'Utilisateur introuvable.' });
-  res.json({ ...data, firstName: data.prenom, lastName: data.nom });
+  // La colonne contient un chemin depuis la migration : on le signe pour que
+  // l'application puisse afficher l'image. Une ancienne valeur en base64 passe
+  // telle quelle, sans conversion.
+  const photoAffichable = data.photo ? await lienPhotoProfil(data.photo) : null;
+  res.json({ ...data, photo: photoAffichable, firstName: data.prenom, lastName: data.nom });
 });
 
 // Fournit la clé publique VAPID au frontend, nécessaire pour s'abonner aux notifications push —
@@ -1175,18 +1179,86 @@ app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
+// ═══════════════════════════════════════════════════════════════════════════
+// LES PHOTOS DE PROFIL VONT DANS LE STOCKAGE, PLUS DANS LA BASE
+//
+// Une photo en base64 dans users.photo pesait jusqu'à 48 Ko. Chaque lecture de
+// la table les emportait — et les listes sont sondées toutes les 15 secondes.
+// Relevé : 787 062 lignes lues, environ 8,6 Go sur un quota de 5,5.
+//
+// La colonne ne contient plus qu'un chemin : "uuid/avatar-1786261371.jpg".
+// Soixante caractères au lieu de dix mille.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const COMPARTIMENT_PHOTOS = 'photos-profil';
+
+// Reconnaît une ancienne valeur base64, pour continuer à la servir telle quelle.
+function estPhotoBase64(v) {
+  return typeof v === 'string' && v.startsWith('data:image/');
+}
+
+// Transforme ce que contient la colonne en quelque chose que l'application peut
+// afficher : un lien signé pour un chemin, la valeur elle-même pour une base64.
+async function lienPhotoProfil(valeur) {
+  if (!valeur) return null;
+  if (estPhotoBase64(valeur)) return valeur;   // ancienne photo, pas encore migrée
+  try {
+    const { data, error } = await supabase.storage
+      .from(COMPARTIMENT_PHOTOS)
+      .createSignedUrl(valeur, 3600);   // une heure : la photo change rarement
+    if (error) return null;
+    return data && data.signedUrl ? data.signedUrl : null;
+  } catch (e) {
+    // Une photo qu'on ne peut pas signer ne doit jamais empêcher de charger un
+    // profil : l'application affiche l'initiale, ce qu'elle sait déjà faire.
+    console.error('Signature photo profil:', e.message);
+    return null;
+  }
+}
+
 app.patch('/api/users/photo', auth, async (req, res) => {
   try {
     const { photo } = req.body;
-    if (!photo || typeof photo !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(photo)) {
+    const format = /^data:image\/(jpeg|jpg|png|webp);base64,/.exec(photo || '');
+    if (!photo || typeof photo !== 'string' || !format) {
       return res.status(400).json({ error: 'Format d\'image non supporté (JPEG, PNG ou WEBP uniquement).' });
     }
     if (photo.length > 600 * 1024) {
       return res.status(413).json({ error: 'Photo trop volumineuse. Réessayez avec une image plus légère.' });
     }
-    const { error } = await supabase.from('users').update({ photo }).eq('id', req.user.id);
-    if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
-    res.json({ message: 'Photo mise à jour.', photo });
+
+    const extension = format[1] === 'jpg' ? 'jpeg' : format[1];
+    const binaire = Buffer.from(photo.split(',')[1] || '', 'base64');
+    if (!binaire.length) return res.status(400).json({ error: 'Image illisible.' });
+
+    // Le nom porte un horodatage : sans lui, le navigateur garderait l'ancienne
+    // image en cache et le changement de photo paraîtrait sans effet.
+    const chemin = req.user.id + '/avatar-' + Date.now() + '.' + extension;
+
+    const { error: erreurEnvoi } = await supabase.storage
+      .from(COMPARTIMENT_PHOTOS)
+      .upload(chemin, binaire, { contentType: 'image/' + extension, upsert: true });
+    if (erreurEnvoi) {
+      console.error('Envoi photo profil:', erreurEnvoi);
+      return res.status(400).json({ error: 'La photo n\'a pas pu être enregistrée.' });
+    }
+
+    // L'ancienne photo est retirée APRÈS que la nouvelle est en place : si
+    // l'envoi échoue, l'utilisateur garde celle qu'il avait.
+    const { data: avant } = await supabase.from('users').select('photo').eq('id', req.user.id).maybeSingle();
+
+    const { error } = await supabase.from('users').update({ photo: chemin }).eq('id', req.user.id);
+    if (error) {
+      console.error('Erreur Supabase, message technique complet:', error);
+      return res.status(400).json({ error: traduireErreurSupabase(error.message) });
+    }
+
+    if (avant && avant.photo && !estPhotoBase64(avant.photo) && avant.photo !== chemin) {
+      supabase.storage.from(COMPARTIMENT_PHOTOS).remove([avant.photo])
+        .catch(e => console.error('Nettoyage ancienne photo:', e.message));
+    }
+
+    res.json({ message: 'Photo mise à jour.', photo: await lienPhotoProfil(chemin) });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
   }
