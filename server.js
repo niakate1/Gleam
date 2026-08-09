@@ -1192,6 +1192,26 @@ app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
 
 const COMPARTIMENT_PHOTOS = 'photos-profil';
 
+// Signe les photos d'un lot de personnes, en parallèle.
+//
+// C'est ce qui rend possible de RENDRE la photo aux listes : depuis qu'elles
+// sont dans le stockage, la colonne ne contient qu'un chemin, et un lien signé
+// pèse environ 200 octets. Avant la migration, chaque photo pesait 10 Ko en
+// base64 — c'est ce qui avait épuisé le quota.
+//
+// Les signatures partent ensemble : les faire une par une ajouterait autant
+// d'allers-retours que de prestataires.
+async function signerPhotosDeLot(personnes) {
+  if (!personnes || !personnes.length) return personnes;
+  await Promise.all(personnes.map(async (p) => {
+    if (p && p.photo) {
+      try { p.photo = await lienPhotoProfil(p.photo); }
+      catch (e) { p.photo = null; }   // une photo absente vaut mieux qu'une liste absente
+    }
+  }));
+  return personnes;
+}
+
 // Reconnaît une ancienne valeur base64, pour continuer à la servir telle quelle.
 function estPhotoBase64(v) {
   return typeof v === 'string' && v.startsWith('data:image/');
@@ -2829,7 +2849,8 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
   if (!devis || !devis.length) return res.json([]);
 
   const proIds = [...new Set(devis.map(d => d.societe_id))];
-  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite').in('id', proIds);
+  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite, photo').in('id', proIds);
+    await signerPhotosDeLot(pros);
   const proMap = {};
   (pros || []).forEach(p => proMap[p.id] = p);
 
@@ -2872,7 +2893,8 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
     if (!devis || !devis.length) return res.json([]);
 
     const proIds = [...new Set(devis.map(d => d.societe_id))];
-    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite').in('id', proIds);
+    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite, photo').in('id', proIds);
+    await signerPhotosDeLot(pros);
     const proMap = {};
     (pros || []).forEach(p => proMap[p.id] = p);
 
@@ -3335,7 +3357,8 @@ app.get('/api/conversations', auth, async (req, res) => {
     let autrePartieParDemande = {};
     if (isProType(user?.type)) {
       const clientIds = [...new Set((demandes || []).map(d => d.client_id))];
-      const { data: clients } = await supabase.from('users').select('id, prenom, nom, note_moyenne').in('id', clientIds);
+      const { data: clients } = await supabase.from('users').select('id, prenom, nom, note_moyenne, photo').in('id', clientIds);
+    await signerPhotosDeLot(clients);
       const clientMap = {};
       (clients || []).forEach(c => clientMap[c.id] = c);
       (demandes || []).forEach(d => { autrePartieParDemande[d.id] = clientMap[d.client_id] || null; });
@@ -3344,7 +3367,8 @@ app.get('/api/conversations', auth, async (req, res) => {
       const proIdParDemande = {};
       (devisAcceptes || []).forEach(dv => { proIdParDemande[dv.demande_id] = dv.societe_id; });
       const proIds = [...new Set(Object.values(proIdParDemande))];
-      const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne').in('id', proIds);
+      const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, photo').in('id', proIds);
+    await signerPhotosDeLot(pros);
       const proMap = {};
       (pros || []).forEach(p => proMap[p.id] = p);
       Object.keys(proIdParDemande).forEach(demId => { autrePartieParDemande[demId] = proMap[proIdParDemande[demId]] || null; });
@@ -4075,7 +4099,8 @@ app.get('/api/favoris', auth, async (req, res) => {
     const { data: favoris } = await supabase.from('favoris').select('pro_id, created_at').eq('client_id', req.user.id).order('created_at', { ascending: false });
     if (!favoris || !favoris.length) return res.json([]);
     const proIds = favoris.map(f => f.pro_id);
-    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, prestations_proposees, disponible').in('id', proIds);
+    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, photo, prestations_proposees, disponible').in('id', proIds);
+    await signerPhotosDeLot(pros);
     const proMap = {};
     (pros || []).forEach(p => proMap[p.id] = p);
     res.json(favoris.map(f => proMap[f.pro_id]).filter(Boolean));
