@@ -2757,7 +2757,7 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
   if (!devis || !devis.length) return res.json([]);
 
   const proIds = [...new Set(devis.map(d => d.societe_id))];
-  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite, photo').in('id', proIds);
+  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite').in('id', proIds);
   const proMap = {};
   (pros || []).forEach(p => proMap[p.id] = p);
 
@@ -2800,7 +2800,7 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
     if (!devis || !devis.length) return res.json([]);
 
     const proIds = [...new Set(devis.map(d => d.societe_id))];
-    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite, photo').in('id', proIds);
+    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite').in('id', proIds);
     const proMap = {};
     (pros || []).forEach(p => proMap[p.id] = p);
 
@@ -3214,6 +3214,28 @@ app.get('/api/messages/:demande_id', auth, async (req, res) => {
 });
 
 // Liste des conversations actives pour l'utilisateur connecté (client ou pro)
+// ═══════════════════════════════════════════════════════════════════════════
+// POURQUOI LES PHOTOS NE PARTENT PLUS DANS LES LISTES
+//
+// Les photos de profil sont stockées en base64 DANS la table users : jusqu'à
+// 48 Ko par personne, 10 Ko en moyenne.
+//
+// Les routes de liste — conversations, devis reçus, favoris — les renvoyaient
+// à chaque appel. Or l'application sonde toutes les 15 à 20 secondes, et la
+// discussion toutes les 6.
+//
+// Relevé dans la base : 109 383 lectures de la table users, 787 062 lignes
+// lues. À 11 Ko la ligne, cela fait environ 8 Go pour cette seule table — sur
+// un quota mensuel de 5,5 Go, avec 14 utilisateurs et 7 demandes.
+//
+// Les listes reçoivent désormais le nom et la note. L'application affiche les
+// initiales, ce qu'elle sait déjà faire. La photo reste servie par /auth/me,
+// appelée une fois par session, et par les écrans de profil.
+//
+// Le vrai correctif reste à faire : sortir les photos de la base et les mettre
+// dans le stockage, qui est prévu pour ça. Ceci arrête l'hémorragie.
+// ═══════════════════════════════════════════════════════════════════════════
+
 app.get('/api/conversations', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
@@ -3241,7 +3263,7 @@ app.get('/api/conversations', auth, async (req, res) => {
     let autrePartieParDemande = {};
     if (isProType(user?.type)) {
       const clientIds = [...new Set((demandes || []).map(d => d.client_id))];
-      const { data: clients } = await supabase.from('users').select('id, prenom, nom, photo, note_moyenne').in('id', clientIds);
+      const { data: clients } = await supabase.from('users').select('id, prenom, nom, note_moyenne').in('id', clientIds);
       const clientMap = {};
       (clients || []).forEach(c => clientMap[c.id] = c);
       (demandes || []).forEach(d => { autrePartieParDemande[d.id] = clientMap[d.client_id] || null; });
@@ -3250,7 +3272,7 @@ app.get('/api/conversations', auth, async (req, res) => {
       const proIdParDemande = {};
       (devisAcceptes || []).forEach(dv => { proIdParDemande[dv.demande_id] = dv.societe_id; });
       const proIds = [...new Set(Object.values(proIdParDemande))];
-      const { data: pros } = await supabase.from('users').select('id, prenom, nom, photo, note_moyenne').in('id', proIds);
+      const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne').in('id', proIds);
       const proMap = {};
       (pros || []).forEach(p => proMap[p.id] = p);
       Object.keys(proIdParDemande).forEach(demId => { autrePartieParDemande[demId] = proMap[proIdParDemande[demId]] || null; });
@@ -3981,7 +4003,7 @@ app.get('/api/favoris', auth, async (req, res) => {
     const { data: favoris } = await supabase.from('favoris').select('pro_id, created_at').eq('client_id', req.user.id).order('created_at', { ascending: false });
     if (!favoris || !favoris.length) return res.json([]);
     const proIds = favoris.map(f => f.pro_id);
-    const { data: pros } = await supabase.from('users').select('id, prenom, nom, photo, note_moyenne, prestations_proposees, disponible').in('id', proIds);
+    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, prestations_proposees, disponible').in('id', proIds);
     const proMap = {};
     (pros || []).forEach(p => proMap[p.id] = p);
     res.json(favoris.map(f => proMap[f.pro_id]).filter(Boolean));
