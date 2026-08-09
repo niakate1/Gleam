@@ -2083,6 +2083,18 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   border-radius: inherit;
 }
 
+/* Le rappel « votre prix couvre l'ensemble », dans le formulaire de devis.
+   Informatif, pas alarmant : c'est une règle de fonctionnement, pas un
+   avertissement de danger. */
+.rappel-devis-global {
+  background: var(--light);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 12px; line-height: 1.5; color: var(--p);
+}
+.rappel-devis-global strong { color: var(--p2); }
+
 /* Compteur par matière de tapis. */
 .comptes-matiere { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .comptes-matiere label { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
@@ -7772,6 +7784,14 @@ function renderProDemandesCards(){
   filtered.forEach(function(d,di){
     var hasPhotos=getPhotosFromNotes(d.notes).length>0;
     var safeId=escAttr(d.id);
+      // Nombre de prestations réellement demandées. Il sert à n'afficher le
+      // rappel « votre prix couvre l'ensemble » que lorsqu'il y a un ensemble.
+      var nbPrestations=(function(){
+        try{ var n=JSON.parse(d.notes);
+          if(n&&Array.isArray(n.prestations)&&n.prestations.length)return n.prestations.length;
+        }catch(e){}
+        return (d.prestation||'').split(' + ').filter(function(s){return s.trim()}).length||1;
+      })();
     var urgence=libelleUrgence(d.creneau);
     html+='<div class="demande-card fade-in-item" id="carte-demande-'+safeId+'" style="animation-delay:'+(di*0.04)+'s">'+
       '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
@@ -7797,6 +7817,17 @@ function renderProDemandesCards(){
       '</div>'+
       '<div class="devis-form" id="devis-form-'+safeId+'" style="display:none">'+
         '<div id="rappel-tarifs-'+safeId+'"></div>'+
+        // Règle de la plateforme : un devis engage sur la DEMANDE ENTIÈRE.
+        // Le prestataire reçoit la demande dès qu'il propose une des
+        // prestations, et il voit toutes les autres avec leur détail. S'il
+        // envoie un prix, c'est qu'il se déclare capable de tout faire.
+        //
+        // Le formulaire ne le disait pas : « Votre prix » sans préciser sur
+        // quoi. Sur une demande à trois prestations, l'ambiguïté se paie en
+        // litige le jour de l'intervention.
+        (nbPrestations>1
+          ? '<div class="rappel-devis-global">Votre prix couvre <strong>l\'ensemble de la demande</strong> — les '+nbPrestations+' prestations. Si vous ne pouvez pas tout réaliser, ne répondez pas.</div>'
+          : '')+
         '<label>💰 Votre prix (€ TTC)</label>'+
         '<input type="number" inputmode="decimal" id="prix-'+safeId+'" placeholder="Ex: 150" min="1">'+
         '<label>📝 Message pour le client</label>'+
