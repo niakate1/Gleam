@@ -929,7 +929,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     // (SendGrid indisponible, etc.) ne doit jamais empêcher la création du compte de réussir,
     // l'utilisateur pourra toujours redemander un nouveau code plus tard depuis son profil.
     try {
-      sendEmail('verification_email', data.email, { prenom: data.prenom, code: codeVerifEmail });
+      sendEmail('verification_email', data.email, { compteId: data.id, prenom: data.prenom, code: codeVerifEmail });
     } catch (e) {
       console.error('Envoi email de vérification échoué (compte créé normalement):', e.message);
     }
@@ -1002,7 +1002,7 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     const expiration = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // valable 30 minutes
     await supabase.from('users').update({ reset_code: code, reset_code_expire: expiration }).eq('id', user.id);
 
-    sendEmail('reinitialisation_mot_de_passe', user.email, { prenom: user.prenom || '', code }).catch(e => console.error('Email réinitialisation:', e));
+    sendEmail('reinitialisation_mot_de_passe', user.email, { compteId: user.id, prenom: user.prenom || '', code }).catch(e => console.error('Email réinitialisation:', e));
 
     res.json({ message: 'Si ce compte existe, un email a été envoyé.' });
   } catch (e) {
@@ -1173,7 +1173,7 @@ app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
     const nouveauCode = String(Math.floor(100000 + Math.random() * 900000));
     const nouvelleExpiration = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     await supabase.from('users').update({ email_verif_code: nouveauCode, email_verif_expire: nouvelleExpiration }).eq('id', req.user.id);
-    sendEmail('verification_email', moi.email, { prenom: moi.prenom, code: nouveauCode });
+    sendEmail('verification_email', moi.email, { compteId: moi.id, prenom: moi.prenom, code: nouveauCode });
     res.json({ message: 'Un nouveau code vous a été envoyé par email.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
@@ -1578,6 +1578,7 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
     const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
     if (client) {
       sendEmail('prochaine_prestation_recurrente', client.email, {
+        compteId: client.id,
         prenom: client.prenom, prestation: demande.prestation, date: dateStr, heure: heureStr
       }).catch(e => console.error('Email récurrence:', e));
     }
@@ -1807,6 +1808,7 @@ async function relancerDemandesSansDevis() {
 
       if (client && client.email && !client.compte_supprime) {
         sendEmail('demande_sans_devis_client', client.email, {
+          compteId: client.id,
           prenom: client.prenom,
           prestation: demande.prestation,
           demandeId: demande.id,
@@ -2106,6 +2108,7 @@ async function cloturerPrestationsOubliees() {
           .select('prenom, email').eq('id', d.client_id).maybeSingle();
         if (client) {
           sendEmail('prestation_validee_automatiquement', client.email, {
+            compteId: client.id,
             prenom: client.prenom || '',
             prestation: d.prestation || d.type_prestation || 'nettoyage'
           }).catch(err => console.error('Email clôture auto:', err.message));
@@ -2724,6 +2727,7 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
       const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', devisAccepte.societe_id).single();
       if (pro) {
         sendEmail('annulation_client', pro.email, {
+          compteId: pro.id,
           prenom: pro.prenom || '', prestation: demande.prestation, creneau: demande.creneau || '',
           tardive, demandeId: demande.id,
         }).catch(e => console.error('Email annulation_client:', e));
@@ -2854,6 +2858,7 @@ app.post('/api/devis', auth, async (req, res) => {
     const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
     if (client) {
       sendEmail('nouveau_devis', client.email, {
+        compteId: client.id,
         prenom: client.prenom,
         prestation: demande.prestation,
         prix: parseFloat(prix_ttc),
@@ -3018,6 +3023,7 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
     const { data: proAccepte } = await supabase.from('users').select('email, prenom').eq('id', devis.societe_id).single();
     if (proAccepte) {
       sendEmail('devis_accepte', proAccepte.email, {
+        compteId: proAccepte.id,
         prenom: proAccepte.prenom,
         prestation: demande.prestation,
         creneau: devis.creneau_propose || demande.creneau,
@@ -3037,7 +3043,7 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
     //   const idsRefuses = [...new Set(devisRefuses.map(d => d.societe_id))];
     //   const { data: prosRefuses } = await supabase.from('users').select('email, prenom').in('id', idsRefuses);
     //   (prosRefuses || []).forEach((pro) => {
-    //     sendEmail('devis_refuse', pro.email, { prenom: pro.prenom, prestation: demande.prestation });
+    //     sendEmail('devis_refuse', pro.email, { compteId: pro.id, prenom: pro.prenom, prestation: demande.prestation });
     //   });
     // }
 
@@ -3061,7 +3067,7 @@ app.post('/api/devis/:id/refuser', auth, async (req, res) => {
     // Pour le réactiver, décommentez le bloc ci-dessous :
     // const { data: proRefuse } = await supabase.from('users').select('email, prenom').eq('id', devis.societe_id).single();
     // if (proRefuse) {
-    //   sendEmail('devis_refuse', proRefuse.email, { prenom: proRefuse.prenom, prestation: demande.prestation });
+    //   sendEmail('devis_refuse', proRefuse.email, { compteId: proRefuse.id, prenom: proRefuse.prenom, prestation: demande.prestation });
     // }
 
     res.json({ message: 'Devis refusé.' });
@@ -3113,7 +3119,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     await supabase.from('users').update(misAJourPro).eq('id', req.user.id);
 
     if (suspendu && proActuel) {
-      sendEmail('compte_suspendu', proActuel.email, { prenom: proActuel.prenom || '' }).catch(e => console.error('Email compte_suspendu:', e));
+      sendEmail('compte_suspendu', proActuel.email, { compteId: proActuel.id, prenom: proActuel.prenom || '' }).catch(e => console.error('Email compte_suspendu:', e));
     }
 
     // Annule le devis, puis vérifie s'il reste d'autres devis actifs pour cette demande : s'il n'y
@@ -3128,6 +3134,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
     if (client) {
       sendEmail('annulation_pro', client.email, {
+        compteId: client.id,
         prenom: client.prenom,
         prestation: demande.prestation,
         creneau: demande.creneau,
@@ -3313,6 +3320,7 @@ app.post('/api/messages', auth, async (req, res) => {
       const { data: destinataire } = await supabase.from('users').select('email, prenom').eq('id', destinataireId).single();
       if (destinataire) {
         sendEmail('nouveau_message', destinataire.email, {
+          compteId: destinataire.id,
           prenom: destinataire.prenom,
           expediteurNom: (expediteur && expediteur.prenom) || 'Un utilisateur',
           prestation: demande.prestation,
@@ -3790,6 +3798,7 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
     const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
     if (pro) {
       sendEmail('paiement_confirme', pro.email, {
+        compteId: pro.id,
         prenom: pro.prenom,
         prestation: demandeInfo ? demandeInfo.prestation : '',
         montantTotal: paiement.montant_ttc,
@@ -3853,11 +3862,13 @@ async function finaliserPrestation(paiement) {
   const { data: client } = await supabase.from('users').select('email, prenom').eq('id', paiement.client_id).single();
   if (client) {
     sendEmail('prestation_confirmee', client.email, {
+      compteId: client.id,
       prenom: client.prenom, role: 'client', prestation: demandeInfo ? demandeInfo.prestation : '', demandeId: paiement.demande_id
     }).catch(e => console.error('Email prestation_confirmee client:', e));
   }
   if (pro) {
     sendEmail('prestation_confirmee', pro.email, {
+      compteId: pro.id,
       prenom: pro.prenom, role: 'pro', prestation: demandeInfo ? demandeInfo.prestation : '', montantPro: paiement.montant_societe, demandeId: paiement.demande_id
     }).catch(e => console.error('Email prestation_confirmee pro:', e));
   }
@@ -4970,7 +4981,7 @@ app.get('/api/admin/dossiers', adminAuth, async (req, res) => {
     const filtre = req.query.filtre || 'a_traiter';
 
     const { data: documents, error } = await supabase.from('documents_pro')
-      .select('id, pro_id, type, face, statut, motif_refus, created_at, expire_le')
+      .select('id, pro_id, type, face, statut, motif_refus, created_at, date_expiration')
       .order('created_at', { ascending: false })
       .limit(5000);
     if (error) return res.status(500).json({ error: 'Lecture impossible.' });
@@ -4992,16 +5003,31 @@ app.get('/api/admin/dossiers', adminAuth, async (req, res) => {
       const pro = parId[id] || {};
       const siens = (documents || []).filter(d => d.pro_id === id);
 
+      // La clé est le type ET LA FACE. Une pièce d'identité demande un recto et
+      // un verso : les regrouper sous « identite » ferait passer pour complet
+      // un dossier où le recto manque — et un prestataire serait validé sur la
+      // moitié de sa pièce.
       const parType = {};
       siens.forEach(d => {
-        // Le plus récent de chaque type fait foi : un prestataire qui redépose
+        const cle = d.type + '|' + (d.face || 'unique');
+        // Le plus récent de chaque pièce fait foi : un prestataire qui redépose
         // après un refus ne doit pas rester bloqué par l'ancien fichier.
-        if (!parType[d.type] || new Date(d.created_at) > new Date(parType[d.type].created_at)) {
-          parType[d.type] = d;
+        if (!parType[cle] || new Date(d.created_at) > new Date(parType[cle].created_at)) {
+          parType[cle] = d;
         }
       });
 
-      const manquants = typesRequis.filter(t => !parType[t]);
+      // Chaque type exige ses faces. TYPES_DOCUMENTS les déclare déjà :
+      // l'identité en demande deux, les autres une seule.
+      const piecesRequises = [];
+      typesRequis.forEach(t => {
+        const faces = (TYPES_DOCUMENTS[t] || {}).faces || ['unique'];
+        faces.forEach(f => piecesRequises.push({ type: t, face: f, cle: t + '|' + f }));
+      });
+
+      const manquants = piecesRequises
+        .filter(p => !parType[p.cle])
+        .map(p => (TYPES_DOCUMENTS[p.type] || {}).libelle || p.type);
       const enAttente = Object.values(parType).filter(d => d.statut === 'en_attente');
       const refuses = Object.values(parType).filter(d => d.statut === 'refuse');
       const valides = Object.values(parType).filter(d => d.statut === 'valide');
@@ -5010,7 +5036,7 @@ app.get('/api/admin/dossiers', adminAuth, async (req, res) => {
       // ans ne couvre pas l'intervention de demain.
       const maintenant = Date.now();
       const expires = Object.values(parType).filter(
-        d => d.statut === 'valide' && d.expire_le && new Date(d.expire_le).getTime() < maintenant
+        d => d.statut === 'valide' && d.date_expiration && new Date(d.date_expiration).getTime() < maintenant
       );
 
       const complet = manquants.length === 0 && !expires.length;
