@@ -2068,7 +2068,25 @@ async function cloturerPrestationsOubliees() {
       .limit(100);
     if (!aClore || !aClore.length) return;
 
+    // ── UN LITIGE OUVERT SUSPEND LA CLÔTURE ─────────────────────────────
+    // Payer automatiquement une prestation contestée reviendrait à trancher
+    // le litige en faveur du prestataire, sans l'avoir instruit. L'argent
+    // attend votre décision.
+    //
+    // « Ouvert » : tout signalement qui n'est ni résolu ni rejeté. Une fois
+    // que vous avez tranché depuis l'administration, la clôture reprend son
+    // cours au passage suivant.
+    const { data: litiges } = await supabase.from('signalements')
+      .select('demande_id')
+      .in('demande_id', aClore.map(d => d.id))
+      .not('statut', 'in', '(resolu,rejete)');
+    const demandesEnLitige = new Set((litiges || []).map(l => l.demande_id));
+
     for (const d of aClore) {
+      if (demandesEnLitige.has(d.id)) {
+        console.log('Clôture suspendue pour ' + d.id + ' : signalement ouvert.');
+        continue;
+      }
       try {
         // Écriture conditionnelle : si le client valide au même instant, c'est
         // SA validation qui gagne, et la clôture automatique ne s'applique pas.
@@ -2118,7 +2136,16 @@ async function avertirValidationProche() {
       .limit(100);
     if (!aPrevenir || !aPrevenir.length) return;
 
+    // Même règle pour l'avertissement : annoncer une validation automatique à
+    // quelqu'un qui vient de signaler un problème serait incompréhensible.
+    const { data: litigesAvert } = await supabase.from('signalements')
+      .select('demande_id')
+      .in('demande_id', aPrevenir.map(d => d.id))
+      .not('statut', 'in', '(resolu,rejete)');
+    const enLitige = new Set((litigesAvert || []).map(l => l.demande_id));
+
     for (const d of aPrevenir) {
+      if (enLitige.has(d.id)) continue;
       // Marqué AVANT l'envoi : un doublon d'e-mail est moins grave qu'un envoi
       // répété à chaque lecture de la liste des demandes.
       await supabase.from('demandes')
@@ -3864,6 +3891,15 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
     const erreurPhotos = validerPhotos(photos_avant, 5);
     if (erreurPhotos) return res.status(400).json({ error: erreurPhotos });
 
+    // ── L'ABSENCE DE PHOTO EST ENREGISTRÉE, PAS BLOQUÉE ─────────────────
+    // Rendre la photo obligatoire bloquerait un prestataire honnête dans un
+    // parking souterrain sans réseau, au moment précis où le client l'attend.
+    // On préfère la noter : un prestataire qui déclare systématiquement son
+    // arrivée sans photo devient repérable dans l'administration.
+    //
+    // Le blocage punit l'accident, la trace punit l'habitude.
+    const sansPhoto = !Array.isArray(photos_avant) || photos_avant.length === 0;
+
     // Vérifie que le prestataire est réellement sur place, en comparant sa position GPS au moment
     // de l'arrivée à l'adresse déclarée par le client (formule de Haversine, distance à vol
     // d'oiseau) — une preuve technique difficile à falsifier, contrairement à une simple
@@ -3884,7 +3920,10 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
         ? JSON.stringify(await televerserPhotos(photos_avant, 'demandes/' + req.params.id + '/avant'))
         : null,
       prestation_demarree_le: new Date().toISOString(),
-      distance_gps_arrivee: distanceGpsMetres
+      distance_gps_arrivee: distanceGpsMetres,
+      // Ce qui manque est noté, pas refusé. Consultable dans l'administration
+      // pour repérer un prestataire qui n'en fournit jamais.
+      arrivee_sans_photo: sansPhoto
     }).eq('id', req.params.id);
 
     res.json({ message: 'Arrivée confirmée. Bonne prestation !' });
