@@ -4949,6 +4949,176 @@ app.get('/api/documents', auth, async (req, res) => {
 
 // La file d'attente, ou le dossier complet d'un prestataire.
 // Les plus anciens d'abord : aucun dossier ne doit rester oublié au fond.
+// ═══════════════════════════════════════════════════════════════════════════
+// LES DOSSIERS PRESTATAIRES — une ligne par personne, pas par fichier
+//
+// La liste à plat fonctionne avec trois prestataires. Avec mille, elle devient
+// inutilisable : cinq documents par personne, dispersés par ordre d'arrivée,
+// et il faut reconstituer mentalement qui a fourni quoi.
+//
+// Cette route renvoie des DOSSIERS. L'unité de travail devient « ce
+// prestataire est-il en règle ? », qui est la vraie question — un document
+// valide isolé ne sert à rien si les deux autres manquent.
+//
+// L'ordre est celui de l'utilité : les dossiers COMPLETS en attente d'abord.
+// Ce sont ceux où une décision débloque immédiatement quelqu'un qui veut
+// travailler. Les dossiers incomplets viennent ensuite : rien à décider tant
+// que les pièces manquent.
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/admin/dossiers', adminAuth, async (req, res) => {
+  try {
+    const filtre = req.query.filtre || 'a_traiter';
+
+    const { data: documents, error } = await supabase.from('documents_pro')
+      .select('id, pro_id, type, face, statut, motif_refus, created_at, expire_le')
+      .order('created_at', { ascending: false })
+      .limit(5000);
+    if (error) return res.status(500).json({ error: 'Lecture impossible.' });
+
+    const proIds = [...new Set((documents || []).map(d => d.pro_id).filter(Boolean))];
+    if (!proIds.length) return res.json({ dossiers: [], compteurs: { a_traiter: 0, complets: 0, incomplets: 0 } });
+
+    const { data: pros } = await supabase.from('users')
+      .select('id, prenom, nom, email, telephone, siret, siret_statut, siret_doublon, created_at, disponible')
+      .in('id', proIds);
+    const parId = {};
+    (pros || []).forEach(p => { parId[p.id] = p; });
+
+    // Les types exigés pour qu'un dossier soit complet. Ils viennent de la
+    // même table que le reste : une seule source, pas deux listes à tenir.
+    const typesRequis = Object.keys(TYPES_DOCUMENTS).filter(t => (TYPES_DOCUMENTS[t] || {}).requis !== false);
+
+    const dossiers = proIds.map(id => {
+      const pro = parId[id] || {};
+      const siens = (documents || []).filter(d => d.pro_id === id);
+
+      const parType = {};
+      siens.forEach(d => {
+        // Le plus récent de chaque type fait foi : un prestataire qui redépose
+        // après un refus ne doit pas rester bloqué par l'ancien fichier.
+        if (!parType[d.type] || new Date(d.created_at) > new Date(parType[d.type].created_at)) {
+          parType[d.type] = d;
+        }
+      });
+
+      const manquants = typesRequis.filter(t => !parType[t]);
+      const enAttente = Object.values(parType).filter(d => d.statut === 'en_attente');
+      const refuses = Object.values(parType).filter(d => d.statut === 'refuse');
+      const valides = Object.values(parType).filter(d => d.statut === 'valide');
+
+      // Un document expiré vaut un document absent : la RC Pro d'il y a deux
+      // ans ne couvre pas l'intervention de demain.
+      const maintenant = Date.now();
+      const expires = Object.values(parType).filter(
+        d => d.statut === 'valide' && d.expire_le && new Date(d.expire_le).getTime() < maintenant
+      );
+
+      const complet = manquants.length === 0 && !expires.length;
+
+      return {
+        pro_id: id,
+        prenom: pro.prenom || '',
+        nom: pro.nom || '',
+        email: pro.email || '',
+        telephone: pro.telephone || '',
+        siret: pro.siret || null,
+        siret_statut: pro.siret_statut || null,
+        siret_doublon: !!pro.siret_doublon,
+        inscrit_le: pro.created_at || null,
+        disponible: !!pro.disponible,
+        documents: siens.length,
+        types_fournis: Object.keys(parType),
+        manquants,
+        nb_en_attente: enAttente.length,
+        nb_refuses: refuses.length,
+        nb_valides: valides.length,
+        nb_expires: expires.length,
+        complet,
+        // Depuis quand le prestataire attend une décision. C'est ce qui doit
+        // remonter en tête : quelqu'un qui patiente depuis six jours passe
+        // avant celui qui a déposé ce matin.
+        attend_depuis: enAttente.length
+          ? Math.min(...enAttente.map(d => new Date(d.created_at).getTime()))
+          : null
+      };
+    });
+
+    const aTraiter = dossiers.filter(d => d.nb_en_attente > 0);
+    const complets = aTraiter.filter(d => d.complet);
+    const incomplets = aTraiter.filter(d => !d.complet);
+
+    let liste;
+    if (filtre === 'complets') liste = complets;
+    else if (filtre === 'incomplets') liste = incomplets;
+    else if (filtre === 'tous') liste = dossiers;
+    else liste = aTraiter;   // par défaut : ce sur quoi il y a quelque chose à faire
+
+    // Les complets d'abord, puis le plus ancien en attente. Une décision sur un
+    // dossier complet libère un prestataire ; sur un incomplet, elle ne fait
+    // qu'avancer d'un cran.
+    liste.sort((a, b) => {
+      if (a.complet !== b.complet) return a.complet ? -1 : 1;
+      return (a.attend_depuis || Infinity) - (b.attend_depuis || Infinity);
+    });
+
+    res.json({
+      dossiers: liste.slice(0, 200),
+      compteurs: {
+        a_traiter: aTraiter.length,
+        complets: complets.length,
+        incomplets: incomplets.length,
+        total: dossiers.length
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+// Valider tous les documents en attente d'un prestataire, en une fois.
+//
+// Un administrateur qui a ouvert le dossier a regardé les cinq pièces. Lui
+// demander cinq clics pour dire ce qu'il a déjà décidé une fois, c'est cinq
+// occasions de se tromper de bouton.
+//
+// Le refus reste UNITAIRE : on refuse une pièce précise, avec un motif. Refuser
+// un dossier entier ne dit pas au prestataire ce qu'il doit refaire.
+app.patch('/api/admin/dossiers/:proId/valider', adminAuth, async (req, res) => {
+  try {
+    const { data: enAttente } = await supabase.from('documents_pro')
+      .select('id, type')
+      .eq('pro_id', req.params.proId)
+      .eq('statut', 'en_attente');
+
+    if (!enAttente || !enAttente.length) {
+      return res.status(400).json({ error: 'Aucun document en attente pour ce prestataire.' });
+    }
+
+    const { error } = await supabase.from('documents_pro')
+      .update({ statut: 'valide', motif_refus: null, verifie_le: new Date().toISOString() })
+      .eq('pro_id', req.params.proId)
+      .eq('statut', 'en_attente');
+    if (error) return res.status(500).json({ error: 'Validation impossible.' });
+
+    // Le prestataire est prévenu une seule fois, pas cinq.
+    try {
+      const { data: pro } = await supabase.from('users')
+        .select('id, prenom, email').eq('id', req.params.proId).maybeSingle();
+      if (pro) {
+        envoyerNotificationPush(pro.id, {
+          titre: 'Vos documents sont validés',
+          corps: 'Votre dossier est complet. Vous pouvez recevoir des demandes.',
+          url: '/#profil'
+        }).catch(() => {});
+      }
+    } catch (e) { console.error('Notification validation dossier:', e.message); }
+
+    res.json({ message: enAttente.length + ' document(s) validé(s).', valides: enAttente.length });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
 app.get('/api/admin/documents', adminAuth, async (req, res) => {
   try {
     let requete = supabase.from('documents_pro')
