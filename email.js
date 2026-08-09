@@ -40,7 +40,21 @@ const LOGO_EMAIL = `<svg width="26" height="26" viewBox="0 0 100 100" style="ver
   <path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="#0A4750"/>
 </svg>`;
 
-function wrapTemplate({ title, body, ctaLabel, ctaUrl }) {
+// Ajoute le compte destinataire à l'adresse du bouton.
+//
+// Un lien de courriel ouvre le navigateur, qui restaure la dernière session
+// utilisée sur cet appareil. Sur un ordinateur partagé, ce n'est pas forcément
+// celle du destinataire — et rien ne le signalait.
+//
+// L'identifiant n'est pas un secret : il ne donne aucun accès, il sert
+// uniquement à comparer. Sans jeton valide, il ne permet rien.
+function lienAvecCompte(url, compteId) {
+  if (!url || !compteId) return url;
+  return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(compteId);
+}
+
+function wrapTemplate({ title, body, ctaLabel, ctaUrl, compteId }) {
+  ctaUrl = lienAvecCompte(ctaUrl, compteId);
   return `
   <div style="font-family: Arial, Helvetica, sans-serif; max-width: 560px; margin: 0 auto; background: #ffffff;">
     <!-- Le dégradé reprend celui de l'application. Les clients de messagerie qui
@@ -83,6 +97,7 @@ const templates = {
                 <strong>Ville :</strong> ${d.ville || 'Non précisée'}</p>
              <p>Connectez-vous pour envoyer votre devis avant les autres prestataires.</p>`,
       ctaLabel: 'Voir la demande',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demandes-disponibles`,
     }),
   }),
@@ -96,6 +111,7 @@ const templates = {
              <p><strong>Prix proposé :</strong> ${d.prix} €</p>
              <p>Consultez le détail et acceptez ou refusez ce devis depuis votre espace.</p>`,
       ctaLabel: 'Voir le devis',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
     }),
   }),
@@ -109,6 +125,7 @@ const templates = {
              <p><strong>Créneau :</strong> ${d.creneau}</p>
              <p>Le paiement du client est en attente. Vous serez notifié dès qu'il sera confirmé.</p>`,
       ctaLabel: 'Voir la demande',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
     }),
   }),
@@ -121,6 +138,7 @@ const templates = {
       body: `<p>Le client a choisi un autre prestataire pour la demande <strong>${d.prestation}</strong>.</p>
              <p>D'autres demandes sont disponibles dès maintenant sur votre tableau de bord.</p>`,
       ctaLabel: 'Voir les demandes disponibles',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demandes-disponibles`,
     }),
   }),
@@ -136,6 +154,7 @@ const templates = {
                 <strong>Vous recevrez :</strong> ${d.montantPro} €</p>
              <p>Le versement est libéré une fois la prestation confirmée par le client.</p>`,
       ctaLabel: 'Voir la demande',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
     }),
   }),
@@ -152,6 +171,7 @@ const templates = {
         : `<p>Merci d'avoir confirmé la prestation <strong>${d.prestation}</strong>.</p>
            <p>Nous espérons que tout s'est bien passé ! Pensez à noter votre prestataire.</p>`,
       ctaLabel: 'Laisser un avis',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
     }),
   }),
@@ -164,6 +184,7 @@ const templates = {
       body: `<p>Le prestataire a annulé la prestation <strong>${d.prestation}</strong> prévue le ${d.creneau}.</p>
              <p>Votre demande a été remise à disposition des autres prestataires. Vous recevrez de nouveaux devis prochainement.</p>`,
       ctaLabel: 'Voir ma demande',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
     }),
   }),
@@ -185,6 +206,7 @@ const templates = {
                : `Aucun prestataire disponible n'a pu répondre à temps sur votre secteur.`}</p>
              <p>Votre demande a été close. Vous pouvez en créer une nouvelle avec une autre date — les mêmes informations vous seront proposées, vous n'aurez qu'à choisir un créneau.</p>`,
       ctaLabel: 'Refaire ma demande',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#nouvelle-demande`,
     }),
   }),
@@ -200,6 +222,7 @@ const templates = {
              <p>Elle a donc été validée automatiquement, et le prestataire a été réglé.</p>
              <p>Si quelque chose ne s'est pas passé comme prévu, vous pouvez encore nous le signaler depuis l'application : nous examinerons la situation.</p>`,
       ctaLabel: 'Voir ma prestation',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#mes-demandes`,
     }),
   }),
@@ -212,6 +235,7 @@ const templates = {
       body: `<p>Suite à plusieurs annulations de prestations déjà acceptées, votre compte professionnel Gleam a été temporairement suspendu.</p>
              <p>Vous ne pouvez plus recevoir de nouvelles demandes pour l'instant. Pour être réactivé, merci de contacter le support Gleam.</p>`,
       ctaLabel: 'Contacter le support',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#aide`,
     }),
   }),
@@ -277,6 +301,7 @@ const templates = {
              ${d.tardive ? `<p style="color:#D97706;"><strong>Annulation tardive</strong> (moins de 24h avant le créneau prévu).</p>` : ''}
              <p>Vous n'avez plus besoin de vous rendre à ce rendez-vous.</p>`,
       ctaLabel: 'Voir mes devis',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#devis`,
     }),
   }),
@@ -294,6 +319,7 @@ const templates = {
                 ${d.creneau ? `<br/><strong>Créneau souhaité :</strong> ${d.creneau}` : ''}</p>
              <p>Le client attend. Vous êtes pour l'instant seul à pouvoir y répondre.</p>`,
       ctaLabel: 'Envoyer mon devis',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demandes-disponibles`,
     }),
   }),
@@ -317,6 +343,7 @@ const templates = {
              <p>Votre demande reste active${d.creneau ? ` jusqu'au ${d.creneau}` : ''}. Vous pouvez la
                 modifier à tout moment depuis l'application.</p>`,
       ctaLabel: 'Modifier ma demande',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
     }),
   }),
@@ -331,6 +358,7 @@ const templates = {
                « ${d.apercu} »
              </p>`,
       ctaLabel: 'Répondre',
+      compteId: d.compteId,
       ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
     }),
   }),
