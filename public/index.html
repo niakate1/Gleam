@@ -6207,6 +6207,19 @@ function afficherEtatHorsLigne(horsLigne){
 
 function brancherHorsLigne(){
   window.addEventListener('offline', function(){ afficherEtatHorsLigne(true) });
+
+// Espacer les sondages ne doit pas coûter en fraîcheur : au retour sur
+// l'application, on rattrape immédiatement. On ne consomme que quand
+// quelqu'un regarde, et l'écran est à jour dès qu'il revient.
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden)return;
+  try{
+    if(typeof refreshActiveScreenData==='function')refreshActiveScreenData();
+    if(typeof refreshUnreadBadge==='function')refreshUnreadBadge();
+    var chat=document.getElementById('s-chat');
+    if(typeof loadChatMessages==='function'&&chat&&chat.classList.contains('active'))loadChatMessages();
+  }catch(e){}
+});
   window.addEventListener('online', function(){
     afficherEtatHorsLigne(false);
     // Au retour du réseau, on recharge ce que l'utilisateur regarde plutôt que
@@ -9606,7 +9619,13 @@ let unreadPollInterval=null;
 function startUnreadPoll(){
   stopUnreadPoll();
   refreshUnreadBadge();
-  unreadPollInterval=setInterval(refreshUnreadBadge,15000);
+  unreadPollInterval=setInterval(function(){
+    // Rien ne sert de sonder une application que personne ne regarde. Sur un
+    // téléphone posé sur une table, l'onglet restait « ouvert » des heures et
+    // appelait le serveur toutes les quinze secondes.
+    if(document.hidden)return;
+    refreshUnreadBadge();
+  },45000);
 }
 function stopUnreadPoll(){if(unreadPollInterval){clearInterval(unreadPollInterval);unreadPollInterval=null}}
 
@@ -9630,7 +9649,10 @@ function refreshActiveScreenData(){
 let dataPollInterval=null;
 function startDataPoll(){
   stopDataPoll();
-  dataPollInterval=setInterval(refreshActiveScreenData,20000);
+  dataPollInterval=setInterval(function(){
+    if(document.hidden)return;
+    refreshActiveScreenData();
+  },60000);
 }
 function stopDataPoll(){if(dataPollInterval){clearInterval(dataPollInterval);dataPollInterval=null}}
 
@@ -9651,7 +9673,7 @@ document.addEventListener('visibilitychange',function(){
   startUnreadPoll();startDataPoll();
   if(currentChatDemandeId){
     loadChatMessages();
-    if(!chatPollInterval)chatPollInterval=setInterval(loadChatMessages,6000);
+    if(!chatPollInterval)chatPollInterval=setInterval(function(){ if(!document.hidden)loadChatMessages(); },6000);
   }
 });
 
@@ -9796,7 +9818,7 @@ function goToChat(demandeId,otherName){
   show('s-chat');
   loadChatMessages();
   stopChatPoll();
-  chatPollInterval=setInterval(loadChatMessages,6000);
+  chatPollInterval=setInterval(function(){ if(!document.hidden)loadChatMessages(); },6000);
   setLastRead(demandeId);
   refreshUnreadBadge();
   fetch(API+'/api/demandes/'+demandeId,{headers:authHeaders()})
