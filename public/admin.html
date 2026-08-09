@@ -323,6 +323,33 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
   border: 1px solid #D5DDDD;
   color: #44585C;
 }
+
+/* ── LES DOSSIERS PRESTATAIRES ────────────────────────────────────────────
+   Une carte par personne. Ce qui compte se lit sans cliquer : l'état du
+   dossier, ce qui manque, depuis combien de temps il attend. */
+.carte.dossier { border-left: 3px solid #D5DDDD; }
+.carte.dossier.complet { border-left-color: #2E9E5B; }
+.etat {
+  flex-shrink: 0; font-size: 11.5px; font-weight: 700;
+  padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+}
+.etat.pret   { background: #EEF6EE; color: #2A5C3C; }
+.etat.manque { background: #FFF7E6; color: #7A4A08; }
+.manquants {
+  font-size: 12.5px; color: #7A4A08; background: #FFF7E6;
+  border-radius: 8px; padding: 8px 10px; margin-top: 8px;
+}
+.alerte-dossier {
+  font-size: 12.5px; color: #8A2020; background: #FDEEEE;
+  border-radius: 8px; padding: 8px 10px; margin-top: 6px;
+}
+.alerte-dossier.douce { color: #44585C; background: #F1F4F4; }
+.attente { margin-top: 4px; }
+/* Trois jours d'attente, c'est le seuil où un prestataire commence à se
+   demander si son inscription a été perdue. */
+.attente.longue { color: #B45309; font-weight: 700; }
+.actions-dossier { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.actions-dossier .action { flex: 1; min-width: 150px; }
 </style>
 </head>
 <body>
@@ -1001,6 +1028,8 @@ function exporterFactures(d) {
 // ── Documents : file d'attente et décisions ─────────────────────────────────
 
 let filtreDocuments = 'en_attente';
+// Le filtre de la vue par dossiers : a_traiter, complets, incomplets, tous.
+let filtreDossiers = 'a_traiter';
 let motifsRefus = {};
 
 function ilYA(iso) {
@@ -1046,40 +1075,19 @@ function blocControle(pro) {
   return '<div class="controle ' + (souci ? 'souci' : 'ok') + '">' + lignes.join('') + '</div>';
 }
 
-async function chargerDocuments() {
-  const c = $('liste-documents');
-  c.innerHTML = '<p class="petit">Chargement…</p>';
-
-  if (filtreDocuments === 'expirations') return chargerExpirations();
-
-  let d;
-  try { d = await appel('/api/admin/documents?statut=' + filtreDocuments); }
-  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
-  motifsRefus = d.motifs_refus || {};
-
-  const pastille = $('compteur-documents');
-  if (pastille) pastille.textContent = d.en_attente ? String(d.en_attente) : '';
-
-  if (!d.documents.length) {
-    c.innerHTML = filtreDocuments === 'en_attente'
-      ? '<div class="tout-traite"><div class="titre">Tout est vérifié</div>' +
-        '<div class="sous">Aucun document en attente. Les nouveaux dépôts apparaîtront ici, ' +
-        'et le nombre s\'affichera sur l\'onglet.</div></div>'
-      : '<p class="petit">Aucun document dans cette catégorie.</p>';
-    return;
-  }
-
-  // Compteur permanent : on sait toujours combien il reste, et l'ordre est
-  // annoncé pour qu'on ne se demande pas pourquoi celui-ci vient en premier.
-  const entete = filtreDocuments === 'en_attente'
-    ? '<div class="compteur-file" id="compteur-file">' +
-        '<div class="reste"><strong>' + d.documents.length + '</strong> ' +
-          'document' + (d.documents.length > 1 ? 's' : '') + ' à vérifier</div>' +
-        '<div class="indication">Les plus anciens d\'abord.<br>Chaque décision passe au suivant.</div>' +
-      '</div>'
-    : '';
-
-  c.innerHTML = entete + d.documents.map((doc) => {
+// ═══════════════════════════════════════════════════════════════════════════
+// LES DOSSIERS — une carte par prestataire, pas par fichier
+//
+// La liste à plat tient avec trois prestataires. Avec mille, elle devient
+// inexploitable : cinq documents chacun, dispersés par ordre d'arrivée, et il
+// faut reconstituer de tête qui a fourni quoi.
+//
+// L'unité de travail devient le PRESTATAIRE. C'est la vraie question — un
+// document valide isolé ne sert à rien si les deux autres manquent.
+// Fabrique d'une carte de document. Extraite de chargerDocuments pour être
+// réutilisée par la vue « dossier d'un prestataire » — c'est la même carte,
+// et deux copies auraient divergé à la première modification.
+function carteDocument(doc) {
     const pro = doc.pro || {};
     const decidable = doc.statut === 'en_attente';
     return '<div class="dossier" id="dossier-' + doc.id + '">' +
@@ -1111,7 +1119,154 @@ async function chargerDocuments() {
             (doc.commentaire ? ' — ' + doc.commentaire : '') + '</p>' : '') +
           (doc.date_expiration ? '<p class="petit">Valable jusqu\'au ' + dateFr(doc.date_expiration) + '</p>' : '')) +
     '</div>';
+  }
+
+// ═══════════════════════════════════════════════════════════════════════════
+async function chargerDossiers() {
+  const c = $('liste-documents');
+  c.innerHTML = '<p class="petit">Chargement…</p>';
+
+  let d;
+  try { d = await appel('/api/admin/dossiers?filtre=' + (filtreDossiers || 'a_traiter')); }
+  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+
+  const pastille = $('compteur-documents');
+  if (pastille) pastille.textContent = d.compteurs.a_traiter ? String(d.compteurs.a_traiter) : '';
+
+  if (!d.dossiers.length) {
+    c.innerHTML = '<div class="tout-traite"><div class="titre">Rien à vérifier</div>' +
+      '<div class="sous">Aucun dossier en attente de décision.</div></div>';
+    return;
+  }
+
+  // Deux nombres, et l'ordre annoncé : on ne se demande pas pourquoi ce
+  // dossier vient en premier.
+  const entete =
+    '<div class="compteur-file">' +
+      '<div class="reste"><strong>' + d.compteurs.complets + '</strong> dossier' +
+        (d.compteurs.complets > 1 ? 's' : '') + ' complet' + (d.compteurs.complets > 1 ? 's' : '') +
+        ' — décision immédiate</div>' +
+      '<div class="indication">' + d.compteurs.incomplets + ' dossier(s) incomplet(s), en attente de pièces.<br>' +
+        'Les complets d\'abord, puis les plus anciens.</div>' +
+    '</div>';
+
+  const jours = (ts) => ts ? Math.floor((Date.now() - ts) / 86400000) : null;
+
+  c.innerHTML = entete + d.dossiers.map((p) => {
+    const nom = echapper(((p.prenom || '') + ' ' + (p.nom || '')).trim() || p.email);
+    const attente = jours(p.attend_depuis);
+    const manque = p.manquants.length;
+
+    // Ce qui bloque, dit en une phrase. Sans elle, il faut comparer les
+    // compteurs entre eux pour comprendre l'état du dossier.
+    const diagnostic = p.complet
+      ? '<span class="etat pret">Complet — ' + p.nb_en_attente + ' pièce(s) à valider</span>'
+      : '<span class="etat manque">' + manque + ' pièce(s) manquante(s)</span>';
+
+    const pieces = p.manquants.length
+      ? '<div class="manquants">Manque : ' + p.manquants.map(echapper).join(', ') + '</div>'
+      : '';
+
+    const alertes =
+      (p.siret_doublon ? '<div class="alerte-dossier">SIRET déjà utilisé par un autre compte</div>' : '') +
+      (p.siret_statut === 'ferme' ? '<div class="alerte-dossier">SIRET fermé selon l\'INSEE</div>' : '') +
+      (p.nb_expires ? '<div class="alerte-dossier">' + p.nb_expires + ' document(s) expiré(s)</div>' : '') +
+      (p.nb_refuses ? '<div class="alerte-dossier douce">' + p.nb_refuses + ' document(s) refusé(s) auparavant</div>' : '');
+
+    return '<div class="carte dossier' + (p.complet ? ' complet' : '') + '">' +
+      '<div class="carte-tete">' +
+        '<div style="min-width:0">' +
+          '<div class="ligne"><strong>' + nom + '</strong></div>' +
+          '<div class="petit">' + echapper(p.email) +
+            (p.telephone ? ' · ' + echapper(p.telephone) : '') + '</div>' +
+        '</div>' + diagnostic +
+      '</div>' +
+      (attente !== null
+        ? '<div class="petit attente' + (attente >= 3 ? ' longue' : '') + '">En attente depuis ' +
+          (attente === 0 ? "aujourd'hui" : attente + ' jour' + (attente > 1 ? 's' : '')) + '</div>'
+        : '') +
+      pieces + alertes +
+      '<div class="actions-dossier">' +
+        (p.complet && p.nb_en_attente
+          ? '<button class="action" onclick="validerDossier(\'' + p.pro_id + '\',\'' +
+              echapper(nom) + '\',' + p.nb_en_attente + ')">Tout valider (' + p.nb_en_attente + ')</button>'
+          : '') +
+        '<button class="action secondaire" onclick="ouvrirDossier(\'' + p.pro_id + '\')">' +
+          'Voir les ' + p.documents + ' pièce(s)</button>' +
+      '</div>' +
+    '</div>';
   }).join('');
+}
+
+// Valider les pièces en attente d'un prestataire, en une fois.
+//
+// On confirme : c'est une décision qui autorise quelqu'un à travailler, et le
+// bouton porte sur plusieurs documents à la fois.
+async function validerDossier(proId, nom, nb) {
+  if (!confirm('Valider les ' + nb + ' pièce(s) en attente de ' + nom + ' ?\n\n' +
+      'Le prestataire pourra recevoir des demandes.')) return;
+  try {
+    const r = await appel('/api/admin/dossiers/' + proId + '/valider', { method: 'PATCH' });
+    avis(r.message || 'Dossier validé.', 'ok');
+    chargerDossiers();
+  } catch (e) { if (e.message !== '401') avis(e.message, 'ko'); }
+}
+
+// Le détail d'un dossier : les pièces une par une, pour refuser précisément.
+// Le refus reste unitaire — dire « votre dossier est refusé » n'apprend rien
+// au prestataire sur ce qu'il doit refaire.
+async function ouvrirDossier(proId) {
+  filtreDocuments = 'pro:' + proId;
+  chargerDocuments();
+}
+
+async function chargerDocuments() {
+  const c = $('liste-documents');
+  c.innerHTML = '<p class="petit">Chargement…</p>';
+
+  if (filtreDocuments === 'expirations') return chargerExpirations();
+
+  // Dossier d'un prestataire précis : le serveur renvoie tout son historique.
+  if (String(filtreDocuments).startsWith('pro:')) {
+    const proId = filtreDocuments.slice(4);
+    let dd;
+    try { dd = await appel('/api/admin/documents?pro_id=' + proId); }
+    catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+    motifsRefus = dd.motifs_refus || {};
+    c.innerHTML = '<button class="action secondaire" style="margin-bottom:12px" ' +
+        'onclick="filtreDocuments=\'en_attente\';chargerDossiers()">← Retour aux dossiers</button>' +
+      dd.documents.map(carteDocument).join('');
+    return;
+  }
+
+  let d;
+  try { d = await appel('/api/admin/documents?statut=' + filtreDocuments); }
+  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+  motifsRefus = d.motifs_refus || {};
+
+  const pastille = $('compteur-documents');
+  if (pastille) pastille.textContent = d.en_attente ? String(d.en_attente) : '';
+
+  if (!d.documents.length) {
+    c.innerHTML = filtreDocuments === 'en_attente'
+      ? '<div class="tout-traite"><div class="titre">Tout est vérifié</div>' +
+        '<div class="sous">Aucun document en attente. Les nouveaux dépôts apparaîtront ici, ' +
+        'et le nombre s\'affichera sur l\'onglet.</div></div>'
+      : '<p class="petit">Aucun document dans cette catégorie.</p>';
+    return;
+  }
+
+  // Compteur permanent : on sait toujours combien il reste, et l'ordre est
+  // annoncé pour qu'on ne se demande pas pourquoi celui-ci vient en premier.
+  const entete = filtreDocuments === 'en_attente'
+    ? '<div class="compteur-file" id="compteur-file">' +
+        '<div class="reste"><strong>' + d.documents.length + '</strong> ' +
+          'document' + (d.documents.length > 1 ? 's' : '') + ' à vérifier</div>' +
+        '<div class="indication">Les plus anciens d\'abord.<br>Chaque décision passe au suivant.</div>' +
+      '</div>'
+    : '';
+
+  c.innerHTML = entete + d.documents.map(carteDocument).join('');
 
   d.documents.forEach((doc) => chargerApercu(doc.id));
   c.querySelectorAll('[data-valider]').forEach((b) => { b.onclick = () => decider(b.dataset.valider, 'valide'); });
@@ -1226,7 +1381,10 @@ document.querySelectorAll('.onglet').forEach((b) => {
       $('vue-' + v).classList.toggle('masque', v !== b.dataset.vue));
     if (b.dataset.vue === 'chiffres') { chargerChiffres(); chargerDiagnostic(); }
     if (b.dataset.vue === 'signalements') chargerSignalements();
-    if (b.dataset.vue === 'documents') chargerDocuments();
+    // L'onglet ouvre la vue par DOSSIERS : c'est l'unité de décision.
+    // La liste à plat reste accessible depuis un dossier, pour refuser une
+    // pièce précise.
+    if (b.dataset.vue === 'documents') { filtreDocuments = 'en_attente'; chargerDossiers(); }
     if (b.dataset.vue === 'declaration') chargerDeclaration();
     if (b.dataset.vue === 'comptes') chargerComptes($('recherche').value.trim());
   };
@@ -1235,8 +1393,12 @@ document.querySelectorAll('.onglet').forEach((b) => {
 document.querySelectorAll('.sous-onglet').forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll('.sous-onglet').forEach((x) => x.classList.toggle('actif', x === b));
-    filtreDocuments = b.dataset.filtre;
-    chargerDocuments();
+    const f = b.dataset.filtre;
+    // « en_attente » signifie désormais « les dossiers à traiter ». Les autres
+    // filtres — validés, refusés, expirations — restent des listes de pièces :
+    // on y cherche un document précis, pas une décision à prendre.
+    if (f === 'en_attente') { filtreDocuments = 'en_attente'; filtreDossiers = 'a_traiter'; chargerDossiers(); }
+    else { filtreDocuments = f; chargerDocuments(); }
   };
 });
 
