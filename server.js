@@ -2079,7 +2079,10 @@ async function cloturerPrestationsOubliees() {
     const { data: litiges } = await supabase.from('signalements')
       .select('demande_id')
       .in('demande_id', aClore.map(d => d.id))
-      .not('statut', 'in', '(resolu,rejete)');
+      // « traite » est le mot qu'écrit l'administration. « resolu » et « rejete »
+      // sont prévus pour un arbitrage plus fin, s'il vient un jour.
+      // Les trois libèrent le paiement ; tout le reste le suspend.
+      .not('statut', 'in', '(traite,resolu,rejete)');
     const demandesEnLitige = new Set((litiges || []).map(l => l.demande_id));
 
     for (const d of aClore) {
@@ -2141,7 +2144,10 @@ async function avertirValidationProche() {
     const { data: litigesAvert } = await supabase.from('signalements')
       .select('demande_id')
       .in('demande_id', aPrevenir.map(d => d.id))
-      .not('statut', 'in', '(resolu,rejete)');
+      // « traite » est le mot qu'écrit l'administration. « resolu » et « rejete »
+      // sont prévus pour un arbitrage plus fin, s'il vient un jour.
+      // Les trois libèrent le paiement ; tout le reste le suspend.
+      .not('statut', 'in', '(traite,resolu,rejete)');
     const enLitige = new Set((litigesAvert || []).map(l => l.demande_id));
 
     for (const d of aPrevenir) {
@@ -5301,9 +5307,31 @@ app.get('/api/admin/signalements', adminAuth, async (req, res) => {
 // remonter dans la liste des cas encore ouverts.
 app.patch('/api/admin/signalements/:id', adminAuth, async (req, res) => {
   try {
-    const { statut } = req.body; // 'nouveau' | 'traite'
-    if (!['nouveau', 'traite'].includes(statut)) return res.status(400).json({ error: 'Statut invalide.' });
+    // ── CE STATUT COMMANDE UN PAIEMENT ──────────────────────────────────
+    // Depuis la clôture automatique, un signalement ouvert SUSPEND le
+    // versement au prestataire. Le refermer ici, c'est autoriser le paiement.
+    //
+    // Trois valeurs, pour que la décision soit lisible dans six mois :
+    //   nouveau  le litige est ouvert, le paiement attend
+    //   traite   vous avez tranché, le paiement peut partir
+    //   rejete   le signalement n'était pas fondé, le paiement peut partir
+    //
+    // Un remboursement éventuel se fait dans Stripe : l'application ne décide
+    // pas de rendre l'argent, elle décide seulement de ne pas le bloquer.
+    const { statut } = req.body;
+    if (!['nouveau', 'traite', 'rejete'].includes(statut)) {
+      return res.status(400).json({ error: 'Statut invalide.' });
+    }
     await supabase.from('signalements').update({ statut }).eq('id', req.params.id);
+
+    // La clôture automatique ne repasse qu'à la prochaine lecture de liste.
+    // On la déclenche tout de suite : un prestataire dont le litige vient
+    // d'être clos ne doit pas attendre qu'un autre utilisateur ouvre
+    // l'application pour être payé.
+    if (statut !== 'nouveau' && typeof cloturerPrestationsOubliees === 'function') {
+      cloturerPrestationsOubliees().catch(e => console.error('Clôture après arbitrage:', e.message));
+    }
+
     res.json({ message: 'Signalement mis à jour.' });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur.' });
