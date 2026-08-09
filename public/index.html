@@ -63,8 +63,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
 <!-- Leaflet + OpenStreetMap : carte interactive gratuite, sans clé API et sans coût à l'usage,
      contrairement à Google Maps — choix délibéré pour éviter une nouvelle dépense récurrente. -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet ne sert qu'à DEUX écrans : le réglage de la zone d'intervention et
+     la confirmation d'adresse. Chargé ici, il bloquait le premier rendu de tous
+     les autres — environ 190 Ko avec sa feuille, pour un visiteur qui n'ouvrira
+     peut-être jamais de carte. Il est désormais chargé par chargerLeaflet(). -->
 <style>
 /* ============================================================================
    GLEAM — SYSTÈME D'INTERFACE
@@ -628,7 +630,7 @@ html, body {
   background: rgba(255,255,255,.16);
   color: #fff;
   border: 1px solid rgba(255,255,255,.18);
-  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
 .home-hero h2 {
   position: relative; z-index: 1;
@@ -3475,7 +3477,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 .barre-enregistrement {
   position: sticky; bottom: 0; z-index: 20;
   background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
   margin: var(--gap-4) calc(-1 * var(--gap-4)) 0;
   padding: var(--gap-3) var(--gap-4) calc(var(--gap-3) + var(--pad-bas));
@@ -10631,7 +10633,41 @@ function deplacerZoneIntervention(lat,lng,zoom){
   markerZoneIntervention.setLatLng(pos);
   if(cercleZoneIntervention)cercleZoneIntervention.setLatLng(pos);
 }
-function initCarteZoneIntervention(){
+// ─────────────────────────────────────────────────────────────────────────────
+// LEAFLET, CHARGÉ SEULEMENT QUAND UNE CARTE S'OUVRE
+//
+// La bibliothèque et sa feuille pèsent environ 190 Ko et bloquaient le premier
+// rendu de TOUS les écrans — alors que deux seulement en ont besoin.
+//
+// La promesse est mémorisée : deux ouvertures successives ne déclenchent qu'un
+// seul chargement, et les appels concurrents attendent le même résultat.
+// ─────────────────────────────────────────────────────────────────────────────
+var chargementLeaflet = null;
+function chargerLeaflet(){
+  if (window.L) return Promise.resolve();
+  if (chargementLeaflet) return chargementLeaflet;
+  chargementLeaflet = new Promise(function(resoudre, rejeter){
+    var feuille = document.createElement('link');
+    feuille.rel = 'stylesheet';
+    feuille.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(feuille);
+    var script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = function(){ resoudre(); };
+    script.onerror = function(){
+      // Une carte qui ne charge pas ne doit pas bloquer l'écran : le
+      // prestataire peut toujours régler son rayon au curseur.
+      chargementLeaflet = null;
+      rejeter(new Error('Leaflet indisponible'));
+    };
+    document.head.appendChild(script);
+  });
+  return chargementLeaflet;
+}
+
+async function initCarteZoneIntervention(){
+  // La carte a besoin de Leaflet, qui n'est plus chargé au démarrage.
+  await chargerLeaflet();
   // Leaflet vient d'un CDN. S'il n'a pas pu se charger — réseau capricieux,
   // domaine bloqué, tunnel d'entreprise — `L` est indéfini et tout ce qui suit
   // lève une exception. Le prestataire verrait alors une fenêtre à moitié
@@ -11737,7 +11773,9 @@ function chercherAdresse(valeur){
 }
 var adresseChoisieLat=null,adresseChoisieLng=null;
 var carteConfirmationAdresse=null,markerConfirmationAdresse=null;
-function choisirAdresse(rue,ville,lat,lng){
+async function choisirAdresse(rue,ville,lat,lng){
+  // La carte a besoin de Leaflet, qui n'est plus chargé au démarrage.
+  await chargerLeaflet();
   var addrEl=document.getElementById('f-addr'),villeEl=document.getElementById('f-ville');
   if(addrEl)addrEl.value=rue;
   if(villeEl)villeEl.value=ville;
