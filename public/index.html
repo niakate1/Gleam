@@ -12894,9 +12894,45 @@ async function restaurerSession(tok){
 // rouvrirait le même écran indéfiniment, et l'utilisateur ne pourrait plus
 // naviguer normalement.
 // ═══════════════════════════════════════════════════════════════════════════
+// Le lien d'un courriel porte le compte auquel il s'adresse. Si la session
+// ouverte n'est pas la bonne, on ne devine pas : on demande.
+//
+// Le cas qui compte n'est pas le vôtre — vous savez que vous avez testé
+// plusieurs comptes. C'est celui d'un ordinateur partagé : quelqu'un ouvre son
+// courriel sur le poste où son conjoint s'était connecté la veille, et laisse
+// un avis, envoie un message ou paie sous le compte de l'autre.
+function verifierCompteDuLien(){
+  var params = new URLSearchParams(window.location.search);
+  var attendu = params.get('c');
+  if (!attendu) return true;              // lien sans destinataire : rien à vérifier
+  if (!currentUser) return true;          // pas de session : la connexion tranchera
+  if (currentUser.id === attendu) return true;
+
+  var qui = (currentUser.prenom || currentUser.email || 'un autre compte');
+  var changer = confirm(
+    'Ce lien concerne un autre compte que celui ouvert ici.\n\n' +
+    'Vous êtes connecté en tant que ' + qui + '.\n\n' +
+    'Voulez-vous vous déconnecter pour ouvrir le bon compte ?');
+  if (changer) {
+    // L'ancre est conservée : après connexion, la personne atterrit là où le
+    // courriel la menait.
+    if (typeof logout === 'function') logout();
+    else { localStorage.removeItem('gleam_token'); location.reload(); }
+  } else {
+    // On reste, mais on n'ouvre rien : ouvrir la demande de quelqu'un d'autre
+    // n'aurait aucun sens, et le serveur la refuserait de toute façon.
+    try { history.replaceState(null, '', window.location.pathname); } catch (err) {}
+    if (typeof toast === 'function') toast('Lien ignoré : il concerne un autre compte.', 5000);
+  }
+  return false;
+}
+
 function traiterAncreEntrante(){
   var ancre = (window.location.hash || '').replace(/^#/, '');
   if (!ancre) return false;
+
+  // Le bon compte est-il ouvert ? Sinon, on ne va nulle part.
+  if (!verifierCompteDuLien()) return false;
 
   // Le retour de configuration Stripe a son propre traitement, plus haut.
   if (ancre === 'paiements-retour') return false;
