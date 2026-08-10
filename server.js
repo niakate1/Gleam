@@ -2659,6 +2659,25 @@ app.post('/api/demandes/:id/proposer-creneau', auth, async (req, res) => {
     if (!['acceptee', 'en_cours'].includes(demande.statut))
       return res.status(400).json({ error: 'La reprogrammation n\'est possible que pour une prestation acceptée ou en cours.' });
 
+    // ── LE PRESTATAIRE EST DÉJÀ SUR PLACE ───────────────────────────────
+    // Avant son arrivée, un report ne coûte rien : il n'a pas bougé, et il
+    // peut refuser — la reprogrammation exige l'accord des deux.
+    //
+    // Après, il s'est déplacé. Le report devient une annulation déguisée, et
+    // l'annulation est déjà bloquée à ce stade. Deux gestes au même effet ne
+    // peuvent pas avoir deux traitements opposés : un client à qui l'on refuse
+    // d'annuler pouvait reprogrammer, et obtenir la même chose par un autre mot.
+    //
+    // Même code, même message que l'annulation : ce qui se passe une fois le
+    // prestataire sur place se règle entre eux, ou par un signalement.
+    if (demande.prestation_demarree_le) {
+      return res.status(409).json({
+        error: 'Le prestataire est déjà sur place et a commencé la prestation. ' +
+               'Elle ne peut plus être reprogrammée — si quelque chose ne va pas, ' +
+               'signalez-le depuis la conversation et nous interviendrons.'
+      });
+    }
+
     const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
     const estClient = demande.client_id === req.user.id;
     const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
@@ -2680,6 +2699,24 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
     if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (!demande.creneau_propose) return res.status(400).json({ error: 'Aucune proposition de créneau en attente.' });
     if (demande.creneau_propose_par === req.user.id) return res.status(403).json({ error: 'Vous ne pouvez pas répondre à votre propre proposition.' });
+
+    // ── LE MÊME GARDE-FOU, SUR L'AUTRE CHEMIN ───────────────────────────
+    // Bloquer la PROPOSITION ne suffit pas : une proposition faite la veille,
+    // encore en attente, pouvait être acceptée après l'arrivée du prestataire.
+    // Le report se produisait alors quand même, par la porte de derrière.
+    //
+    // On refuse la réponse, et on retire la proposition devenue caduque :
+    // la laisser en attente ferait réapparaître le bouton à chaque ouverture.
+    if (demande.prestation_demarree_le) {
+      await supabase.from('demandes')
+        .update({ creneau_propose: null, creneau_propose_par: null })
+        .eq('id', demande.id);
+      return res.status(409).json({
+        error: 'Le prestataire est déjà sur place et a commencé la prestation. ' +
+               'La proposition de report n\'est plus valable — si quelque chose ne va pas, ' +
+               'signalez-le depuis la conversation et nous interviendrons.'
+      });
+    }
 
     const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
     const estClient = demande.client_id === req.user.id;
