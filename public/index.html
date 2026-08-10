@@ -6327,6 +6327,29 @@ async function safeJson(r){
     return{error:'Erreur serveur (code '+r.status+'). Réessayez dans un instant.'};
   }
 }
+// ─────────────────────────────────────────────────────────────────────────────
+// LE MESSAGE À AFFICHER QUAND UNE REQUÊTE ÉCHOUE
+//
+// Vingt-et-un endroits écrivaient toast('Erreur : ' + (d.error || '')). Quand
+// le serveur ne renvoyait rien d'exploitable — coupure, erreur non prévue —,
+// l'utilisateur lisait « Erreur : » et rien d'autre.
+//
+// Le serveur fournit désormais une référence d'incident pour les erreurs
+// techniques. On la garde : c'est ce que la personne pourra vous citer.
+// ─────────────────────────────────────────────────────────────────────────────
+function messageErreur(reponse, donnees, repli){
+  var d = donnees || {};
+  if (d.error) return d.error;
+  if (reponse) {
+    if (reponse.status === 401) return 'Votre session a expiré. Reconnectez-vous pour continuer.';
+    if (reponse.status === 403) return 'Vous n\'avez pas accès à cette action avec ce compte.';
+    if (reponse.status === 404) return 'Cet élément n\'existe plus. Il a sans doute été supprimé.';
+    if (reponse.status === 429) return 'Trop de tentatives. Patientez une minute avant de réessayer.';
+    if (reponse.status >= 500) return 'Une erreur est survenue de notre côté. Réessayez dans un instant.';
+  }
+  return repli || 'L\'action n\'a pas abouti. Réessayez dans un instant.';
+}
+
 function friendlyNetworkError(e){
   if(e&&e.name==='TypeError')return'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
   return'Erreur réseau. Réessayez dans un instant.';
@@ -6378,7 +6401,7 @@ async function forgotPassword(){
   try{
     const r=await fetch(API+'/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     toast('📧 Si ce compte existe, un code a été envoyé par email.',5000);
     ouvrirNouveauMotDePasse(email);
   }catch(e){toast(friendlyNetworkError(e))}
@@ -6633,7 +6656,7 @@ async function supprimerCompte(){
   try{
     const r=await fetch(API+'/api/users/me/supprimer',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     toast('Votre compte a été supprimé.');
     setTimeout(doLogout,1200);
   }catch(e){toast(friendlyNetworkError(e))}
@@ -6942,7 +6965,7 @@ async function handleProfilePhoto(input,who){
     var dataUrl=await compressImage(file,400,0.8);
     const r=await fetch(API+'/api/users/photo',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({photo:dataUrl})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||'photo non enregistrée'));return}
+    if(!r.ok){toast(messageErreur(r, d, "La photo n'a pas pu être enregistrée. Réessayez avec une image plus légère."));return}
     if(who==='pro')renderProfileAvatar('pro-profile-avatar-inner',dataUrl,'🏢');
     else renderProfileAvatar('profile-avatar-inner',dataUrl,'👤');
     toast('📸 Photo de profil mise à jour !');
@@ -7496,7 +7519,7 @@ async function accepterDevis(devisId,btn,montant){
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/accepter',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;var sib2=btn.parentElement&&btn.parentElement.querySelector('.btn-refuse');if(sib2)sib2.disabled=false}return}
+    if(!r.ok){toast(messageErreur(r, d));if(btn){btn.disabled=false;var sib2=btn.parentElement&&btn.parentElement.querySelector('.btn-refuse');if(sib2)sib2.disabled=false}return}
     toast('✅ Devis accepté !');
     loadDevis();loadDemandes();
 
@@ -7521,7 +7544,7 @@ async function refuserDevis(devisId,btn){
   if(btn){btn.disabled=true;var sib=btn.parentElement&&btn.parentElement.querySelector('.btn-accept');if(sib)sib.disabled=true}
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/refuser',{method:'POST',headers:authHeaders()});
-    if(!r.ok){const d=await safeJson(r);toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;var sib2=btn.parentElement&&btn.parentElement.querySelector('.btn-accept');if(sib2)sib2.disabled=false}return}
+    if(!r.ok){const d=await safeJson(r);toast(messageErreur(r, d));if(btn){btn.disabled=false;var sib2=btn.parentElement&&btn.parentElement.querySelector('.btn-accept');if(sib2)sib2.disabled=false}return}
     toast('❌ Devis refusé.');loadDevis();
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
@@ -7633,7 +7656,7 @@ async function annulerDemandeAcceptee(){
   try{
     const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id+'/annuler-client',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     var msg;
     if(d.frais_retenus&&d.rembourse){msg='🚫 Prestation annulée. Remboursé : '+d.montant_rembourse+'€ (frais de '+d.montant_retenu+'€ retenus, annulation tardive).'}
     else if(d.frais_retenus&&!d.rembourse){msg='🚫 Prestation annulée. Aucun remboursement (annulation à moins de 2h du créneau).'}
@@ -7657,7 +7680,7 @@ async function archiverDemande(demandeId){
   try{
     const r=await fetch(API+'/api/demandes/'+cible+'/archiver',{method:'PATCH',headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     toast('📥 Prestation rangée — elle ne s\'affichera plus dans vos listes.');
     // On reste où l'on est : renvoyer sur l'accueil après un rangement fait dans
     // la liste des devis serait déroutant.
@@ -7675,7 +7698,7 @@ async function deleteDemande(){
   try{
     const r=await fetch(API+'/api/demandes/'+currentDetailDemande.id,{method:'DELETE',headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     toast('🗑️ Demande supprimée.');goTab('home');
   }catch(e){toast(friendlyNetworkError(e))}
 }
@@ -7748,7 +7771,7 @@ async function envoyerNote(btn){
   if(btn)btn.disabled=true;
   try{
     const r=await fetch(API+'/api/evaluations',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:noteDemandeId,evalue_id:noteSocieteId,note:noteSelectionnee,commentaire:comment})});
-    if(!r.ok){const d=await safeJson(r);toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
+    if(!r.ok){const d=await safeJson(r);toast(messageErreur(r, d));if(btn)btn.disabled=false;return}
     document.getElementById('modal-overlay').classList.remove('open');
     toast('⭐ Merci pour votre avis !',4000);
     if(isPro())loadProDevis();else loadDevis();
@@ -8912,7 +8935,7 @@ async function enregistrerFacturation(){
     const r=await fetch(API+'/api/entreprises/facturation',
       {method:'PATCH',headers:authHeaders(),body:JSON.stringify(corps)});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d&&d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     currentUser.siret=corps.siret;
     currentUser.raison_sociale=corps.raison_sociale;
     currentUser.adresse_facturation=corps.adresse_facturation;
@@ -8978,7 +9001,7 @@ async function enregistrerJustificatifs(){
     const r=await fetch(API+'/api/societes/justificatifs',
       {method:'PATCH',headers:authHeaders(),body:JSON.stringify(corps)});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d&&d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     // On tient currentUser à jour pour que le parcours se rafraîchisse sans rechargement.
     currentUser.siret=corps.siret;
     currentUser.assurance_rc_pro=corps.assurance_rc_pro;
@@ -9251,7 +9274,7 @@ async function deposerDocument(champ){
     const r=await fetch(API+'/api/documents',{method:'POST',headers:authHeaders(),
       body:JSON.stringify({type:type,face:face,fichier:contenu,nom_original:fichier.name,qualite:qualite})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d&&d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
 
     vibrer('succes');
     toast('Document déposé, il sera vérifié rapidement.');
@@ -9405,7 +9428,7 @@ async function envoyerDevis(demandeId){
       return;
     }
 
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}return}
+    if(!r.ok){toast(messageErreur(r, d));if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}return}
     vibrer('succes');
     toast('✅ Devis envoyé au client !');
     loadProDemandes();loadProDevisCount();
@@ -9689,7 +9712,7 @@ async function saveTarifs(){
   try{
     const r=await fetchGroupe(API+'/api/societes/tarifs',{method:'PATCH',headers:authHeaders(),body:JSON.stringify({tarifs,tarifs_unitaires:tarifsUnitaires,prestations})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     toast('💾 Tarifs enregistrés !');
     tarifsModifies=false;
     var etat=document.getElementById('etat-tarifs');
@@ -9726,7 +9749,7 @@ async function toggleDispo(){
       document.getElementById('dispo-toggle').classList.toggle('on',disponible);
       document.getElementById('dispo-sub').textContent=disponible?'Vous êtes disponible':'Vous êtes indisponible';
       majEnteteProDisponibilite();
-      toast('Erreur, réessayez.');return;
+      toast("L'action n'a pas abouti. Réessayez dans un instant.");return;
     }
   }catch(e){
     disponible=!disponible;
@@ -9749,7 +9772,7 @@ async function annulerProDevis(devisId,btn){
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/annuler-pro',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
+    if(!r.ok){toast(messageErreur(r, d));if(btn)btn.disabled=false;return}
     var msg;
     if(d.suspendu){msg='🚫 Devis annulé. ⚠️ Votre compte a été suspendu suite à plusieurs annulations — contactez le support Gleam pour être réactivé.'}
     else if(typeof d.taux_fiabilite==='number'){msg='🚫 Devis annulé. Le client a été '+(d.rembourse?'intégralement remboursé':'notifié')+'. Votre taux de fiabilité est maintenant de '+d.taux_fiabilite+'%.'}
@@ -10063,7 +10086,7 @@ async function envoyerContactSupport(){
   try{
     const r=await fetch(API+'/api/signalements',{method:'POST',headers:authHeaders(),body:JSON.stringify({motif:motif,description:desc})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
+    if(!r.ok){toast(messageErreur(r, d));if(btn)btn.disabled=false;return}
     closeModalForce();
     toast('✅ Message envoyé. Notre équipe va vous répondre par email.',5000);
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
@@ -10094,7 +10117,7 @@ async function envoyerSignalement(signaleId){
   try{
     const r=await fetch(API+'/api/signalements',{method:'POST',headers:authHeaders(),body:JSON.stringify({signale_id:signaleId,demande_id:currentChatDemandeId,motif:motif,description:desc})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
+    if(!r.ok){toast(messageErreur(r, d));if(btn)btn.disabled=false;return}
     closeModalForce();
     toast('🚩 Signalement envoyé. Notre équipe va l\u2019examiner.',5000);
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
@@ -10454,7 +10477,7 @@ async function configurerPaiementsPro(){
   try{
     const r=await fetch(API+'/api/paiements/connect/onboarding',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     window.location.href=d.url;
   }catch(e){toast(friendlyNetworkError(e))}
 }
@@ -10602,7 +10625,7 @@ async function ajouterFavori(proId,proName,btn){
   try{
     const r=await fetch(API+'/api/favoris',{method:'POST',headers:authHeaders(),body:JSON.stringify({pro_id:proId})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn)btn.disabled=false;return}
+    if(!r.ok){toast(messageErreur(r, d));if(btn)btn.disabled=false;return}
     toast('⭐ '+escapeHtml(proName)+' ajouté à vos favoris !');
     if(btn){btn.innerHTML='<i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
@@ -11055,7 +11078,7 @@ async function showFacture(demandeId){
   try{
     const r=await fetch(API+'/api/demandes/'+demandeId+'/facture',{headers:authHeaders()});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));return}
+    if(!r.ok){toast(messageErreur(r, d));return}
     var w=window.open('','_blank');
     if(!w){toast('Autorisez les fenêtres pop-up pour voir le document.');return}
     w.document.write(buildFactureHtml(d,isPro()));
@@ -12952,7 +12975,7 @@ async function sendDemand(type){
     var method=isEdit?'PATCH':'POST';
     const r=await fetch(url,{method:method,headers:authHeaders(),body:JSON.stringify({prestations:prestations,address:adresseComplete,date:date,time:time,flexibility:flex,photos:photos.slice(0,5),pro_prefere_id:proPrefereChoisi,recurrence:recurrenceChoisie,latitude:adresseChoisieLat,longitude:adresseChoisieLng})});
     const d=await safeJson(r);
-    if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='Envoyer ma demande'}return}
+    if(!r.ok){toast(messageErreur(r, d));if(btn){btn.disabled=false;btn.textContent='Envoyer ma demande'}return}
     document.getElementById('modal-overlay').classList.remove('open');
     photos=[];selectedServices=[];
     adresseChoisieLat=null;adresseChoisieLng=null;
