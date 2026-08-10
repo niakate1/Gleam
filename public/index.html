@@ -9249,23 +9249,41 @@ async function rappelTarifsPro(demandeId, prestation){
   var t=await chargerTarifsPro();
   if(!t){box.innerHTML='';return}
 
-  var base=(t.tarifs||{})[prestation];
-  var unitaire=(t.tarifs_unitaires||{})[prestation];
-  var lignes=[];
+  // `prestation` arrive sous la forme « voiture + canape + tapis » sur une
+  // demande à plusieurs prestations. Aucun tarif ne porte ce nom : le rappel
+  // annonçait donc « aucun tarif enregistré » à un prestataire qui les avait
+  // tous saisis.
+  //
+  // On découpe, et on montre le tarif de CHAQUE prestation demandée. C'est
+  // d'ailleurs plus utile : le devis couvre l'ensemble, autant voir l'ensemble.
+  var types=String(prestation||'').split(' + ').map(function(s){return s.trim()}).filter(Boolean);
+  if(!types.length)types=[prestation];
 
-  if(base&&typeof base==='object'){
-    Object.keys(base).forEach(function(k){
-      var v=parseFloat(base[k]);
-      if(v>0)lignes.push({nom:k.replace(/_/g,' '),prix:Math.round(v)+' €'});
-    });
-  }else if(base&&parseFloat(base)>0){
-    lignes.push({nom:'Forfait',prix:Math.round(parseFloat(base))+' €'});
-  }
-  if(unitaire&&parseFloat(unitaire)>0){
-    // Virgule décimale, comme partout ailleurs dans l'application. Un point décimal
-    // au milieu d'une interface en français passe pour une négligence.
-    lignes.push({nom:'À l\'unité',prix:(Math.round(parseFloat(unitaire)*100)/100).toFixed(2).replace('.',',')+' € / unité'});
-  }
+  var lignes=[];
+  types.forEach(function(type){
+    var base=(t.tarifs||{})[type];
+    var unitaire=(t.tarifs_unitaires||{})[type];
+    // Pas de table de libellés dans l'application : on capitalise le nom
+    // technique, comme le fait déjà l'affichage des demandes.
+    var etiquette=types.length>1
+      ? type.charAt(0).toUpperCase()+type.slice(1).replace(/_/g,' ')+' — '
+      : '';
+
+    if(base&&typeof base==='object'){
+      Object.keys(base).forEach(function(k){
+        var v=parseFloat(base[k]);
+        if(v>0)lignes.push({nom:etiquette+k.replace(/_/g,' '),prix:Math.round(v)+' €'});
+      });
+    }else if(base&&parseFloat(base)>0){
+      lignes.push({nom:etiquette+'Forfait',prix:Math.round(parseFloat(base))+' €'});
+    }
+    if(unitaire&&parseFloat(unitaire)>0){
+      lignes.push({nom:etiquette+'À l\'unité',
+        prix:(Math.round(parseFloat(unitaire)*100)/100).toFixed(2).replace('.',',')+' € / unité'});
+    }
+  });
+
+  // Le calcul par type, plus haut, a rempli `lignes`.
 
   if(!lignes.length){
     // Aucun tarif pour cette prestation : on le dit, et on mène à l'écran qui
@@ -9360,7 +9378,15 @@ const TARIF_CATEGORIES=[
     note:'Prix par m² de surface vitrée, état propre. Le client indique la surface exacte.'},
   {key:'tapis',label:'🧶 Tapis',unite:true,uniteLabel:'m²',tiers:null,placeholder:16,
     note:'Prix par m², pour un tapis synthétique, état propre. Coton/jute-sisal/berbère/laine/soie ajustent ensuite automatiquement le prix (la soie coûte nettement plus cher à nettoyer). Le client indique la surface exacte.'},
-  {key:'autre',label:'➕ Autre',tiers:null,placeholder:60,note:'Prix de base indicatif, à ajuster au cas par cas dans votre message au client.'}
+  // « Autre » a été retiré des tarifs prestataire.
+  //
+  // Une prestation « autre » n'a pas de tarif possible : elle recouvre tout ce
+  // que le client décrit en texte libre. Demander un prix de base pour
+  // l'inconnu produisait un chiffre qui n'engageait personne.
+  //
+  // Le client garde la catégorie — c'est utile, elle capte des besoins qui ne
+  // rentrent nulle part. Le prestataire, lui, voit la demande si elle est dans
+  // sa zone et répond au cas par cas, avec le prix qu'il juge.
 ];
 
 // Icônes vectorielles plutôt que les emojis des libellés : ils se dessinent
