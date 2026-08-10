@@ -7489,7 +7489,10 @@ function renderDevisClientCards(){
         if(v.photos_avant&&v.photos_avant.length){
           photosAvantHtml='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">📸 Photos avant intervention</div>'+
             '<div style="display:flex;gap:6px;overflow-x:auto">'+v.photos_avant.map(function(ph){return '<img src="'+ph+'" style="width:70px;height:70px;border-radius:8px;object-fit:cover;flex-shrink:0" onclick="ouvrirPhotoPleinEcran(this.src)">'}).join('')+'</div></div>';
-        }else if(v.prestation_demarree){
+        // Même correction que côté prestataire : le champ porte le suffixe « _le »,
+      // et il est sur la DEMANDE, pas sur le devis. Sans cela, le client ne voyait
+      // jamais la confirmation que le prestataire avait commencé.
+      }else if(v.demande&&v.demande.prestation_demarree_le){
           photosAvantHtml='<div style="font-size:12px;color:var(--mint);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Le prestataire est arrivé</div>';
         }
         actions=creneauHtml+photosAvantHtml+'<div style="margin-top:0">'+
@@ -8848,8 +8851,14 @@ function renderProDevisCards(){
         }
       }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="wrench" style="width:12px;height:12px;vertical-align:-2px"></i> En cours</span>';
-        var demandeeDemarree=v.demande&&v.demande.prestation_demarree;
-        var blocReprogrammation=creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par);
+        // Le champ s'appelle « prestation_demarree_le ». Sans le suffixe, la variable
+      // valait toujours undefined : le prestataire voyait l'étape « photo d'arrivée »
+      // même après avoir démarré, et jamais celle du code de validation.
+      var demandeeDemarree=v.demande&&v.demande.prestation_demarree_le;
+        var blocReprogrammation=// Le cinquième argument manquait ici : le prestataire aurait gardé le bouton
+        // « Reprogrammer » alors que le serveur refuse — et c'est LUI qui est sur
+        // place, donc lui qui aurait cliqué en premier.
+        creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par,v.demande&&v.demande.prestation_demarree_le);
         var creneauHtmlPro=(v.demande&&v.demande.creneau)?'<div style="display:flex;align-items:center;gap:6px;background:var(--surface-alt);border-radius:8px;padding:8px 10px;margin-top:10px;font-size:13px;font-weight:700;color:var(--text)"><i data-lucide="calendar" style="width:15px;height:15px;color:var(--p);flex-shrink:0"></i> '+formatCreneau(v.demande.creneau)+'</div>':'';
         extra='<div style="margin-top:10px">'+creneauHtmlPro+
           '<button class="btn-accept" style="width:100%;margin-top:10px;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
