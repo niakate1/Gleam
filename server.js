@@ -1654,6 +1654,11 @@ async function prosConcernesParDemande(demande, options) {
     // recevoir, exactement comme il voit tout dans l'application.
     if (Array.isArray(pro.prestations_proposees) && pro.prestations_proposees.length) {
       const proposees = new Set(pro.prestations_proposees);
+      // Même règle que pour la liste : « autre » n'est plus cochable dans les
+      // tarifs, donc personne ne l'a déclarée. Sans cette ligne, une demande
+      // « autre » ne déclencherait aucun courriel — elle arriverait dans
+      // l'application sans que personne ne soit prévenu.
+      proposees.add('autre');
       if (!typesDemandes.some((t) => proposees.has(t))) return false;
     }
     return true;
@@ -2314,6 +2319,15 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     const prestationsPro = user.prestations_proposees;
     if (Array.isArray(prestationsPro) && prestationsPro.length > 0) {
       const prestationsProSet = new Set(prestationsPro);
+      // « autre » ne figure plus dans l'écran des tarifs prestataire : une
+      // prestation décrite en texte libre n'a pas de prix de base possible.
+      //
+      // Il ne peut donc plus la cocher — et sans cette ligne, il ne verrait
+      // plus jamais ces demandes. Elles resteraient sans réponse, alors que ce
+      // sont précisément celles qui méritent un devis sur mesure.
+      //
+      // Le prestataire les reçoit s'il est dans la zone, et décide en lisant.
+      prestationsProSet.add('autre');
       filtered = filtered.filter(d => {
         const typesDemande = extractPrestationTypes(d);
         return typesDemande.some(t => prestationsProSet.has(t));
