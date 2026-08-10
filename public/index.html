@@ -5849,7 +5849,7 @@ function majSimulateur(){
   var commission = brut * TAUX_COMMISSION;
   var verse = brut - commission;
 
-  var euros = function(n){ return Math.round(n).toLocaleString('fr-FR') + ' €'; };
+  var euros = formaterEuros;   // une seule règle d'affichage, partout
   var heures = function(h){
     var entier = Math.floor(h), minutes = Math.round((h - entier) * 60);
     return entier + ' h' + (minutes ? String(minutes).padStart(2,'0') : '');
@@ -6690,17 +6690,41 @@ const STATUTS={
 
 // Affiche les détails d'une prestation en ajoutant l'unité claire pour la quantité/surface
 // (ex: "6 m²" plutôt que juste "6"), pour que ce soit toujours compréhensible sans ambiguïté.
+// Les libellés des champs, pour que chaque valeur dise ce qu'elle est.
+//
+// Sans eux, le détail donnait « Carrelage • Propre • 38 m² » — trois valeurs
+// alignées, sans indiquer laquelle est la matière, laquelle l'état, laquelle
+// la surface. Lisible quand on connaît le formulaire, opaque quand on l'a
+// rempli il y a trois jours.
+var LIBELLES_CHAMPS = {
+  'terrasse-mat':'Revêtement', 'terr-mat':'Revêtement',
+  'piscine-type':'Type de bassin', 'piscine-taille':'Taille',
+  'toit-mat':'Matériau', 'toit-acces':'Accès',
+  'vitres-type':'Type de bien', 'vitres-etage':'Étage',
+  'etat':'État', 'quantite':'Surface', 'f-quantite':'Quantité',
+  'net-type':'Prestation', 'veh':'Véhicule',
+  'can-pl':'Places', 'can-mat':'Matière', 'can-forme':'Forme',
+  'mat-t':'Taille', 'tapis-mat':'Matière'
+};
+
 function formatDetails(details,type){
   if(!details)return'';
   return Object.entries(details).map(function(entry){
     var key=entry[0],val=entry[1];
+    var libelle=LIBELLES_CHAMPS[key];
+    var texte;
     if(key==='quantite'){
       var unit=UNIT_CATEGORIES_LABELS[type]||'';
-      return escapeHtml(val+(unit?' '+unit:''));
+      texte=escapeHtml(val+(unit?' '+unit:''));
+    }else if(Array.isArray(val)){
+      texte=val.map(function(v){return escapeHtml(v)}).join(', ');
+    }else{
+      texte=escapeHtml(val);
     }
-    if(Array.isArray(val))return val.map(function(v){return escapeHtml(v)}).join(', ');
-    return escapeHtml(val);
-  }).join(' • ');
+    // Une ligne par champ, avec son nom : on lit en diagonale sans deviner.
+    return '<div style="margin-bottom:2px">'+
+      (libelle?'<strong>'+escapeHtml(libelle)+' :</strong> ':'')+texte+'</div>';
+  }).join('');
 }
 // Traduit les valeurs techniques des options en un libellé clair et lisible pour le pro.
 var LABELS_OPTIONS_VOITURE={interieur:'Intérieur',exterieur:'Extérieur',complet:'Intérieur + Extérieur'};
@@ -6831,7 +6855,29 @@ function afficherDetailsVitresPro(p){
 function afficherDetailsTapisPro(p){
   var d=p.details||{};
   var lignes='';
-  if(d['tapis-mat'])lignes+='<div style="margin-bottom:3px"><strong>🧶 Matière :</strong> '+escapeHtml(d['tapis-mat'])+'</div>';
+
+  // ── LE DÉTAIL PAR MATIÈRE ───────────────────────────────────────────────
+  // Quand le client choisit plusieurs matières, il saisit une quantité et un
+  // état POUR CHACUNE. Le formulaire construit alors une phrase complète :
+  //
+  //   « Laine : 1 moyen, 1 grand — très sale · Synthétique : 2 petits — propre »
+  //
+  // Elle était enregistrée sous `tapis_par_matiere`, et le prestataire ne la
+  // lisait jamais. Il voyait « Matière : Jute / Sisal » et une quantité
+  // globale — sans savoir combien de chaque, ni dans quel état.
+  //
+  // Or c'est exactement ce qui détermine son devis : la laine et le synthétique
+  // ne se nettoient ni avec le même produit, ni dans le même temps.
+  if(d['tapis_par_matiere']){
+    lignes+='<div style="margin-bottom:5px"><strong>🧶 Détail par matière :</strong>'+
+      '<ul style="margin:4px 0 2px;padding-left:18px">'+
+      String(d['tapis_par_matiere']).split(' \u00b7 ').map(function(v){
+        return '<li>'+escapeHtml(v)+'</li>';
+      }).join('')+'</ul></div>';
+  }else if(d['tapis-mat']){
+    // Une seule matière : la phrase détaillée n'existe pas, on affiche le nom.
+    lignes+='<div style="margin-bottom:3px"><strong>🧶 Matière :</strong> '+escapeHtml(d['tapis-mat'])+'</div>';
+  }
   if(Array.isArray(d['tapis_estime'])&&d['tapis_estime'].length){
     lignes+='<div style="margin-bottom:4px"><strong>📐 Tapis (estimation du client) :</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['tapis_estime'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul>'+
@@ -6848,7 +6894,7 @@ function tryParseNotes(notes){
   try{
     const n=JSON.parse(notes);
     if(n.prestations&&Array.isArray(n.prestations)){
-      return n.prestations.map(function(p){
+      return n.prestations.map(function(p, indicePresta){
         var corps;
         if(p.type==='voiture'&&p.details&&Object.keys(p.details).length){
           corps=afficherDetailsVoiturePro(p);
@@ -6864,7 +6910,27 @@ function tryParseNotes(notes){
           var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
           corps=(det?'<div style="font-size:12px">'+det+'</div>':'');
         }
-        return '<div style="margin-bottom:8px"><strong style="text-transform:capitalize">'+ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+(p.description?'<div style="font-size:12px;margin-top:2px">'+escapeHtml(p.description)+'</div>':'')+corps+'</div>';
+        // ── CHAQUE PRESTATION EST UN BLOC DISTINCT ─────────────────────
+        // Sur une demande à quatre prestations, le détail dépasse deux écrans.
+        // Séparées par huit pixels seulement, elles se lisaient comme un seul
+        // texte continu : on ne savait plus où finissait le canapé et où
+        // commençait le matelas.
+        //
+        // Un filet, un fond alterné et un titre plus visible suffisent. Le
+        // numéro d'ordre aide à s'y retrouver quand on fait défiler.
+        var separateur = (indicePresta > 0)
+          ? 'border-top:2px solid var(--border);margin-top:14px;padding-top:14px;'
+          : '';
+        return '<div style="'+separateur+'margin-bottom:8px">'+
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'+
+            '<span style="background:var(--light);color:var(--p);font-size:10.5px;font-weight:800;'+
+              'min-width:18px;height:18px;border-radius:9px;display:inline-flex;'+
+              'align-items:center;justify-content:center">'+(indicePresta+1)+'</span>'+
+            '<strong style="text-transform:capitalize;font-size:13.5px;color:var(--p)">'+
+              ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+
+          '</div>'+
+          (p.description?'<div style="font-size:12px;margin-top:2px">'+escapeHtml(p.description)+'</div>':'')+
+          corps+'</div>';
       }).join('');
     }
     return escapeHtml(n.description||'');
@@ -8059,7 +8125,7 @@ async function chargerTableauDeBordPro(){
       return '<div><div class="valeur '+(classe||'')+'">'+valeur+'</div>'+
              '<div class="etiquette">'+etiquette+'</div></div>';
     }
-    var euros=function(n){return (Math.round((n||0)*100)/100).toFixed(2).replace('.',',')+' €'};
+    var euros = formaterEuros;   // une seule règle d'affichage, partout;
 
     // Six cases à zéro ne distinguent pas « vous n'avez pas encore commencé » de
     // « quelque chose est cassé ». Tant qu'aucun devis n'a été envoyé, on explique
@@ -8311,6 +8377,33 @@ async function majEnteteClientChiffres(){
     '<div class="entete-client-chiffre"><b>'+libelleProchaine+'</b><span>prochaine</span></div>';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// L'AFFICHAGE DES MONTANTS
+//
+// Trois fonctions `euros` coexistaient, définies localement dans trois
+// fonctions différentes. Deux arrondissaient à l'euro, une gardait les
+// centimes — d'où « 111 € » dans l'en-tête et « 110,50 € » juste en dessous,
+// pour la même somme.
+//
+// De l'argent s'affiche au centime. Un prestataire qui lit deux chiffres
+// différents pour ce qu'il a gagné ne sait plus lequel croire, et c'est le
+// genre de doute qui fait perdre un compte.
+// ─────────────────────────────────────────────────────────────────────────────
+function formaterEuros(n){
+  var v = parseFloat(n || 0);
+  if (!isFinite(v)) v = 0;
+  // Pas de décimales inutiles : « 85 € » plutôt que « 85,00 € », mais
+  // « 110,50 € » reste entier.
+  var arrondi = Math.round(v * 100) / 100;
+  // toLocaleString gère l'espace des milliers ET la virgule décimale. Écrire
+  // le format à la main donnait « 1234,50 € » au lieu de « 1 234,50 € » — un
+  // détail qui compte le jour où les montants dépassent le millier.
+  return arrondi.toLocaleString('fr-FR', {
+    minimumFractionDigits: Number.isInteger(arrondi) ? 0 : 2,
+    maximumFractionDigits: 2
+  }) + ' €';
+}
+
 async function majEnteteProChiffres(){
   var boite=document.getElementById('pro-chiffres-entete');
   if(!boite||!currentUser||!isPro())return;
@@ -8360,7 +8453,9 @@ async function majEnteteProChiffres(){
     // L'identifiant permet à loadProDemandes de corriger ce chiffre sans
     // reconstruire les trois tuiles ni relancer un appel réseau.
     '<div class="entete-pro-chiffre"><b id="pro-chiffre-demandes">'+demandes+'</b><span>demandes</span></div>'+
-    '<div class="entete-pro-chiffre"><b>'+Math.round(gains)+' €</b><span>ce mois</span></div>'+
+    // Même règle que le tableau de bord juste en dessous : au centime.
+    // C'est ici que naissait l'écart — 111 € en haut, 110,50 € plus bas.
+    '<div class="entete-pro-chiffre"><b>'+formaterEuros(gains)+'</b><span>ce mois</span></div>'+
     '<div class="entete-pro-chiffre"><b>'+noteAffichee+'</b><span>note</span></div>';
 }
 
@@ -8651,7 +8746,7 @@ function renderProDevisCards(){
     return v.statut==='accepte'&&v.demande&&v.demande.statut==='terminee';
   });
   var montantGagne=gagnes.reduce(function(t,v){return t+(parseFloat(v.prix_ttc)||0)*(1-TAUX_COMMISSION)},0);
-  var euros=function(n){return Math.round(n).toLocaleString('fr-FR')+' €'};
+  var euros = formaterEuros;   // une seule règle d'affichage, partout;
 
   var recap='<div class="recap-devis">'+
     '<div><div class="valeur attente">'+enAttente.length+'</div><div class="etiquette">En attente de réponse</div></div>'+
