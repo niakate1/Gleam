@@ -7434,7 +7434,10 @@ function renderDevisClientCards(){
         // Trois niveaux, dans l'ordre de ce que le client veut faire :
         // accepter est l'action principale, consulter le devis vient avant la
         // décision, et refuser reste discret — c'est une action sans retour.
-        actions='<button class="btn-principal-devis" onclick="accepterDevis(\''+safeVId+'\',this)">'+
+        // Le prix part avec le clic : le paiement s'ouvre juste après l'acceptation,
+      // et lui redemander le montant au serveur ajouterait une attente pour une
+      // information déjà affichée à l'écran.
+      actions='<button class="btn-principal-devis" onclick="accepterDevis(\''+safeVId+'\',this,'+Number(v.prix_ttc||0)+')">'+
             '<i data-lucide="check"></i> Accepter ce devis</button>'+
           '<button class="btn-secondaire-devis" onclick="showDevisDocument(\''+safeVId+'\')">'+
             '<i data-lucide="file-text"></i> Voir le devis détaillé</button>'+
@@ -7473,18 +7476,45 @@ function renderDevisClientCards(){
   c.innerHTML=html;
 }
 
-async function accepterDevis(devisId,btn){
+// Le paiement s'ouvre DANS LA FOULÉE de l'acceptation.
+//
+// Avant : accepter → confirmer → revenir à la liste → retrouver la demande →
+// cliquer « Payer ». Cinq gestes pour une décision déjà prise, et quatre
+// occasions d'abandonner entre l'accord et le paiement.
+//
+// La confirmation annonce désormais les deux conséquences en une fois : les
+// autres devis sont refusés, et le paiement suit. Le client sait ce qu'il
+// engage avant de valider, ce qui est plus honnête qu'un écran de paiement
+// qui surgit sans prévenir.
+async function accepterDevis(devisId,btn,montant){
   if(!await demanderConfirmation({
     titre:'Accepter ce devis',
-    texte:'Les autres devis reçus pour cette prestation seront automatiquement refusés.',
-    valider:'Accepter', icone:'check-circle'
+    texte:'Les autres devis reçus seront automatiquement refusés, et le paiement s\'ouvrira juste après.',
+    valider:'Accepter et payer', icone:'check-circle'
   }))return;
   if(btn){btn.disabled=true;var sib=btn.parentElement&&btn.parentElement.querySelector('.btn-refuse');if(sib)sib.disabled=true}
   try{
     const r=await fetch(API+'/api/devis/'+devisId+'/accepter',{method:'POST',headers:authHeaders()});
     const d=await safeJson(r);
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;var sib2=btn.parentElement&&btn.parentElement.querySelector('.btn-refuse');if(sib2)sib2.disabled=false}return}
-    toast('✅ Devis accepté !');loadDevis();loadDemandes();
+    toast('✅ Devis accepté !');
+    loadDevis();loadDemandes();
+
+    // Le montant vient du bouton lui-même : il l'affiche déjà, inutile de le
+    // redemander au serveur. S'il manque — bouton appelé depuis un autre
+    // écran —, on relit le devis plutôt que d'ouvrir un paiement sans prix.
+    var prix=montant;
+    if(prix==null){
+      try{
+        const rd=await fetch(API+'/api/devis/'+devisId,{headers:authHeaders()});
+        if(rd.ok){const dd=await safeJson(rd);prix=dd&&dd.prix_ttc;}
+      }catch(e){}
+    }
+    if(prix!=null&&typeof openPayment==='function'){
+      // Un court délai laisse le message de confirmation s'afficher : enchaîner
+      // sans respiration donne l'impression d'avoir cliqué sur autre chose.
+      setTimeout(function(){ openPayment(devisId,prix); },600);
+    }
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 async function refuserDevis(devisId,btn){
