@@ -6696,6 +6696,38 @@ const STATUTS={
 // alignées, sans indiquer laquelle est la matière, laquelle l'état, laquelle
 // la surface. Lisible quand on connaît le formulaire, opaque quand on l'a
 // rempli il y a trois jours.
+// ─────────────────────────────────────────────────────────────────────────────
+// LE TAPIS, CHEZ LE CLIENT
+//
+// Le détail générique empilait cinq champs dont trois disaient la même chose :
+//
+//   « Jute / Sisal • Propre • 8 • Synthétique : 1 petit — propre · Coton :
+//     1 petit — propre · Jute / Sisal : 1 moyen — propre • Petit tapis —
+//     quantité : 2, Tapis moyen — quantité : 1 »
+//
+// « Jute / Sisal » deux fois, la quantité sous deux formes, et l'état répété
+// à chaque matière alors qu'il figure déjà en tête.
+//
+// Quand le client a détaillé par matière, cette liste EST le détail : le reste
+// devient du bruit. On l'affiche seule, une ligne par matière.
+// ─────────────────────────────────────────────────────────────────────────────
+function detailTapisClient(details){
+  var d = details || {};
+  if (!d['tapis_par_matiere']) return null;   // une seule matière : rien à faire
+
+  var lignes = String(d['tapis_par_matiere']).split(' \u00b7 ').map(function(v){
+    return '<div style="margin-bottom:2px">• ' + escapeHtml(v.trim()) + '</div>';
+  }).join('');
+
+  // La surface totale reste utile : c'est elle qui sert au prix.
+  var surface = d['quantite']
+    ? '<div style="margin-top:4px"><strong>Surface totale :</strong> ' +
+      escapeHtml(d['quantite']) + ' m²</div>'
+    : '';
+
+  return lignes + surface;
+}
+
 var LIBELLES_CHAMPS = {
   'terrasse-mat':'Revêtement', 'terr-mat':'Revêtement',
   'piscine-type':'Type de bassin', 'piscine-taille':'Taille',
@@ -6878,7 +6910,18 @@ function afficherDetailsTapisPro(p){
     // Une seule matière : la phrase détaillée n'existe pas, on affiche le nom.
     lignes+='<div style="margin-bottom:3px"><strong>🧶 Matière :</strong> '+escapeHtml(d['tapis-mat'])+'</div>';
   }
-  if(Array.isArray(d['tapis_estime'])&&d['tapis_estime'].length){
+  // L'estimation globale ne fait que TOTALISER le détail par matière :
+  //
+  //   par matière   Synthétique : 1 petit · Coton : 1 petit · Jute : 1 moyen
+  //   estimation    Petit tapis — quantité : 2 · Tapis moyen — quantité : 1
+  //
+  // Deux petits et un moyen, dit deux fois. Le second bloc n'apprend rien et
+  // double la hauteur du détail — sur une demande à six prestations, c'est un
+  // écran entier de répétition.
+  //
+  // On ne l'affiche que si le détail par matière est absent : dans ce cas seul,
+  // il porte une information que rien d'autre ne donne.
+  if(!d['tapis_par_matiere']&&Array.isArray(d['tapis_estime'])&&d['tapis_estime'].length){
     lignes+='<div style="margin-bottom:4px"><strong>📐 Tapis (estimation du client) :</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['tapis_estime'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul>'+
       '<div style="font-size:10.5px;color:var(--gray);font-style:italic">Taille approximative, pas une mesure exacte — à confirmer sur place.</div></div>';
@@ -6887,7 +6930,12 @@ function afficherDetailsTapisPro(p){
     lignes+='<div style="margin-bottom:4px"><strong>📏 Indiqué par le client (surface exacte) :</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['tapis_indique_client'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul></div>';
   }
-  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  // Même raison pour l'état : chaque ligne du détail par matière se termine
+  // déjà par « — propre », « — très sale ». Le répéter en bas ajoute une ligne
+  // qui contredit parfois le détail, quand les matières sont dans des états
+  // différents.
+  if(d['etat']&&!d['tapis_par_matiere'])
+    lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
   return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>';
 }
 function tryParseNotes(notes){
@@ -7659,7 +7707,10 @@ function renderDetail(d){
       '<span class="demand-status '+st[1]+'" style="font-size:13px">'+st[0]+'</span>'+
     '</div>'+
     (prestations.length?prestations.map(function(p){
-      var det=p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'';
+      // Le tapis a sa propre présentation quand le client a détaillé par
+      // matière : le format générique le rendait illisible.
+      var det=(p.type==='tapis'&&detailTapisClient(p.details))
+        || (p.details&&Object.keys(p.details).length?formatDetails(p.details,p.type):'');
       return '<div class="detail-presta"><span class="detail-presta-icon">'+ICONS_get(p.type)+'</span>'+
         '<div><div class="detail-presta-name">'+escapeHtml(p.type)+'</div>'+
         (det?'<div class="detail-presta-info">'+det+'</div>':'')+
