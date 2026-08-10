@@ -835,6 +835,88 @@ function extractPrestationTypes(demande) {
   } catch (e) { /* notes non-JSON ou absent, on utilise le repli ci-dessous */ }
   return (demande.prestation || '').split(' + ').map(s => s.trim()).filter(Boolean);
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// LES COORDONNÉES DÉGUISÉES
+//
+// Le filtre bloquait « 06 12 34 56 78 » mais laissait passer :
+//
+//   « Zéro six cinquante un vingt quatre vingt douze quatre vingt cinq »
+//   « O6 I2 34 56 78 »        (lettre O, lettre I)
+//   « 06​12​34​56​78 »            (espaces de largeur nulle entre les chiffres)
+//
+// Plutôt que d'allonger une expression déjà illisible, on NORMALISE le texte
+// avant de le tester. Chaque nouvelle ruse se traite alors en ajoutant une
+// ligne de conversion, pas une alternative de plus dans le motif.
+//
+// Ce que ce filtre ne fera jamais : arrêter quelqu'un de déterminé. « mon
+// numéro finit par 85, le début c'est mon année de naissance » passera
+// toujours. L'objectif est de rendre le contournement plus pénible que la voie
+// normale, et de garder une trace quand quelqu'un essaie.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Les nombres écrits en lettres, du plus long au plus court : « quatre-vingt »
+// doit être converti avant « quatre », sinon il reste « 4-vingt ».
+const MOTS_NOMBRES = [
+  ['quatre[\s-]*vingt[s]?[\s-]*dix[\s-]*neuf', '99'], ['quatre[\s-]*vingt[s]?[\s-]*dix[\s-]*huit', '98'],
+  ['quatre[\s-]*vingt[s]?[\s-]*dix[\s-]*sept', '97'], ['quatre[\s-]*vingt[s]?[\s-]*seize', '96'],
+  ['quatre[\s-]*vingt[s]?[\s-]*quinze', '95'], ['quatre[\s-]*vingt[s]?[\s-]*quatorze', '94'],
+  ['quatre[\s-]*vingt[s]?[\s-]*treize', '93'], ['quatre[\s-]*vingt[s]?[\s-]*douze', '92'],
+  ['quatre[\s-]*vingt[s]?[\s-]*onze', '91'], ['quatre[\s-]*vingt[s]?[\s-]*dix', '90'],
+  ['quatre[\s-]*vingt[s]?', '80'],
+  ['soixante[\s-]*dix[\s-]*neuf', '79'], ['soixante[\s-]*dix[\s-]*huit', '78'],
+  ['soixante[\s-]*dix[\s-]*sept', '77'], ['soixante[\s-]*seize', '76'],
+  ['soixante[\s-]*quinze', '75'], ['soixante[\s-]*quatorze', '74'],
+  ['soixante[\s-]*treize', '73'], ['soixante[\s-]*douze', '72'],
+  ['soixante[\s-]*et[\s-]*onze', '71'], ['soixante[\s-]*dix', '70'],
+  ['cinquante[\s-]*et[\s-]*un', '51'], ['quarante[\s-]*et[\s-]*un', '41'],
+  ['trente[\s-]*et[\s-]*un', '31'], ['vingt[\s-]*et[\s-]*un', '21'],
+  ['soixante', '60'], ['cinquante', '50'], ['quarante', '40'], ['trente', '30'],
+  ['dix[\s-]*neuf', '19'], ['dix[\s-]*huit', '18'], ['dix[\s-]*sept', '17'],
+  ['seize', '16'], ['quinze', '15'], ['quatorze', '14'], ['treize', '13'],
+  ['douze', '12'], ['onze', '11'], ['vingt', '20'], ['dix', '10'],
+  ['neuf', '9'], ['huit', '8'], ['sept', '7'], ['six', '6'], ['cinq', '5'],
+  ['quatre', '4'], ['trois', '3'], ['deux', '2'], ['une?', '1'],
+  ['z[ée]ro', '0'], ['o', '0']
+];
+
+function normaliserPourDetection(texte) {
+  if (!texte) return '';
+  let t = String(texte);
+
+  // 1. Les caractères invisibles, insérés entre les chiffres pour casser le
+  //    motif sans que rien ne se voie à l'écran.
+  t = t.replace(/[\u200B-\u200D\uFEFF\u00AD\u2060]/g, '');
+
+  // 2. Les accents, pour que « zéro » et « zero » se traitent pareil.
+  t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  // 3. Les mots-nombres, du plus long au plus court.
+  //    La dernière règle — « o » seul → « 0 » — ne s'applique qu'entre des
+  //    chiffres, sinon elle détruirait tous les mots du message.
+  for (const [motif, chiffre] of MOTS_NOMBRES) {
+    if (motif === 'o') continue;
+    t = t.replace(new RegExp('\\b' + motif + '\\b', 'g'), chiffre);
+  }
+
+  // 4. Les lettres qui imitent des chiffres, uniquement dans un contexte
+  //    numérique : « O6 12 » devient « 06 12 », mais « Bonjour » reste intact.
+  t = t.replace(/(?<=\d[\s.-]*)[oO](?=[\s.-]*\d)/g, '0')
+       .replace(/(?<=\d[\s.-]*)[iIlL](?=[\s.-]*\d)/g, '1')
+       .replace(/^[oO](?=\s*\d)/g, '0');
+
+  // 5. Les espaces multiples issus des remplacements.
+  return t.replace(/\s{2,}/g, ' ');
+}
+
+// Un numéro peut aussi apparaître une fois les mots convertis mais sans le
+// préfixe attendu : « 6 51 24 92 85 » sans le zéro initial. On cherche donc
+// aussi une suite de huit à dix chiffres séparés par n'importe quoi.
+// Une suite de neuf chiffres ou plus, quels que soient les séparateurs — les
+// virgules comprises : « zéro six, douze, trente-quatre » donne « 0 6, 12, 34 »
+// une fois normalisé, et sans la virgule dans la classe, le motif s'arrête au
+// premier groupe.
+const SUITE_LONGUE_REGEX = /(?:\d[\s.,;:\-]*){9,}/;
+
 // Détecte un numéro de téléphone français (mobile ou fixe), même écrit avec espaces/points/tirets
 // entre les groupes de chiffres (ex: "06 12 34 56 78", "06.12.34.56.78"), pas seulement collé.
 // Détecte une tentative de partage de coordonnées avant paiement : numéro français (fixe/mobile,
@@ -843,6 +925,16 @@ function extractPrestationTypes(demande) {
 // la plateforme. Reste volontairement prudent sur les mots ambigus (ex: "signal", "snap") pour éviter
 // de bloquer des messages innocents.
 const BLOCK_REGEX = /(\b0[1-9](?:[\s.-]?\d{2}){4}\b|(?:\+33|0033)[\s.-]?[1-9](?:[\s.-]?\d{2}){4}\b|[\w.+-]+\s?(?:@|\(at\)|arobase)\s?[\w-]+\s?(?:\.|\(dot\)|\bpoint\b)\s?[a-z]{2,}|whatsapp|telegram|instagram|messenger|snapchat|tiktok|facebook|viber|\bsms\b)/i;
+
+// Teste le message brut ET sa version normalisée. Le brut attrape ce qui est
+// écrit directement ; le normalisé attrape les déguisements.
+function contientCoordonnees(texte) {
+  if (!texte) return false;
+  if (BLOCK_REGEX.test(texte)) return true;
+  const normalise = normaliserPourDetection(texte);
+  return BLOCK_REGEX.test(normalise) || SUITE_LONGUE_REGEX.test(normalise);
+}
+
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', app: 'Gleam API', version: '2.2.0', timestamp: new Date().toISOString() });
@@ -3338,7 +3430,7 @@ app.post('/api/messages', auth, async (req, res) => {
       .gte('created_at', cinqMinutesAvant).order('created_at', { ascending: true }).limit(5);
     const contenuRecent = (messagesRecents || []).map(m => m.contenu).join(' ') + ' ' + contenu;
 
-    if (BLOCK_REGEX.test(contenu) || contientNumeroReconstitue(contenuRecent))
+    if (contientCoordonnees(contenu) || contientNumeroReconstitue(contenuRecent))
       return res.status(400).json({ error: 'Gleam bloque les coordonnées avant paiement.', blocked: true });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
