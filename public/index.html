@@ -7504,7 +7504,7 @@ function renderDevisClientCards(){
               '</div>'+
             '</div>'
           ):'')+
-          creneauBlockHtml(v.demande_id,v.creneau,v.creneau_propose,v.creneau_propose_par)+
+          creneauBlockHtml(v.demande_id,v.creneau,v.creneau_propose,v.creneau_propose_par,v.demande&&v.demande.prestation_demarree_le)+
         '</div>';
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
@@ -10663,8 +10663,23 @@ async function checkConnectStatut(){
 // ou enregistrer en PDF via la fonction native du navigateur — pas besoin de générateur de PDF côté serveur.
 // Construit le bloc "reprogrammer" pour une carte de devis acceptée/en cours : bouton de
 // proposition, ou bannière d'acceptation/refus si l'autre partie a déjà proposé un nouveau créneau.
-function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposePar){
+function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposePar,prestationDemarreeLe){
   var safeId=escAttr(demandeId);
+
+  // ── LE PRESTATAIRE EST ARRIVÉ : PLUS DE REPORT ──────────────────────────
+  // Le serveur refuse désormais la reprogrammation à ce stade, comme il refuse
+  // déjà l'annulation. Laisser le bouton afficherait une action qui échoue —
+  // et sur un écran où le client attend justement une solution, un refus est
+  // plus décourageant qu'une absence de bouton.
+  //
+  // On dit ce qui reste possible, plutôt que de proposer ce qui ne l'est plus.
+  if(prestationDemarreeLe){
+    return '<div style="margin-top:8px;font-size:12px;color:var(--text-secondary);'+
+      'background:var(--light);border-radius:8px;padding:9px 11px;line-height:1.5">'+
+      'La prestation a commencé — elle ne peut plus être reprogrammée. '+
+      'Si quelque chose ne va pas, signalez-le depuis la conversation.'+
+      '</div>';
+  }
   if(creneauPropose){
     if(creneauProposePar===currentUser.id){
       return '<div style="margin-top:8px;font-size:12px;color:var(--gold);background:var(--amber-clair);border-radius:8px;padding:8px 10px">⏳ Nouveau créneau proposé ('+formatCreneau(creneauPropose)+'), en attente de confirmation.</div>';
