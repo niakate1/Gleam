@@ -110,6 +110,42 @@ async function envoyerNotificationPush(userId, { titre, corps, url }) {
 
 const app = express();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LES ERREURS QUE L'ON PEUT SUIVRE
+//
+// « Erreur serveur. » apparaissait 66 fois, et 54 d'entre elles ne
+// journalisaient rien. Un utilisateur écrivait « ça ne marche pas », et il n'y
+// avait rien à lire pour comprendre.
+//
+// Améliorer le message sans journaliser la cause n'aurait servi à rien : on
+// aurait écrit joliment qu'on ne sait pas ce qui s'est passé.
+//
+// Chaque incident reçoit désormais une référence courte. L'utilisateur peut la
+// citer, elle se retrouve dans les journaux Railway en une recherche.
+// ═══════════════════════════════════════════════════════════════════════════
+function referenceIncident() {
+  // Six caractères : assez pour être unique à l'échelle d'une journée, assez
+  // court pour être recopié au téléphone sans se tromper.
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+// Journalise la cause réelle et renvoie une réponse utilisable par l'humain
+// qui la reçoit. Le détail technique reste côté serveur : « column x does not
+// exist » n'aide personne et renseigne un attaquant.
+function erreurServeur(res, contexte, e, messageUtilisateur) {
+  const ref = referenceIncident();
+  console.error('[' + ref + '] ' + contexte + ' —', (e && e.message) || e, (e && e.stack) || '');
+  return res.status(500).json({
+    error: (messageUtilisateur ||
+      "Une erreur est survenue de notre côté. Réessayez dans un instant — " +
+      "si cela persiste, contactez-nous en citant la référence ci-dessous.") +
+      ' (réf. ' + ref + ')',
+    reference: ref
+  });
+}
+
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PAS D'ETAG, PAS DE CACHE SUR L'API
 //
@@ -246,10 +282,10 @@ app.use((err, req, res, next) => {
     return res.status(413).json({ error: 'Le fichier envoyé est trop volumineux (photos trop lourdes). Réessayez avec moins de photos.' });
   }
   if (err && err.type === 'entity.parse.failed') {
-    return res.status(400).json({ error: 'Requête invalide.' });
+    return res.status(400).json({ error: 'Les informations envoyées sont incomplètes ou mal formées. Rechargez la page et réessayez.' });
   }
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    return res.status(400).json({ error: 'Requête invalide.' });
+    return res.status(400).json({ error: 'Les informations envoyées sont incomplètes ou mal formées. Rechargez la page et réessayez.' });
   }
   next(err);
 });
@@ -271,7 +307,7 @@ app.use('/api/', globalLimiter);
 
 const auth = async (req, res, next) => {
   const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Non autorisé' });
+  if (!token) return res.status(401).json({ error: 'Votre session a expiré ou n\'est plus valide. Reconnectez-vous pour continuer.' });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
@@ -290,10 +326,10 @@ const auth = async (req, res, next) => {
 // mais un token distinct, signé avec sa propre clé, vérifié par ce middleware dédié.
 const adminAuth = async (req, res, next) => {
   const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Non autorisé' });
+  if (!token) return res.status(401).json({ error: 'Votre session a expiré ou n\'est plus valide. Reconnectez-vous pour continuer.' });
   try {
     const decoded = jwt.verify(token, SECRET_ADMIN);
-    if (!decoded.admin) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!decoded.admin) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     next();
   } catch (e) {
     res.status(401).json({ error: 'Session admin invalide, reconnectez-vous.' });
@@ -945,7 +981,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     res.status(201).json({ message: 'Compte Gleam créé !', token, user: { ...data, firstName: data.prenom, lastName: data.nom } });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/auth/register', e);
   }
 });
 
@@ -973,13 +1009,13 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       }).select().single();
       user = newUser;
     }
-    if (!user) return res.status(500).json({ error: 'Utilisateur introuvable.' });
+    if (!user) return res.status(500).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
 
     const token = jwt.sign({ id: user.id, email: user.email, type: user.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: { ...user, firstName: user.prenom, lastName: user.nom } });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/auth/login', e);
   }
 });
 
@@ -1007,7 +1043,7 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     res.json({ message: 'Si ce compte existe, un email a été envoyé.' });
   } catch (e) {
     console.error('Erreur mot de passe oublié:', e);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/auth/forgot-password', e);
   }
 });
 
@@ -1019,7 +1055,7 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
 
     const { data: user } = await supabase.from('users').select('id, reset_code, reset_code_expire').eq('email', email.toLowerCase().trim()).maybeSingle();
     if (!user || !user.reset_code || user.reset_code !== String(code).trim())
-      return res.status(400).json({ error: 'Code incorrect.' });
+      return res.status(400).json({ error: 'Ce code ne correspond pas. Vérifiez les six chiffres auprès du client — ils figurent dans son application.' });
     if (!user.reset_code_expire || new Date(user.reset_code_expire) < new Date())
       return res.status(400).json({ error: 'Ce code a expiré. Refaites une demande de "mot de passe oublié".' });
 
@@ -1031,13 +1067,13 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
     res.json({ message: 'Mot de passe mis à jour avec succès !' });
   } catch (e) {
     console.error('Erreur réinitialisation mot de passe:', e);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/auth/reset-password', e);
   }
 });
 
 app.get('/api/auth/me', auth, async (req, res) => {
   const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
-  if (!data) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+  if (!data) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
   // La colonne contient un chemin depuis la migration : on le signe pour que
   // l'application puisse afficher l'image. Une ancienne valeur en base64 passe
   // telle quelle, sans conversion.
@@ -1077,7 +1113,7 @@ app.post('/api/push/subscribe', auth, async (req, res) => {
     }, { onConflict: 'endpoint' });
     res.json({ message: 'Notifications activées.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/push/subscribe', e);
   }
 });
 
@@ -1088,7 +1124,7 @@ app.post('/api/push/unsubscribe', auth, async (req, res) => {
     if (endpoint) await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint).eq('user_id', req.user.id);
     res.json({ message: 'Notifications désactivées.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/push/unsubscribe', e);
   }
 });
 
@@ -1099,10 +1135,10 @@ app.post('/api/push/unsubscribe', auth, async (req, res) => {
 app.post('/api/parrainage/renseigner-code', auth, async (req, res) => {
   try {
     const code = (req.body.code || '').trim().toUpperCase();
-    if (!code) return res.status(400).json({ error: 'Code requis.' });
+    if (!code) return res.status(400).json({ error: 'Saisissez le code de validation que le client vous a communiqué à la fin de la prestation.' });
 
     const { data: moi } = await supabase.from('users').select('parraine_par, code_parrainage').eq('id', req.user.id).single();
-    if (!moi) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (!moi) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
     if (moi.parraine_par) return res.status(400).json({ error: 'Un parrain est déjà associé à votre compte.' });
     if (moi.code_parrainage === code) return res.status(400).json({ error: 'Vous ne pouvez pas utiliser votre propre code.' });
 
@@ -1117,7 +1153,7 @@ app.post('/api/parrainage/renseigner-code', auth, async (req, res) => {
     await supabase.from('users').update({ parraine_par: parrain.id }).eq('id', req.user.id);
     res.json({ message: 'Code de parrainage enregistré ! La réduction s\'appliquera dès votre première prestation payée.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/parrainage/renseigner-code', e);
   }
 });
 
@@ -1136,7 +1172,7 @@ app.post('/api/client/adresse-memorisee', auth, async (req, res) => {
     }).eq('id', req.user.id);
     res.json({ message: 'Adresse mémorisée.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/client/adresse-memorisee', e);
   }
 });
 
@@ -1146,20 +1182,20 @@ app.post('/api/client/adresse-memorisee', auth, async (req, res) => {
 app.post('/api/auth/verifier-email', auth, async (req, res) => {
   try {
     const code = (req.body.code || '').trim();
-    if (!code) return res.status(400).json({ error: 'Code requis.' });
+    if (!code) return res.status(400).json({ error: 'Saisissez le code de validation que le client vous a communiqué à la fin de la prestation.' });
 
     const { data: moi } = await supabase.from('users').select('email_verifie, email_verif_code, email_verif_expire').eq('id', req.user.id).single();
-    if (!moi) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (!moi) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
     if (moi.email_verifie) return res.json({ message: 'Votre email est déjà confirmé.' });
     if (!moi.email_verif_code || moi.email_verif_code !== code)
-      return res.status(400).json({ error: 'Code incorrect.' });
+      return res.status(400).json({ error: 'Ce code ne correspond pas. Vérifiez les six chiffres auprès du client — ils figurent dans son application.' });
     if (moi.email_verif_expire && new Date(moi.email_verif_expire) < new Date())
       return res.status(400).json({ error: 'Ce code a expiré, demandez-en un nouveau.' });
 
     await supabase.from('users').update({ email_verifie: true, email_verif_code: null }).eq('id', req.user.id);
     res.json({ message: 'Email confirmé, merci !' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/auth/verifier-email', e);
   }
 });
 
@@ -1167,7 +1203,7 @@ app.post('/api/auth/verifier-email', auth, async (req, res) => {
 app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
   try {
     const { data: moi } = await supabase.from('users').select('email, prenom, email_verifie').eq('id', req.user.id).single();
-    if (!moi) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (!moi) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
     if (moi.email_verifie) return res.json({ message: 'Votre email est déjà confirmé.' });
 
     const nouveauCode = String(Math.floor(100000 + Math.random() * 900000));
@@ -1176,7 +1212,7 @@ app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
     sendEmail('verification_email', moi.email, { compteId: moi.id, prenom: moi.prenom, code: nouveauCode });
     res.json({ message: 'Un nouveau code vous a été envoyé par email.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/auth/renvoyer-code-verification', e);
   }
 });
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1280,7 +1316,7 @@ app.patch('/api/users/photo', auth, async (req, res) => {
 
     res.json({ message: 'Photo mise à jour.', photo: await lienPhotoProfil(chemin) });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/users/photo', e);
   }
 });
 
@@ -1421,7 +1457,7 @@ app.post('/api/users/me/supprimer', auth, async (req, res) => {
 
     res.json({ message: 'Compte supprimé.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/users/me/supprimer', e);
   }
 });
 
@@ -1430,7 +1466,7 @@ app.post('/api/users/me/supprimer', auth, async (req, res) => {
 app.post('/api/demandes', auth, async (req, res) => {
   try {
     const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id, latitude, longitude, recurrence } = req.body;
-    if (!address) return res.status(400).json({ error: 'Adresse requise.' });
+    if (!address) return res.status(400).json({ error: 'Indiquez l\'adresse où doit avoir lieu la prestation.' });
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
     // La récurrence ne nécessite plus un favori précis : sans favori choisi, la prochaine
@@ -1520,7 +1556,7 @@ app.post('/api/demandes', auth, async (req, res) => {
 
     res.status(201).json({ ...data, prestataires_prevenus: envoi.nb, zone_elargie: envoi.elargi });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/demandes', e);
   }
 });
 
@@ -2280,7 +2316,7 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     const { data: user, error: userErr } = await supabase.from('users').select('type, prestations_proposees, latitude, longitude, rayon_intervention_km').eq('id', req.user.id).single();
     if (userErr) return res.status(500).json({ error: 'Erreur utilisateur: ' + userErr.message });
     if (!user || !isProType(user.type))
-      return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
+      return res.status(403).json({ error: 'Cet écran est réservé aux comptes prestataires. Votre compte est un compte client.' });
 
     // Colonnes explicites plutôt que select('*') : la colonne `notes` contient les
     // photos encodées en base64 (jusqu'à 282 ko pour une seule demande dans la base
@@ -2372,7 +2408,7 @@ app.get('/api/demandes/all', auth, async (req, res) => {
 app.post('/api/pro/zone-intervention', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
-    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Cette action est réservée aux comptes prestataires. Votre compte est un compte client.' });
 
     const { latitude, longitude, rayon_km } = req.body;
     if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude))
@@ -2384,30 +2420,30 @@ app.post('/api/pro/zone-intervention', auth, async (req, res) => {
     await supabase.from('users').update({ latitude, longitude, rayon_intervention_km: rayon }).eq('id', req.user.id);
     res.json({ message: 'Zone d\'intervention enregistrée.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/pro/zone-intervention', e);
   }
 });
 
 app.get('/api/demandes/:id', auth, async (req, res) => {
   const { data } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-  if (!data) return res.status(404).json({ error: 'Demande introuvable.' });
+  if (!data) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
   if (data.client_id === req.user.id) return res.json((await signerPhotosDesDemandes([data]))[0]);
   const { data: monDevis } = await supabase.from('devis').select('id').eq('demande_id', req.params.id).eq('societe_id', req.user.id).maybeSingle();
   if (monDevis) return res.json((await signerPhotosDesDemandes([data]))[0]);
-  return res.status(403).json({ error: 'Accès refusé.' });
+  return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 });
 
 // Modifier une demande (uniquement si aucun devis n'a été accepté)
 app.patch('/api/demandes/:id', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Impossible de modifier : un devis a déjà été accepté pour cette demande.' });
 
     const { prestations, address, date, time, flexibility } = req.body;
-    if (!address) return res.status(400).json({ error: 'Adresse requise.' });
+    if (!address) return res.status(400).json({ error: 'Indiquez l\'adresse où doit avoir lieu la prestation.' });
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
 
@@ -2434,7 +2470,7 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
     res.json(data);
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/demandes/:id', e);
   }
 });
 
@@ -2444,8 +2480,8 @@ app.patch('/api/demandes/:id/recurrence', auth, async (req, res) => {
   try {
     const { action } = req.body; // 'pause' | 'reprendre' | 'arreter'
     const { data: demande } = await supabase.from('demandes').select('client_id, recurrence').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (!demande.recurrence) return res.status(400).json({ error: 'Cette demande n\'est pas récurrente.' });
 
     if (action === 'pause') await supabase.from('demandes').update({ recurrence_active: false }).eq('id', req.params.id);
@@ -2455,7 +2491,7 @@ app.patch('/api/demandes/:id/recurrence', auth, async (req, res) => {
 
     res.json({ message: 'Récurrence mise à jour.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/demandes/:id/recurrence', e);
   }
 });
 
@@ -2470,8 +2506,8 @@ app.post('/api/demandes/:id/relancer-recurrente', auth, async (req, res) => {
       return res.status(400).json({ error: 'Choisissez un délai entre 3 et 365 jours.' });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (demande.statut !== 'terminee') return res.status(400).json({ error: 'Seule une prestation terminée peut être relancée en récurrence.' });
 
     let proPrefereId = null;
@@ -2515,7 +2551,7 @@ app.post('/api/demandes/:id/relancer-recurrente', auth, async (req, res) => {
     res.status(201).json({ message: 'Prestation récurrente programmée !', demande: nouvelleDemande });
   } catch (e) {
     console.error('Erreur relance en récurrence:', e.message);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/demandes/:id/relancer-recurrente', e);
   }
 });
 // l'autre partie avant que le créneau ne change réellement, pour éviter qu'une personne décale
@@ -2527,21 +2563,21 @@ app.post('/api/demandes/:id/proposer-creneau', auth, async (req, res) => {
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (!['acceptee', 'en_cours'].includes(demande.statut))
       return res.status(400).json({ error: 'La reprogrammation n\'est possible que pour une prestation acceptée ou en cours.' });
 
     const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
     const estClient = demande.client_id === req.user.id;
     const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
-    if (!estClient && !estPro) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     const nouveauCreneau = date + ' à ' + time;
     await supabase.from('demandes').update({ creneau_propose: nouveauCreneau, creneau_propose_par: req.user.id }).eq('id', req.params.id);
 
     res.json({ message: 'Nouveau créneau proposé, en attente de confirmation de l\'autre partie.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/demandes/:id/proposer-creneau', e);
   }
 });
 
@@ -2549,14 +2585,14 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
   try {
     const { accepter } = req.body;
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (!demande.creneau_propose) return res.status(400).json({ error: 'Aucune proposition de créneau en attente.' });
     if (demande.creneau_propose_par === req.user.id) return res.status(403).json({ error: 'Vous ne pouvez pas répondre à votre propre proposition.' });
 
     const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
     const estClient = demande.client_id === req.user.id;
     const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
-    if (!estClient && !estPro) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     if (accepter) {
       await supabase.from('demandes').update({ creneau: demande.creneau_propose, creneau_propose: null, creneau_propose_par: null }).eq('id', req.params.id);
@@ -2566,7 +2602,7 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
       res.json({ message: 'Proposition refusée. L\'ancien créneau reste valable.' });
     }
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/demandes/:id/repondre-creneau', e);
   }
 });
 
@@ -2688,8 +2724,8 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
 app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (demande.statut === 'terminee')
       return res.status(400).json({ error: 'Cette prestation est déjà terminée, elle ne peut plus être annulée.' });
     if (demande.statut !== 'acceptee' && demande.statut !== 'en_cours')
@@ -2758,7 +2794,7 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
     });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/demandes/:id/annuler-client', e);
   }
 });
 
@@ -2769,22 +2805,22 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
 app.patch('/api/demandes/:id/archiver', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes').select('client_id, statut').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     const { error } = await supabase.from('demandes').update({ archivee_client: true }).eq('id', req.params.id);
     if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
     res.json({ message: 'Demande archivée.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/demandes/:id/archiver', e);
   }
 });
 
 app.delete('/api/demandes/:id', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
+    if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee')
       return res.status(400).json({ error: 'Impossible de supprimer : un devis a déjà été accepté. Utilisez le bouton "Annuler cette prestation" à la place.' });
     if (demande.statut === 'annulee_client')
@@ -2799,7 +2835,7 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
 
     res.json({ message: 'Demande supprimée.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'DELETE /api/demandes/:id', e);
   }
 });
 
@@ -2846,7 +2882,7 @@ app.post('/api/devis', auth, async (req, res) => {
     }
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Cette demande n\'est plus disponible.' });
 
@@ -2887,15 +2923,15 @@ app.post('/api/devis', auth, async (req, res) => {
 
     res.status(201).json(data);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/devis', e);
   }
 });
 
 // Devis reçus par un client pour une demande (avec infos pro)
 app.get('/api/devis/demande/:id', auth, async (req, res) => {
   const { data: demande } = await supabase.from('demandes').select('client_id, statut').eq('id', req.params.id).single();
-  if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
-  if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+  if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
+  if (demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
   const { data: devis } = await supabase.from('devis').select('*').eq('demande_id', req.params.id).order('prix_ttc', { ascending: true });
   if (!devis || !devis.length) return res.json([]);
@@ -2981,7 +3017,7 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
 
     res.json(enriched);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/devis/mes-devis-recus', e);
   }
 });
 app.get('/api/devis/mes-devis', auth, async (req, res) => {
@@ -3008,17 +3044,17 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
     await signerPhotosDesDemandes(enriched.map(d => d.demande).filter(Boolean));
     res.json(enriched);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/devis/mes-devis', e);
   }
 });
 
 app.post('/api/devis/:id/accepter', auth, async (req, res) => {
   try {
     const { data: devis } = await supabase.from('devis').select('*').eq('id', req.params.id).single();
-    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+    if (!devis) return res.status(404).json({ error: 'Ce devis n\'existe plus. Il a peut-être été retiré par le prestataire, ou la demande a été supprimée.' });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
-    if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (demande.statut === 'acceptee') return res.status(400).json({ error: 'Une demande a déjà été acceptée pour cette prestation.' });
 
     // La demande est réservée par écriture conditionnelle. Le contrôle ci-dessus
@@ -3063,17 +3099,17 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
 
     res.json({ message: 'Devis accepté !', demande_id: devis.demande_id, societe_id: devis.societe_id });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/devis/:id/accepter', e);
   }
 });
 
 app.post('/api/devis/:id/refuser', auth, async (req, res) => {
   try {
     const { data: devis } = await supabase.from('devis').select('*').eq('id', req.params.id).single();
-    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+    if (!devis) return res.status(404).json({ error: 'Ce devis n\'existe plus. Il a peut-être été retiré par le prestataire, ou la demande a été supprimée.' });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
-    if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     await supabase.from('devis').update({ statut: 'refuse' }).eq('id', req.params.id);
 
@@ -3086,7 +3122,7 @@ app.post('/api/devis/:id/refuser', auth, async (req, res) => {
 
     res.json({ message: 'Devis refusé.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/devis/:id/refuser', e);
   }
 });
 
@@ -3094,12 +3130,12 @@ app.post('/api/devis/:id/refuser', auth, async (req, res) => {
 app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
   try {
     const { data: devis } = await supabase.from('devis').select('*').eq('id', req.params.id).single();
-    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
-    if (devis.societe_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!devis) return res.status(404).json({ error: 'Ce devis n\'existe plus. Il a peut-être été retiré par le prestataire, ou la demande a été supprimée.' });
+    if (devis.societe_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (devis.statut !== 'accepte') return res.status(400).json({ error: 'Ce devis n\'est pas accepté.' });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
 
     // Vérifie le délai de 24h avant le créneau (signalé, mais jamais bloquant — cohérent avec l'annulation côté client)
     let tardive = false;
@@ -3167,7 +3203,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/devis/:id/annuler-pro', e);
   }
 });
 
@@ -3306,9 +3342,9 @@ app.post('/api/messages', auth, async (req, res) => {
       return res.status(400).json({ error: 'Gleam bloque les coordonnées avant paiement.', blocked: true });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (!(await peutAccederConversation(demande_id, req.user.id)))
-      return res.status(403).json({ error: 'Accès refusé.' });
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     const { data, error } = await supabase.from('messages').insert({
       demande_id: demande_id,
@@ -3351,13 +3387,13 @@ app.post('/api/messages', auth, async (req, res) => {
 
     res.status(201).json(data);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/messages', e);
   }
 });
 
 app.get('/api/messages/:demande_id', auth, async (req, res) => {
   if (!(await peutAccederConversation(req.params.demande_id, req.user.id)))
-    return res.status(403).json({ error: 'Accès refusé.' });
+    return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
   const { data } = await supabase.from('messages').select('*').eq('demande_id', req.params.demande_id).order('created_at', { ascending: true });
   res.json(data || []);
 });
@@ -3447,7 +3483,7 @@ app.get('/api/conversations', auth, async (req, res) => {
     res.json(conversations);
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/conversations', e);
   }
 });
 
@@ -3459,7 +3495,7 @@ app.get('/api/conversations', auth, async (req, res) => {
 app.post('/api/paiements/connect/onboarding', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type, stripe_account_id, email').eq('id', req.user.id).single();
-    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Cette action est réservée aux comptes prestataires. Votre compte est un compte client.' });
 
     let accountId = user.stripe_account_id;
     if (!accountId) {
@@ -3537,7 +3573,7 @@ app.patch('/api/entreprises/facturation', auth, async (req, res) => {
       misAJour.tva_intracom = String(req.body.tva_intracom || '').trim() || null;
 
     if (!Object.keys(misAJour).length)
-      return res.status(400).json({ error: 'Aucune information à enregistrer.' });
+      return res.status(400).json({ error: 'Aucune modification à enregistrer : les champs sont identiques aux valeurs actuelles.' });
 
     const { error } = await supabase.from('users').update(misAJour).eq('id', req.user.id);
     if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
@@ -3550,7 +3586,7 @@ app.patch('/api/entreprises/facturation', auth, async (req, res) => {
     res.json({ message: 'Informations de facturation enregistrées.',
                facturation_manquante: facturationManquante(apres) });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/entreprises/facturation', e);
   }
 });
 
@@ -3609,11 +3645,11 @@ app.post('/api/paiements/intent', auth, async (req, res) => {
     }
 
     const { data: devis } = await supabase.from('devis').select('*').eq('id', devis_id).single();
-    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+    if (!devis) return res.status(404).json({ error: 'Ce devis n\'existe plus. Il a peut-être été retiré par le prestataire, ou la demande a été supprimée.' });
 
     const { data: demandePourPaiement } = await supabase.from('demandes').select('client_id').eq('id', devis.demande_id).single();
     if (!demandePourPaiement || demandePourPaiement.client_id !== req.user.id)
-      return res.status(403).json({ error: 'Accès refusé.' });
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     // Récompense de parrainage éventuellement disponible : le client paie 10% de moins, le pro
     // reçoit toujours sa part pleine (85% du prix du devis) — c'est la commission Gleam, et
@@ -3913,11 +3949,11 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
   try {
     const { photos_avant, latitude_pro, longitude_pro } = req.body;
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (demande.statut !== 'en_cours') return res.status(400).json({ error: 'Cette prestation n\'est pas en cours.' });
 
     const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', req.params.id).eq('statut', 'accepte').maybeSingle();
-    if (!devisAccepte || devisAccepte.societe_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!devisAccepte || devisAccepte.societe_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     const erreurPhotos = validerPhotos(photos_avant, 5);
     if (erreurPhotos) return res.status(400).json({ error: erreurPhotos });
@@ -3959,7 +3995,7 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
 
     res.json({ message: 'Arrivée confirmée. Bonne prestation !' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/demandes/:id/demarrer-prestation', e);
   }
 });
 
@@ -3969,11 +4005,11 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
 app.post('/api/paiements/valider-code', auth, async (req, res) => {
   try {
     const { demande_id, code, photos_apres } = req.body;
-    if (!demande_id || !code) return res.status(400).json({ error: 'Code requis.' });
+    if (!demande_id || !code) return res.status(400).json({ error: 'Saisissez le code de validation que le client vous a communiqué à la fin de la prestation.' });
 
     const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demande_id).eq('statut', 'paye').maybeSingle();
     if (!paiement) return res.status(404).json({ error: 'Aucun paiement en attente pour cette prestation.' });
-    if (paiement.societe_id !== req.user.id) return res.status(403).json({ error: 'Accès refusé.' });
+    if (paiement.societe_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (String(code).trim() !== paiement.code_validation) return res.status(400).json({ error: 'Code incorrect. Vérifiez le code donné par le client.' });
 
     const erreurPhotos = validerPhotos(photos_apres, 5);
@@ -4009,7 +4045,7 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
 
     res.json({ message: 'Prestation validée, paiement transféré ✨' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/paiements/valider-code', e);
   }
 });
 
@@ -4032,7 +4068,7 @@ app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
     enrichis.sort((a, b) => (prioritePaiement[a.statut] ?? 9) - (prioritePaiement[b.statut] ?? 9));
     res.json(enrichis);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'route inconnue', e);
   }
 });
 
@@ -4061,7 +4097,7 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
       paiements: enrichis
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/paiements/mes-gains', e);
   }
 });
 
@@ -4090,15 +4126,15 @@ function construireDescriptionPrestation(notes, prestationFallback) {
 app.get('/api/demandes/:id/facture', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (demande.statut !== 'terminee') return res.status(400).json({ error: 'La facture n\'est disponible qu\'une fois la prestation terminée.' });
 
     const { data: devisAccepte } = await supabase.from('devis').select('*').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
-    if (!devisAccepte) return res.status(404).json({ error: 'Devis introuvable.' });
+    if (!devisAccepte) return res.status(404).json({ error: 'Ce devis n\'existe plus. Il a peut-être été retiré par le prestataire, ou la demande a été supprimée.' });
 
     const estClient = demande.client_id === req.user.id;
     const estPro = devisAccepte.societe_id === req.user.id;
-    if (!estClient && !estPro) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     const { data: client } = await supabase.from('users').select('prenom, nom, email, type, raison_sociale, siret, tva_intracom, adresse_facturation').eq('id', demande.client_id).single();
     const { data: pro } = await supabase.from('users').select('prenom, nom, email, siret').eq('id', devisAccepte.societe_id).single();
@@ -4129,7 +4165,7 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
       montant_pro: montantPro
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/demandes/:id/facture', e);
   }
 });
 
@@ -4151,7 +4187,7 @@ app.post('/api/favoris', auth, async (req, res) => {
     if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
     res.status(201).json({ message: 'Ajouté à vos favoris ✨' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/favoris', e);
   }
 });
 
@@ -4160,7 +4196,7 @@ app.delete('/api/favoris/:proId', auth, async (req, res) => {
     await supabase.from('favoris').delete().eq('client_id', req.user.id).eq('pro_id', req.params.proId);
     res.json({ message: 'Retiré de vos favoris.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'DELETE /api/favoris/:proId', e);
   }
 });
 
@@ -4175,7 +4211,7 @@ app.get('/api/favoris', auth, async (req, res) => {
     (pros || []).forEach(p => proMap[p.id] = p);
     res.json(favoris.map(f => proMap[f.pro_id]).filter(Boolean));
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/favoris', e);
   }
 });
 
@@ -4246,7 +4282,7 @@ app.post('/api/signalements', auth, async (req, res) => {
 
     res.status(201).json({ message: 'Signalement envoyé. Notre équipe va l\'examiner.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'route inconnue', e);
   }
 });
 
@@ -4260,13 +4296,13 @@ app.post('/api/evaluations', auth, async (req, res) => {
     if (evalue_id === req.user.id) return res.status(400).json({ error: 'Vous ne pouvez pas vous auto-évaluer.' });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
-    if (!demande) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (demande.statut !== 'terminee') return res.status(400).json({ error: 'Vous ne pouvez noter qu\'une prestation terminée.' });
 
     const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande_id).eq('statut', 'accepte').maybeSingle();
     const estClient = demande.client_id === req.user.id;
     const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
-    if (!estClient && !estPro) return res.status(403).json({ error: 'Accès refusé.' });
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     // Vérifie que la personne notée est bien "l'autre partie" de cette prestation précise
     const autrePartieAttendue = estClient ? (devisAccepte && devisAccepte.societe_id) : demande.client_id;
@@ -4291,7 +4327,7 @@ app.post('/api/evaluations', auth, async (req, res) => {
 
     res.status(201).json(data);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/evaluations', e);
   }
 });
 
@@ -4312,7 +4348,7 @@ app.get('/api/evaluations/mes-avis', auth, async (req, res) => {
       evaluateur_prenom: evaluateursMap[e.evaluateur_id] ? evaluateursMap[e.evaluateur_id].prenom : 'Utilisateur Gleam'
     })));
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/evaluations/mes-avis', e);
   }
 });
 
@@ -4323,7 +4359,7 @@ app.get('/api/evaluations/mes-notes-donnees', auth, async (req, res) => {
     const { data } = await supabase.from('evaluations').select('demande_id').eq('evaluateur_id', req.user.id);
     res.json((data || []).map(e => e.demande_id));
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/evaluations/mes-notes-donnees', e);
   }
 });
 
@@ -4333,7 +4369,7 @@ app.get('/api/evaluations/mes-notes-donnees', auth, async (req, res) => {
 app.post('/api/demandes/:id/masquer', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
-    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Cette action est réservée aux comptes prestataires. Votre compte est un compte client.' });
 
     // Le motif est facultatif, et volontairement borné à une liste connue :
     // du texte libre serait impossible à agréger, donc inutile pour comprendre
@@ -4358,7 +4394,7 @@ app.post('/api/demandes/:id/masquer', auth, async (req, res) => {
 
     res.json({ message: 'Demande écartée.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/demandes/:id/masquer', e);
   }
 });
 
@@ -4369,7 +4405,7 @@ app.delete('/api/demandes/:id/masquer', auth, async (req, res) => {
       .eq('pro_id', req.user.id).eq('demande_id', req.params.id);
     res.json({ message: 'Demande rétablie.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'DELETE /api/demandes/:id/masquer', e);
   }
 });
 
@@ -4406,7 +4442,7 @@ app.patch('/api/societes/disponibilite', auth, async (req, res) => {
 app.patch('/api/societes/justificatifs', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
-    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Cette action est réservée aux comptes prestataires. Votre compte est un compte client.' });
 
     const misAJour = {};
 
@@ -4424,7 +4460,7 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
       misAJour.assurance_police = String(req.body.assurance_police || '').trim() || null;
 
     if (!Object.keys(misAJour).length)
-      return res.status(400).json({ error: 'Aucune information à enregistrer.' });
+      return res.status(400).json({ error: 'Aucune modification à enregistrer : les champs sont identiques aux valeurs actuelles.' });
 
     const { error } = await supabase.from('users').update(misAJour).eq('id', req.user.id);
     if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
@@ -4446,7 +4482,7 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
       siret_partage: partage.partage
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/societes/justificatifs', e);
   }
 });
 
@@ -4561,7 +4597,7 @@ app.get('/api/admin/mes-revenus', adminAuth, async (req, res) => {
       }
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/mes-revenus', e);
   }
 });
 
@@ -4625,7 +4661,7 @@ app.get('/api/admin/factures', adminAuth, async (req, res) => {
       }
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/factures', e);
   }
 });
 
@@ -4715,7 +4751,7 @@ app.get('/api/admin/declaration-annuelle', adminAuth, async (req, res) => {
     });
   } catch (e) {
     console.error('Déclaration annuelle :', e.message);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/declaration-annuelle', e);
   }
 });
 
@@ -4881,7 +4917,7 @@ app.get('/api/admin/diagnostic', adminAuth, async (req, res) => {
     });
   } catch (e) {
     console.error('Diagnostic admin :', e.message);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/diagnostic', e);
   }
 });
 
@@ -4892,7 +4928,7 @@ app.get('/api/admin/diagnostic', adminAuth, async (req, res) => {
 app.post('/api/documents', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
-    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Réservé aux professionnels.' });
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Cette action est réservée aux comptes prestataires. Votre compte est un compte client.' });
 
     const type = String(req.body.type || '').trim();
     if (!TYPES_DOCUMENTS[type]) return res.status(400).json({ error: 'Type de document inconnu.' });
@@ -4952,7 +4988,7 @@ app.post('/api/documents', auth, async (req, res) => {
     res.status(201).json({ message: 'Document déposé, il sera vérifié rapidement.', document: { id: data.id, type, face, statut: data.statut } });
   } catch (e) {
     console.error('Dépôt document :', e.message);
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'POST /api/documents', e);
   }
 });
 
@@ -4993,7 +5029,7 @@ app.get('/api/documents', auth, async (req, res) => {
 
     res.json({ documents: etat });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/documents', e);
   }
 });
 
@@ -5149,7 +5185,7 @@ app.get('/api/admin/dossiers', adminAuth, async (req, res) => {
       }
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/dossiers', e);
   }
 });
 
@@ -5193,7 +5229,7 @@ app.patch('/api/admin/dossiers/:proId/valider', adminAuth, async (req, res) => {
 
     res.json({ message: enAttente.length + ' document(s) validé(s).', valides: enAttente.length });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/admin/dossiers/:proId/valider', e);
   }
 });
 
@@ -5225,7 +5261,7 @@ app.get('/api/admin/documents', adminAuth, async (req, res) => {
 
     res.json({ documents: enrichis, en_attente: enAttente || 0, motifs_refus: MOTIFS_REFUS });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/documents', e);
   }
 });
 
@@ -5241,7 +5277,7 @@ app.get('/api/admin/documents/:id/fichier', adminAuth, async (req, res) => {
     if (!url) return res.status(500).json({ error: 'Lien de consultation indisponible.' });
     res.json({ url, type_mime: doc.type_mime });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/documents/:id/fichier', e);
   }
 });
 
@@ -5278,7 +5314,7 @@ app.patch('/api/admin/documents/:id', adminAuth, async (req, res) => {
 
     res.json({ message: decision === 'valide' ? 'Document validé.' : 'Document refusé.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/admin/documents/:id', e);
   }
 });
 
@@ -5304,7 +5340,7 @@ app.get('/api/admin/documents/expirations', adminAuth, async (req, res) => {
       }))
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/documents/expirations', e);
   }
 });
 
@@ -5314,10 +5350,10 @@ app.get('/api/admin/documents/expirations', adminAuth, async (req, res) => {
 app.get('/api/societes/tarifs', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type, tarifs_base, tarifs_unitaires, prestations_proposees').eq('id', req.user.id).single();
-    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Cet écran est réservé aux comptes prestataires. Votre compte est un compte client.' });
     res.json({ tarifs: user.tarifs_base || {}, tarifs_unitaires: user.tarifs_unitaires || {}, prestations: user.prestations_proposees || [] });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/societes/tarifs', e);
   }
 });
 
@@ -5326,7 +5362,7 @@ app.get('/api/societes/tarifs', auth, async (req, res) => {
 app.patch('/api/societes/tarifs', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
-    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Accès réservé aux professionnels.' });
+    if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Cet écran est réservé aux comptes prestataires. Votre compte est un compte client.' });
 
     const categoriesValides = Object.keys(PRESTATION_CONFIG);
     const prestationsRecues = Array.isArray(req.body.prestations) ? req.body.prestations : [];
@@ -5372,7 +5408,7 @@ app.patch('/api/societes/tarifs', auth, async (req, res) => {
     if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
     res.json({ message: 'Tarifs mis à jour.', tarifs: tarifsPropres, tarifs_unitaires: tarifsUnitairesPropres, prestations: prestationsPropres });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/societes/tarifs', e);
   }
 });
 
@@ -5479,7 +5515,7 @@ app.get('/api/tarifs/estimation', publicLimiter, async (req, res) => {
       nombre_pros_reference: nbPros
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/tarifs/estimation', e);
   }
 });
 
@@ -5526,7 +5562,7 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
       commission_totale: Math.round(commissionTotale * 100) / 100
     });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/stats', e);
   }
 });
 
@@ -5547,7 +5583,7 @@ app.get('/api/admin/signalements', adminAuth, async (req, res) => {
       signale: usersMap[s.signale_id] || null
     })));
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/signalements', e);
   }
 });
 
@@ -5582,7 +5618,7 @@ app.patch('/api/admin/signalements/:id', adminAuth, async (req, res) => {
 
     res.json({ message: 'Signalement mis à jour.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/admin/signalements/:id', e);
   }
 });
 
@@ -5599,7 +5635,7 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     const { data } = await requete;
     res.json(data || []);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'GET /api/admin/users', e);
   }
 });
 
@@ -5612,7 +5648,7 @@ app.patch('/api/admin/users/:id/disponibilite', adminAuth, async (req, res) => {
     await supabase.from('users').update({ disponible: !!disponible }).eq('id', req.params.id);
     res.json({ message: disponible ? 'Compte réactivé.' : 'Compte suspendu.' });
   } catch (e) {
-    res.status(500).json({ error: 'Erreur serveur.' });
+    erreurServeur(res, 'PATCH /api/admin/users/:id/disponibilite', e);
   }
 });
 
