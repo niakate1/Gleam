@@ -3904,7 +3904,14 @@ async function finaliserPrestation(paiement) {
 
   // Le paiement porte ici le statut de réservation posé par l'appelant ('liberation_en_cours'),
   // ou encore 'paye' pour les appels internes qui ne réservent pas : les deux sont acceptés.
-  await supabase.from('paiements').update({ statut: 'libere' }).eq('id', paiement.id).in('statut', ['liberation_en_cours', 'paye']);
+  await supabase.from('paiements').update({
+      statut: 'libere',
+      // La colonne existait et n'était jamais remplie. Sans elle, impossible de
+      // savoir QUAND un versement a été libéré — et donc de dire ce qui a été
+      // gagné « ce mois ». L'application retombait sur created_at, la date de
+      // paiement du client, qui n'est pas la même chose.
+      libere_le: new Date().toISOString()
+    }).eq('id', paiement.id).in('statut', ['liberation_en_cours', 'paye']);
   await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', paiement.demande_id);
   creerProchaineOccurrenceRecurrente(paiement.demande_id).catch(e => console.error('Récurrence non créée:', e.message));
 
