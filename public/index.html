@@ -8311,8 +8311,18 @@ async function majEnteteProChiffres(){
     const d=await safeJson(r);
     // On additionne ce qui a été libéré ce mois-ci, pas le cumul : « ce mois »
     // doit vouloir dire ce mois.
+    //
+    // La route renvoie un OBJET — { total_libere, total_en_attente, paiements }
+    // — et non un tableau. Le code lisait `Array.isArray(d) ? d : []`, obtenait
+    // donc toujours un tableau vide, et affichait zéro quels que soient les
+    // versements. Trois paiements réglés et un libéré ne changeaient rien.
+    var listeGains=Array.isArray(d)?d:(d&&Array.isArray(d.paiements)?d.paiements:[]);
     var maintenant=new Date();
-    (Array.isArray(d)?d:[]).forEach(function(p){
+    listeGains.forEach(function(p){
+      // Seul ce qui est réellement acquis compte. Un paiement « paye » attend
+      // encore la validation du client : l'afficher comme un gain donnerait au
+      // prestataire un chiffre qu'il n'a pas touché.
+      if(p.statut!=='libere'&&p.statut!=='rembourse_partiel')return;
       var date=new Date(p.libere_le||p.created_at);
       if(date.getMonth()===maintenant.getMonth()&&date.getFullYear()===maintenant.getFullYear()){
         gains+=parseFloat(p.montant_societe||0);
@@ -9329,6 +9339,22 @@ function basculerFormulaireDevis(id,prestation){
   form.style.display=etaitOuvert?'none':'block';
   if(btn)btn.textContent=etaitOuvert?'💰 Proposer un prix':'Fermer';
   if(!etaitOuvert){
+    // ── LA DEMANDE EXISTE-T-ELLE ENCORE ? ───────────────────────────────
+    // Le prestataire s'apprête à saisir un prix et à rédiger un message. Autant
+    // vérifier maintenant que la demande n'a pas été supprimée entre le dernier
+    // sondage et ce clic — plutôt que de le lui apprendre après qu'il a écrit.
+    //
+    // Silencieux si tout va bien : on n'interrompt personne pour dire que rien
+    // n'a changé.
+    fetch(API+'/api/demandes/'+id,{headers:authHeaders()}).then(function(rep){
+      if(rep.status!==404)return;
+      toast('Cette demande vient d\'être supprimée par le client.',6000);
+      var c=document.getElementById('carte-demande-'+id);
+      if(c&&c.parentElement){c.style.opacity='0';setTimeout(function(){if(c.parentElement)c.remove()},320)}
+      if(typeof viderMemoireRequetes==='function')viderMemoireRequetes();
+      if(typeof loadProDemandes==='function')loadProDemandes(true);
+    }).catch(function(){ /* réseau indisponible : l'envoi tranchera */ });
+
     if(prestation)rappelTarifsPro(id,prestation);
     var prix=document.getElementById('prix-'+id);
     if(prix)setTimeout(function(){prix.focus()},60);
@@ -9354,6 +9380,31 @@ async function envoyerDevis(demandeId){
   try{
     const r=await fetch(API+'/api/devis',{method:'POST',headers:authHeaders(),body:JSON.stringify({demande_id:demandeId,prix_ttc:parseFloat(prix),description:msg})});
     const d=await safeJson(r);
+
+    // ── LA DEMANDE A DISPARU PENDANT QU'IL ÉCRIVAIT ─────────────────────
+    // Le client peut supprimer sa demande à tout moment. La liste du
+    // prestataire ne se rafraîchit qu'au sondage suivant : il a donc jusqu'à
+    // une minute pour saisir un prix sur quelque chose qui n'existe plus.
+    //
+    // Le serveur refuse — aucun devis ne peut aboutir, aucun argent ne bouge.
+    // Mais « Erreur : Demande introuvable » ne dit pas ce qui s'est passé, et
+    // la carte restait à l'écran : il pouvait réessayer indéfiniment.
+    //
+    // On explique, et on retire la carte tout de suite.
+    if(r.status===404){
+      toast('Cette demande vient d\'être supprimée par le client. Votre devis n\'a pas été envoyé.',6000);
+      var carte=document.getElementById('carte-demande-'+demandeId);
+      if(carte&&carte.parentElement){
+        carte.style.transition='opacity .3s';
+        carte.style.opacity='0';
+        setTimeout(function(){ if(carte.parentElement)carte.remove(); },320);
+      }
+      // La liste et le compteur se remettent d'accord sans attendre le sondage.
+      if(typeof viderMemoireRequetes==='function')viderMemoireRequetes();
+      if(typeof loadProDemandes==='function')loadProDemandes(true);
+      return;
+    }
+
     if(!r.ok){toast('Erreur : '+(d.error||''));if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}return}
     vibrer('succes');
     toast('✅ Devis envoyé au client !');
