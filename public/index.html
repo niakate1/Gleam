@@ -5548,6 +5548,27 @@ function show(id){
   if(ECRANS_CONNECTES.indexOf(id)>=0 && !currentUser){
     id = 's-guest';
   }
+
+  // ── LE PROFIL SE REMPLIT À L'OUVERTURE ────────────────────────────────
+  // Hier, j'ai vidé les valeurs de secours du HTML — « Utilisateur »,
+  // « email@exemple.com » — parce qu'elles s'affichaient quand la session
+  // manquait, et ressemblaient à un compte inconnu.
+  //
+  // Mais ces champs n'étaient remplis QUE par enterApp(), à la connexion. Si
+  // l'on arrive au profil autrement — retour navigateur, restauration de
+  // session, navigation directe —, ils restaient vides. Le nom et l'adresse
+  // du propriétaire du compte, absents.
+  //
+  // On les remplit ici, à chaque ouverture. C'est trois lignes, et cela ne
+  // dépend plus du chemin par lequel on est arrivé.
+  if(currentUser && (id === 's-profile' || id === 's-pro-profile')){
+    var champNom = document.getElementById(id === 's-profile' ? 'profile-name' : 'pro-profile-name');
+    var champMail = document.getElementById(id === 's-profile' ? 'profile-email' : 'pro-profile-email');
+    var nomComplet = ((currentUser.prenom || currentUser.firstName || '') + ' ' +
+                      (currentUser.nom || currentUser.lastName || '')).trim();
+    if(champNom) champNom.textContent = nomComplet || currentUser.email || '';
+    if(champMail) champMail.textContent = currentUser.email || '';
+  }
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   // L'écran de découverte prestataire construit son contenu à la première
