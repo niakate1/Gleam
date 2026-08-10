@@ -7805,6 +7805,20 @@ async function loadProDemandes(silent){
     if(sous)sous.textContent=data.length
       ? (data.length===1?'1 demande vous attend':data.length+' demandes vous attendent')
       : 'Aucune demande disponible pour le moment';
+
+    // ── LE COMPTEUR SUIT LA LISTE, IL NE LA RECALCULE PLUS ────────────────
+    // Le chiffre de l'en-tête venait d'un appel séparé, dans
+    // majEnteteProChiffres(). Deux lectures de la même route, à deux moments
+    // différents — et le sondage périodique ne rafraîchissait que la liste.
+    //
+    // Résultat : une demande arrive, la liste l'affiche, le compteur reste à
+    // zéro. Elle disparaît, la liste se vide, le compteur reste à un. Il
+    // fallait recharger la page pour les réconcilier.
+    //
+    // La liste est ici, déjà comptée. Une seule source, plus de divergence.
+    var chiffreDemandes=document.getElementById('pro-chiffre-demandes');
+    if(chiffreDemandes)chiffreDemandes.textContent=String(data.length);
+
     loadProDevisCount();
     if(!data||!data.length){proDemandesCache=[];renderProDemandesCards();return}
     var changed2=hasDataChanged('proDemandes',data);
@@ -8310,7 +8324,9 @@ async function majEnteteProChiffres(){
   var noteAffichee=(note&&parseFloat(note)>0)?parseFloat(note).toFixed(1).replace('.',','):'—';
 
   boite.innerHTML=
-    '<div class="entete-pro-chiffre"><b>'+demandes+'</b><span>demandes</span></div>'+
+    // L'identifiant permet à loadProDemandes de corriger ce chiffre sans
+    // reconstruire les trois tuiles ni relancer un appel réseau.
+    '<div class="entete-pro-chiffre"><b id="pro-chiffre-demandes">'+demandes+'</b><span>demandes</span></div>'+
     '<div class="entete-pro-chiffre"><b>'+Math.round(gains)+' €</b><span>ce mois</span></div>'+
     '<div class="entete-pro-chiffre"><b>'+noteAffichee+'</b><span>note</span></div>';
 }
