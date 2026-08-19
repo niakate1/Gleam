@@ -159,6 +159,25 @@ const templates = {
     }),
   }),
 
+  // ── DOSSIER VALIDÉ → Prestataire ──────────────────────────────────────
+  // Envoyé UNE SEULE FOIS, au moment où la dernière pièce manquante est
+  // validée. Un prestataire qui attend depuis des jours mérite de l'apprendre
+  // autrement qu'en rouvrant l'application par hasard.
+  dossier_valide: (d) => ({
+    subject: 'Votre dossier Gleam est validé',
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Vos justificatifs ont été vérifiés et <strong>votre dossier est complet</strong>.</p>
+             <p>Vous recevez dès maintenant les demandes de votre zone d'intervention, et vous pouvez y répondre par un devis.</p>
+             <p>Un conseil : les premières réponses comptent. Un devis envoyé dans l'heure a bien plus de chances d'être accepté.</p>`,
+      ctaLabel: 'Voir les demandes',
+      // Même forme que les autres gabarits : APP_URL plus une ancre que le
+      // routeur de l'application sait traiter. « lienVersApp » n'existe pas —
+      // je l'avais inventée, et le courriel aurait planté à l'envoi.
+      ctaUrl: `${APP_URL}#demandes-disponibles`
+    })
+  }),
+
   // 6. Prestation confirmée → Client + Pro
   prestation_confirmee: (d) => ({
     subject: `Prestation confirmée : ${d.prestation}`,
