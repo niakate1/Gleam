@@ -2508,6 +2508,39 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     const idsMasquees = new Set((masquees || []).map(m => m.demande_id));
     filtered = filtered.filter(d => !idsMasquees.has(d.id));
 
+    // ── UN DOSSIER INCOMPLET NE REÇOIT PAS DE DEMANDES ──────────────────
+    // Montrer des demandes à un prestataire qui ne peut pas y répondre est
+    // doublement mauvais : il perd son temps à lire des annonces, et il se
+    // heurte au refus au moment d'envoyer son prix — c'est-à-dire après avoir
+    // réfléchi à son tarif.
+    //
+    // La liste devient vide, et l'écran explique ce qui manque. Le parcours de
+    // démarrage est déjà là pour l'y conduire.
+    //
+    // On vérifie avant tout autre filtre : inutile de trier des demandes qu'on
+    // ne montrera pas.
+    const regleListe = await prestataireEnRegle(req.user.id);
+    if (!regleListe.enRegle) {
+      // La route renvoie NORMALEMENT un tableau : l'application fait
+      // `data.length` puis `data.map`. Répondre un objet l'aurait laissée sur
+      // son squelette de chargement, sans erreur visible.
+      //
+      // Premier essai : mettre l'explication dans un en-tête HTTP. Mauvaise
+      // idée — un en-tête personnalisé est INVISIBLE au JavaScript d'origine
+      // croisée tant qu'il n'est pas explicitement exposé, et cela dépend
+      // d'une configuration CORS qu'on peut oublier en changeant d'hébergeur.
+      //
+      // On reste donc sur un tableau, et on y glisse UN élément qui porte
+      // l'explication. L'application le reconnaît à son drapeau et l'affiche
+      // au lieu de le traiter comme une demande. Aucune configuration à
+      // maintenir, et la forme de la réponse ne change pas.
+      return res.json([{
+        acces_restreint: true,
+        manques: regleListe.manques,
+        message: regleListe.manques.join(' ')
+      }]);
+    }
+
     // Ne montrer que les demandes correspondant aux prestations que le pro a déclaré savoir faire
     // (si le pro n'a configuré aucune préférence dans "Mes tarifs", on continue à tout lui montrer
     // pour ne pas casser l'expérience des pros n'ayant pas encore configuré cet écran).
@@ -3053,6 +3086,72 @@ function justificatifsManquants(user) {
   return manquants;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UN PRESTATAIRE PEUT-IL TRAVAILLER SUR GLEAM ?
+//
+// Deux conditions, nées de deux incidents réels.
+//
+// 1. SES PAIEMENTS SONT OPÉRATIONNELS
+//    Le 19 août, deux versements ont échoué sur « balance_insufficient ». Le
+//    prestataire n'avait pas de compte Connect actif au moment du paiement :
+//    l'argent est resté sur le compte de la plateforme, et il fallait le lui
+//    virer depuis un solde vide.
+//
+//    L'existence d'un `stripe_account_id` NE SUFFIT PAS — Christopher en avait
+//    un, et le virement a quand même échoué. On interroge Stripe pour connaître
+//    l'état réel du compte.
+//
+// 2. SES TROIS DOCUMENTS SONT VALIDÉS
+//    Identité, immatriculation, assurance RC Pro. Un client qui réserve chez un
+//    prestataire non vérifié n'a aucune garantie — et c'est la plateforme qui
+//    répond du sinistre.
+//
+// La fonction dit CE QUI MANQUE. Un refus qui n'explique pas se transforme en
+// appel au support, et en prestataire qui s'en va.
+// ═══════════════════════════════════════════════════════════════════════════
+const DOCUMENTS_REQUIS = ['identite', 'immatriculation', 'rc_pro'];
+const NOM_DOCUMENT = {
+  identite: 'pièce d\'identité',
+  immatriculation: 'justificatif d\'immatriculation',
+  rc_pro: 'attestation d\'assurance RC Pro'
+};
+
+async function prestataireEnRegle(proId) {
+  const manques = [];
+
+  const { data: pro } = await supabase.from('users')
+    .select('stripe_account_id').eq('id', proId).single();
+
+  if (!pro || !pro.stripe_account_id) {
+    manques.push('Configurez vos paiements depuis votre profil pour pouvoir être réglé.');
+  } else {
+    try {
+      const compte = await stripe.accounts.retrieve(pro.stripe_account_id);
+      const pret = compte.charges_enabled &&
+                   compte.capabilities && compte.capabilities.transfers === 'active';
+      if (!pret) {
+        manques.push('Votre configuration de paiement n\'est pas terminée — reprenez-la depuis votre profil.');
+      }
+    } catch (e) {
+      // Stripe injoignable : on ne bloque pas un prestataire pour une panne qui
+      // ne vient pas de lui. Le versement sera de toute façon vérifié plus tard.
+      console.warn('Vérification Connect impossible (' + e.message + ') — prestataire non bloqué.');
+    }
+  }
+
+  const { data: docs } = await supabase.from('documents_pro')
+    .select('type, statut').eq('pro_id', proId);
+  const valides = new Set((docs || []).filter(d => d.statut === 'valide').map(d => d.type));
+  const absents = DOCUMENTS_REQUIS.filter(t => !valides.has(t));
+  if (absents.length) {
+    manques.push('Documents à faire valider : ' +
+                 absents.map(t => NOM_DOCUMENT[t] || t).join(', ') + '.');
+  }
+
+  return { enRegle: manques.length === 0, manques };
+}
+
 app.post('/api/devis', auth, async (req, res) => {
   try {
     const { demande_id, prix_ttc, description, creneau_propose } = req.body;
@@ -3065,6 +3164,18 @@ app.post('/api/devis', auth, async (req, res) => {
     // prestataire, et il arrive au moment où il est légitime.
     const { data: auteur } = await supabase.from('users')
       .select('type, siret, assurance_rc_pro').eq('id', req.user.id).single();
+    // Aux justificatifs déclaratifs — SIRET et assurance — s'ajoutent
+    // désormais deux conditions vérifiables : les paiements opérationnels et
+    // les documents validés. Un seul point de contrôle, pour qu'ils ne
+    // divergent jamais.
+    const regle = await prestataireEnRegle(req.user.id);
+    if (!regle.enRegle) {
+      return res.status(403).json({
+        error: 'Vous ne pouvez pas encore envoyer de devis. ' + regle.manques.join(' '),
+        manques: regle.manques
+      });
+    }
+
     const manquants = justificatifsManquants(auteur);
     if (manquants.length) {
       return res.status(403).json({
