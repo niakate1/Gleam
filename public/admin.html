@@ -1152,9 +1152,35 @@ async function afficherVersionServeur() {
     var v = await appel('/api/admin/version');
     var manquantes = Object.keys(v.routes_recentes || {})
       .filter(function(k){ return !v.routes_recentes[k]; });
+    // Le mode Stripe, en clair. Une clé de test en production ne lève aucune
+    // erreur : les paiements s'enchaînent et aucun euro ne bouge. Il faut donc
+    // le lire, on ne peut pas le déduire.
+    var stripe = '';
+    if (v.stripe === 'test')          stripe = '  ·  STRIPE EN MODE TEST';
+    else if (v.stripe === 'absente')  stripe = '  ·  clé Stripe absente';
+    else if (v.stripe_coherent === false) stripe = '  ·  clés Stripe incohérentes';
+
+    // ── L'ÉTAT DE LA CLÔTURE AUTOMATIQUE ────────────────────────────────
+    // Trois situations se ressemblaient de l'extérieur : serveur non déployé,
+    // minuterie absente, ou minuterie qui tourne sans rien trouver. On les
+    // distingue maintenant en une seconde.
+    var cloture = '';
+    if (v.cloture_planifiee === false) {
+      cloture = '  ·  CLÔTURE NON PLANIFIÉE — ancien serveur';
+    } else if (!v.cloture_dernier_passage) {
+      cloture = '  ·  clôture planifiée, pas encore passée';
+    } else {
+      var quand = new Date(v.cloture_dernier_passage);
+      var minutes = Math.round((Date.now() - quand.getTime()) / 60000);
+      cloture = '  ·  clôture il y a ' + minutes + ' min — ' +
+                (v.cloture_dernier_resultat || '');
+    }
+
     cible.textContent = 'serveur v' + v.version +
-      (manquantes.length ? '  ·  ' + manquantes.length + ' correctif(s) absent(s)' : '');
-    cible.className = 'version-serveur' + (manquantes.length ? ' ancien' : '');
+      (manquantes.length ? '  ·  ' + manquantes.length + ' correctif(s) absent(s)' : '') +
+      stripe + cloture;
+    cible.className = 'version-serveur' +
+      ((manquantes.length || stripe || v.cloture_planifiee === false) ? ' ancien' : '');
   } catch (e) {
     // Une route absente signifie que le déploiement n'a pas pris : c'est
     // l'information la plus utile du moment, il faut la dire.
