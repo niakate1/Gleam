@@ -5672,6 +5672,44 @@ app.patch('/api/admin/documents/:id', adminAuth, async (req, res) => {
       .update(misAJour).eq('id', req.params.id).select('*, pro:users!documents_pro_pro_id_fkey(email, prenom)').single();
     if (error || !data) return res.status(400).json({ error: 'Mise à jour impossible.' });
 
+    // ═══════════════════════════════════════════════════════════════════
+    // LE DOSSIER VIENT-IL DE DEVENIR COMPLET ?
+    //
+    // Le contrôle d'accès lit la base à chaque appel : dès la validation, le
+    // prestataire PEUT voir les demandes. Mais son écran ne se rafraîchit
+    // qu'au sondage suivant — jusqu'à soixante secondes — et s'il a fermé
+    // l'application, jamais.
+    //
+    // Sans avertissement, il découvrirait son déblocage par hasard, en
+    // rouvrant l'application un jour. On le prévient au moment exact où son
+    // dossier devient complet, et une seule fois : c'est le passage de
+    // « incomplet » à « complet » qui déclenche, pas chaque validation.
+    // ═══════════════════════════════════════════════════════════════════
+    if (decision === 'valide' && data.pro_id) {
+      try {
+        const apres = await prestataireEnRegle(data.pro_id);
+        if (apres.enRegle) {
+          const pro = data.pro || {};
+          if (pro.email) {
+            sendEmail('dossier_valide', pro.email, {
+              compteId: data.pro_id,
+              prenom: pro.prenom || ''
+            }).catch(e => console.error('Email dossier validé:', e.message));
+          }
+          envoyerNotificationPush(data.pro_id, {
+            titre: 'Votre dossier est validé',
+            corps: 'Vous pouvez maintenant recevoir des demandes et envoyer vos devis.',
+            url: '/#accueil'
+          }).catch(() => {});
+          console.log('🎉 Dossier complet — ' + data.pro_id + ' peut recevoir des demandes.');
+        }
+      } catch (e) {
+        // Un avertissement qui échoue ne doit jamais empêcher la validation
+        // elle-même : le prestataire est débloqué de toute façon.
+        console.error('Avertissement dossier complet:', e.message);
+      }
+    }
+
     const libelle = (TYPES_DOCUMENTS[data.type] || {}).libelle || data.type;
     console.log((decision === 'valide' ? '✅' : '❌') + ' Document ' + decision + ' — ' + libelle +
       ' — ' + (data.pro && data.pro.email));
