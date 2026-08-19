@@ -2234,6 +2234,40 @@ async function cloturerPrestationsOubliees() {
         await supabase.from('demandes')
           .update({ validation_automatique: true }).eq('id', d.id);
 
+        // ── LE VERSEMENT, QUI MANQUAIT ────────────────────────────────────
+        // La clôture passait la demande en « terminée » et écrivait au client
+        // que « le prestataire a été réglé » — sans jamais libérer l'argent.
+        // Le paiement restait au statut « paye », et le virement n'existait
+        // que dans le courriel.
+        //
+        // On réutilise exactement la brique de la validation par code :
+        // réservation de la ligne, puis finalisation. La réservation évite
+        // qu'un client validant au même instant ne déclenche un second
+        // virement pour la même prestation.
+        const { data: paiement } = await supabase.from('paiements')
+          .select('*').eq('demande_id', d.id).eq('statut', 'paye').maybeSingle();
+
+        if (paiement) {
+          const reserve = await reserverLigne(
+            'paiements', paiement.id, ['paye'], 'liberation_en_cours');
+          if (reserve) {
+            try {
+              const resultat = await finaliserPrestation(paiement);
+              if (resultat && resultat.erreur) {
+                // On rend la réservation : sans cela le paiement resterait
+                // dans un état intermédiaire que plus rien ne reprendrait.
+                await supabase.from('paiements').update({ statut: 'paye' })
+                  .eq('id', paiement.id).eq('statut', 'liberation_en_cours');
+                console.error('Clôture auto ' + d.id + ' — versement refusé : ' + resultat.erreur);
+              }
+            } catch (errPaiement) {
+              await supabase.from('paiements').update({ statut: 'paye' })
+                .eq('id', paiement.id).eq('statut', 'liberation_en_cours');
+              console.error('Clôture auto ' + d.id + ' — versement : ' + errPaiement.message);
+            }
+          }
+        }
+
         console.log('Prestation ' + d.id + ' validée automatiquement apres ' +
                     HEURES_AVANT_CLOTURE_AUTO + ' h sans code.');
 
@@ -4953,11 +4987,55 @@ const VERSION_SERVEUR = (function(){
 })();
 const DEMARRE_LE = new Date().toISOString();
 
+// ═══════════════════════════════════════════════════════════════════════════
+// STRIPE EST-IL EN TEST OU EN PRODUCTION ?
+//
+// Les clés viennent des variables d'environnement — aucune n'est en dur, c'est
+// bien. Mais rien ne disait laquelle était chargée.
+//
+// Une clé de test en production ne lève AUCUNE erreur : les paiements
+// s'enchaînent, les écrans confirment, les montants s'affichent. Simplement,
+// aucun euro ne bouge. On peut prendre des commandes pendant des jours sans
+// s'en apercevoir.
+//
+// C'est exactement le genre de défaut que cette application a eu ailleurs :
+// tout fonctionne, rien ne se passe.
+// ═══════════════════════════════════════════════════════════════════════════
+const STRIPE_MODE = (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_live_')
+  ? 'production'
+  : ((process.env.STRIPE_SECRET_KEY || '').startsWith('sk_test_') ? 'test' : 'absente');
+
+// La clé publique et la clé secrète doivent être du même mode. Les mélanger
+// produit des erreurs incompréhensibles au moment du paiement, jamais avant.
+const STRIPE_MODE_PUBLIC = (process.env.STRIPE_PUBLISHABLE_KEY || '').startsWith('pk_live_')
+  ? 'production'
+  : ((process.env.STRIPE_PUBLISHABLE_KEY || '').startsWith('pk_test_') ? 'test' : 'absente');
+
+if (STRIPE_MODE !== STRIPE_MODE_PUBLIC) {
+  console.error('╔═══════════════════════════════════════════════════════════════╗');
+  console.error('║  CLÉS STRIPE INCOHÉRENTES                                     ║');
+  console.error('║  secrète : ' + STRIPE_MODE.padEnd(12) + '  publique : ' + STRIPE_MODE_PUBLIC.padEnd(12) + '     ║');
+  console.error('║  Les paiements échoueront au moment du règlement, pas avant.  ║');
+  console.error('╚═══════════════════════════════════════════════════════════════╝');
+}
+
+if (STRIPE_MODE === 'test' && process.env.NODE_ENV === 'production') {
+  console.warn('╔═══════════════════════════════════════════════════════════════╗');
+  console.warn('║  STRIPE EST EN MODE TEST, SUR UN SERVEUR DE PRODUCTION        ║');
+  console.warn('║  Les clients paieront sans qu\'aucun euro ne soit encaissé.    ║');
+  console.warn('║  Remplacez STRIPE_SECRET_KEY et STRIPE_PUBLISHABLE_KEY.       ║');
+  console.warn('╚═══════════════════════════════════════════════════════════════╝');
+}
+
 app.get('/api/admin/version', adminAuth, (req, res) => {
   res.json({
     version: VERSION_SERVEUR,
     demarre_le: DEMARRE_LE,
     // Les routes récentes : leur présence dit si le déploiement a pris.
+    // Le mode Stripe, visible en une seconde depuis l'administration. Sans
+    // cela, il faut ouvrir Railway et lire une variable d'environnement.
+    stripe: STRIPE_MODE,
+    stripe_coherent: STRIPE_MODE === STRIPE_MODE_PUBLIC,
     routes_recentes: {
       dossiers: true,
       cloture_automatique: typeof cloturerPrestationsOubliees === 'function',
@@ -5848,6 +5926,34 @@ setTimeout(balayerDemandesExpirees, 30 * 1000);
 // solliciter la base en même temps que le balayage des expirations.
 setInterval(relancerDemandesSansDevis, 15 * 60 * 1000);
 setTimeout(relancerDemandesSansDevis, 60 * 1000);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LA CLÔTURE AUTOMATIQUE, ENFIN PLANIFIÉE
+//
+// Elle existait, elle fonctionnait, et elle ne tournait jamais.
+//
+// Son seul déclencheur était la CRÉATION d'une demande — un événement qui
+// survient une fois tous les quelques jours. Trois prestations sont donc
+// restées « en cours » pendant 307, 262 et 222 heures, sans le moindre litige,
+// avec l'argent du client bloqué chez Stripe et le prestataire impayé.
+//
+// Les deux autres balayages étaient bien planifiés. Celui-ci avait été
+// raccroché à une route, et personne ne s'en est aperçu tant qu'aucune
+// prestation n'avait dépassé 48 heures.
+//
+// Même rythme que les autres, décalé de 30 secondes de plus pour ne pas
+// solliciter la base en même temps.
+// ═══════════════════════════════════════════════════════════════════════════
+async function balayerPrestationsAValider() {
+  try {
+    await cloturerPrestationsOubliees();
+    await avertirValidationProche();
+  } catch (e) {
+    console.error('Balayage clôture automatique:', e.message);
+  }
+}
+setInterval(balayerPrestationsAValider, 15 * 60 * 1000);
+setTimeout(balayerPrestationsAValider, 90 * 1000);
 
 const PORT = process.env.PORT || 3000;
 // ── FILETS DE SÉCURITÉ DU PROCESSUS ─────────────────────────────────────────
