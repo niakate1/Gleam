@@ -7921,6 +7921,9 @@ async function envoyerNote(btn){
 
 // ── PRO DEMANDES ──
 var proDemandesCache=[];
+// La cause du vide, transmise par le serveur dans un en-tête. Null quand le
+// dossier est complet — auquel cas un vide signifie « pas de demande ».
+var proAccesRestreint=null;
 var proDemandesFilterActive='tous';
 function setProDemandesFilter(f){
   proDemandesFilterActive=f;
@@ -7962,6 +7965,21 @@ async function loadProDemandes(silent){
     if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
     if(!r.ok){c.innerHTML='<div class="etat-vide"><i data-lucide="wifi-off" style="width:44px;height:44px;color:var(--gray);margin-bottom:14px"></i><h3>Chargement impossible</h3><p>Une erreur est survenue en récupérant les demandes. Vérifiez votre connexion et réessayez.</p><button class="btn" style="width:auto;padding:10px 22px" onclick="loadProDemandes()">Réessayer</button></div>';if(window.lucide)lucide.createIcons();document.getElementById('stat-demandes').textContent='0';return}
     const data=await safeJson(r);
+
+    // ── POURQUOI LA LISTE EST VIDE ────────────────────────────────────────
+    // Le serveur renvoie une liste vide dans deux cas très différents : le
+    // dossier du prestataire est incomplet, ou il n'y a simplement aucune
+    // demande dans sa zone.
+    //
+    // Le même écran pour les deux laisse le prestataire attendre des demandes
+    // qui ne viendront jamais. Le serveur glisse donc un élément porteur d'un
+    // drapeau `acces_restreint` : on le retire de la liste et on garde son
+    // message.
+    proAccesRestreint = null;
+    if (Array.isArray(data) && data.length === 1 && data[0] && data[0].acces_restreint) {
+      proAccesRestreint = data[0].message || 'Votre dossier est incomplet.';
+      data.length = 0;
+    }
     document.getElementById('stat-demandes').textContent=data.length||0;
     // Le compte migre dans le bandeau, où il tient en une phrase plutôt qu'en
     // carte chiffrée répétant la liste située juste en dessous.
@@ -7999,10 +8017,17 @@ function renderProDemandesCards(){
     // Un écran vide n'apprend rien. On explique la cause probable, on propose
     // l'action correspondante, et on montre à quoi ressemblera une demande —
     // clairement identifié comme exemple, jamais mêlé à de vraies demandes.
+    // Le titre ne change pas : « Aucune demande pour le moment » reste vrai
+    // dans les deux cas. C'est la CAUSE qui change, et l'action avec elle.
+    // Changer le titre ferait croire à deux écrans différents ; changer la
+    // seule explication dit la vérité sans dérouter.
+    var dossierIncomplet = !!proAccesRestreint;
     c.innerHTML=emptyStateHtml({
       title:'Aucune demande pour le moment',
-      sub:'Élargissez votre zone d\'intervention ou ajoutez des prestations à votre profil pour en recevoir davantage.',
-      ctaLabel:'Régler ma zone',
+      sub: dossierIncomplet
+        ? proAccesRestreint + ' Vous recevrez des demandes dès que votre dossier sera complet.'
+        : 'Élargissez votre zone d\'intervention ou ajoutez des prestations à votre profil pour en recevoir davantage.',
+      ctaLabel: dossierIncomplet ? 'Compléter mon dossier' : 'Régler ma zone',
       ctaAction:"goProTab('pro-profile')"
     })+exempleDemandePro();
     if(window.lucide)lucide.createIcons();
