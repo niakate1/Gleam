@@ -5387,7 +5387,10 @@ function ouvrirConsoleGleam(){
   // que tous les visiteurs voient.
   // Sa place est ici : on l'ouvre quand on cherche, pas quand on visite.
   html += titre('VERSION');
-  html += ligne('  v26.08.08-7bff77b');
+  // Empreinte recalculée à chaque livraison. L'ancienne était figée au
+  // 8 août : elle ne disait donc jamais quelle version tournait, et nous
+  // avons perdu deux échanges à nous demander si un déploiement avait pris.
+  html += ligne('  v26.08.19-30ad962');
 
   html += titre('APPAREIL');
   html += ligne('  ' + ((ua.match(/Android [\d.]+/) || ua.match(/OS \d+_\d+/) || ['système inconnu'])[0]));
