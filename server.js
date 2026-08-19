@@ -2201,7 +2201,7 @@ async function cloturerPrestationsOubliees() {
       .not('prestation_demarree_le', 'is', null)
       .lt('prestation_demarree_le', limite)
       .limit(100);
-    if (!aClore || !aClore.length) return;
+    if (!aClore || !aClore.length) return 0;
 
     // ── UN LITIGE OUVERT SUSPEND LA CLÔTURE ─────────────────────────────
     // Payer automatiquement une prestation contestée reviendrait à trancher
@@ -2219,6 +2219,7 @@ async function cloturerPrestationsOubliees() {
       // Les trois libèrent le paiement ; tout le reste le suspend.
       .not('statut', 'in', '(traite,resolu,rejete)');
     const demandesEnLitige = new Set((litiges || []).map(l => l.demande_id));
+    let cloturees = 0;
 
     for (const d of aClore) {
       if (demandesEnLitige.has(d.id)) {
@@ -2268,6 +2269,7 @@ async function cloturerPrestationsOubliees() {
           }
         }
 
+        cloturees += 1;
         console.log('Prestation ' + d.id + ' validée automatiquement apres ' +
                     HEURES_AVANT_CLOTURE_AUTO + ' h sans code.');
 
@@ -2289,9 +2291,11 @@ async function cloturerPrestationsOubliees() {
         console.error('Clôture automatique ' + d.id + ' :', err.message);
       }
     }
+    return cloturees;
   } catch (err) {
     // Une clôture qui échoue ne doit jamais empêcher la lecture des demandes.
     console.error('Clôture automatique ignorée:', err.message);
+    return 0;
   }
 }
 
@@ -5036,6 +5040,12 @@ app.get('/api/admin/version', adminAuth, (req, res) => {
     // cela, il faut ouvrir Railway et lire une variable d'environnement.
     stripe: STRIPE_MODE,
     stripe_coherent: STRIPE_MODE === STRIPE_MODE_PUBLIC,
+    // Le seul marqueur qui distingue vraiment les deux versions : la fonction
+    // de balayage n'existait pas avant. `cloture_automatique` était vrai dans
+    // les deux, donc inutile pour savoir si le déploiement a pris.
+    cloture_planifiee: typeof balayerPrestationsAValider === 'function',
+    cloture_dernier_passage: CLOTURE_DERNIER_PASSAGE,
+    cloture_dernier_resultat: CLOTURE_DERNIER_RESULTAT,
     routes_recentes: {
       dossiers: true,
       cloture_automatique: typeof cloturerPrestationsOubliees === 'function',
@@ -5944,11 +5954,26 @@ setTimeout(relancerDemandesSansDevis, 60 * 1000);
 // Même rythme que les autres, décalé de 30 secondes de plus pour ne pas
 // solliciter la base en même temps.
 // ═══════════════════════════════════════════════════════════════════════════
+// Le dernier passage de la clôture, exposé à l'administration.
+//
+// Sans cette trace, impossible de distinguer trois situations qui se
+// ressemblent de l'extérieur : le serveur n'est pas déployé, la minuterie ne
+// tourne pas, ou elle tourne et ne trouve rien à faire. On a perdu deux
+// échanges là-dessus.
+let CLOTURE_DERNIER_PASSAGE = null;
+let CLOTURE_DERNIER_RESULTAT = 'jamais exécutée';
+
 async function balayerPrestationsAValider() {
+  CLOTURE_DERNIER_PASSAGE = new Date().toISOString();
   try {
-    await cloturerPrestationsOubliees();
+    const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
+    CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
+      ? closes + ' prestation(s) clôturée(s)'
+      : 'passage sans erreur';
+    console.log('⏱️  Clôture automatique : ' + CLOTURE_DERNIER_RESULTAT);
   } catch (e) {
+    CLOTURE_DERNIER_RESULTAT = 'erreur : ' + e.message;
     console.error('Balayage clôture automatique:', e.message);
   }
 }
