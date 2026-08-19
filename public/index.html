@@ -8031,16 +8031,20 @@ function renderProDemandesCards(){
     // clairement identifié comme exemple, jamais mêlé à de vraies demandes.
     // Le titre ne change pas : « Aucune demande pour le moment » reste vrai
     // dans les deux cas. C'est la CAUSE qui change, et l'action avec elle.
-    // Changer le titre ferait croire à deux écrans différents ; changer la
-    // seule explication dit la vérité sans dérouter.
+    //
+    // « Régler ma zone » n'a rien à voir avec un dossier incomplet : envoyer
+    // quelqu'un élargir son rayon alors qu'il lui manque une pièce d'identité,
+    // c'est lui faire perdre son temps et lui cacher le vrai obstacle.
+    //
+    // Le bouton mène donc directement au dépôt des documents.
     var dossierIncomplet = !!proAccesRestreint;
     c.innerHTML=emptyStateHtml({
       title:'Aucune demande pour le moment',
       sub: dossierIncomplet
         ? proAccesRestreint + ' Vous recevrez des demandes dès que votre dossier sera complet.'
         : 'Élargissez votre zone d\'intervention ou ajoutez des prestations à votre profil pour en recevoir davantage.',
-      ctaLabel: dossierIncomplet ? 'Compléter mon dossier' : 'Régler ma zone',
-      ctaAction:"goProTab('pro-profile')"
+      ctaLabel: dossierIncomplet ? 'Déposer mes documents' : 'Régler ma zone',
+      ctaAction: dossierIncomplet ? 'ouvrirDocumentsPro()' : "goProTab('pro-profile')"
     })+exempleDemandePro();
     if(window.lucide)lucide.createIcons();
     return;
