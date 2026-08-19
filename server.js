@@ -3135,12 +3135,15 @@ function justificatifsManquants(user) {
 // La fonction dit CE QUI MANQUE. Un refus qui n'explique pas se transforme en
 // appel au support, et en prestataire qui s'en va.
 // ═══════════════════════════════════════════════════════════════════════════
-const DOCUMENTS_REQUIS = ['identite', 'immatriculation', 'rc_pro'];
-const NOM_DOCUMENT = {
-  identite: 'pièce d\'identité',
-  immatriculation: 'justificatif d\'immatriculation',
-  rc_pro: 'attestation d\'assurance RC Pro'
-};
+// La liste des documents obligatoires est DÉDUITE de TYPES_DOCUMENTS, jamais
+// recopiée. Elle y porte déjà un drapeau `requis`, et les pièces facultatives
+// — vigilance URSSAF, agrément services à la personne — sont marquées
+// `requis: false`. Les recopier ici aurait créé deux vérités qui finissent
+// toujours par diverger : rendre un document facultatif dans un fichier sans
+// le faire dans l'autre, et bloquer des prestataires en règle.
+function documentsObligatoires() {
+  return Object.keys(TYPES_DOCUMENTS).filter(t => TYPES_DOCUMENTS[t].requis);
+}
 
 async function prestataireEnRegle(proId) {
   const manques = [];
@@ -3166,12 +3169,24 @@ async function prestataireEnRegle(proId) {
   }
 
   const { data: docs } = await supabase.from('documents_pro')
-    .select('type, statut').eq('pro_id', proId);
-  const valides = new Set((docs || []).filter(d => d.statut === 'valide').map(d => d.type));
-  const absents = DOCUMENTS_REQUIS.filter(t => !valides.has(t));
+    .select('type, face, statut').eq('pro_id', proId);
+
+  // Une pièce d'identité, ce sont DEUX faces. Ne vérifier que le type aurait
+  // déclaré le dossier complet avec le seul recto validé — et le verso, celui
+  // qui porte la date de validité, jamais regardé.
+  const validees = new Set((docs || [])
+    .filter(d => d.statut === 'valide')
+    .map(d => d.type + '|' + (d.face || 'unique')));
+
+  const absents = [];
+  for (const type of documentsObligatoires()) {
+    const faces = TYPES_DOCUMENTS[type].faces || ['unique'];
+    if (faces.some(f => !validees.has(type + '|' + f))) absents.push(type);
+  }
+
   if (absents.length) {
     manques.push('Documents à faire valider : ' +
-                 absents.map(t => NOM_DOCUMENT[t] || t).join(', ') + '.');
+      absents.map(t => (TYPES_DOCUMENTS[t] || {}).libelle || t).join(', ') + '.');
   }
 
   return { enRegle: manques.length === 0, manques };
