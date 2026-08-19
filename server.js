@@ -2470,6 +2470,26 @@ app.get('/api/demandes', auth, async (req, res) => {
 });
 
 // Demandes disponibles pour les pros (en attente, pas encore acceptées) — DOIT être déclarée avant /api/demandes/:id
+// L'état du dossier prestataire, pour l'écran d'accueil.
+//
+// Route SÉPARÉE, et c'est délibéré : la liste des demandes doit rester une
+// liste de demandes. Mélanger les deux a produit une carte fantôme en
+// production, avec un bouton « Proposer un prix » sur une demande inexistante.
+app.get('/api/pro/acces', auth, async (req, res) => {
+  try {
+    const regle = await prestataireEnRegle(req.user.id);
+    res.json({
+      en_regle: regle.enRegle,
+      manques: regle.manques,
+      message: regle.manques.join(' ')
+    });
+  } catch (e) {
+    // En cas d'échec on répond « en règle » : mieux vaut un message générique
+    // qu'un prestataire accusé à tort d'avoir un dossier incomplet.
+    res.json({ en_regle: true, manques: [], message: '' });
+  }
+});
+
 app.get('/api/demandes/all', auth, async (req, res) => {
   try {
     const { data: user, error: userErr } = await supabase.from('users').select('type, prestations_proposees, latitude, longitude, rayon_intervention_km').eq('id', req.user.id).single();
@@ -2521,24 +2541,29 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     // ne montrera pas.
     const regleListe = await prestataireEnRegle(req.user.id);
     if (!regleListe.enRegle) {
-      // La route renvoie NORMALEMENT un tableau : l'application fait
-      // `data.length` puis `data.map`. Répondre un objet l'aurait laissée sur
-      // son squelette de chargement, sans erreur visible.
+      // ── UNE LISTE VIDE, ET RIEN D'AUTRE ──────────────────────────────
       //
-      // Premier essai : mettre l'explication dans un en-tête HTTP. Mauvaise
-      // idée — un en-tête personnalisé est INVISIBLE au JavaScript d'origine
-      // croisée tant qu'il n'est pas explicitement exposé, et cela dépend
-      // d'une configuration CORS qu'on peut oublier en changeant d'hébergeur.
+      // Deux mauvaises idées essayées avant celle-ci :
       //
-      // On reste donc sur un tableau, et on y glisse UN élément qui porte
-      // l'explication. L'application le reconnaît à son drapeau et l'affiche
-      // au lieu de le traiter comme une demande. Aucune configuration à
-      // maintenir, et la forme de la réponse ne change pas.
-      return res.json([{
-        acces_restreint: true,
-        manques: regleListe.manques,
-        message: regleListe.manques.join(' ')
-      }]);
+      // 1. Un objet { demandes: [], acces_restreint: true } — l'application
+      //    fait `data.length` puis `data.map` et serait restée sur son
+      //    squelette de chargement, sans erreur.
+      //
+      // 2. Un en-tête HTTP — invisible au JavaScript d'origine croisée sans
+      //    configuration CORS, donc silencieusement perdu le jour d'un
+      //    changement d'hébergeur.
+      //
+      // 3. Un élément porteur d'un drapeau glissé dans le tableau — et une
+      //    application pas encore mise à jour l'a affiché comme une DEMANDE
+      //    VIDE, avec un bouton « Proposer un prix » sur du néant. C'est
+      //    arrivé en production.
+      //
+      // La leçon : la réponse d'une route ne doit jamais dépendre de la
+      // version de l'application qui la lit. On renvoie donc une liste vide,
+      // point. L'application demande la cause à une route dédiée, quand elle
+      // en a besoin — et une application qui l'ignore affiche simplement son
+      // message générique, ce qui reste juste.
+      return res.json([]);
     }
 
     // Ne montrer que les demandes correspondant aux prestations que le pro a déclaré savoir faire
