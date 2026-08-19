@@ -2195,12 +2195,32 @@ const HEURES_AVANT_AVERTISSEMENT = 24;
 async function cloturerPrestationsOubliees() {
   try {
     const limite = new Date(Date.now() - HEURES_AVANT_CLOTURE_AUTO * 3600000).toISOString();
-    const { data: aClore } = await supabase.from('demandes')
-      .select('id, client_id, prestation, type_prestation, prestation_demarree_le')
+    // ═══════════════════════════════════════════════════════════════════
+    // LA COLONNE QUI N'EXISTE PAS
+    //
+    // Cette requête demandait « type_prestation ». La colonne n'existe pas :
+    // la table n'a que « prestation ». PostgREST renvoyait donc une erreur,
+    // le code ne lisait que `data` sans regarder `error`, et `aClore` valait
+    // null — traité comme « rien à faire ».
+    //
+    // La clôture n'a JAMAIS fonctionné, depuis le premier jour. Elle échouait
+    // en silence, à chaque appel, en annonçant zéro prestation à traiter.
+    //
+    // On lit désormais l'erreur, et on la fait remonter. Une requête qui
+    // échoue doit se voir : sinon on cherche pendant des jours pourquoi rien
+    // ne se passe.
+    // ═══════════════════════════════════════════════════════════════════
+    const { data: aClore, error: erreurLecture } = await supabase.from('demandes')
+      .select('id, client_id, prestation, prestation_demarree_le')
       .eq('statut', 'en_cours')
       .not('prestation_demarree_le', 'is', null)
       .lt('prestation_demarree_le', limite)
       .limit(100);
+
+    if (erreurLecture) {
+      console.error('Clôture automatique — lecture impossible :', erreurLecture.message);
+      throw new Error('lecture des prestations à clôturer : ' + erreurLecture.message);
+    }
     if (!aClore || !aClore.length) return 0;
 
     // ── UN LITIGE OUVERT SUSPEND LA CLÔTURE ─────────────────────────────
@@ -2279,7 +2299,7 @@ async function cloturerPrestationsOubliees() {
           sendEmail('prestation_validee_automatiquement', client.email, {
             compteId: client.id,
             prenom: client.prenom || '',
-            prestation: d.prestation || d.type_prestation || 'nettoyage'
+            prestation: d.prestation || 'nettoyage'
           }).catch(err => console.error('Email clôture auto:', err.message));
         }
         envoyerNotificationPush(d.client_id, {
@@ -2303,14 +2323,23 @@ async function avertirValidationProche() {
   try {
     const debut = new Date(Date.now() - HEURES_AVANT_CLOTURE_AUTO * 3600000).toISOString();
     const fin = new Date(Date.now() - HEURES_AVANT_AVERTISSEMENT * 3600000).toISOString();
-    const { data: aPrevenir } = await supabase.from('demandes')
-      .select('id, client_id, prestation, type_prestation')
+    // Même colonne inexistante que dans la clôture, et même conséquence :
+    // l'avertissement 24 h avant la validation automatique n'a jamais été
+    // envoyé. Les deux fonctions ont été écrites le même jour, avec la même
+    // erreur — et aucune ne lisait son `error`.
+    const { data: aPrevenir, error: erreurPrevenir } = await supabase.from('demandes')
+      .select('id, client_id, prestation')
       .eq('statut', 'en_cours')
       .not('prestation_demarree_le', 'is', null)
       .gte('prestation_demarree_le', debut)
       .lt('prestation_demarree_le', fin)
       .is('avertissement_validation_envoye', null)
       .limit(100);
+
+    if (erreurPrevenir) {
+      console.error('Avertissement validation — lecture impossible :', erreurPrevenir.message);
+      return;
+    }
     if (!aPrevenir || !aPrevenir.length) return;
 
     // Même règle pour l'avertissement : annoncer une validation automatique à
@@ -2403,7 +2432,7 @@ async function expirerDemandesEnRetard(demandes) {
           if (!client) continue;
           const donnees = {
             prenom: client.prenom || '',
-            prestation: d.prestation || d.type_prestation || 'nettoyage',
+            prestation: d.prestation || 'nettoyage',
             creneau: d.creneau || 'la date prévue',
             demandeId: d.id,
             avaitDevis: avecDevis.has(d.id)
