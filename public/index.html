@@ -7971,14 +7971,26 @@ async function loadProDemandes(silent){
     // dossier du prestataire est incomplet, ou il n'y a simplement aucune
     // demande dans sa zone.
     //
-    // Le même écran pour les deux laisse le prestataire attendre des demandes
-    // qui ne viendront jamais. Le serveur glisse donc un élément porteur d'un
-    // drapeau `acces_restreint` : on le retire de la liste et on garde son
-    // message.
+    // On ne le demande QUE si la liste est vide : inutile d'interroger le
+    // serveur quand des demandes s'affichent, et cela évite une requête
+    // supplémentaire à chaque sondage.
+    //
+    // Une route séparée, jamais un élément glissé dans la liste : la première
+    // version le faisait, et une application pas encore mise à jour l'a
+    // affiché comme une demande vide avec un bouton « Proposer un prix ».
     proAccesRestreint = null;
-    if (Array.isArray(data) && data.length === 1 && data[0] && data[0].acces_restreint) {
-      proAccesRestreint = data[0].message || 'Votre dossier est incomplet.';
-      data.length = 0;
+    if (Array.isArray(data) && data.length === 0) {
+      try {
+        const ra = await fetch(API + '/api/pro/acces', { headers: authHeaders() });
+        if (ra.ok) {
+          const acces = await safeJson(ra);
+          // Un serveur plus ancien ne connaît pas cette route : on reste alors
+          // sur le message générique, qui n'est jamais faux.
+          if (acces && acces.en_regle === false && acces.message) {
+            proAccesRestreint = acces.message;
+          }
+        }
+      } catch (e) { /* réseau : message générique, c'est sans conséquence */ }
     }
     document.getElementById('stat-demandes').textContent=data.length||0;
     // Le compte migre dans le bandeau, où il tient en une phrase plutôt qu'en
