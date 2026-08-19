@@ -6228,6 +6228,42 @@ process.on('uncaughtException', function(err) {
   setTimeout(function() { process.exit(1); }, 1000);
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SERVIR L'APPLICATION DEPUIS CE SERVEUR
+//
+// Jusqu'ici, index.html était hébergé sur Netlify pendant que l'API tournait
+// ici. Deux déploiements, donc deux occasions d'oublier — et le site public
+// est resté figé au 10 août pendant NEUF JOURS sans que personne le voie.
+//
+// Un seul déploiement met désormais tout à jour : le décalage devient
+// impossible.
+//
+// L'ORDRE COMPTE : ce bloc vient APRÈS toutes les routes d'API. Placé avant,
+// express.static aurait pu intercepter des chemins « /api/… » et rendre des
+// routes inaccessibles.
+const chemin = require('path');
+
+app.use(express.static(__dirname, {
+  setHeaders: (res, fichier) => {
+    // index.html porte le numéro de version, et sw.js pilote le cache : les
+    // laisser en cache quelques heures suffit à faire croire qu'un
+    // déploiement n'a pas pris. C'est exactement ce qui vient d'arriver.
+    if (fichier.endsWith('index.html') || fichier.endsWith('sw.js')) {
+      res.set('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }
+}));
+
+// Toute adresse inconnue rend l'application, qui gère ses propres ancres.
+// Les chemins d'API absents répondent en revanche 404 : sinon un appel mal
+// orthographié recevrait du HTML et échouerait de façon incompréhensible.
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/webhooks/')) {
+    return res.status(404).json({ error: 'Route inconnue.' });
+  }
+  res.sendFile(chemin.join(__dirname, 'index.html'));
+});
+
 const serveurHttp = app.listen(PORT, function() {
   console.log('✨ Gleam API démarrée sur le port ' + PORT);
   console.log('   Environnement : ' + (process.env.NODE_ENV || 'development'));
