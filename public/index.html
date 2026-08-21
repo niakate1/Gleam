@@ -10899,7 +10899,7 @@ async function confirmerRelanceRecurrente(demandeId){
 function ouvrirReprogrammer(demandeId){
   var today=localDateISO(new Date());
   var opts='';
-  for(var i=0;i<27;i++){var h=Math.floor(i/2)+7,m=i%2?'30':'00';opts+='<option>'+h+'h'+m+'</option>'}
+  opts = optionsHoraires();
   document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="calendar-clock" style="width:20px;height:20px;vertical-align:-4px"></i> Reprogrammer</div>'+
     '<div class="modal-sub">L\'autre partie devra confirmer ce nouveau créneau.</div>'+
     '<div class="field-group"><label>Nouvelle date et heure</label>'+
@@ -12107,9 +12107,52 @@ function choisirRecurrence(btn){
 // Le créneau souhaité ne suppose aucun compte : il est désormais demandé à tout
 // le monde, visiteur compris. Le mur d'inscription arrive donc plus tard dans le
 // parcours, et la personne a déjà répondu à davantage de questions quand il tombe.
+// ═══════════════════════════════════════════════════════════════════════════
+// LES CRÉNEAUX HORAIRES — VINGT-QUATRE HEURES SUR VINGT-QUATRE
+//
+// Ils s'arrêtaient à 20h00 et commençaient à 7h00. Or une partie du nettoyage
+// se fait justement hors des heures de bureau : les bureaux le soir, les
+// commerces avant l'ouverture, les véhicules de nuit pour les chauffeurs.
+//
+// Quarante-huit créneaux d'une demi-heure couvrent la journée entière.
+//
+// ILS SONT GROUPÉS PAR MOMENT. Une liste de quarante-huit lignes sans repère
+// se parcourt mal sur un téléphone : on cherche « soirée », pas « 21h30 ».
+//
+// UNE SEULE FONCTION, DEUX USAGES. La demande initiale et la reprogrammation
+// affichaient la même liste, écrite deux fois. Étendre l'une sans l'autre
+// aurait donné des horaires de nuit à la création, et pas au report.
+// ═══════════════════════════════════════════════════════════════════════════
+function optionsHoraires(heureChoisie) {
+  var MOMENTS = [
+    { nom: 'Nuit (début)', de: 0,  a: 5  },
+    { nom: 'Tôt le matin', de: 5,  a: 8  },
+    { nom: 'Matinée',      de: 8,  a: 12 },
+    { nom: 'Après-midi',   de: 12, a: 18 },
+    { nom: 'Soirée',       de: 18, a: 22 },
+    { nom: 'Nuit (fin)',   de: 22, a: 24 }
+  ];
+  // 9h00 par défaut : c'est le créneau le plus demandé, et ouvrir le menu sur
+  // « 0h00 » serait déroutant.
+  var defaut = heureChoisie || '9h00';
+  var opts = '';
+  MOMENTS.forEach(function (bloc) {
+    var lignes = '';
+    for (var heure = bloc.de; heure < bloc.a; heure++) {
+      for (var demi = 0; demi < 2; demi++) {
+        var libelle = heure + 'h' + (demi ? '30' : '00');
+        lignes += '<option' + (libelle === defaut ? ' selected' : '') + '>'
+                + libelle + '</option>';
+      }
+    }
+    opts += '<optgroup label="' + bloc.nom + '">' + lignes + '</optgroup>';
+  });
+  return opts;
+}
+
 function blocDateHeure(today){
   var opts='';
-  for(var i=0;i<27;i++){var h=Math.floor(i/2)+7,m=i%2?'30':'00';opts+='<option>'+h+'h'+m+'</option>'}
+  opts = optionsHoraires();
   var libelles=['Heure exacte','\u00b1 30 min','\u00b1 1 heure','Matin\u00e9e','Apr\u00e8s-midi','Toute la journ\u00e9e'];
   var flexBtns=libelles.map(function(l,i){return'<button class="flex-opt'+(i===0?' sel':'')+'" onclick="selFlex(this)">'+l+'</button>'}).join('');
   return '<div class="field-group"><label>\ud83d\udcc5 Date et heure souhait\u00e9es</label>'+
