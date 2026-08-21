@@ -5138,7 +5138,16 @@ textarea { min-height: 92px; padding-top: 13px; }
 <script src="https://js.stripe.com/v3/"></script>
 <script src="https://unpkg.com/lucide@1.28.0/dist/umd/lucide.js"></script>
 <script>
-const API='https://gleam-production-9b95.up.railway.app';
+// L'API est désormais servie par le MÊME serveur que cette page. On utilise
+// donc une adresse relative : la requête ne sort plus du domaine, il n'y a
+// plus de partage d'origine, et l'application fonctionne à l'identique sur
+// gleam-app.fr, sur l'adresse Railway, ou en local.
+//
+// Le repli sur l'adresse Railway couvre l'application mobile Capacitor, qui
+// s'exécute depuis un fichier local et n'a donc pas de serveur d'origine.
+const API = (location.protocol === 'file:' || location.hostname === 'localhost')
+  ? 'https://gleam-production-9b95.up.railway.app'
+  : '';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ÉCRAN DE DÉMARRAGE
@@ -5803,6 +5812,26 @@ const TAUX_COMMISSION = 0.15;
 // 25 voitures par semaine — une cinquantaine d'heures de travail — et le
 // résultat perdait toute crédibilité auprès de ceux qui connaissent le métier.
 // Durées portes ouvertes comprises : déplacement, installation, rangement.
+// Le nom de prestation stocké en base est une CLÉ sans accent : « canape »,
+// « terrasse ». Les cartes se contentaient de le capitaliser en CSS, ce qui
+// affichait « Canape » au lieu de « Canapé » — visible partout où une demande
+// est listée, et impossible à rattraper par la feuille de style.
+//
+// PANIERS_MOYENS porte déjà le nom lisible de chaque prestation. On s'en sert
+// plutôt que d'écrire une seconde table : deux listes des mêmes noms finissent
+// toujours par diverger.
+function libellePrestation(cle) {
+  var brut = String(cle || '').trim();
+  if (!brut) return '';
+  // Une demande peut porter plusieurs prestations, séparées par « + ».
+  return brut.split('+').map(function (part) {
+    var c = part.trim().toLowerCase();
+    var trouve = (typeof PANIERS_MOYENS !== 'undefined')
+      ? PANIERS_MOYENS.filter(function (p) { return p.cle === c; })[0] : null;
+    return trouve ? trouve.nom : (c.charAt(0).toUpperCase() + c.slice(1));
+  }).join(' + ');
+}
+
 const PANIERS_MOYENS = [
   { cle:'voiture',  nom:'Voiture',  icone:'car',        panier:125, heures:2.5 },
   { cle:'canape',   nom:'Canapé',   icone:'sofa',       panier:63,  heures:1.5 },
@@ -7254,7 +7283,7 @@ async function loadDemandes(silent){
       html+='<div class="demand-row fade-in-item" style="animation-delay:'+(i*0.04)+'s;'+urgentStyle+'" onclick="openDetail(\''+escAttr(d.id)+'\')">'+
         '<span class="demand-icon">'+icon+'</span>'+
         '<div class="demand-info">'+
-          '<div class="demand-type">'+escapeHtml(d.prestation)+urgentBadge+badgeRecurrence+'</div>'+
+          '<div class="demand-type">'+escapeHtml(libellePrestation(d.prestation))+urgentBadge+badgeRecurrence+'</div>'+
           '<div class="demand-addr">'+escapeHtml(d.adresse)+'</div>'+
           '<div class="demand-status '+st[1]+'">'+st[0]+'</div>'+
         '</div>'+
@@ -7308,7 +7337,7 @@ async function renderActiveRequestBanner(data){
     acceptee:{label:'Prestation à venir',color:'var(--p)',action:"openDetail('"+escAttr(meilleure.id)+"')"}
   }[meilleure.statut];
   var icon=ICONS_get((meilleure.prestation||'').split(' + ')[0]);
-  var sousTitre=escapeHtml(meilleure.prestation);
+  var sousTitre=escapeHtml(libellePrestation(meilleure.prestation));
   // Le créneau (date et heure) est l'information la plus utile à voir d'un coup d'œil, sans avoir
   // à ouvrir "Mes devis" pour la retrouver — surtout après une reprogrammation, où le client doit
   // pouvoir constater immédiatement le changement depuis l'accueil.
@@ -8110,7 +8139,7 @@ function renderProDemandesCards(){
       })();
     var urgence=libelleUrgence(d.creneau);
     html+='<div class="demande-card fade-in-item" id="carte-demande-'+safeId+'" style="animation-delay:'+(di*0.04)+'s">'+
-      '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(d.prestation)+'</div>'+
+      '<div class="dc-header"><div class="dc-type">'+ICONS_get(d.prestation)+' '+escapeHtml(libellePrestation(d.prestation))+'</div>'+
       '<span class="dc-num">'+escapeHtml(d.numero_anonyme||'#???')+'</span></div>'+
       // Le repère d'urgence rend visible le tri déjà appliqué : la liste est
       // ordonnée du créneau le plus proche au plus lointain.
@@ -9934,6 +9963,21 @@ async function saveTarifs(){
     const d=await safeJson(r);
     if(!r.ok){toast(messageErreur(r, d));return}
     toast('💾 Tarifs enregistrés !');
+
+    // ── LA MÉMOIRE DES TARIFS DOIT ÊTRE VIDÉE ────────────────────────────
+    // `chargerTarifsPro()` garde les tarifs dans `tarifsProEnCache` pour
+    // toute la session, et rien ne les rafraîchissait après un
+    // enregistrement.
+    //
+    // Conséquence : le prestataire modifiait ses prix, ouvrait un devis, et
+    // le rappel « Vos tarifs enregistrés » lui montrait les ANCIENS. Il
+    // chiffrait sur une base fausse, ou repartait vérifier sa grille — et
+    // perdait la demande de vue.
+    //
+    // Il fallait quitter l'application et la rouvrir pour voir ses vrais
+    // prix. Personne ne devine ça.
+    tarifsProEnCache = null;
+
     tarifsModifies=false;
     var etat=document.getElementById('etat-tarifs');
     if(etat){etat.textContent='Enregistré';etat.className='etat enregistre'}
