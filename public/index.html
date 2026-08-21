@@ -2546,6 +2546,55 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
    49. ACCUEIL VISITEUR — PARCOURS, AIGUILLAGE, ACTIONS
    ──────────────────────────────────────────────────────────────────────────── */
 
+/* ── LE BANDEAU DE FACTURATION ──────────────────────────────────────────────
+   Ambre plutôt que rouge : ce n'est pas une erreur, c'est une information
+   manquante. Le rouge dirait « quelque chose ne va pas » alors que tout va
+   bien — la commande est possible. */
+.bandeau-facturation {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-3);
+  margin: 0 0 var(--gap-4);
+  padding: var(--gap-3) var(--gap-4);
+  background: #FFF8E9;
+  border: 1px solid #F0DCA8;
+  border-radius: var(--radius-3);
+}
+.bandeau-facturation-texte { flex: 1; min-width: 0; }
+.bandeau-facturation-texte strong {
+  display: block;
+  font-size: 13.5px;
+  color: #7A5A12;
+  margin-bottom: 2px;
+}
+.bandeau-facturation-texte span {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+.bandeau-facturation-action {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-2);
+  background: #7A5A12;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bandeau-facturation-fermer {
+  flex: 0 0 auto;
+  width: 28px; height: 28px;
+  border: none;
+  background: transparent;
+  color: #9A7A32;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* Les trois étapes. Un <ol> et non des <div> : c'est une séquence, l'ordre
    porte du sens, et un lecteur d'écran doit l'annoncer comme telle. */
 .parcours-visiteur {
@@ -4572,6 +4621,23 @@ textarea { min-height: 92px; padding-top: 13px; }
     </div>
     <div class="entete-client-chiffres" id="client-chiffres-entete"></div>
   </div>
+
+  <!-- ── BANDEAU DE FACTURATION ────────────────────────────────────────────
+       Affiché UNIQUEMENT pour un compte entreprise dont les informations de
+       société manquent. Il ne bloque rien : le bouton conduit droit au
+       formulaire, la croix le referme.
+
+       Pourquoi ici et pas à la connexion : une entreprise vient commander,
+       pas remplir un formulaire administratif. Lui barrer la route avant
+       qu'elle ait vu vos prestations la ferait partir. -->
+  <div id="bandeau-facturation" class="bandeau-facturation" style="display:none">
+    <div class="bandeau-facturation-texte">
+      <strong>Vos factures ne seront pas à votre nom</strong>
+      <span>Raison sociale, SIRET et adresse — pour des factures déductibles.</span>
+    </div>
+    <button class="bandeau-facturation-action" onclick="ouvrirFacturation()">Compléter</button>
+    <button class="bandeau-facturation-fermer" onclick="fermerBandeauFacturation()" aria-label="Masquer">×</button>
+  </div>
   <div class="home-hero-card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
       <i data-lucide="shield-check" style="width:20px;height:20px;color:var(--mint);flex-shrink:0"></i>
@@ -6557,6 +6623,9 @@ async function doRegister(){
 }
 
 function enterApp(){
+  // Le bandeau se décide à l'entrée : c'est là qu'on connaît enfin le type de
+  // compte et l'état des informations de société.
+  setTimeout(majBandeauFacturation, 0);
   // Changement de compte : aucune réponse ne doit survivre d'un utilisateur
   // à l'autre.
   viderMemoireRequetes();
@@ -9220,6 +9289,9 @@ async function enregistrerFacturation(){
     currentUser.raison_sociale=corps.raison_sociale;
     currentUser.adresse_facturation=corps.adresse_facturation;
     currentUser.tva_intracom=corps.tva_intracom;
+      // Les champs viennent d'être renseignés : le bandeau doit disparaître
+      // immédiatement, sans attendre un rechargement.
+      majBandeauFacturation();
     document.getElementById('modal-overlay').classList.remove('open');
     if(d.facturation_manquante&&d.facturation_manquante.length){
       toast('Enregistré. Il manque encore : '+d.facturation_manquante.join(', ').replace(/_/g,' ')+'.');
@@ -9231,6 +9303,54 @@ async function enregistrerFacturation(){
 
 // Un paiement refusé faute d'informations de facturation ne doit pas se solder
 // par un message d'erreur : le gérant est à un SIRET près de pouvoir payer.
+// ═══════════════════════════════════════════════════════════════════════════
+// LE BANDEAU DE FACTURATION — ENTREPRISE UNIQUEMENT
+//
+// Il signale, il ne bloque pas. L'entreprise peut créer une demande, recevoir
+// des devis, discuter — tout, sauf payer sans avoir renseigné sa société.
+//
+// POURQUOI LE BLOCAGE AU PAIEMENT RESTE
+//
+// L'article L.441-9 du Code de commerce impose au VENDEUR de délivrer une
+// facture conforme — pas à l'acheteur de la réclamer. Une facture entre
+// professionnels sans raison sociale ni SIRET expose l'émetteur à une amende
+// pouvant atteindre 375 000 € pour une personne morale.
+//
+// Autrement dit : si l'entreprise ne renseigne rien et qu'on émet quand même
+// la facture, ce n'est pas elle qui est en tort. C'est Gleam.
+//
+// Le bandeau évite d'en arriver là ; le blocage au paiement garantit qu'on
+// n'y arrive jamais.
+// ═══════════════════════════════════════════════════════════════════════════
+var bandeauFacturationMasque = false;
+
+function fermerBandeauFacturation(){
+  // La croix masque le bandeau pour la SESSION EN COURS.
+  //
+  // À ne pas confondre avec le fait de renseigner ses informations : une fois
+  // la raison sociale, le SIRET et l'adresse enregistrés, le bandeau ne
+  // revient JAMAIS — ni à la demande suivante, ni à la reconnexion. Ces
+  // champs sont écrits en base sur le compte, une bonne fois pour toutes.
+  //
+  // La croix ne sert qu'à celui qui préfère remplir plus tard : le rappel
+  // reviendra au démarrage suivant tant que l'information manque réellement.
+  bandeauFacturationMasque = true;
+  var b = document.getElementById('bandeau-facturation');
+  if (b) b.style.display = 'none';
+}
+
+function majBandeauFacturation(){
+  var b = document.getElementById('bandeau-facturation');
+  if (!b) return;
+  var estEntreprise = currentUser && currentUser.type === 'entreprise';
+  var manque = estEntreprise && (
+    !String(currentUser.raison_sociale || '').trim() ||
+    !/^\d{14}$/.test(String(currentUser.siret || '').replace(/\s/g, '')) ||
+    !String(currentUser.adresse_facturation || '').trim()
+  );
+  b.style.display = (manque && !bandeauFacturationMasque) ? 'flex' : 'none';
+}
+
 function traiterPaiementRefuse(d){
   if(!d||!Array.isArray(d.facturation_manquante)||!d.facturation_manquante.length)return false;
   toast(d.error||'Informations de facturation requises.');
