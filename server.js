@@ -942,6 +942,41 @@ app.get('/health', (req, res) => {
 
 // ══════════════ AUTH ══════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CE QU'UN COMPTE NE DOIT JAMAIS RÉVÉLER
+//
+// `res.json({ ...data })` renvoyait TOUTES les colonnes de la table users.
+// Parmi elles :
+//
+//   reset_code           le code qui permet de changer un mot de passe
+//   email_verif_code     le code de vérification d'adresse
+//   siret_donnees        la réponse brute de l'annuaire des entreprises
+//
+// Le compte est bien celui de l'utilisateur — ce n'est donc pas une fuite
+// vers un tiers. Mais ces codes n'ont aucune raison de quitter le serveur :
+// ils transitent par le réseau, s'inscrivent dans les journaux du navigateur,
+// et restent en mémoire de l'application.
+//
+// Le risque grandit avec le temps : le jour où la table gagne une colonne
+// sensible — un jeton, une note interne, un indicateur d'administration —
+// elle partirait au client sans que personne s'en aperçoive.
+//
+// On liste donc ce qu'on RETIRE, jamais ce qu'on garde : une nouvelle colonne
+// anodine reste visible, une nouvelle colonne sensible s'ajoute ici.
+// ═══════════════════════════════════════════════════════════════════════════
+const CHAMPS_INTERNES = [
+  'reset_code', 'reset_code_expire',
+  'email_verif_code', 'email_verif_expire',
+  'siret_donnees'
+];
+
+function compteVisible(compte) {
+  if (!compte) return compte;
+  const propre = { ...compte };
+  for (const champ of CHAMPS_INTERNES) delete propre[champ];
+  return propre;
+}
+
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
     const email = req.body.email;
@@ -1104,7 +1139,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     if (!user) return res.status(500).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
 
     const token = jwt.sign({ id: user.id, email: user.email, type: user.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { ...user, firstName: user.prenom, lastName: user.nom } });
+    res.json({ token, user: { ...compteVisible(user),
+                              firstName: user.prenom, lastName: user.nom } });
   } catch (e) {
     console.error(e);
     erreurServeur(res, 'POST /api/auth/login', e);
@@ -1163,6 +1199,7 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
   }
 });
 
+
 app.get('/api/auth/me', auth, async (req, res) => {
   const { data } = await supabase.from('users').select('*').eq('id', req.user.id).single();
   if (!data) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
@@ -1170,7 +1207,8 @@ app.get('/api/auth/me', auth, async (req, res) => {
   // l'application puisse afficher l'image. Une ancienne valeur en base64 passe
   // telle quelle, sans conversion.
   const photoAffichable = data.photo ? await lienPhotoProfil(data.photo) : null;
-  res.json({ ...data, photo: photoAffichable, firstName: data.prenom, lastName: data.nom });
+  res.json({ ...compteVisible(data), photo: photoAffichable,
+             firstName: data.prenom, lastName: data.nom });
 });
 
 // Fournit la clé publique VAPID au frontend, nécessaire pour s'abonner aux notifications push —
@@ -6094,6 +6132,49 @@ app.patch('/api/admin/users/:id/disponibilite', adminAuth, async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SERVIR L'APPLICATION DEPUIS CE SERVEUR
+//
+// Jusqu'ici, index.html était hébergé sur Netlify pendant que l'API tournait
+// ici. Deux déploiements, donc deux occasions d'oublier — et le site public
+// est resté figé au 10 août pendant NEUF JOURS sans que personne le voie.
+//
+// Un seul déploiement met désormais tout à jour : le décalage devient
+// impossible.
+//
+// L'ORDRE COMPTE, DEUX FOIS.
+//
+// APRÈS les routes d'API : placé avant, express.static intercepterait des
+// chemins « /api/… » et rendrait ces routes inaccessibles.
+//
+// AVANT le 404 générique : Express traite les intergiciels dans l'ordre de
+// déclaration. Le « Route introuvable » posé plus bas répondait à la racine du
+// site avant que les fichiers n'aient une chance d'être servis — la page
+// d'accueil renvoyait donc une erreur JSON. C'est ce qui vient d'arriver.
+const chemin = require('path');
+
+app.use(express.static(__dirname, {
+  setHeaders: (res, fichier) => {
+    // index.html porte le numéro de version, et sw.js pilote le cache : les
+    // laisser en cache quelques heures suffit à faire croire qu'un
+    // déploiement n'a pas pris. C'est exactement ce qui vient d'arriver.
+    if (fichier.endsWith('index.html') || fichier.endsWith('sw.js')) {
+      res.set('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }
+}));
+
+// Toute adresse inconnue rend l'application, qui gère ses propres ancres.
+// Les chemins d'API absents répondent en revanche 404 : sinon un appel mal
+// orthographié recevrait du HTML et échouerait de façon incompréhensible.
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/webhooks/')) {
+    return res.status(404).json({ error: 'Route inconnue.' });
+  }
+  res.sendFile(chemin.join(__dirname, 'index.html'));
+});
+
+
 // Filet de sécurité : toute erreur non interceptée par un try/catch de route
 // renvoie une réponse JSON propre plutôt qu'une page d'erreur HTML illisible par le frontend.
 app.use((err, req, res, next) => {
@@ -6226,42 +6307,6 @@ process.on('uncaughtException', function(err) {
     try { Sentry.captureException(err); } catch (e) {}
   }
   setTimeout(function() { process.exit(1); }, 1000);
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SERVIR L'APPLICATION DEPUIS CE SERVEUR
-//
-// Jusqu'ici, index.html était hébergé sur Netlify pendant que l'API tournait
-// ici. Deux déploiements, donc deux occasions d'oublier — et le site public
-// est resté figé au 10 août pendant NEUF JOURS sans que personne le voie.
-//
-// Un seul déploiement met désormais tout à jour : le décalage devient
-// impossible.
-//
-// L'ORDRE COMPTE : ce bloc vient APRÈS toutes les routes d'API. Placé avant,
-// express.static aurait pu intercepter des chemins « /api/… » et rendre des
-// routes inaccessibles.
-const chemin = require('path');
-
-app.use(express.static(__dirname, {
-  setHeaders: (res, fichier) => {
-    // index.html porte le numéro de version, et sw.js pilote le cache : les
-    // laisser en cache quelques heures suffit à faire croire qu'un
-    // déploiement n'a pas pris. C'est exactement ce qui vient d'arriver.
-    if (fichier.endsWith('index.html') || fichier.endsWith('sw.js')) {
-      res.set('Cache-Control', 'no-cache, must-revalidate');
-    }
-  }
-}));
-
-// Toute adresse inconnue rend l'application, qui gère ses propres ancres.
-// Les chemins d'API absents répondent en revanche 404 : sinon un appel mal
-// orthographié recevrait du HTML et échouerait de façon incompréhensible.
-app.get('*', (req, res) => {
-  if (req.path.startsWith('/api/') || req.path.startsWith('/webhooks/')) {
-    return res.status(404).json({ error: 'Route inconnue.' });
-  }
-  res.sendFile(chemin.join(__dirname, 'index.html'));
 });
 
 const serveurHttp = app.listen(PORT, function() {
