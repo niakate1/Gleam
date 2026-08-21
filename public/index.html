@@ -5145,9 +5145,26 @@ textarea { min-height: 92px; padding-top: 13px; }
 //
 // Le repli sur l'adresse Railway couvre l'application mobile Capacitor, qui
 // s'exécute depuis un fichier local et n'a donc pas de serveur d'origine.
-const API = (location.protocol === 'file:' || location.hostname === 'localhost')
-  ? 'https://gleam-production-9b95.up.railway.app'
-  : '';
+// ── L'ADRESSE DE L'API ────────────────────────────────────────────────────
+//
+// J'avais rendu cette adresse RELATIVE en prévision de la bascule vers
+// Railway. Erreur : l'application est encore servie par Netlify, et
+// « /api/auth/login » visait donc Netlify — qui n'a pas cette route et
+// répondait 404. La connexion était impossible.
+//
+// La règle est maintenant sûre partout : on n'utilise l'adresse relative que
+// si la page est DÉJÀ servie par le serveur d'API. Partout ailleurs, on vise
+// Railway explicitement.
+//
+//   servie par Railway     relative — aucun partage d'origine
+//   servie par Netlify     Railway en absolu — CORS l'autorise déjà
+//   application mobile     Railway en absolu — pas de serveur d'origine
+//   développement local    Railway en absolu
+//
+// Le jour où gleam-app.fr pointera vers Railway, l'adresse redeviendra
+// relative d'elle-même, sans rien changer ici.
+const HOTE_API = 'https://gleam-production-9b95.up.railway.app';
+const API = (location.origin === HOTE_API) ? '' : HOTE_API;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ÉCRAN DE DÉMARRAGE
@@ -6377,7 +6394,21 @@ async function safeJson(r){
   catch(e){
     if(r.status===413)return{error:'Le fichier envoyé est trop volumineux. Réessayez avec moins de photos ou des photos plus légères.'};
     if(r.status===0)return{error:'Impossible de contacter le serveur. Vérifiez votre connexion internet.'};
-    return{error:'Erreur serveur (code '+r.status+'). Réessayez dans un instant.'};
+    // ── UN MESSAGE POUR UN HUMAIN, PAS UN CODE HTTP ────────────────────
+    // « Erreur serveur (code 404) » ne veut rien dire pour un client ni pour
+    // un artisan. Ce sont les deux seules personnes qui le lisent, et cela
+    // leur donne l'impression d'une application inachevée.
+    //
+    // Le code technique reste utile — mais dans la console, pour vous.
+    console.error('Réponse illisible du serveur — statut ' + r.status +
+                  ' sur ' + (r.url || 'adresse inconnue'));
+    if (r.status === 404) {
+      return { error: 'Ce service est momentanément indisponible. Réessayez dans quelques instants.' };
+    }
+    if (r.status >= 500) {
+      return { error: 'Une erreur est survenue de notre côté. Réessayez dans un instant — vos données sont intactes.' };
+    }
+    return { error: 'L\'action n\'a pas abouti. Réessayez dans un instant.' };
   }
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -12342,7 +12373,12 @@ async function updateEstimationMaintenant(){
     const r=await fetch(url,{headers:authHeaders(),signal:controleurEstimation.signal});
     const d=await safeJson(r);
     if(!r.ok){
-      box.innerHTML='<div style="font-size:12px;color:var(--red)">⚠️ Estimation indisponible ('+(d&&d.error?d.error:'code '+r.status)+')</div>';
+      // Le code HTTP n'apprend rien au visiteur, et il arrive AVANT même son
+      // inscription : c'est la première impression qu'il a de l'application.
+      console.error('Estimation indisponible — statut ' + r.status);
+      box.innerHTML='<div style="font-size:12px;color:var(--text-secondary)">'
+        + 'Estimation momentanément indisponible. Vous pouvez continuer :'
+        + ' vous recevrez des devis chiffrés par les professionnels.</div>';
       return;
     }
     if(d.prix_min===null||d.prix_min===undefined){
