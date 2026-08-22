@@ -3590,6 +3590,43 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   background: #FFF8E9; border-radius: var(--radius-2);
   color: #7A5A12; font-weight: 600;
 }
+/* ── LA PROPOSITION DE FAVORI ───────────────────────────────────────────────
+   Elle apparaît une fois, à la fin d'une prestation. Discrète : ce n'est pas
+   une action attendue, c'est une opportunité. Un encadré ambre appellerait
+   l'attention comme une alerte, alors qu'on peut très bien l'ignorer. */
+.proposition-favori {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--surface-2, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-2);
+}
+.proposition-favori-texte {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+.proposition-favori-actions { display: flex; gap: 8px; }
+.proposition-favori-actions button {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: var(--radius-2);
+  border: 1.5px solid var(--gold);
+  background: none;
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+/* « Non merci » ne doit pas peser autant que « Oui » : c'est un refus, pas
+   une action symétrique. */
+.proposition-favori-actions button.discret {
+  flex: 0 0 auto;
+  border-color: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 .rappel-tarifs .note.manquant button {
   border: none; background: none; padding: 0;
   color: #7A5A12; font-weight: 700; text-decoration: underline; cursor: pointer;
@@ -7529,6 +7566,9 @@ function setDevisClientFilter(f){
   renderDevisClientCards();
 }
 async function loadDevis(silent){
+  // Les favoris doivent être connus AVANT de composer les cartes : sans eux,
+  // `estFavori` répond faux et le bouton réapparaît à tort.
+  await chargerFavoris();
   var c0=document.getElementById('devis-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
@@ -7694,7 +7734,33 @@ function renderDevisClientCards(){
         }
         actions=photosHtml+'<button class="btn-accept" style="background:var(--p);width:100%;margin-top:10px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>'+
           '<button class="btn-accept" style="background:none;border:1.5px solid var(--p);color:var(--p);width:100%;margin-top:8px" onclick="ouvrirRelancerRecurrence(\''+safeDemandeId+'\',\''+safeProName+'\')">🔁 Refaire régulièrement</button>'+
-          '<button class="btn-accept" style="background:none;border:1.5px solid var(--gold);color:var(--amber);width:100%;margin-top:8px" onclick="ajouterFavori(\''+safeSocieteId+'\',\''+safeProName+'\',this)"><i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px"></i> Ajouter à mes favoris</button>';
+          // ── LE BOUTON DISPARAÎT S'IL EST DÉJÀ FAVORI ────────────────────
+          // Le proposer à quelqu'un qui l'a déjà ajouté — après cinq
+          // prestations — donne le sentiment que rien n'est enregistré. Le
+          // serveur répondait « Déjà dans vos favoris », mais il fallait
+          // cliquer pour l'apprendre.
+          //
+          // À la place : une confirmation discrète, sans bouton, puisqu'il
+          // n'y a plus rien à faire.
+          // ── TROIS ÉTATS, UN SEUL VISIBLE À LA FOIS ──────────────────────
+          //
+          // déjà favori     une confirmation, sans bouton
+          // déjà refusé     rien du tout — la question a été posée
+          // ni l'un ni      la proposition, une fois, au moment où la
+          // l'autre        prestation vient de se terminer
+          //
+          // On PROPOSE, on n'ajoute pas d'office : un favori qu'on n'a pas
+          // choisi n'en est pas un, et la liste deviendrait un historique.
+          (estFavori(safeSocieteId)
+            ? '<div style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;padding:9px;font-size:13px;font-weight:600;color:var(--amber)"><i data-lucide="star" style="width:14px;height:14px;fill:var(--gold);color:var(--gold)"></i> Dans vos favoris</div>'
+            : (favoriRefuse(safeSocieteId)
+              ? ''
+              : '<div class="proposition-favori">'
+                + '<div class="proposition-favori-texte">Reprendre <strong>'+escapeHtml(proNameRaw)+'</strong> la prochaine fois ?</div>'
+                + '<div class="proposition-favori-actions">'
+                + '<button onclick="ajouterFavori(\''+safeSocieteId+'\',\''+safeProName+'\',this)"><i data-lucide="star" style="width:13px;height:13px;vertical-align:-2px"></i> Oui, l\'ajouter</button>'
+                + '<button class="discret" onclick="refuserFavori(\''+safeSocieteId+'\',this)">Non merci</button>'
+                + '</div></div>'));
         if(notesDonnees.indexOf(v.demande_id)>=0){
           actions+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
         }else{
@@ -11169,6 +11235,68 @@ async function repondreCreneau(demandeId,accepter,btn){
     if(isPro())loadProDevis();else loadDevis();
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// QUI EST DÉJÀ DANS MES FAVORIS
+//
+// La carte de devis proposait « Ajouter aux favoris » SANS CONDITION — même
+// pour un prestataire ajouté depuis longtemps, après cinq prestations.
+//
+// Le serveur, lui, refusait poliment le doublon : « Déjà dans vos favoris ».
+// Le client cliquait donc, ne comprenait pas, et finissait par douter que
+// l'ajout ait jamais fonctionné.
+//
+// C'était un défaut d'affichage, pas de données. La liste est mise en mémoire
+// pour la session et rafraîchie à chaque ajout ou retrait — ce qui évite un
+// appel réseau par carte affichée.
+// ═══════════════════════════════════════════════════════════════════════════
+var favorisEnMemoire = null;
+// Les prestataires pour lesquels le client a déjà répondu « non merci ». Le
+// refus porte sur la PERSONNE, pas sur la prestation : refuser une fois vaut
+// pour toutes les suivantes.
+var refusEnMemoire = null;
+
+async function chargerFavoris(force){
+  if (favorisEnMemoire && !force) return favorisEnMemoire;
+  try{
+    const r = await fetchGroupe(API+'/api/favoris/etat', { headers: authHeaders() });
+    if(!r.ok) return favorisEnMemoire || [];
+    const etat = await safeJson(r);
+    favorisEnMemoire = Array.isArray(etat && etat.favoris) ? etat.favoris : [];
+    refusEnMemoire   = Array.isArray(etat && etat.refuses) ? etat.refuses : [];
+  }catch(e){
+    // Un échec réseau ne doit pas faire disparaître le bouton : mieux vaut le
+    // proposer à tort que priver quelqu'un de la possibilité d'ajouter.
+    favorisEnMemoire = favorisEnMemoire || [];
+    refusEnMemoire   = refusEnMemoire   || [];
+  }
+  return favorisEnMemoire;
+}
+
+function estFavori(proId){
+  if(!favorisEnMemoire || !proId) return false;
+  return favorisEnMemoire.some(function(id){ return String(id) === String(proId); });
+}
+
+function favoriRefuse(proId){
+  if(!refusEnMemoire || !proId) return false;
+  return refusEnMemoire.some(function(id){ return String(id) === String(proId); });
+}
+
+// « Non merci » : on retient, et on retire la proposition de l'écran.
+async function refuserFavori(proId, btn){
+  if(btn) btn.disabled = true;
+  try{
+    await fetch(API+'/api/favoris/refuser', {
+      method:'POST', headers:authHeaders(), body:JSON.stringify({ pro_id: proId })
+    });
+    if(!refusEnMemoire) refusEnMemoire = [];
+    refusEnMemoire.push(proId);
+    if (typeof renderDevisClientCards === 'function') renderDevisClientCards();
+  }catch(e){
+    if(btn) btn.disabled = false;
+  }
+}
+
 async function ajouterFavori(proId,proName,btn){
   if(btn)btn.disabled=true;
   try{
@@ -11178,6 +11306,10 @@ async function ajouterFavori(proId,proName,btn){
     toast('⭐ '+escapeHtml(proName)+' ajouté à vos favoris !');
     if(btn){btn.innerHTML='<i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
+  // La liste en mémoire doit suivre : sans cela, le bouton resterait affiché
+  // jusqu'au prochain chargement complet.
+  await chargerFavoris(true);
+  if (typeof renderDevisClientCards === 'function') renderDevisClientCards();
 }
 // Convertit la clé VAPID publique (base64url) au format attendu par l'API PushManager (un
 // tableau d'octets Uint8Array) — une conversion technique standard, la même chez tous les sites
@@ -11623,6 +11755,7 @@ async function retirerFavori(proId,btn){
     toast('Retiré de vos favoris.');
     showMesFavoris();
   }catch(e){toast(friendlyNetworkError(e))}
+  await chargerFavoris(true);
 }
 async function showFacture(demandeId){
   try{
@@ -11692,6 +11825,42 @@ function buildDevisHtml(v){
   // Le lieu d'exécution : attendu sur un devis de prestation à domicile, et
   // utile en cas de litige.
   var adressePresta = (v.demande && v.demande.adresse) ? v.demande.adresse : '';
+
+  // ── UNE LIGNE PAR PRESTATION ───────────────────────────────────────────
+  // Le devis annonçait « Prestation de nettoyage » sans dire laquelle. Sur
+  // une demande à trois prestations, le client ne pouvait pas vérifier que le
+  // prix couvrait bien l'ensemble — et le prestataire ne savait pas ce qu'il
+  // s'engageait à faire.
+  //
+  // Le montant reste sur la PREMIÈRE ligne : c'est un prix global, convenu
+  // pour l'ensemble. Le ventiler serait inventer une répartition que personne
+  // n'a décidée.
+  var detailsDevis=[];
+  try{
+    var notes=(v.demande&&v.demande.notes)?JSON.parse(v.demande.notes):null;
+    if(notes&&Array.isArray(notes.prestations)&&notes.prestations.length){
+      detailsDevis=notes.prestations.map(function(p){
+        return { type:p.type||'',
+                 details:(p.details&&Object.keys(p.details).length)
+                   ? Object.values(p.details).filter(Boolean).join(' · ') : '',
+                 note:p.description||'' };
+      });
+    }
+  }catch(e){ /* notes absentes ou non structurées */ }
+  if(!detailsDevis.length){
+    detailsDevis=[{ type:(v.demande&&v.demande.prestation)||'', details:'', note:v.description||'' }];
+  }
+
+  var prixDevis=parseFloat(v.prix_ttc);
+  var lignesDevis=detailsDevis.map(function(p,index){
+    var nom=(typeof libellePrestation==='function' && p.type)
+      ? libellePrestation(p.type) : (p.type||'Prestation de nettoyage');
+    var sous=[p.details, p.note].filter(Boolean).join(' — ');
+    return '<tr><td class="desc"><strong>'+escapeHtml(nom)+'</strong>'+
+      (sous?'<div class="sub-desc">'+escapeHtml(sous)+'</div>':'')+'</td>'+
+      '<td class="qte">1</td>'+
+      '<td class="montant">'+(index===0?prixDevis.toFixed(2)+' €':'')+'</td></tr>';
+  }).join('');
   var dateDoc=new Date(v.created_at||Date.now()).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   // Un devis reste valable un temps raisonnable, pas indéfiniment — pratique courante et attendue
   // de tout devis professionnel, la personne doit savoir jusqu'à quand ce prix est garanti.
@@ -11767,8 +11936,7 @@ function buildDevisHtml(v){
     '</div>'+
 
     '<table><thead><tr><td class="desc">Description</td><td class="qte">Qté</td><td class="montant">Montant</td></tr></thead>'+
-    '<tbody><tr><td class="desc"><strong>Prestation de nettoyage</strong>'+(v.description?'<div class="sub-desc">'+escapeHtml(v.description)+'</div>':'')+'</td>'+
-    '<td class="qte">1</td><td class="montant">'+parseFloat(v.prix_ttc).toFixed(2)+' €</td></tr>'+
+    '<tbody>'+lignesDevis+
     '<tr><td class="desc" style="color:#9CA3AF;font-size:12px">TVA (0%)</td><td class="qte"></td><td class="montant" style="color:#9CA3AF;font-size:12px">0,00 €</td></tr>'+
     '</tbody></table>'+
     '<div class="total-ligne"><span>Total TTC</span><span>'+parseFloat(v.prix_ttc).toFixed(2)+' €</span></div>'+
@@ -11898,9 +12066,33 @@ function buildFactureHtml(d,vuePro){
   // comptable, que ce soit pour le client ou pour un usage de déclaration côté pro.
   var ligneMontant=vuePro?d.montant_pro:d.montant_ttc;
   var ligneLabel=vuePro?'Rémunération nette pour cette prestation':'Prestation de nettoyage';
-  var lignesTableau=
-    '<tr><td class="desc"><strong>'+escapeHtml(ligneLabel)+'</strong><div class="sub-desc">'+escapeHtml(d.prestation||'')+'</div></td>'+
-    '<td class="qte">1</td><td class="montant">'+(vuePro?d.montant_pro:d.montant_ttc).toFixed(2)+' €</td></tr>';
+  // ── UNE LIGNE PAR PRESTATION ──────────────────────────────────────────
+  // Tout tenait sur une seule ligne, séparé par des points-virgules — six
+  // lignes de texte serré que personne ne lit. Ni le client, qui veut
+  // vérifier ce qu'il paie ; ni le prestataire, qui veut savoir ce qu'il doit
+  // faire ; ni un comptable, qui cherche le détail.
+  //
+  // Le montant reste sur la PREMIÈRE ligne seulement : c'est un prix global,
+  // convenu pour l'ensemble. Le répartir entre les prestations serait inventer
+  // une ventilation que personne n'a décidée.
+  var listePrestations=(d.prestations&&d.prestations.length)
+    ? d.prestations
+    : [{type:d.prestation||'', details:'', note:''}];
+  var montantLigne=(vuePro?d.montant_pro:d.montant_ttc);
+
+  var lignesTableau=listePrestations.map(function(p,index){
+    var nom=(typeof libellePrestation==='function' && p.type)
+      ? libellePrestation(p.type) : (p.type||'');
+    var sous=[p.details, p.note].filter(Boolean).join(' — ');
+    return '<tr>'+
+      '<td class="desc"><strong>'+escapeHtml(nom||ligneLabel)+'</strong>'+
+        (sous?'<div class="sub-desc">'+escapeHtml(sous)+'</div>':'')+'</td>'+
+      '<td class="qte">1</td>'+
+      // Une seule fois le montant, sur la première ligne : les suivantes
+      // laissent la colonne vide plutôt que d'afficher un prix inventé.
+      '<td class="montant">'+(index===0?montantLigne.toFixed(2)+' €':'')+'</td>'+
+      '</tr>';
+  }).join('');
 
   // ── LE RELEVÉ A ÉTÉ DÉPLACÉ ────────────────────────────────────────────
   // Sa répartition est désormais AU BAS DE LA FACTURE DE COMMISSION, qui est
