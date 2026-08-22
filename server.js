@@ -4559,6 +4559,18 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
     if (!numeroFacture && paiement) {
       numeroFacture = await attribuerNumeroFacture(paiement.id);
     }
+
+    // ── LA FACTURE DE COMMISSION ─────────────────────────────────────────
+    // Elle n'est attribuée que si le paiement est LIBÉRÉ : tant que l'argent
+    // est retenu, la prestation d'intermédiation n'est pas achevée, et une
+    // facture émise trop tôt devrait être annulée en cas de remboursement.
+    //
+    // Une facture annulée laisse une trace dans la suite — un avoir à émettre,
+    // une ligne à justifier. Autant ne l'émettre qu'une fois l'opération sûre.
+    let numeroCommission = paiement && paiement.numero_facture_commission;
+    if (!numeroCommission && paiement && paiement.statut === 'libere') {
+      numeroCommission = await attribuerNumeroCommission(paiement.id);
+    }
     if (!numeroFacture) {
       // Aucun paiement rattaché : il n'y a rien à facturer. Mieux vaut le dire
       // que d'émettre un document sans numéro valable.
@@ -4589,6 +4601,21 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
       pro: pro ? { nom_affiche: ((pro.prenom || '') + ' ' + (pro.nom || '')).trim(), siret: pro.siret } : null,
       montant_ttc: montantTtc,
       commission_gleam: commission,
+
+      // Tout ce qu'il faut pour composer la seconde facture, celle que Gleam
+      // adresse au prestataire. Elle n'existe qu'une fois le paiement libéré.
+      facture_commission: numeroCommission ? {
+        numero: numeroCommission,
+        date: paiement.libere_le || paiement.created_at,
+        montant: commission,
+        // Le prestataire est ici l'ACHETEUR, alors qu'il est le vendeur sur
+        // l'autre facture. C'est ce renversement qui interdit de fusionner
+        // les deux documents.
+        acheteur: pro ? {
+          nom_affiche: ((pro.prenom || '') + ' ' + (pro.nom || '')).trim(),
+          siret: pro.siret
+        } : null
+      } : null,
       montant_pro: montantPro
     });
   } catch (e) {
@@ -4922,6 +4949,39 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
 //
 // Ne lève jamais d'exception : un échec de numérotation ne doit pas empêcher un
 // encaissement. Le numéro sera attribué au prochain accès à la facture.
+// ═══════════════════════════════════════════════════════════════════════════
+// LE NUMÉRO DE LA FACTURE DE COMMISSION
+//
+// Gleam vend un service d'intermédiation au prestataire : c'est une vente
+// entre professionnels, et l'article L.441-9 impose une facture, sans seuil.
+//
+// Sa suite est SÉPARÉE de celle des prestations — série « COM- ». Les deux
+// factures n'ont pas le même émetteur : la prestation est vendue par le
+// prestataire, la commission par Gleam. Mêler les deux séries rendrait la
+// numérotation incompréhensible à un contrôle.
+// ═══════════════════════════════════════════════════════════════════════════
+async function attribuerNumeroCommission(paiementId) {
+  try {
+    const { data: existant } = await supabase.from('paiements')
+      .select('numero_facture_commission').eq('id', paiementId).single();
+    if (existant && existant.numero_facture_commission) {
+      return existant.numero_facture_commission;
+    }
+    const { data: numero, error } = await supabase
+      .rpc('attribuer_numero_commission', { p_annee: new Date().getFullYear() });
+    if (error || !numero) {
+      console.error('Numérotation de commission impossible :', error && error.message);
+      return null;
+    }
+    await supabase.from('paiements')
+      .update({ numero_facture_commission: numero }).eq('id', paiementId);
+    return numero;
+  } catch (e) {
+    console.error('Numérotation de commission :', e.message);
+    return null;
+  }
+}
+
 async function attribuerNumeroFacture(paiementId) {
   try {
     const { data: existant } = await supabase.from('paiements')
