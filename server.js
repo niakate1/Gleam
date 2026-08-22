@@ -3361,7 +3361,10 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
     const { data: demandes } = await supabase.from('demandes').// `adresse` est ajoutée pour le devis imprimable : un devis de prestation à
       // domicile doit porter le LIEU d'exécution — attendu par le client, et
       // décisif en cas de litige.
-      select('id, prestation, statut, photos_avant, photos_apres, prestation_demarree_le, creneau, creneau_propose, creneau_propose_par, adresse')
+      // `notes` porte le détail de chaque prestation. Sans elle, le devis
+      // imprimable affichait « Prestation de nettoyage » sans dire laquelle —
+      // ni ce qu'elle comprend.
+      select('id, prestation, statut, photos_avant, photos_apres, prestation_demarree_le, creneau, creneau_propose, creneau_propose_par, adresse, notes')
       .eq('client_id', req.user.id).in('statut', ['devis_recus', 'acceptee', 'en_cours', 'terminee']);
     if (!demandes || !demandes.length) return res.json([]);
 
@@ -4509,6 +4512,42 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
 // Construit une description complète de la prestation (matière, surface/quantité, état) à partir
 // des notes structurées de la demande — plutôt que d'afficher juste le nom brut de la catégorie
 // sur la facture, ce qui serait trop pauvre pour un usage comptable ou professionnel sérieux.
+// ═══════════════════════════════════════════════════════════════════════════
+// LES PRESTATIONS, UNE PAR LIGNE
+//
+// `construireDescriptionPrestation` fusionnait tout en une seule chaîne,
+// séparée par des points-virgules :
+//
+//   Nettoyage — voiture (Intérieur, Shampouinage…, Citadine, 2 places,
+//   Parking souterrain, Propre) ; Nettoyage — canape (Droit, Coussins…) ;
+//   Nettoyage — matelas (140x190 cm, Sommier…, 1)
+//
+// Sur une facture, cela donne un pavé de six lignes que personne ne lit. Ni
+// le client, qui veut vérifier ce qu'il paie ; ni le prestataire, qui veut
+// savoir ce qu'il doit faire ; ni un comptable, qui cherche le détail.
+//
+// On renvoie donc une LISTE STRUCTURÉE, et l'application en fait des lignes
+// de tableau. La chaîne reste disponible pour les courriels et les écrans qui
+// n'ont pas la place d'un tableau.
+// ═══════════════════════════════════════════════════════════════════════════
+function detaillerPrestations(notes, prestationFallback) {
+  try {
+    const n = JSON.parse(notes);
+    if (n.prestations && Array.isArray(n.prestations) && n.prestations.length) {
+      return n.prestations.map(p => ({
+        type: p.type || '',
+        // Les détails restent groupés : ce sont des caractéristiques d'une
+        // même prestation, pas des lignes distinctes.
+        details: (p.details && Object.keys(p.details).length)
+          ? Object.values(p.details).filter(Boolean).join(' · ')
+          : '',
+        note: p.description || ''
+      }));
+    }
+  } catch (e) { /* notes non structurées ou absentes */ }
+  return [{ type: prestationFallback || '', details: '', note: '' }];
+}
+
 function construireDescriptionPrestation(notes, prestationFallback) {
   try {
     const n = JSON.parse(notes);
@@ -4590,6 +4629,9 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
       numero: numeroFacture,
       date: demande.updated_at || demande.created_at,
       prestation: construireDescriptionPrestation(demande.notes, demande.prestation),
+      // La même chose, mais structurée : une entrée par prestation, pour que
+      // la facture puisse en faire des lignes de tableau distinctes.
+      prestations: detaillerPrestations(demande.notes, demande.prestation),
       adresse: demande.adresse,
       client: client ? {
         est_entreprise: client.type === 'entreprise',
@@ -4651,6 +4693,58 @@ app.delete('/api/favoris/:proId', auth, async (req, res) => {
     res.json({ message: 'Retiré de vos favoris.' });
   } catch (e) {
     erreurServeur(res, 'DELETE /api/favoris/:proId', e);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROPOSER UN FAVORI, UNE SEULE FOIS
+//
+// Quand une prestation se termine, on demande au client s'il veut retrouver ce
+// prestataire. S'il refuse, on ne redemande plus POUR LUI — le refus porte sur
+// la personne, pas sur la prestation.
+//
+// Pourquoi ne pas ajouter automatiquement : un favori qu'on n'a pas choisi
+// n'en est pas un. Au bout de dix prestations avec dix prestataires, la liste
+// deviendrait un historique — et on en a déjà un.
+//
+// Et le fait qu'un client ajoute un favori est un signal précieux : il dit
+// qui l'on veut revoir, bien plus sûrement qu'une note, parce que c'est un
+// geste et non une déclaration. L'automatiser effacerait ce signal.
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/favoris/refuser', auth, async (req, res) => {
+  try {
+    const proId = req.body && req.body.pro_id;
+    if (!proId) return res.status(400).json({ error: 'Prestataire requis.' });
+
+    // `upsert` plutôt qu'`insert` : refuser deux fois ne doit pas produire
+    // d'erreur — le client peut cliquer deux fois, ou revenir en arrière.
+    const { error } = await supabase.from('favoris_refuses')
+      .upsert({ client_id: req.user.id, pro_id: proId },
+              { onConflict: 'client_id,pro_id' });
+    if (error) return erreurServeur(res, 'POST /api/favoris/refuser', error);
+    res.json({ message: 'Nous ne vous le proposerons plus.' });
+  } catch (e) {
+    erreurServeur(res, 'POST /api/favoris/refuser', e);
+  }
+});
+
+// L'état complet, en un appel : qui est favori, et à qui on ne doit plus le
+// proposer. Deux requêtes séparées auraient fait deux allers-retours pour une
+// information qu'on lit toujours ensemble.
+app.get('/api/favoris/etat', auth, async (req, res) => {
+  try {
+    const [favoris, refuses] = await Promise.all([
+      supabase.from('favoris').select('pro_id').eq('client_id', req.user.id),
+      supabase.from('favoris_refuses').select('pro_id').eq('client_id', req.user.id)
+    ]);
+    res.json({
+      favoris: (favoris.data || []).map(f => f.pro_id),
+      refuses: (refuses.data || []).map(f => f.pro_id)
+    });
+  } catch (e) {
+    // En cas d'échec, on renvoie des listes vides : le bouton s'affichera à
+    // tort plutôt que de priver quelqu'un de la possibilité d'ajouter.
+    res.json({ favoris: [], refuses: [] });
   }
 });
 
