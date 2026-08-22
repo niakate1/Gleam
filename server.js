@@ -2550,6 +2550,40 @@ async function expirerDemandesEnRetard(demandes) {
 app.get('/api/demandes', auth, async (req, res) => {
   const { data } = await supabase.from('demandes').select('*').eq('client_id', req.user.id).order('created_at', { ascending: false });
   const dataAJour = await expirerDemandesEnRetard(data || []);
+
+  // ── QUI A RÉALISÉ LA PRESTATION ────────────────────────────────────────
+  // La liste ne portait aucune trace du prestataire retenu. Le bandeau
+  // « Votre avis compte » ne pouvait donc que renvoyer vers l'onglet Devis,
+  // à charge pour le client de retrouver la bonne prestation dans sa liste.
+  //
+  // On joint le devis accepté aux prestations terminées : c'est ce qui permet
+  // d'ouvrir la notation directement, sur la bonne personne.
+  const terminees = dataAJour.filter(d => d.statut === 'terminee').map(d => d.id);
+  if (terminees.length) {
+    const { data: devisAcceptes } = await supabase.from('devis')
+      .select('demande_id, societe_id')
+      .in('demande_id', terminees)
+      .eq('statut', 'accepte');
+
+    const parDemande = {};
+    (devisAcceptes || []).forEach(v => { parDemande[v.demande_id] = v.societe_id; });
+
+    const proIds = [...new Set(Object.values(parDemande))];
+    const { data: pros } = proIds.length
+      ? await supabase.from('users').select('id, prenom, nom').in('id', proIds)
+      : { data: [] };
+    const parPro = {};
+    (pros || []).forEach(p => { parPro[p.id] = p; });
+
+    dataAJour.forEach(d => {
+      const proId = parDemande[d.id];
+      if (!proId) return;
+      const p = parPro[proId];
+      d.societe_id = proId;
+      d.pro_nom = p ? ((p.prenom || '') + ' ' + (p.nom || '')).trim() : 'votre prestataire';
+    });
+  }
+
   res.json(await signerPhotosDesDemandes(dataAJour));
 });
 
