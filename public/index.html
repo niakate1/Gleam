@@ -3590,6 +3590,25 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   background: #FFF8E9; border-radius: var(--radius-2);
   color: #7A5A12; font-weight: 600;
 }
+/* ── OUVRIR À TOUS ─────────────────────────────────────────────────────────
+   Discret : c'est un recours, pas l'action attendue. Le client a choisi son
+   favori — lui mettre un bouton voyant sous les yeux reviendrait à lui
+   suggérer qu'il s'est trompé. */
+.ouvrir-a-tous {
+  display: block;
+  width: 100%;
+  margin: -4px 0 10px;
+  padding: 8px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ouvrir-a-tous:disabled { opacity: .5; cursor: default; text-decoration: none; }
+
 /* ── LA PROPOSITION DE FAVORI ───────────────────────────────────────────────
    Elle apparaît une fois, à la fin d'une prestation. Discrète : ce n'est pas
    une action attendue, c'est une opportunité. Un encadré ambre appellerait
@@ -7448,7 +7467,18 @@ async function loadDemandes(silent){
           '<div class="demand-status '+st[1]+'">'+st[0]+'</div>'+
         '</div>'+
         '<div class="demand-date">'+dateAffichee+'</div>'+
-      '</div>';
+      '</div>'+
+
+      // ── LE BOUTON QUE L'APPLICATION PROMETTAIT ──────────────────────
+      // Il n'apparaît que si la demande est encore en attente de devis ET
+      // réservée à un favori. Le montrer ailleurs n'aurait aucun sens : une
+      // demande déjà acceptée ne se rouvre pas.
+      //
+      // Le clic ne doit pas ouvrir le détail : d'où le stopPropagation.
+      ((d.pro_prefere_id && (d.statut==='en_attente'||d.statut==='devis_recus'))
+        ? '<button class="ouvrir-a-tous" onclick="event.stopPropagation();ouvrirDemandeATous(\''+escAttr(d.id)+'\',this)">'
+          + 'Ouvrir à tous les prestataires</button>'
+        : '');
     });
     c.innerHTML=html;
   }catch(e){console.error('loadDemandes',e)}
@@ -12660,9 +12690,34 @@ async function chargerFavoriCible(type){
         var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
         return '<button class="opt-btn" data-group="favori-cible" onclick="choisirProPrefere(\''+escAttr(p.id)+'\',this)">'+escapeHtml(nom)+(p.disponible===false?' (indisponible)':'')+'</button>';
       }).join('')+
-      '</div><div style="font-size:11px;color:var(--gray);margin-top:6px">Si non disponible, vous pourrez toujours rouvrir la demande à tous les prestataires.</div></div>';
+      // La promesse était vraie sur le fond, mais rien ne la tenait : aucune
+      // route ne permettait de rouvrir. Elle dit maintenant ce qui se passe
+      // vraiment, y compris sans action du client.
+      '</div><div style="font-size:11px;color:var(--gray);margin-top:6px">Il la reçoit en priorité. S\'il ne répond pas, elle s\'ouvrira d\'elle-même aux autres prestataires de votre zone — et vous pouvez l\'ouvrir avant, à tout moment.</div></div>';
   }catch(e){}
 }
+// ── ROUVRIR UNE DEMANDE À TOUS ───────────────────────────────────────────
+// Le bouton que l'application promettait sans l'avoir. Il n'apparaît que sur
+// une demande encore en attente, adressée à un favori.
+async function ouvrirDemandeATous(demandeId, btn){
+  if(btn){ btn.disabled = true; btn.textContent = 'Ouverture…'; }
+  try{
+    const r = await fetch(API+'/api/demandes/'+demandeId+'/ouvrir-a-tous',
+      { method:'PATCH', headers:authHeaders() });
+    const d = await safeJson(r);
+    if(!r.ok){
+      toast(messageErreur(r, d));
+      if(btn){ btn.disabled = false; btn.textContent = 'Ouvrir à tous les prestataires'; }
+      return;
+    }
+    toast('🔓 '+(d.message||'Demande ouverte à tous.'), 4000);
+    if(typeof loadDemandes === 'function') loadDemandes();
+  }catch(e){
+    toast(friendlyNetworkError(e));
+    if(btn){ btn.disabled = false; btn.textContent = 'Ouvrir à tous les prestataires'; }
+  }
+}
+
 function choisirProPrefere(proId,btn){
   var deja=btn.classList.contains('sel');
   document.querySelectorAll('[data-group="favori-cible"]').forEach(function(b){b.classList.remove('sel')});
