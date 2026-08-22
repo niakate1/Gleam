@@ -11529,6 +11529,26 @@ function showDevisDocument(devisId){
 }
 function buildDevisHtml(v){
   var proNom=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
+
+  // ── L'IDENTITÉ DU DESTINATAIRE ─────────────────────────────────────────
+  // Elle vient du compte connecté : c'est lui qui a demandé le devis. Pour une
+  // entreprise, la raison sociale prime sur le nom de la personne — c'est la
+  // société qui contracte, pas son gérant.
+  var clientNom = 'Client Gleam';
+  var clientSiret = '';
+  if (typeof currentUser !== 'undefined' && currentUser) {
+    if (currentUser.type === 'entreprise' && String(currentUser.raison_sociale||'').trim()) {
+      clientNom = currentUser.raison_sociale;
+      clientSiret = currentUser.siret || '';
+    } else {
+      var nomComplet = ((currentUser.prenom||'') + ' ' + (currentUser.nom||'')).trim();
+      if (nomComplet) clientNom = nomComplet;
+    }
+  }
+
+  // Le lieu d'exécution : attendu sur un devis de prestation à domicile, et
+  // utile en cas de litige.
+  var adressePresta = (v.demande && v.demande.adresse) ? v.demande.adresse : '';
   var dateDoc=new Date(v.created_at||Date.now()).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
   // Un devis reste valable un temps raisonnable, pas indéfiniment — pratique courante et attendue
   // de tout devis professionnel, la personne doit savoir jusqu'à quand ce prix est garanti.
@@ -11577,11 +11597,24 @@ function buildDevisHtml(v){
     '</div>'+
 
     '<div class="parties">'+
+      // ── LES DEUX PARTIES, IDENTIFIÉES ────────────────────────────────
+      // Un devis est une OFFRE DE CONTRAT : signé, il engage les deux parties
+      // au sens de l'article 1113 du Code civil. Sans identité du destinataire,
+      // il est contestable.
+      //
+      // Et les articles R.123-237 et R.123-238 du Code de commerce imposent
+      // que tout document émis par une entreprise porte son SIRET. « Prestataire
+      // indépendant Gleam » ne dit pas QUI exécute.
       '<div class="partie-box"><div class="partie-label">Prestataire</div><div class="partie-nom">'+escapeHtml(proNom)+'</div>'+
-        (v.pro&&v.pro.note_moyenne?'<div class="partie-detail">Note moyenne : '+escapeHtml(v.pro.note_moyenne)+' / 5</div>':'<div class="partie-detail">Prestataire indépendant Gleam</div>')+
+        (v.pro&&v.pro.siret?'<div class="partie-detail">SIRET '+escapeHtml(v.pro.siret)+'</div>':'')+
+        '<div class="partie-detail">Prestataire indépendant — TVA non applicable, art. 293 B du CGI</div>'+
+        (v.pro&&v.pro.note_moyenne?'<div class="partie-detail">Note moyenne : '+escapeHtml(v.pro.note_moyenne)+' / 5</div>':'')+
       '</div>'+
-      '<div class="partie-box"><div class="partie-label">Devis adressé à</div><div class="partie-nom">Vous</div>'+
-        '<div class="partie-detail">Via votre compte Gleam</div></div>'+
+      '<div class="partie-box"><div class="partie-label">Devis adressé à</div>'+
+        '<div class="partie-nom">'+escapeHtml(clientNom)+'</div>'+
+        (clientSiret?'<div class="partie-detail">SIRET '+escapeHtml(clientSiret)+'</div>':'')+
+        (adressePresta?'<div class="partie-detail">Lieu : '+escapeHtml(adressePresta)+'</div>':'')+
+      '</div>'+
     '</div>'+
 
     '<table><thead><tr><td class="desc">Description</td><td class="qte">Qté</td><td class="montant">Montant</td></tr></thead>'+
@@ -11592,6 +11625,19 @@ function buildDevisHtml(v){
     '<div class="total-ligne"><span>Total TTC</span><span>'+parseFloat(v.prix_ttc).toFixed(2)+' €</span></div>'+
 
     '<div class="validite"><span class="validite-marque">Validité</span><span><strong>Ce devis est valable jusqu\'au '+dateValiditeStr+'.</strong> Passé ce délai, le prestataire pourra être amené à réviser son prix. Ce document ne constitue pas une facture — le règlement n\'intervient qu\'après acceptation et réalisation de la prestation, directement depuis votre espace Gleam.</span></div>'+
+
+    // ── LA GRATUITÉ DU DEVIS ────────────────────────────────────────────
+    // L'article L.111-1 du Code de la consommation impose d'informer le
+    // consommateur du prix AVANT l'engagement — y compris du prix de
+    // l'établissement du devis lui-même. Beaucoup d'artisans facturent le
+    // déplacement ; le dire évite une contestation.
+    //
+    // Et l'arrêté du 17 mars 2015 rend le devis OBLIGATOIRE pour les services
+    // à la personne dès 100 € TTC. Vos prestations dépassent presque toutes
+    // ce seuil : ce document n'est pas une commodité, il est exigé.
+    '<div class="validite"><span class="validite-marque">Gratuité</span>'+
+      '<span>L\'établissement de ce devis est gratuit et sans engagement. '+
+      'Aucun frais de déplacement ni d\'étude n\'est facturé.</span></div>'+
 
     // Sans ce bouton, une application installée sur l'écran d'accueil piège
     // l'utilisateur : la fenêtre s'ouvre en plein écran, sans onglet ni barre
