@@ -7367,11 +7367,20 @@ async function loadDemandes(silent){
     data.sort(function(a,b){
       var diff=(order[a.statut]??9)-(order[b.statut]??9);
       if(diff!==0)return diff;
-      // À statut égal, le rendez-vous le plus proche d'abord. Sans ce
-      // départage, l'ordre dépendait de ce que renvoyait la base et pouvait
-      // changer d'un rafraîchissement à l'autre.
+      // ── LE SENS DU TRI DÉPEND DE CE QU'ON REGARDE ─────────────────────
+      // Pour une demande À VENIR, le rendez-vous le plus proche d'abord :
+      // c'est celui qui approche, donc celui qui compte.
+      //
+      // Pour une prestation TERMINÉE ou EXPIRÉE, c'est l'inverse. La plus
+      // récente est celle qu'on cherche — pour retrouver sa facture, laisser
+      // un avis, ou reprendre le même prestataire. Avec l'ancien tri, elle se
+      // retrouvait tout en bas, derrière tout l'historique.
+      //
+      // Plus le client utilise Gleam, plus le défaut s'aggravait.
+      var closes=(a.statut==='terminee'||a.statut==='expiree');
       var ta=instantCreneau(a.creneau), tb=instantCreneau(b.creneau);
-      if(ta!==tb)return ta-tb;
+      if(ta!==tb)return closes ? tb-ta : ta-tb;
+      // Départage final : la plus récemment créée d'abord, dans les deux cas.
       return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
 
@@ -7545,9 +7554,16 @@ async function loadDevis(silent){
       var diff=clientDevisScore(a)-clientDevisScore(b);
       if(diff!==0)return diff;
       // À rang égal, la prestation la plus imminente d'abord : c'est elle qui
-      // demande une décision. La date d'envoi ne sert que de dernier recours.
+      // demande une décision.
+      //
+      // SAUF pour l'historique. Une prestation terminée ne demande plus rien —
+      // on y revient pour la facture, l'avis, ou reprendre le même
+      // prestataire. C'est donc la plus RÉCENTE qu'on cherche, et l'ordre
+      // s'inverse. Sinon elle finit en bas de liste, derrière tout
+      // l'historique — et plus le client utilise Gleam, plus elle s'enfonce.
+      var closesC=(a.statut==='accepte'&&a.demande_statut==='terminee');
       var ta=instantCreneau(a.creneau), tb=instantCreneau(b.creneau);
-      if(ta!==tb)return ta-tb;
+      if(ta!==tb)return closesC ? tb-ta : ta-tb;
       return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
     var changed1=hasDataChanged('devis',all);
@@ -7621,7 +7637,14 @@ function renderDevisClientCards(){
   filtered.forEach(function(v,vi){
       var proNameRaw=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
       var proName=escapeHtml(proNameRaw);
-      var proNote=v.pro&&v.pro.note_moyenne?'<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold);vertical-align:-2px"></i> '+escapeHtml(v.pro.note_moyenne):'';
+      // ── L'ÉCHELLE DOIT ÊTRE DITE ──────────────────────────────────────────
+  // « 4,9 » seul ne veut rien dire : sur 5, sur 10, sur 20 ? L'étoile suggère
+  // une échelle sur 5, mais suggérer n'est pas dire — et un client qui hésite
+  // entre deux devis compare des chiffres, pas des icônes.
+  //
+  // La base garantit l'échelle : CHECK (note >= 1 AND note <= 5).
+  var noteDevis=noteAffichable(v.pro&&v.pro.note_moyenne);
+  var proNote=noteDevis?'<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold);vertical-align:-2px"></i> '+escapeHtml(noteDevis)+' / 5':'';
       var badge,actions='';
       var cardStyle='';
       var safeDemandeId=escAttr(v.demande_id),safeVId=escAttr(v.id),safeSocieteId=escAttr(v.societe_id),safeProName=escAttr(proNameRaw);
@@ -8962,8 +8985,11 @@ async function loadProDevis(silent){
     data.sort(function(a,b){
       var diff=proDevisScore(a)-proDevisScore(b);
       if(diff!==0)return diff;
+      // Même règle côté prestataire : ses prestations terminées servent à
+      // retrouver un relevé ou un client, pas à préparer une intervention.
+      var closesP=(a.statut==='accepte'&&a.demande&&a.demande.statut==='terminee');
       var ta=instantCreneau(a.demande&&a.demande.creneau), tb=instantCreneau(b.demande&&b.demande.creneau);
-      if(ta!==tb)return ta-tb;
+      if(ta!==tb)return closesP ? tb-ta : ta-tb;
       return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
     var changed3=hasDataChanged('proDevis',data);
@@ -11578,7 +11604,8 @@ async function showMesFavoris(){
     if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>⭐</span><p>Aucun favori pour l\u2019instant.<br>Ajoutez un prestataire depuis une prestation terminée !</p></div>';return}
     c.innerHTML=d.map(function(p,i){
       var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
-      var note=p.note_moyenne?'<i data-lucide="star" style="width:12px;height:12px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(p.note_moyenne)+' / 5':'';
+      var noteP=noteAffichable(p.note_moyenne);
+  var note=noteP?'<i data-lucide="star" style="width:12px;height:12px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(noteP)+' / 5':'';
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s;display:flex;align-items:center;gap:12px">'+
         miniAvatarHtml(p.photo,nom)+
         '<div style="flex:1;min-width:0"><div style="font-weight:700">'+escapeHtml(nom)+'</div>'+
@@ -11620,6 +11647,29 @@ function showDevisDocument(devisId){
   w.document.write(buildDevisHtml(v));
   w.document.close();
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// L'AFFICHAGE D'UNE NOTE
+//
+// Deux pièges, tous deux constatés.
+//
+// 1. L'ÉCHELLE. « 4,9 » seul ne veut rien dire : sur 5, sur 10, sur 20 ?
+//    L'étoile suggère une échelle sur 5, mais suggérer n'est pas dire — et un
+//    client qui hésite entre deux devis compare des chiffres, pas des icônes.
+//
+// 2. LA NOTE À ZÉRO. Un prestataire sans avis a `note_moyenne` à 0.0, et
+//    Supabase le renvoie en CHAÎNE : '0.0' est une valeur vraie en
+//    JavaScript. Le client lisait donc « ★ 0.0 / 5 » — ce qui suggère un
+//    prestataire catastrophique, alors que personne ne l'a jamais évalué.
+//
+//    Sur vos quatre prestataires, trois sont dans ce cas.
+//
+// Sans avis, on n'affiche rien. Une absence se comprend ; un zéro ment.
+// ═══════════════════════════════════════════════════════════════════════════
+function noteAffichable(valeur) {
+  var n = parseFloat(valeur);
+  return (isFinite(n) && n > 0) ? n.toFixed(1).replace('.', ',') : null;
+}
+
 function buildDevisHtml(v){
   var proNom=v.pro?((v.pro.prenom||'')+' '+(v.pro.nom||'')).trim():'Prestataire Gleam';
 
@@ -11707,7 +11757,7 @@ function buildDevisHtml(v){
       '<div class="partie-box"><div class="partie-label">Prestataire</div><div class="partie-nom">'+escapeHtml(proNom)+'</div>'+
         (v.pro&&v.pro.siret?'<div class="partie-detail">SIRET '+escapeHtml(v.pro.siret)+'</div>':'')+
         '<div class="partie-detail">Prestataire indépendant — TVA non applicable, art. 293 B du CGI</div>'+
-        (v.pro&&v.pro.note_moyenne?'<div class="partie-detail">Note moyenne : '+escapeHtml(v.pro.note_moyenne)+' / 5</div>':'')+
+        (noteAffichable(v.pro&&v.pro.note_moyenne)?'<div class="partie-detail">Note moyenne : '+escapeHtml(noteAffichable(v.pro.note_moyenne))+' / 5</div>':'')+
       '</div>'+
       '<div class="partie-box"><div class="partie-label">Devis adressé à</div>'+
         '<div class="partie-nom">'+escapeHtml(clientNom)+'</div>'+
