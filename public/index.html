@@ -7506,11 +7506,21 @@ async function renderActiveRequestBanner(data){
         const notesDonnees=rNotes.ok?await safeJson(rNotes):[];
         var aNoter=terminees.find(function(d){return notesDonnees.indexOf(d.id)<0});
         if(aNoter){
-          banner.innerHTML='<div class="fade-in-item" style="background:var(--surface);border:1.5px solid var(--gold);border-radius:14px;padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="goTab(\'devis\')">'+
+          // ── LE CLIC OUVRE LA NOTATION, PAS L'ONGLET ────────────────────
+          // Il faisait goTab('devis') : le client arrivait sur sa liste et
+          // devait retrouver lui-même la prestation à noter. Sur cinq
+          // prestations terminées, il cherchait.
+          //
+          // L'action est calculée AVANT plutôt qu'imbriquée dans l'attribut :
+          // trois niveaux de guillemets finissent toujours par casser.
+          var actionNote = aNoter.societe_id
+            ? "ouvrirNote('"+escAttr(aNoter.id)+"','"+escAttr(aNoter.societe_id)+"','"+escAttr(aNoter.pro_nom||'votre prestataire')+"')"
+            : "goTab('devis')";   // repli : mieux vaut une liste qu'un clic mort
+          banner.innerHTML='<div class="fade-in-item" style="background:var(--surface);border:1.5px solid var(--gold);border-radius:14px;padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="'+actionNote+'">'+
             '<span style="font-size:26px;flex-shrink:0">⭐</span>'+
             '<div style="flex:1;min-width:0">'+
               '<div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.03em">Votre avis compte</div>'+
-              '<div style="font-weight:700;font-size:14px">Notez votre prestataire pour '+escapeHtml(aNoter.prestation)+'</div>'+
+              '<div style="font-weight:700;font-size:14px">Notez '+escapeHtml(aNoter.pro_nom||'votre prestataire')+' pour '+escapeHtml(libellePrestation(aNoter.prestation))+'</div>'+
             '</div>'+
             '<i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--gray);flex-shrink:0"></i>'+
           '</div>';
