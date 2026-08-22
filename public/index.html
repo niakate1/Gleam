@@ -11560,6 +11560,12 @@ function buildDevisHtml(v){
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Devis '+numero+'</title>'+
     '<style>'+
     '@page{size:A4;margin:18mm 16mm}'+
+    // Les deux factures partagent un fichier, pas une page : chacune doit
+    // s'imprimer sur sa propre feuille, sinon elles se lisent comme un seul
+    // document et perdent leur valeur de pièce distincte.
+    '.saut-page{page-break-before:always;break-before:page;margin-top:40px;'+
+      'padding-top:40px;border-top:2px dashed #E5E7EB}'+
+    '@media print{.saut-page{border-top:none;margin-top:0;padding-top:0}}'+
     '*{box-sizing:border-box}'+
     'body{font-family:\'Segoe UI\',Helvetica,Arial,sans-serif;max-width:760px;margin:0 auto;padding:30px 24px;color:#1F2937;font-size:14px;line-height:1.5}'+
     '.entete{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;margin-bottom:26px;border-bottom:3px solid #0E5A63}'+
@@ -11654,6 +11660,91 @@ function buildDevisHtml(v){
 
     '</body></html>';
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// LA FACTURE DE COMMISSION — GLEAM VERS LE PRESTATAIRE
+//
+// Elle reprend la mise en page de la facture principale, sur une nouvelle
+// page à l'impression. Le prestataire obtient donc DEUX pièces comptables
+// dans un seul document :
+//
+//   page 1   sa facture au client        ce qu'il a vendu
+//   page 2   la facture Gleam            ce qu'il a acheté
+//
+// LE RELEVÉ A DISPARU. Sa répartition — payé, commission, net — est reprise
+// ici, au bas de la facture de commission. C'est le bon endroit : c'est
+// précisément le document qui explique le prélèvement.
+//
+// Trois documents, c'était deux de trop.
+// ═══════════════════════════════════════════════════════════════════════════
+function blocCommission(d) {
+  var f = d.facture_commission;
+  var dateCom = new Date(f.date || Date.now()).toLocaleDateString('fr-FR',
+    { day: '2-digit', month: 'long', year: 'numeric' });
+
+  return '<div class="saut-page"></div>' +
+    '<div class="doc-entete">' +
+      '<div class="doc-marque"><div class="doc-logo">Gleam</div>' +
+      '<div class="doc-baseline">Services de nettoyage à domicile</div></div>' +
+      '<div class="doc-info"><div class="doc-titre">Facture</div>' +
+      '<div class="doc-numero">N° ' + escapeHtml(f.numero) + '</div>' +
+      '<div class="doc-date">' + dateCom + '</div></div>' +
+    '</div>' +
+
+    // Le prestataire est ici l'ACHETEUR, alors qu'il est vendeur page 1.
+    // C'est ce renversement qui interdit de fusionner les deux factures.
+    '<div class="parties">' +
+      '<div class="partie-box"><div class="partie-label">Émetteur</div>' +
+        '<div class="partie-nom">Gleam</div>' +
+        '<div class="partie-detail">Service de mise en relation</div>' +
+        '<div class="partie-detail">gleam-app.fr</div>' +
+      '</div>' +
+      '<div class="partie-box"><div class="partie-label">Facturé à</div>' +
+        '<div class="partie-nom">' + escapeHtml(f.acheteur ? f.acheteur.nom_affiche : '') + '</div>' +
+        (f.acheteur && f.acheteur.siret
+          ? '<div class="partie-detail">SIRET ' + escapeHtml(f.acheteur.siret) + '</div>' : '') +
+        '<div class="partie-detail">Prestataire indépendant</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<table><thead><tr><td class="desc">Description</td><td class="qte">Qté</td>' +
+    '<td class="montant">Montant</td></tr></thead><tbody>' +
+      '<tr><td class="desc"><strong>Commission d\'intermédiation</strong>' +
+        '<div style="font-size:12px;color:#6B7280;margin-top:3px">' +
+        'Mise en relation, encaissement sécurisé et garantie de paiement — ' +
+        'facture n° ' + escapeHtml(d.numero) + '</div></td>' +
+      '<td class="qte">1</td><td class="montant">' + f.montant.toFixed(2) + ' €</td></tr>' +
+    '</tbody></table>' +
+
+    '<div class="total-ligne"><span>Total</span><span>' + f.montant.toFixed(2) + ' €</span></div>' +
+
+    // ── LA RÉPARTITION, REPRISE DU RELEVÉ ────────────────────────────────
+    // Elle appartient à ce document : c'est lui qui facture le prélèvement,
+    // c'est donc lui qui doit l'expliquer.
+    '<div class="repartition">' +
+      '<div class="repartition-titre">Détail du versement</div>' +
+      '<div class="repartition-ligne"><span>Montant payé par le client (TTC)</span>' +
+        '<span>' + d.montant_ttc.toFixed(2) + ' €</span></div>' +
+      '<div class="repartition-ligne"><span>Commission Gleam (cette facture)</span>' +
+        '<span>− ' + f.montant.toFixed(2) + ' €</span></div>' +
+      '<div class="repartition-ligne repartition-net"><span>Versé sur votre compte</span>' +
+        '<span>' + d.montant_pro.toFixed(2) + ' €</span></div>' +
+    '</div>' +
+
+    // Sans cette mention, la facture paraîtrait impayée : Gleam ne réclame
+    // rien, la commission a déjà été retenue sur le versement.
+    '<div class="paiement-info"><span class="paiement-marque">Règlement</span>' +
+      '<span>Réglée par compensation : cette commission a été retenue sur le ' +
+      'versement de la prestation. Aucun paiement de votre part n\'est attendu.</span></div>' +
+
+    '<div class="doc-pied">' +
+      '<p>TVA non applicable, article 293 B du Code général des impôts.</p>' +
+      '<p style="margin-top:8px">En cas de retard de paiement, pénalités au taux de ' +
+      'trois fois le taux d\'intérêt légal, et indemnité forfaitaire pour frais de ' +
+      'recouvrement de 40 € — articles L.441-10 et D.441-5 du Code de commerce.</p>' +
+      '<p style="margin-top:12px;color:#D1D5DB">Gleam — gleam-app.fr</p>' +
+    '</div>';
+}
+
 function buildFactureHtml(d,vuePro){
   var estEntreprise=d.client&&d.client.est_entreprise;
   var titre=vuePro?'Relevé de prestation':'Facture';
@@ -11668,7 +11759,13 @@ function buildFactureHtml(d,vuePro){
     '<tr><td class="desc"><strong>'+escapeHtml(ligneLabel)+'</strong><div class="sub-desc">'+escapeHtml(d.prestation||'')+'</div></td>'+
     '<td class="qte">1</td><td class="montant">'+(vuePro?d.montant_pro:d.montant_ttc).toFixed(2)+' €</td></tr>';
 
-  var blocRepartition=vuePro?
+  // ── LE RELEVÉ A ÉTÉ DÉPLACÉ ────────────────────────────────────────────
+  // Sa répartition est désormais AU BAS DE LA FACTURE DE COMMISSION, qui est
+  // le document qui facture ce prélèvement — donc celui qui doit l'expliquer.
+  //
+  // Le laisser ici l'aurait fait apparaître deux fois dans le même fichier.
+  // Trois documents, c'était deux de trop ; deux répartitions, c'en est une.
+  var blocRepartition=(vuePro && !d.facture_commission)?
     '<div class="repartition">'+
       '<div class="repartition-titre">Détail de la répartition</div>'+
       '<div class="repartition-ligne"><span>Montant payé par le client (TTC)</span><span>'+d.montant_ttc.toFixed(2)+' €</span></div>'+
@@ -11769,6 +11866,18 @@ function buildFactureHtml(d,vuePro){
     // d'adresse, et le seul recours est de quitter l'application.
     // window.close() est parfois refusé pour une fenêtre que le navigateur n'a
     // pas ouverte lui-même — d'où le repli sur l'historique.
+    // ── LA SECONDE FACTURE, DANS LE MÊME FICHIER ─────────────────────────
+    // Gleam vend un service d'intermédiation au prestataire : seconde vente,
+    // autre vendeur, autre acheteur. Deux paires ne tiennent pas sur une
+    // facture unique.
+    //
+    // Mais rien n'oblige à deux FICHIERS. Le prestataire ouvre un document et
+    // obtient les deux pièces — un geste pour lui, deux justificatifs pour sa
+    // comptabilité.
+    //
+    // Le client ne la voit jamais : elle ne le regarde pas.
+    (vuePro && d.facture_commission ? blocCommission(d) : '')+
+
     '<button class="bouton-retour-document" onclick="try{window.close()}catch(e){};setTimeout(function(){if(!window.closed)history.back()},120)">&#8592; Retour</button>'+
     '<button class="bouton-impression" onclick="window.print()">Imprimer ou enregistrer en PDF</button>'+
     '</body></html>';
