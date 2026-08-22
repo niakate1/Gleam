@@ -9725,8 +9725,29 @@ async function rappelTarifsPro(demandeId, prestation){
   var lignes=[];
   var typesSansTarif=[];
   types.forEach(function(type){
-    var base=(t.tarifs||{})[type];
-    var unitaire=(t.tarifs_unitaires||{})[type];
+    // ── LES PALIERS PEUVENT ÊTRE DANS L'UNE OU L'AUTRE TABLE ────────────
+    // `saveTarifs` range selon `cat.unite` : les prestations facturées à
+    // l'unité — matelas, tapis, vitres — vont dans `tarifs_unitaires`, les
+    // autres dans `tarifs`.
+    //
+    // Mais le MATELAS a les deux : `unite:true` ET cinq paliers de taille.
+    // Ses tarifs partaient donc dans `tarifs_unitaires` sous forme d'OBJET,
+    // que le rappel traitait avec parseFloat — lequel rend NaN sur un objet.
+    //
+    // Résultat : des tarifs bien enregistrés, affichés « à définir ».
+    //
+    // On regarde donc les DEUX tables, et on distingue par la FORME de la
+    // valeur — objet ou nombre — plutôt que par la table où elle se trouve.
+    var brut=(t.tarifs||{})[type];
+    var brutUnitaire=(t.tarifs_unitaires||{})[type];
+
+    // Les paliers, d'où qu'ils viennent.
+    var base=(brut&&typeof brut==='object') ? brut
+           : ((brutUnitaire&&typeof brutUnitaire==='object') ? brutUnitaire : brut);
+    // Le prix unitaire simple, s'il y en a un.
+    var unitaire=(brutUnitaire&&typeof brutUnitaire!=='object') ? brutUnitaire : null;
+    // La prestation est-elle facturée à l'unité ? Cela change le libellé.
+    var estUnitaire=!!brutUnitaire;
     // ── LE NOM LISIBLE, PAS LA CLÉ ──────────────────────────────────────
     // TARIF_CATEGORIES porte déjà le libellé de chaque prestation ET celui de
     // chaque palier. Le rappel affichait « Canape — A » au lieu de
@@ -9759,7 +9780,14 @@ async function rappelTarifsPro(demandeId, prestation){
         // Le palier a lui aussi son libellé : « 2 places », pas « A ».
         var nomPalier=(categorie&&categorie.tierLabels&&categorie.tierLabels[k])
           ? categorie.tierLabels[k] : k.replace(/_/g,' ');
-        if(v>0){aUnTarif=true;lignes.push({nom:etiquette+nomPalier,prix:Math.round(v)+' €'});}
+        // « 35 € / matelas » plutôt que « 35 € » : le prestataire doit voir
+        // que le prix se multiplie par le nombre de pièces.
+        var suffixe=(estUnitaire&&categorie&&categorie.uniteLabel)
+          ? ' / '+categorie.uniteLabel : '';
+        if(v>0){
+          aUnTarif=true;
+          lignes.push({nom:etiquette+nomPalier,prix:Math.round(v)+' €'+suffixe});
+        }
       });
     }else if(base&&parseFloat(base)>0){
       aUnTarif=true;
