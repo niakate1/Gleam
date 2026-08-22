@@ -3580,6 +3580,20 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   font-size: 13px;
 }
 .rappel-tarifs .grille span { color: var(--text-secondary); text-transform: capitalize; }
+
+/* Une prestation sans tarif : ambre, pas rouge. Ce n'est pas une erreur, il
+   manque une information — et le prestataire peut la fournir en un clic. */
+.rappel-tarifs .grille span.manquant,
+.rappel-tarifs .grille strong.manquant { color: #B4780F; font-style: italic; }
+.rappel-tarifs .note.manquant {
+  margin-top: 8px; padding: 8px 10px;
+  background: #FFF8E9; border-radius: var(--radius-2);
+  color: #7A5A12; font-weight: 600;
+}
+.rappel-tarifs .note.manquant button {
+  border: none; background: none; padding: 0;
+  color: #7A5A12; font-weight: 700; text-decoration: underline; cursor: pointer;
+}
 .rappel-tarifs .grille strong { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
 .rappel-tarifs .note { font-size: 11.5px; color: var(--gray); margin-top: 9px; line-height: 1.45; }
 
@@ -9709,26 +9723,66 @@ async function rappelTarifsPro(demandeId, prestation){
   if(!types.length)types=[prestation];
 
   var lignes=[];
+  var typesSansTarif=[];
   types.forEach(function(type){
     var base=(t.tarifs||{})[type];
     var unitaire=(t.tarifs_unitaires||{})[type];
-    // Pas de table de libellés dans l'application : on capitalise le nom
-    // technique, comme le fait déjà l'affichage des demandes.
-    var etiquette=types.length>1
-      ? type.charAt(0).toUpperCase()+type.slice(1).replace(/_/g,' ')+' — '
-      : '';
+    // ── LE NOM LISIBLE, PAS LA CLÉ ──────────────────────────────────────
+    // TARIF_CATEGORIES porte déjà le libellé de chaque prestation ET celui de
+    // chaque palier. Le rappel affichait « Canape — A » au lieu de
+    // « Canapé — 2 places » : la clé brute, capitalisée.
+    //
+    // Un prestataire qui lit « Canape — D » ne sait pas de quel canapé on
+    // parle. Il doit ouvrir sa grille pour le retrouver — exactement ce que
+    // ce rappel devait lui éviter.
+    var categorie=(typeof TARIF_CATEGORIES!=='undefined')
+      ? TARIF_CATEGORIES.filter(function(c){return c.key===type})[0]
+      : null;
+    // Vrai dès qu'une ligne de tarif a été trouvée pour ce type.
+    var aUnTarif=false;
+    var nomLisible=categorie
+      // On retire tout ce qui précède la première LETTRE, plutôt que d'énumérer
+      // des plages d'émojis. J'avais commencé par énumérer, et j'ai oublié
+      // U+FE0F — le « sélecteur de variante » qui suit l'émoji sans faire
+      // partie de sa plage : « 🛋️ Canapé » devenait « ️ Canapé », avec un
+      // caractère invisible devant le mot.
+      //
+      // Cette forme est déjà utilisée ailleurs dans l'application. Une seule
+      // façon de faire vaut mieux que deux qui se ressemblent.
+      ? String(categorie.label||type).replace(/^[^\p{L}]+/u,'').trim()
+      : (typeof libellePrestation==='function' ? libellePrestation(type) : type);
+    var etiquette=types.length>1 ? nomLisible+' — ' : '';
 
     if(base&&typeof base==='object'){
       Object.keys(base).forEach(function(k){
         var v=parseFloat(base[k]);
-        if(v>0)lignes.push({nom:etiquette+k.replace(/_/g,' '),prix:Math.round(v)+' €'});
+        // Le palier a lui aussi son libellé : « 2 places », pas « A ».
+        var nomPalier=(categorie&&categorie.tierLabels&&categorie.tierLabels[k])
+          ? categorie.tierLabels[k] : k.replace(/_/g,' ');
+        if(v>0){aUnTarif=true;lignes.push({nom:etiquette+nomPalier,prix:Math.round(v)+' €'});}
       });
     }else if(base&&parseFloat(base)>0){
+      aUnTarif=true;
       lignes.push({nom:etiquette+'Forfait',prix:Math.round(parseFloat(base))+' €'});
     }
     if(unitaire&&parseFloat(unitaire)>0){
+      aUnTarif=true;
       lignes.push({nom:etiquette+'À l\'unité',
         prix:(Math.round(parseFloat(unitaire)*100)/100).toFixed(2).replace('.',',')+' € / unité'});
+    }
+
+    // ── UNE PRESTATION SANS TARIF DOIT SE VOIR ──────────────────────────
+    // Une demande à trois prestations n'en affichait que deux : la troisième
+    // n'avait aucun tarif enregistré, et disparaissait SILENCIEUSEMENT.
+    //
+    // Le prestataire croyait alors que la demande n'en comptait que deux, et
+    // chiffrait son devis en oubliant la troisième. Il l'aurait découvert sur
+    // place, devant le client.
+    //
+    // Un manque annoncé vaut mieux qu'un manque invisible.
+    if(!aUnTarif){
+      lignes.push({nom:etiquette||nomLisible, prix:'à définir', manquant:true});
+      typesSansTarif.push(nomLisible);
     }
   });
 
@@ -9746,8 +9800,19 @@ async function rappelTarifsPro(demandeId, prestation){
     box.innerHTML='<div class="rappel-tarifs">'+
       '<div class="titre"><i data-lucide="euro"></i> Vos tarifs enregistrés</div>'+
       '<div class="grille">'+lignes.map(function(l){
-        return '<span>'+escapeHtml(l.nom)+'</span><strong>'+escapeHtml(l.prix)+'</strong>';
+        return l.manquant
+          ? '<span class="manquant">'+escapeHtml(l.nom)+'</span>'
+            +'<strong class="manquant">'+escapeHtml(l.prix)+'</strong>'
+          : '<span>'+escapeHtml(l.nom)+'</span><strong>'+escapeHtml(l.prix)+'</strong>';
       }).join('')+'</div>'+
+      // Un avertissement franc, en ambre : le prestataire doit savoir qu'il
+      // lui manque un prix AVANT de chiffrer, pas après.
+      (typesSansTarif.length
+        ? '<div class="note manquant">Aucun tarif enregistré pour : '
+          + escapeHtml(typesSansTarif.join(', ')) + '. '
+          + '<button type="button" onclick="event.stopPropagation();goProTab(\'pro-tarifs\')">'
+          + 'Le renseigner</button></div>'
+        : '')+
       '<div class="note">Ajustez selon l\'état décrit et la distance. Le prix reste le vôtre.</div>'+
     '</div>';
   }
