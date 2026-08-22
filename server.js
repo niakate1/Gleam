@@ -3322,7 +3322,11 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
   if (!devis || !devis.length) return res.json([]);
 
   const proIds = [...new Set(devis.map(d => d.societe_id))];
-  const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite, photo').in('id', proIds);
+  const { data: pros } = await supabase.from('users').// `siret` est ajouté pour le devis imprimable : les articles R.123-237 et
+      // R.123-238 du Code de commerce imposent que tout document émis par une
+      // entreprise porte son identification. Sans lui, le champ restait vide et
+      // le devis n'était pas conforme.
+      select('id, prenom, nom, note_moyenne, taux_fiabilite, photo, siret').in('id', proIds);
     await signerPhotosDeLot(pros);
   const proMap = {};
   (pros || []).forEach(p => proMap[p.id] = p);
@@ -3354,7 +3358,10 @@ app.get('/api/devis/demande/:id', auth, async (req, res) => {
 app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
   try {
     // Signées plus bas, une fois le lot complet rassemblé.
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, statut, photos_avant, photos_apres, prestation_demarree_le, creneau, creneau_propose, creneau_propose_par')
+    const { data: demandes } = await supabase.from('demandes').// `adresse` est ajoutée pour le devis imprimable : un devis de prestation à
+      // domicile doit porter le LIEU d'exécution — attendu par le client, et
+      // décisif en cas de litige.
+      select('id, prestation, statut, photos_avant, photos_apres, prestation_demarree_le, creneau, creneau_propose, creneau_propose_par, adresse')
       .eq('client_id', req.user.id).in('statut', ['devis_recus', 'acceptee', 'en_cours', 'terminee']);
     if (!demandes || !demandes.length) return res.json([]);
 
@@ -3366,7 +3373,10 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
     if (!devis || !devis.length) return res.json([]);
 
     const proIds = [...new Set(devis.map(d => d.societe_id))];
-    const { data: pros } = await supabase.from('users').select('id, prenom, nom, note_moyenne, taux_fiabilite, photo').in('id', proIds);
+    const { data: pros } = await supabase.from('users').// `siret` : R.123-237 et R.123-238 imposent que tout document émis par une
+      // entreprise porte son identification. Sans lui, le champ du devis restait
+      // vide et le document n'était pas conforme.
+      select('id, prenom, nom, note_moyenne, taux_fiabilite, photo, siret').in('id', proIds);
     await signerPhotosDeLot(pros);
     const proMap = {};
     (pros || []).forEach(p => proMap[p.id] = p);
@@ -4532,6 +4542,31 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
     const { data: pro } = await supabase.from('users').select('prenom, nom, email, siret').eq('id', devisAccepte.societe_id).single();
     const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demande.id).maybeSingle();
 
+    // ── LE NUMÉRO EST ATTRIBUÉ ICI SI ON NE L'A PAS ENCORE ──────────────
+    // Il l'est normalement à l'encaissement. Mais si cette attribution a
+    // échoué — Supabase indisponible une seconde, par exemple —, la facture
+    // affichait un identifiant de repli « GLEAM-XXXXXXXX » construit sur
+    // l'identifiant de la demande.
+    //
+    // Un tel numéro n'est PAS conforme : l'article 242 nonies A du CGI exige
+    // une suite continue, sans rupture ni doublon. Deux factures pouvaient
+    // porter des numéros sans lien entre eux, et l'administration y verrait
+    // une comptabilité non probante.
+    //
+    // On rattrape donc ici, au moment où quelqu'un consulte réellement la
+    // facture — le dernier instant où c'est encore possible.
+    let numeroFacture = paiement && paiement.numero_facture;
+    if (!numeroFacture && paiement) {
+      numeroFacture = await attribuerNumeroFacture(paiement.id);
+    }
+    if (!numeroFacture) {
+      // Aucun paiement rattaché : il n'y a rien à facturer. Mieux vaut le dire
+      // que d'émettre un document sans numéro valable.
+      return res.status(409).json({
+        error: 'La facture sera disponible dès que le paiement aura été enregistré.'
+      });
+    }
+
     const montantTtc = parseFloat(devisAccepte.prix_ttc);
     const commission = paiement ? parseFloat(paiement.commission) : Math.round(montantTtc * 0.15 * 100) / 100;
     const montantPro = paiement ? parseFloat(paiement.montant_societe) : Math.round((montantTtc - commission) * 100) / 100;
@@ -4540,7 +4575,7 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
       // Numéro séquentiel attribué en base à l'encaissement. Le repli sur
       // l'ancien format ne concerne que les paiements antérieurs à cette
       // correction, s'il en restait ; il ne doit jamais servir en production.
-      numero: (paiement && paiement.numero_facture) || ('GLEAM-' + demande.id.slice(0, 8).toUpperCase()),
+      numero: numeroFacture,
       date: demande.updated_at || demande.created_at,
       prestation: construireDescriptionPrestation(demande.notes, demande.prestation),
       adresse: demande.adresse,
