@@ -1593,6 +1593,50 @@ app.post('/api/users/me/supprimer', auth, async (req, res) => {
 
 // ══════════════ DEMANDES ══════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// JUSQU'À QUAND LE FAVORI GARDE-T-IL LA DEMANDE POUR LUI ?
+//
+// Une durée FIXE serait fausse la moitié du temps :
+//
+//   demande pour dans trois jours   six heures, c'est confortable
+//   demande pour demain matin       six heures, c'est déjà trop tard
+//
+// On prend donc un QUART du temps restant avant le créneau, plafonné à douze
+// heures et planché à trente minutes.
+//
+//   créneau dans 4 h    →  1 h d'exclusivité
+//   créneau dans 3 j    →  12 h (le plafond)
+//   créneau dans 1 h    →  30 min (le plancher)
+//
+// Le plancher compte : sans lui, une demande pour dans dix minutes s'ouvrirait
+// à tous instantanément, et le choix du client n'aurait servi à rien.
+// ═══════════════════════════════════════════════════════════════════════════
+function finExclusivite(creneauTexte) {
+  const maintenant = Date.now();
+  const creneau = instantDuCreneau(creneauTexte);
+
+  // Créneau illisible ou déjà passé : on retombe sur le plafond, plutôt que
+  // de calculer sur une valeur qu'on ne comprend pas.
+  if (!creneau || creneau <= maintenant) {
+    return new Date(maintenant + 12 * 3600 * 1000).toISOString();
+  }
+  const restant = creneau - maintenant;
+  const quart = Math.floor(restant / 4);
+  const duree = Math.min(Math.max(quart, 30 * 60 * 1000), 12 * 3600 * 1000);
+  return new Date(maintenant + duree).toISOString();
+}
+
+// Le créneau est stocké en texte lisible — « 2026-08-25 à 9h00 ». On en tire
+// un instant, ou null si la forme est inattendue.
+function instantDuCreneau(texte) {
+  if (!texte) return null;
+  const m = String(texte).match(/(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2})h(\d{2})/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]),
+                     Number(m[4]), Number(m[5]));
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+
 app.post('/api/demandes', auth, async (req, res) => {
   try {
     const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id, latitude, longitude, recurrence } = req.body;
@@ -1652,6 +1696,8 @@ app.post('/api/demandes', auth, async (req, res) => {
       notes: notes,
       numero_anonyme: numero,
       pro_prefere_id: proPrefereValide,
+      // L'exclusivité n'a de sens que s'il y a un favori désigné.
+      exclusivite_jusqu_a: proPrefereValide ? finExclusivite(creneau) : null,
       latitude: (typeof latitude === 'number' && !isNaN(latitude)) ? latitude : null,
       longitude: (typeof longitude === 'number' && !isNaN(longitude)) ? longitude : null,
       statut: 'en_attente',
@@ -2543,7 +2589,7 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     // demande précise, qui est le seul moment où le détail est réellement lu.
     const { data: demandes, error: demErr } = await supabase
       .from('demandes')
-      .select('id, client_id, prestation, adresse, creneau, notes, statut, numero_anonyme, created_at, pro_prefere_id, latitude, longitude, recurrence')
+      .select('id, client_id, prestation, adresse, creneau, notes, statut, numero_anonyme, created_at, pro_prefere_id, exclusivite_jusqu_a, latitude, longitude, recurrence')
       .or('statut.eq.en_attente,statut.eq.devis_recus')
       .order('created_at', { ascending: false })
       .limit(500);
@@ -2625,9 +2671,22 @@ app.get('/api/demandes/all', auth, async (req, res) => {
       });
     }
 
-    // Une demande adressée en priorité à un prestataire favori n'est visible que pour lui —
-    // les autres pros ne la voient pas tant que le client ne l'a pas rouverte à tout le monde.
-    filtered = filtered.filter(d => !d.pro_prefere_id || d.pro_prefere_id === req.user.id);
+    // ── L'EXCLUSIVITÉ DU FAVORI A UNE FIN ───────────────────────────────
+    // Elle n'en avait aucune : si le favori ne répondait pas, la demande
+    // restait invisible pour tous jusqu'à son expiration, une heure après le
+    // créneau. Le client perdait son créneau sans jamais savoir pourquoi.
+    //
+    // Passé `exclusivite_jusqu_a`, la demande redevient visible par tous les
+    // prestataires de la zone. Le favori la garde toujours — il n'est pas
+    // écarté, il cesse simplement d'être seul.
+    const maintenant = Date.now();
+    filtered = filtered.filter(d => {
+      if (!d.pro_prefere_id) return true;                    // ouverte à tous
+      if (d.pro_prefere_id === req.user.id) return true;     // c'est son favori
+      // Un autre prestataire : il la voit si l'exclusivité est échue.
+      if (!d.exclusivite_jusqu_a) return false;
+      return new Date(d.exclusivite_jusqu_a).getTime() <= maintenant;
+    });
 
     // Filtre par zone d'intervention — uniquement si le pro a configuré sa position ET un rayon.
     // Sans configuration, aucun filtrage n'est appliqué : un pro qui n'a pas encore réglé sa zone
@@ -4711,6 +4770,55 @@ app.delete('/api/favoris/:proId', auth, async (req, res) => {
 // qui l'on veut revoir, bien plus sûrement qu'une note, parce que c'est un
 // geste et non une déclaration. L'automatiser effacerait ce signal.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUVRIR UNE DEMANDE À TOUS LES PRESTATAIRES
+//
+// L'application le promettait au client — « Si non disponible, vous pourrez
+// toujours rouvrir la demande à tous les prestataires » — et rien ne le
+// permettait. C'était une promesse en l'air depuis le premier jour.
+//
+// L'ouverture automatique couvre le cas où le client n'y pense pas ; ce bouton
+// couvre celui où il n'attend pas.
+// ═══════════════════════════════════════════════════════════════════════════
+app.patch('/api/demandes/:id/ouvrir-a-tous', auth, async (req, res) => {
+  try {
+    const { data: demande } = await supabase.from('demandes')
+      .select('id, client_id, statut, pro_prefere_id')
+      .eq('id', req.params.id).maybeSingle();
+
+    if (!demande) {
+      return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
+    }
+    if (demande.client_id !== req.user.id) {
+      return res.status(403).json({
+        error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte.'
+      });
+    }
+    if (!demande.pro_prefere_id) {
+      return res.status(400).json({ error: 'Cette demande est déjà ouverte à tous.' });
+    }
+    // Une demande déjà acceptée ne se rouvre pas : un devis a été retenu, et
+    // rouvrir ferait arriver des propositions sur une affaire conclue.
+    if (demande.statut !== 'en_attente' && demande.statut !== 'devis_recus') {
+      return res.status(409).json({
+        error: 'Cette demande n\'est plus en attente de devis.'
+      });
+    }
+
+    // On efface le favori désigné ET la date : la demande redevient une
+    // demande ordinaire. Garder le favori aurait laissé un filtre actif que
+    // plus rien ne justifie.
+    const { error } = await supabase.from('demandes')
+      .update({ pro_prefere_id: null, exclusivite_jusqu_a: null })
+      .eq('id', demande.id);
+    if (error) return erreurServeur(res, 'PATCH ouvrir-a-tous', error);
+
+    res.json({ message: 'Votre demande est maintenant visible par tous les prestataires de votre zone.' });
+  } catch (e) {
+    erreurServeur(res, 'PATCH /api/demandes/:id/ouvrir-a-tous', e);
+  }
+});
+
 app.post('/api/favoris/refuser', auth, async (req, res) => {
   try {
     const proId = req.body && req.body.pro_id;
@@ -6397,6 +6505,61 @@ if (process.env.SENTRY_DSN && Sentry.setupExpressErrorHandler) {
 // Les relances à 24 h et 48 h sont désormais traitées par
 // relancerDemandesSansDevis(), sur son propre minuteur.
 // ─────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// OUVRIR LES DEMANDES DONT L'EXCLUSIVITÉ EST ÉCHUE
+//
+// Le filtre de lecture suffit techniquement : passé la date, les autres
+// prestataires voient la demande. Mais personne n'est PRÉVENU — ni le client,
+// qui croit toujours attendre son favori, ni les prestataires de la zone, qui
+// ne consultent pas la liste toutes les heures.
+//
+// Ce balayage efface le favori désigné et notifie. C'est ce qui transforme un
+// changement de visibilité en chance réelle de recevoir un devis.
+// ═══════════════════════════════════════════════════════════════════════════
+async function ouvrirExclusivitesEchues() {
+  try {
+    const { data, error } = await supabase.from('demandes')
+      .select('id, client_id, prestation, pro_prefere_id, exclusivite_jusqu_a')
+      .in('statut', ['en_attente', 'devis_recus'])
+      .not('pro_prefere_id', 'is', null)
+      .not('exclusivite_jusqu_a', 'is', null)
+      .lt('exclusivite_jusqu_a', new Date().toISOString())
+      .limit(100);
+
+    if (error) {
+      // On remonte l'erreur au lieu de la taire : une lecture qui échoue en
+      // silence, c'est le défaut qui a bloqué la clôture pendant des jours.
+      console.error('Ouverture des exclusivités — lecture :', error.message);
+      return 0;
+    }
+    if (!data || !data.length) return 0;
+
+    for (const d of data) {
+      // On efface le favori : la demande redevient ordinaire. Le favori la
+      // voit toujours — il n'est pas écarté, il cesse d'être seul.
+      const { error: majErr } = await supabase.from('demandes')
+        .update({ pro_prefere_id: null, exclusivite_jusqu_a: null })
+        .eq('id', d.id)
+        .not('pro_prefere_id', 'is', null);   // évite d'écraser une réouverture manuelle
+
+      if (majErr) {
+        console.error('Ouverture ' + d.id + ' :', majErr.message);
+        continue;
+      }
+
+      envoyerNotificationPush(d.client_id, {
+        titre: 'Votre demande est ouverte à tous',
+        corps: 'Sans réponse de votre prestataire favori, elle est maintenant visible par les professionnels de votre zone.',
+        url: '/#accueil'
+      }).catch(() => {});
+    }
+    return data.length;
+  } catch (e) {
+    console.error('Ouverture des exclusivités :', e.message);
+    return 0;
+  }
+}
+
 async function balayerDemandesExpirees() {
   try {
     const { data, error } = await supabase
@@ -6454,6 +6617,11 @@ let CLOTURE_DERNIER_RESULTAT = 'jamais exécutée';
 async function balayerPrestationsAValider() {
   CLOTURE_DERNIER_PASSAGE = new Date().toISOString();
   try {
+    // L'ouverture des exclusivités échues suit le même rythme : quinze
+    // minutes de retard sur une demande de trois jours ne changent rien, et
+    // cela évite une quatrième minuterie.
+    const ouvertes = await ouvrirExclusivitesEchues();
+    if (ouvertes) console.log('🔓 ' + ouvertes + ' demande(s) ouverte(s) à tous.');
     const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
     CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
