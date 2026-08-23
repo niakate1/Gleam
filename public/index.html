@@ -7487,7 +7487,11 @@ async function loadDemandes(silent){
             ? '<div class="demand-reservee">'
               + '<i data-lucide="lock" style="width:12px;height:12px;vertical-align:-2px"></i> '
               + 'Réservée à '+escapeHtml(d.pro_prefere_nom||'votre favori')
-              + ' · <button onclick="event.stopPropagation();ouvrirDemandeATous(\''+escAttr(d.id)+'\',this)">ouvrir à tous</button>'
+              // L'échéance remplace l'invitation à agir : le client n'a rien à
+              // faire, sauf s'il ne veut pas attendre.
+              + (tempsAvantOuverture(d.exclusivite_jusqu_a)
+                  ? ' · ' + escapeHtml(tempsAvantOuverture(d.exclusivite_jusqu_a))
+                  : '')
               + '</div>'
             : '')+
         '</div>'+
@@ -8047,6 +8051,40 @@ function renderDetail(d){
   // les 6 mois » ne pouvait donc ni l'interrompre, ni la mettre en pause : à
   // chaque prestation terminée, une nouvelle demande réapparaissait sans qu'il
   // puisse rien y faire. C'est ce bouton qui manquait.
+  // ── LA DEMANDE RÉSERVÉE : L'ACTION VIT DANS LE DÉTAIL ──────────────────
+  // La carte de l'accueil INFORME — « Réservée à Arnaud, ouverte à tous dans
+  // 4 h ». C'est tout ce dont la plupart des clients ont besoin.
+  //
+  // L'ACTION appartient au détail : c'est là qu'on vient pour agir, et là
+  // qu'il y a la place d'expliquer ce qui va se passer.
+  //
+  // POURQUOI PAS UN INTERRUPTEUR — il suggère qu'on peut revenir en arrière.
+  // Ici, non : le favori est effacé, on ne peut plus refermer. Un interrupteur
+  // qu'on ne peut pas basculer dans l'autre sens est un mensonge visuel.
+  //
+  // POURQUOI PAS UN BALAYAGE — personne ne devine un geste caché sur une
+  // action rare. Ce qui n'est pas visible n'existe pas.
+  if(d.pro_prefere_id && (d.statut==='en_attente'||d.statut==='devis_recus')){
+    var echeance = tempsAvantOuverture(d.exclusivite_jusqu_a);
+    html+='<div class="detail-card" style="border-color:var(--gold)">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+        '<span style="font-size:22px">🔒</span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-weight:700;font-size:14px">Réservée à '+escapeHtml(d.pro_prefere_nom||'votre favori')+'</div>'+
+          '<div style="font-size:12.5px;color:var(--gray)">'+escapeHtml(echeance||'ouverte à tous prochainement')+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.5;margin-bottom:12px">'+
+        'Lui seul voit cette demande pour le moment. Sans réponse de sa part, '+
+        'elle s\'ouvrira d\'elle-même aux autres professionnels de votre zone — '+
+        'vous n\'avez rien à faire.'+
+      '</div>'+
+      '<button class="btn-accept" style="background:none;border:1.5px solid var(--gold);color:var(--amber);width:100%" '+
+        'onclick="confirmerOuvertureATous(\''+escAttr(d.id)+'\',\''+escAttr(d.pro_prefere_nom||'votre favori')+'\')">'+
+        'Ouvrir maintenant à tous</button>'+
+    '</div>';
+  }
+
   if(d.recurrence){
     html+='<div class="detail-card" style="border-color:var(--p)">'+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
@@ -12723,6 +12761,53 @@ async function chargerFavoriCible(type){
 // ── ROUVRIR UNE DEMANDE À TOUS ───────────────────────────────────────────
 // Le bouton que l'application promettait sans l'avoir. Il n'apparaît que sur
 // une demande encore en attente, adressée à un favori.
+// ═══════════════════════════════════════════════════════════════════════════
+// COMBIEN DE TEMPS LE FAVORI GARDE-T-IL ENCORE LA DEMANDE ?
+//
+// C'est l'information qui manquait le plus. « Réservée à Arnaud » dit l'état,
+// mais pas la suite — et le client ignorait que l'ouverture se ferait toute
+// seule. Il croyait devoir agir.
+//
+// Une échéance change la nature du message : ce n'est plus « voulez-vous
+// ouvrir ? » mais « cela s'ouvrira, à moins que vous ne préfériez avant ».
+// La plupart des clients n'auront alors rien à faire.
+// ═══════════════════════════════════════════════════════════════════════════
+function tempsAvantOuverture(dateIso){
+  if(!dateIso) return null;
+  var restant = new Date(dateIso).getTime() - Date.now();
+  if(!isFinite(restant)) return null;
+  if(restant <= 0) return 'ouverte à tous';
+  var minutes = Math.round(restant / 60000);
+  if(minutes < 60) return 'ouverte à tous dans ' + minutes + ' min';
+  var heures = Math.round(minutes / 60);
+  if(heures < 24) return 'ouverte à tous dans ' + heures + ' h';
+  // Au-delà d'un jour on arrondit : la précision n'apporte rien, et
+  // « dans 27 h » se lit moins bien que « demain ».
+  return 'ouverte à tous ' + (heures < 36 ? 'demain' : 'dans ' + Math.round(heures/24) + ' jours');
+}
+
+// ── LA CONFIRMATION ────────────────────────────────────────────────────────
+// L'action est IRRÉVERSIBLE : le favori est effacé, on ne peut pas refermer.
+// Une confirmation n'est justifiée que dans ce cas — en abuser apprend aux
+// gens à cliquer « oui » sans lire.
+//
+// Elle dit ce qu'on perd, pas seulement ce qu'on gagne.
+function confirmerOuvertureATous(demandeId, nomPro){
+  document.getElementById('modal-body').innerHTML =
+    '<div class="modal-title">Ouvrir à tous les prestataires ?</div>'+
+    '<div class="modal-sub">Cette action ne peut pas être annulée.</div>'+
+    '<div style="font-size:13px;line-height:1.55;color:var(--text-secondary);margin:14px 0 18px">'+
+      escapeHtml(nomPro)+' ne sera plus le seul à voir votre demande : tous les '+
+      'professionnels de votre zone pourront vous envoyer un devis. '+
+      '<strong>Il continuera de la voir</strong> et peut toujours répondre.'+
+    '</div>'+
+    '<button class="btn-accept" style="width:100%" onclick="ouvrirDemandeATous(\''+escAttr(demandeId)+'\',this)">'+
+      'Oui, ouvrir à tous</button>'+
+    '<button class="btn-accept" style="background:none;color:var(--text-secondary);width:100%;margin-top:8px" '+
+      'onclick="document.getElementById(\'modal-overlay\').classList.remove(\'open\')">Annuler</button>';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
 async function ouvrirDemandeATous(demandeId, btn){
   if(btn){ btn.disabled = true; btn.textContent = 'ouverture…'; }
   try{
@@ -12735,7 +12820,16 @@ async function ouvrirDemandeATous(demandeId, btn){
       return;
     }
     toast('🔓 '+(d.message||'Demande ouverte à tous.'), 4000);
+    var overlay = document.getElementById('modal-overlay');
+    if(overlay) overlay.classList.remove('open');
     if(typeof loadDemandes === 'function') loadDemandes();
+    // Si l'écran de détail est ouvert, il doit refléter le changement : sans
+    // cela, le bouton resterait affiché sur une demande déjà ouverte.
+    if(typeof openDetail === 'function' &&
+       document.getElementById('s-detail') &&
+       document.getElementById('s-detail').classList.contains('active')){
+      openDetail(demandeId);
+    }
   }catch(e){
     toast(friendlyNetworkError(e));
     if(btn){ btn.disabled = false; btn.textContent = 'ouvrir à tous'; }
