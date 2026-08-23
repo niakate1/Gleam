@@ -571,6 +571,45 @@ function normaliserSiret(brut) {
 // même. Refuser une demande parce qu'un service tiers ne répond pas serait
 // punir le client pour une panne qui ne le concerne pas.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LE REPORT EST-IL ENCORE POSSIBLE ?
+//
+// Il était bloqué DÈS la déclaration d'arrivée, sans regarder si celle-ci
+// était crédible. Un prestataire déclarant son arrivée depuis chez lui
+// retirait au client son droit de reprogrammer — alors que rien ne prouvait
+// qu'il fût là.
+//
+// Cela créait une contradiction avec ce qu'on avait posé la veille :
+//
+//   la clôture attendait 7 jours     parce qu'on doutait de l'arrivée
+//   le report était bloqué           comme si on n'en doutait pas
+//
+// On protégeait l'argent du client, pas son créneau. Il ne pouvait ni
+// reporter, ni annuler, et devait attendre une semaine pour être remboursé
+// d'une prestation qui n'avait peut-être pas eu lieu.
+//
+// LA RÈGLE
+//
+//   arrivée sur place (< 2 km)         report fermé — quelqu'un est là
+//   arrivée douteuse, client confirme  report fermé — il l'a dit lui-même
+//   arrivée douteuse, sans réponse     report OUVERT
+//
+// L'ANNULATION, ELLE, RESTE BLOQUÉE DANS TOUS LES CAS. Annuler efface
+// l'affaire : trop grave pour un doute. Reporter ne coûte rien à personne —
+// le prestataire garde sa mission, à une autre date.
+// ═══════════════════════════════════════════════════════════════════════════
+function reportEncorePossible(demande) {
+  if (!demande.prestation_demarree_le) return true;   // pas encore commencé
+
+  // Le client a confirmé la venue : plus de doute, plus de report.
+  if (demande.arrivee_confirmee_client === true) return false;
+
+  // Arrivée non vérifiable : le client garde la main tant qu'il n'a pas
+  // répondu. C'est lui qui sait si quelqu'un a sonné.
+  return demande.arrivee_qualite === 'eloignee'
+      || demande.arrivee_qualite === 'non_verifiee';
+}
+
 async function geocoderAdresse(adresse) {
   const texte = String(adresse || '').trim();
   if (texte.length < 8) return null;   // trop court pour être une adresse
@@ -3054,7 +3093,10 @@ app.post('/api/demandes/:id/proposer-creneau', auth, async (req, res) => {
     //
     // Même code, même message que l'annulation : ce qui se passe une fois le
     // prestataire sur place se règle entre eux, ou par un signalement.
-    if (demande.prestation_demarree_le) {
+    // Le blocage suit désormais la QUALITÉ de l'arrivée, pas sa simple
+    // déclaration : un report reste possible tant qu'une arrivée douteuse
+    // n'a pas été confirmée par le client.
+    if (!reportEncorePossible(demande)) {
       return res.status(409).json({
         error: 'Le prestataire est déjà sur place et a commencé la prestation. ' +
                'Elle ne peut plus être reprogrammée — si quelque chose ne va pas, ' +
@@ -3091,7 +3133,10 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
     //
     // On refuse la réponse, et on retire la proposition devenue caduque :
     // la laisser en attente ferait réapparaître le bouton à chaque ouverture.
-    if (demande.prestation_demarree_le) {
+    // Le blocage suit désormais la QUALITÉ de l'arrivée, pas sa simple
+    // déclaration : un report reste possible tant qu'une arrivée douteuse
+    // n'a pas été confirmée par le client.
+    if (!reportEncorePossible(demande)) {
       await supabase.from('demandes')
         .update({ creneau_propose: null, creneau_propose_par: null })
         .eq('id', demande.id);
@@ -4582,6 +4627,40 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
     if (demande.statut !== 'en_cours') return res.status(400).json({ error: 'Cette prestation n\'est pas en cours.' });
 
     const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', req.params.id).eq('statut', 'accepte').maybeSingle();
+
+    // ── ON N'ARRIVE PAS TROIS JOURS À L'AVANCE ──────────────────────────
+    // Rien ne vérifiait la date. Un prestataire pouvait déclarer son arrivée
+    // dès l'acceptation du devis — et cela verrouillait tout :
+    //
+    //   le client ne pouvait plus reprogrammer
+    //   il ne pouvait plus annuler
+    //   la clôture des 48 h démarrait
+    //
+    // Autrement dit, l'argent pouvait partir AVANT MÊME le créneau, pour une
+    // prestation qui n'avait pas eu lieu. Le client se retrouvait sans recours
+    // sur une décision qu'il n'avait pas prise.
+    //
+    // POURQUOI DEUX HEURES DE MARGE
+    // Un prestataire arrive souvent en avance, et il a raison de le déclarer
+    // en arrivant plutôt qu'à l'heure dite. Deux heures couvrent l'avance
+    // raisonnable sans ouvrir la porte à une déclaration de la veille.
+    //
+    // AUCUNE LIMITE DANS L'AUTRE SENS : une prestation peut commencer en
+    // retard, et refuser une arrivée tardive empêcherait de travailler
+    // quelqu'un qui est déjà sur place.
+    const instantPrestation = instantDuCreneau(demande.creneau);
+    if (instantPrestation) {
+      const MARGE_AVANCE_MS = 2 * 3600 * 1000;
+      if (Date.now() < instantPrestation - MARGE_AVANCE_MS) {
+        const ouverture = new Date(instantPrestation - MARGE_AVANCE_MS);
+        return res.status(409).json({
+          error: 'Vous pourrez déclarer votre arrivée à partir de '
+            + ouverture.toLocaleString('fr-FR',
+                { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
+            + ', soit deux heures avant le créneau convenu.'
+        });
+      }
+    }
     if (!devisAccepte || devisAccepte.societe_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     const erreurPhotos = validerPhotos(photos_avant, 5);
