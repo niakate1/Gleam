@@ -610,6 +610,36 @@ function reportEncorePossible(demande) {
       || demande.arrivee_qualite === 'non_verifiee';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LE NOM D'UNE COMMUNE, À PARTIR DE COORDONNÉES
+//
+// « 10 km » ne veut rien dire sans son point de départ. La carte affichait ce
+// chiffre seul, et le prestataire devait ouvrir le réglage pour se rappeler
+// d'où partait son rayon.
+//
+// L'API Adresse fait aussi du géocodage inverse : des coordonnées donnent une
+// commune. Gratuite, sans clé, comme le géocodage direct.
+//
+// Un échec renvoie null et l'application affiche « votre position » : moins
+// précis, mais jamais faux.
+// ═══════════════════════════════════════════════════════════════════════════
+async function communeDepuisCoordonnees(latitude, longitude) {
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
+  try {
+    const reponse = await fetch(
+      'https://api-adresse.data.gouv.fr/reverse/?lat=' + latitude + '&lon=' + longitude,
+      { signal: AbortSignal.timeout(4000), headers: { 'Accept': 'application/json' } }
+    );
+    if (!reponse.ok) return null;
+    const data = await reponse.json();
+    const trouve = data && Array.isArray(data.features) ? data.features[0] : null;
+    return (trouve && trouve.properties && trouve.properties.city) || null;
+  } catch (e) {
+    console.warn('Commune introuvable :', e.message);
+    return null;
+  }
+}
+
 async function geocoderAdresse(adresse) {
   const texte = String(adresse || '').trim();
   if (texte.length < 8) return null;   // trop court pour être une adresse
@@ -2892,12 +2922,40 @@ app.get('/api/demandes/all', auth, async (req, res) => {
     // Filtre par zone d'intervention — uniquement si le pro a configuré sa position ET un rayon.
     // Sans configuration, aucun filtrage n'est appliqué : un pro qui n'a pas encore réglé sa zone
     // continue de tout voir, exactement comme avant l'ajout de cette fonctionnalité.
-    const proAConfigureZone = typeof user.latitude === 'number' && typeof user.longitude === 'number' && typeof user.rayon_intervention_km === 'number';
+    // ── PLUSIEURS ZONES, PAS UNE SEULE ──────────────────────────────────
+    // Un prestataire habitant Cergy et travaillant souvent à Poissy devait
+    // choisir : un rayon énorme depuis Cergy — et des demandes hors de portée
+    // — ou rater tout ce qui se passe autour de Poissy.
+    const { data: zonesPro } = await supabase.from('zones_intervention')
+      .select('libelle, latitude, longitude, rayon_km')
+      .eq('pro_id', req.user.id);
+
+    // Repli sur l'ancien champ tant qu'un prestataire n'a pas de zone en
+    // table. Sans lui, il ne verrait plus une seule demande sans comprendre.
+    const zones = (zonesPro && zonesPro.length)
+      ? zonesPro
+      : ((typeof user.latitude === 'number' && typeof user.longitude === 'number'
+          && typeof user.rayon_intervention_km === 'number')
+          ? [{ libelle: 'Ma zone', latitude: user.latitude, longitude: user.longitude,
+               rayon_km: user.rayon_intervention_km }]
+          : []);
+
+    const proAConfigureZone = zones.length > 0;
     filtered = filtered.map(d => {
-      if (typeof d.latitude === 'number' && typeof d.longitude === 'number' && proAConfigureZone) {
-        return { ...d, distance_km: Math.round(distanceKm(user.latitude, user.longitude, d.latitude, d.longitude) * 10) / 10 };
+      if (typeof d.latitude !== 'number' || typeof d.longitude !== 'number' || !proAConfigureZone) {
+        return { ...d, distance_km: null, zone_libelle: null, dans_zone: false };
       }
-      return { ...d, distance_km: null };
+      // La distance affichée est celle de la zone la PLUS PROCHE — c'est elle
+      // qui décide s'il peut y aller. Mais l'appartenance se juge sur TOUTES :
+      // une zone plus lointaine peut avoir un rayon plus large.
+      let meilleure = null;
+      let dansZone = false;
+      for (const z of zones) {
+        const dist = Math.round(distanceKm(z.latitude, z.longitude, d.latitude, d.longitude) * 10) / 10;
+        if (dist <= z.rayon_km) dansZone = true;
+        if (!meilleure || dist < meilleure.dist) meilleure = { dist, libelle: z.libelle };
+      }
+      return { ...d, distance_km: meilleure.dist, zone_libelle: meilleure.libelle, dans_zone: dansZone };
     });
     if (proAConfigureZone) {
       // Une demande adressée en priorité à CE prestataire reste visible quelle que
@@ -2908,7 +2966,7 @@ app.get('/api/demandes/all', auth, async (req, res) => {
       filtered = filtered.filter(d =>
         d.pro_prefere_id === req.user.id
         || d.distance_km === null
-        || d.distance_km <= user.rayon_intervention_km);
+        || d.dans_zone);
     }
 
     res.json(await signerPhotosDesDemandes(filtered));
@@ -2920,6 +2978,107 @@ app.get('/api/demandes/all', auth, async (req, res) => {
 
 // Enregistre la position de référence et le rayon d'intervention souhaité d'un pro — utilisé pour
 // filtrer les demandes qu'il voit (voir /api/demandes/all). Réservé aux comptes pro.
+// ═══════════════════════════════════════════════════════════════════════════
+// LES ZONES D'INTERVENTION — JUSQU'À TROIS
+//
+// Un prestataire habitant Cergy et travaillant souvent à Poissy devait
+// choisir : un rayon énorme depuis Cergy — et des demandes qu'il ne peut pas
+// honorer — ou rater tout ce qui se passe autour de Poissy.
+//
+// Trois zones suffisent, et la limite protège la lecture : chaque zone ajoute
+// un calcul de distance par demande affichée.
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/pro/zones', auth, async (req, res) => {
+  try {
+    const { data } = await supabase.from('zones_intervention')
+      .select('id, libelle, latitude, longitude, rayon_km')
+      .eq('pro_id', req.user.id)
+      .order('created_at', { ascending: true });
+    res.json(data || []);
+  } catch (e) {
+    erreurServeur(res, 'GET /api/pro/zones', e);
+  }
+});
+
+app.post('/api/pro/zones', auth, async (req, res) => {
+  try {
+    const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
+    if (!user || !isProType(user.type)) {
+      return res.status(403).json({ error: 'Cette action est réservée aux comptes prestataires.' });
+    }
+
+    const { latitude, longitude, rayon_km, libelle } = req.body;
+    if (typeof latitude !== 'number' || typeof longitude !== 'number'
+        || isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({ error: 'Position invalide.' });
+    }
+    const rayon = Number.isInteger(rayon_km) ? rayon_km : parseInt(rayon_km, 10);
+    if (!Number.isInteger(rayon) || rayon < 1 || rayon > 200) {
+      return res.status(400).json({ error: 'Le rayon doit être compris entre 1 et 200 km.' });
+    }
+
+    // Le nom vient du géocodage inverse si le client n'en a pas fourni : c'est
+    // lui qui rendra « 10 km autour de Cergy » lisible sur la carte.
+    const nom = String(libelle || '').trim()
+      || await communeDepuisCoordonnees(latitude, longitude)
+      || 'Ma zone';
+
+    const { data, error } = await supabase.from('zones_intervention')
+      .insert({ pro_id: req.user.id, libelle: nom, latitude, longitude, rayon_km: rayon })
+      .select('id, libelle, latitude, longitude, rayon_km').single();
+
+    if (error) {
+      // Le déclencheur en base refuse au-delà de trois. Son message est clair,
+      // on le transmet plutôt que d'en inventer un autre.
+      if (/trois zones/i.test(error.message)) {
+        return res.status(409).json({ error: 'Trois zones d\'intervention au maximum.' });
+      }
+      return erreurServeur(res, 'POST /api/pro/zones', error);
+    }
+
+    // On garde `users.latitude` à jour sur la PREMIÈRE zone : d'autres écrans
+    // s'en servent encore, et deux sources qui divergent finissent toujours
+    // par produire un écart inexplicable.
+    const { data: toutes } = await supabase.from('zones_intervention')
+      .select('id').eq('pro_id', req.user.id);
+    if ((toutes || []).length === 1) {
+      await supabase.from('users')
+        .update({ latitude, longitude, rayon_intervention_km: rayon })
+        .eq('id', req.user.id);
+    }
+
+    res.json(data);
+  } catch (e) {
+    erreurServeur(res, 'POST /api/pro/zones', e);
+  }
+});
+
+app.delete('/api/pro/zones/:id', auth, async (req, res) => {
+  try {
+    const { data: zone } = await supabase.from('zones_intervention')
+      .select('id, pro_id').eq('id', req.params.id).maybeSingle();
+    if (!zone) return res.status(404).json({ error: 'Cette zone n\'existe plus.' });
+    if (zone.pro_id !== req.user.id) {
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
+    }
+
+    // Supprimer la dernière zone reviendrait à ne plus recevoir aucune
+    // demande, sans que rien ne l'explique. On refuse, en le disant.
+    const { data: toutes } = await supabase.from('zones_intervention')
+      .select('id').eq('pro_id', req.user.id);
+    if ((toutes || []).length <= 1) {
+      return res.status(409).json({
+        error: 'Gardez au moins une zone : sans elle, vous ne recevriez plus aucune demande.'
+      });
+    }
+
+    await supabase.from('zones_intervention').delete().eq('id', zone.id);
+    res.json({ message: 'Zone supprimée.' });
+  } catch (e) {
+    erreurServeur(res, 'DELETE /api/pro/zones/:id', e);
+  }
+});
+
 app.post('/api/pro/zone-intervention', auth, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type').eq('id', req.user.id).single();
