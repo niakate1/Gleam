@@ -2988,12 +2988,55 @@ app.get('/api/demandes/all', auth, async (req, res) => {
 // Trois zones suffisent, et la limite protège la lecture : chaque zone ajoute
 // un calcul de distance par demande affichée.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LA COMMUNE À PARTIR D'UNE POSITION
+//
+// Le bouton « me localiser » écrivait littéralement « Position actuelle » dans
+// le champ d'adresse. Le prestataire ne savait donc pas où il venait de se
+// placer — et sa zone s'appelait ensuite « Ma zone » faute de nom.
+//
+// L'API Adresse ne peut pas être appelée depuis le navigateur sans exposer
+// l'application au partage d'origine ; le serveur relaie donc.
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/geo/commune', auth, async (req, res) => {
+  try {
+    const lat = parseFloat(req.query.lat);
+    const lng = parseFloat(req.query.lng);
+    if (!isFinite(lat) || !isFinite(lng)) {
+      return res.status(400).json({ error: 'Position invalide.' });
+    }
+    const commune = await communeDepuisCoordonnees(lat, lng);
+    res.json({ commune: commune || null });
+  } catch (e) {
+    // Un échec n'est pas une erreur : l'application affichera « Position
+    // actuelle », comme avant. On ne casse rien.
+    res.json({ commune: null });
+  }
+});
+
 app.get('/api/pro/zones', auth, async (req, res) => {
   try {
     const { data } = await supabase.from('zones_intervention')
       .select('id, libelle, latitude, longitude, rayon_km')
       .eq('pro_id', req.user.id)
       .order('created_at', { ascending: true });
+
+    // ── LES ZONES REPRISES N'ONT PAS DE NOM ─────────────────────────────
+    // La migration a converti les zones existantes en « Ma zone » : elle ne
+    // pouvait pas appeler l'API Adresse depuis PostgreSQL.
+    //
+    // On les nomme à la première lecture, une seule fois. Le prestataire n'a
+    // rien à faire, et sa tuile passe de « Ma zone · 10 km » à
+    // « Cergy · 10 km » tout seul.
+    const aNommer = (data || []).filter(z => z.libelle === 'Ma zone');
+    for (const z of aNommer) {
+      const commune = await communeDepuisCoordonnees(z.latitude, z.longitude);
+      if (!commune) continue;   // le service n'a pas répondu : on réessaiera
+      await supabase.from('zones_intervention')
+        .update({ libelle: commune }).eq('id', z.id);
+      z.libelle = commune;
+    }
+
     res.json(data || []);
   } catch (e) {
     erreurServeur(res, 'GET /api/pro/zones', e);
@@ -3050,6 +3093,69 @@ app.post('/api/pro/zones', auth, async (req, res) => {
     res.json(data);
   } catch (e) {
     erreurServeur(res, 'POST /api/pro/zones', e);
+  }
+});
+
+// ── MODIFIER UNE ZONE EXISTANTE ────────────────────────────────────────────
+// Sans cette route, l'écran de réglage n'avait que la création : un
+// prestataire qui ajuste son rayon trois fois se retrouvait avec trois zones,
+// puis bloqué par la limite — sans comprendre pourquoi.
+app.patch('/api/pro/zones/:id', auth, async (req, res) => {
+  try {
+    const { data: zone } = await supabase.from('zones_intervention')
+      .select('id, pro_id').eq('id', req.params.id).maybeSingle();
+    if (!zone) return res.status(404).json({ error: 'Cette zone n\'existe plus.' });
+    if (zone.pro_id !== req.user.id) {
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
+    }
+
+    const { latitude, longitude, rayon_km, libelle } = req.body;
+    const maj = {};
+
+    if (typeof latitude === 'number' && typeof longitude === 'number'
+        && !isNaN(latitude) && !isNaN(longitude)) {
+      maj.latitude = latitude;
+      maj.longitude = longitude;
+      // La position change : le nom aussi, sauf si le client en fournit un.
+      maj.libelle = String(libelle || '').trim()
+        || await communeDepuisCoordonnees(latitude, longitude)
+        || 'Ma zone';
+    } else if (String(libelle || '').trim()) {
+      maj.libelle = String(libelle).trim();
+    }
+
+    if (rayon_km !== undefined) {
+      const rayon = Number.isInteger(rayon_km) ? rayon_km : parseInt(rayon_km, 10);
+      if (!Number.isInteger(rayon) || rayon < 1 || rayon > 200) {
+        return res.status(400).json({ error: 'Le rayon doit être compris entre 1 et 200 km.' });
+      }
+      maj.rayon_km = rayon;
+    }
+
+    if (!Object.keys(maj).length) {
+      return res.status(400).json({ error: 'Rien à modifier.' });
+    }
+
+    const { data, error } = await supabase.from('zones_intervention')
+      .update(maj).eq('id', zone.id)
+      .select('id, libelle, latitude, longitude, rayon_km').single();
+    if (error) return erreurServeur(res, 'PATCH /api/pro/zones/:id', error);
+
+    // On garde `users.latitude` aligné sur la PREMIÈRE zone : d'autres écrans
+    // s'en servent, et deux sources qui divergent produisent des écarts
+    // inexplicables.
+    const { data: toutes } = await supabase.from('zones_intervention')
+      .select('id').eq('pro_id', req.user.id).order('created_at', { ascending: true });
+    if (toutes && toutes.length && toutes[0].id === zone.id && maj.latitude) {
+      await supabase.from('users')
+        .update({ latitude: maj.latitude, longitude: maj.longitude,
+                  rayon_intervention_km: maj.rayon_km || undefined })
+        .eq('id', req.user.id);
+    }
+
+    res.json(data);
+  } catch (e) {
+    erreurServeur(res, 'PATCH /api/pro/zones/:id', e);
   }
 });
 
