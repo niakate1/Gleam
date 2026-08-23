@@ -6913,12 +6913,50 @@ function icoStatut(nom){
 const STATUTS={
   en_attente:     [icoStatut('clock')+'En attente','s-attente'],
   devis_recus:    [icoStatut('file-text')+'Devis reçus','s-devis'],
-  acceptee:       [icoStatut('check-circle')+'Acceptée','s-acceptee'],
-  en_cours:       [icoStatut('wrench')+'En cours','s-acceptee'],
+  // ── DEUX LIBELLÉS QUI MENTAIENT ──────────────────────────────────────
+  // « Acceptée » laissait croire que tout était réglé : le devis était retenu,
+  // mais RIEN N'ÉTAIT PAYÉ. Le client ne savait pas qu'il lui restait un geste.
+  //
+  // « En cours » s'affichait dès le PAIEMENT. Une prestation prévue le 18 était
+  // « en cours » le 17, alors que personne n'avait bougé.
+  //
+  // On ne renomme pas les VALEURS — « en_cours » est lu à trente-neuf endroits,
+  // plus la base. On renomme ce que l'utilisateur LIT.
+  acceptee:       [icoStatut('credit-card')+'À payer','s-attente'],
+  en_cours:       [icoStatut('check-circle')+'Payée','s-acceptee'],
   terminee:       [icoStatut('flag')+'Terminée','s-terminee'],
   annulee_client: [icoStatut('ban')+'Annulée','s-terminee'],
   expiree:        [icoStatut('calendar-x')+'Expirée','s-terminee']
 };
+
+// ── LE LIBELLÉ EXACT D'UNE DEMANDE PAYÉE ───────────────────────────────────
+// Trois moments, trois mots. « En cours » ne convient qu'au troisième.
+//
+//   avant le créneau               « Payée »
+//   créneau passé, sans arrivée    « Prestataire attendu »
+//   le prestataire a déclaré       « En cours »
+//
+// Un même état de base se dit légitimement de trois façons selon le moment :
+// c'est le créneau qui tranche, pas la colonne.
+function libelleStatutDemande(d){
+  var base = STATUTS[(d && d.statut)] || ['',''];
+  if(!d || d.statut !== 'en_cours') return base;
+
+  if(d.prestation_demarree_le){
+    return [icoStatut('wrench')+'En cours','s-acceptee'];
+  }
+
+  var instant = null;
+  var m = /(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2})h(\d{2})/.exec(d.creneau||'');
+  if(m) instant = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]).getTime();
+
+  // Créneau dépassé sans arrivée déclarée : on le dit, plutôt que d'afficher
+  // « en cours » sur une prestation que personne n'a commencée.
+  if(instant && Date.now() > instant){
+    return [icoStatut('clock')+'Prestataire attendu','s-attente'];
+  }
+  return base;
+}
 
 // Affiche les détails d'une prestation en ajoutant l'unité claire pour la quantité/surface
 // (ex: "6 m²" plutôt que juste "6"), pour que ce soit toujours compréhensible sans ambiguïté.
@@ -7451,7 +7489,9 @@ async function loadDemandes(silent){
 
     var html='';
     data.forEach(function(d,i){
-      var st=STATUTS[d.statut]||['',''];
+      // Le libellé passe par la fonction : elle regarde le créneau et l'arrivée
+      // pour distinguer « Payée », « Prestataire attendu » et « En cours ».
+      var st=libelleStatutDemande(d);
       var icon=ICONS_get((d.prestation||'').split(' + ')[0]);
       var urgentStyle=d.statut==='en_cours'?'border-color:var(--green);background:var(--green-clair);':'';
       var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px;margin-left:6px">ACTION REQUISE</span>':'';
@@ -7996,7 +8036,9 @@ function renderDetail(d){
   var c=document.getElementById('detail-content');
   var prestations=[];
   try{var n=JSON.parse(d.notes);if(n.prestations)prestations=n.prestations}catch(e){}
-  var st=STATUTS[d.statut]||['',''];
+  // Le libellé passe par la fonction : elle regarde le créneau et l'arrivée
+      // pour distinguer « Payée », « Prestataire attendu » et « En cours ».
+      var st=libelleStatutDemande(d);
   var locked=d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee'||d.statut==='annulee_client';
   var canCancel=d.statut==='acceptee'||d.statut==='en_cours';
   var hasPhotos=getPhotosFromNotes(d.notes).length>0;
