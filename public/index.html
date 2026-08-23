@@ -7774,7 +7774,7 @@ function renderDevisClientCards(){
               '</div>'+
             '</div>'
           ):'')+
-          creneauBlockHtml(v.demande_id,v.creneau,v.creneau_propose,v.creneau_propose_par,v.demande&&v.demande.prestation_demarree_le)+
+          creneauBlockHtml(v.demande_id,v.creneau,v.creneau_propose,v.creneau_propose_par,v.demande&&v.demande.prestation_demarree_le,v.demande)+
         '</div>';
       }else if(v.statut==='accepte'&&v.demande_statut==='terminee'){
         badge='<span class="devis-badge badge-accepted"><i data-lucide="flag" style="width:12px;height:12px;vertical-align:-2px"></i> Terminé</span>';
@@ -9264,7 +9264,7 @@ function renderProDevisCards(){
         var blocReprogrammation=// Le cinquième argument manquait ici : le prestataire aurait gardé le bouton
         // « Reprogrammer » alors que le serveur refuse — et c'est LUI qui est sur
         // place, donc lui qui aurait cliqué en premier.
-        creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par,v.demande&&v.demande.prestation_demarree_le);
+        creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par,v.demande&&v.demande.prestation_demarree_le,v.demande);
         var creneauHtmlPro=(v.demande&&v.demande.creneau)?'<div style="display:flex;align-items:center;gap:6px;background:var(--surface-alt);border-radius:8px;padding:8px 10px;margin-top:10px;font-size:13px;font-weight:700;color:var(--text)"><i data-lucide="calendar" style="width:15px;height:15px;color:var(--p);flex-shrink:0"></i> '+formatCreneau(v.demande.creneau)+'</div>':'';
         extra='<div style="margin-top:10px">'+creneauHtmlPro+
           '<button class="btn-accept" style="width:100%;margin-top:10px;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
@@ -11086,7 +11086,17 @@ async function demarrerPrestation(demandeId,btn){
       longitude_pro:position?position.lng:null
     ,position_indisponible:positionIndisponible})});
     const d=await safeJson(r);
-    if(!r.ok){toast('❌ '+(d.error||''));if(btn)btn.disabled=false;return}
+    if(!r.ok){
+      // Le serveur refuse une arrivée déclarée plus de deux heures avant le
+      // créneau, et dit à partir de quand elle sera possible. Ce message vaut
+      // mieux qu'une croix seule : le prestataire sait quoi faire.
+      //
+      // Un refus de date n'est pas une erreur, c'est une règle — d'où
+      // l'horloge plutôt que la croix.
+      toast((r.status === 409 ? '🕒 ' : '❌ ') + (d.error||'Arrivée impossible pour le moment.'), 6000);
+      if(btn)btn.disabled=false;
+      return;
+    }
     delete photosAvantParDemande[demandeId];
     toast('✅ Arrivée confirmée. Bonne prestation !');
     loadProDevis();
@@ -11243,7 +11253,20 @@ async function checkConnectStatut(){
 // ou enregistrer en PDF via la fonction native du navigateur — pas besoin de générateur de PDF côté serveur.
 // Construit le bloc "reprogrammer" pour une carte de devis acceptée/en cours : bouton de
 // proposition, ou bannière d'acceptation/refus si l'autre partie a déjà proposé un nouveau créneau.
-function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposePar,prestationDemarreeLe){
+// Le sixième argument est la DEMANDE ENTIÈRE, et non deux champs de plus.
+// Ajouter un paramètre à chaque nouveau besoin finit par produire des appels
+// à huit arguments dont on ne sait plus lequel est lequel.
+// Le bouton de reprogrammation, écrit UNE fois. Deux chemins l'utilisent :
+// le cas normal, et celui d'une arrivée non confirmée.
+function boutonReprogrammer(safeId){
+  return '<button class="btn-accept" style="background:none;border:1.5px solid var(--border);'+
+    'color:var(--text-secondary);width:100%;margin-top:8px;font-size:13px" '+
+    'onclick="ouvrirReprogrammer(\''+safeId+'\')">'+
+    '<i data-lucide="calendar-clock" style="width:14px;height:14px;vertical-align:-2px"></i> '+
+    'Reprogrammer</button>';
+}
+
+function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposePar,prestationDemarreeLe,demande){
   var safeId=escAttr(demandeId);
 
   // ── LE PRESTATAIRE EST ARRIVÉ : PLUS DE REPORT ──────────────────────────
@@ -11253,7 +11276,32 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
   // plus décourageant qu'une absence de bouton.
   //
   // On dit ce qui reste possible, plutôt que de proposer ce qui ne l'est plus.
+  // ── LE BLOCAGE SUIT LA QUALITÉ DE L'ARRIVÉE ─────────────────────────────
+  // Il se déclenchait à la simple déclaration, sans regarder si celle-ci était
+  // crédible. Un prestataire déclarant son arrivée depuis chez lui retirait au
+  // client son droit de reprogrammer, alors que rien ne prouvait qu'il fût là.
+  //
+  // Tant qu'une arrivée douteuse n'est pas confirmée par le client, le report
+  // reste possible. C'est lui qui sait si quelqu'un a sonné.
   if(prestationDemarreeLe){
+    var d = demande || {};
+    var douteuse = (d.arrivee_qualite === 'eloignee' || d.arrivee_qualite === 'non_verifiee');
+    var confirmee = d.arrivee_confirmee_client === true;
+
+    if(douteuse && !confirmee){
+      // On ne ferme pas, mais on prévient : reprogrammer alors que le
+      // prestataire est peut-être devant la porte serait maladroit.
+      return '<div style="margin-top:8px;font-size:12px;color:var(--text-secondary);'+
+        'background:var(--light);border-radius:8px;padding:9px 11px;line-height:1.5;margin-bottom:8px">'+
+        'Le prestataire a déclaré son arrivée, mais sa position n\'a pas pu être '+
+        'confirmée. Si personne n\'est venu, vous pouvez encore reprogrammer.'+
+        '</div>' +
+        // Le même bouton qu'en temps normal, écrit une seule fois plus bas.
+        // Le dupliquer ici aurait produit deux libellés qui divergent au
+        // premier changement.
+        boutonReprogrammer(safeId);
+    }
+
     return '<div style="margin-top:8px;font-size:12px;color:var(--text-secondary);'+
       'background:var(--light);border-radius:8px;padding:9px 11px;line-height:1.5">'+
       'La prestation a commencé — elle ne peut plus être reprogrammée. '+
@@ -11271,7 +11319,7 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
         '<button class="btn-refuse" style="padding:8px" onclick="repondreCreneau(\''+safeId+'\',false,this)">❌ Refuser</button>'+
       '</div></div>';
   }
-  return '<button class="btn-accept" style="background:none;border:1.5px solid var(--border);color:var(--text-secondary);width:100%;margin-top:8px;font-size:13px" onclick="ouvrirReprogrammer(\''+safeId+'\')"><i data-lucide="calendar-clock" style="width:14px;height:14px;vertical-align:-2px"></i> Reprogrammer</button>';
+  return boutonReprogrammer(safeId);
 }
 function ouvrirGererRecurrence(demandeId,active){
   var html='<div class="modal-title">🔁 Prestation récurrente</div><div class="modal-sub">Gérez la répétition automatique de cette demande</div>'+
