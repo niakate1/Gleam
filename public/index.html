@@ -8938,6 +8938,9 @@ async function majEnteteProChiffres(){
 }
 
 async function chargerAccesRapides(){
+  // Les zones doivent être connues AVANT de composer la tuile : sans elles,
+  // `libelleZonePro` retombe sur l'ancien champ et n'affiche pas la commune.
+  await chargerZonesPro();
   var box=document.getElementById('acces-rapides');
   if(!box||!currentUser||!isPro())return;
 
@@ -8971,7 +8974,15 @@ async function chargerAccesRapides(){
     // d'intervention » passait sur deux lignes et « 15 km autour de vous » se
     // tronquait à « 15 km aut… ». L'icône dit le reste.
     { icone:'map-pin', libelle:'Zone',
-      valeur:zoneReglee?(currentUser.rayon_intervention_km+' km'):'À définir',
+      // ── « 10 KM » NE VEUT RIEN DIRE SANS SON POINT DE DÉPART ──────────
+      // La tuile affichait le rayon seul. Le prestataire devait ouvrir le
+      // réglage pour se rappeler d'où il partait — et ne savait pas si sa
+      // zone suivait ses déplacements. Elle ne les suit pas : c'est une
+      // position de référence, choisie une fois.
+      //
+      // Avec plusieurs zones, on affiche leur nombre : les nommer toutes ne
+      // tiendrait pas dans 160 pixels.
+      valeur: libelleZonePro(),
       // ouvrirZoneIntervention(), pas goProTab('pro-zone') : cet onglet n'existe
       // pas, et show(undefined) masquait tous les écrans d'un coup.
       alerte:!zoneReglee, action:'ouvrirZoneIntervention()' },
@@ -11629,6 +11640,41 @@ function arrayBufferToBase64Url(buffer){
   return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
 var carteZoneIntervention=null,markerZoneIntervention=null,cercleZoneIntervention=null;
+// ── LE LIBELLÉ DE LA TUILE « ZONE » ────────────────────────────────────────
+// Une zone : « Cergy · 10 km ». Plusieurs : « 3 zones ». Aucune : « À définir ».
+//
+// La tuile fait 160 pixels sur un écran de 393 — « 10 km autour de Cergy »
+// tiendrait, mais deux noms de communes non. Le nombre suffit à dire qu'il y
+// en a plusieurs ; le détail est dans le réglage.
+var zonesProEnMemoire = null;
+
+function libelleZonePro(){
+  if(Array.isArray(zonesProEnMemoire) && zonesProEnMemoire.length){
+    if(zonesProEnMemoire.length > 1) return zonesProEnMemoire.length + ' zones';
+    var z = zonesProEnMemoire[0];
+    return (z.libelle ? z.libelle + ' · ' : '') + z.rayon_km + ' km';
+  }
+  // Repli sur l'ancien champ tant que les zones ne sont pas chargées : mieux
+  // vaut un rayon sans commune qu'un « À définir » faux.
+  if(currentUser && typeof currentUser.rayon_intervention_km === 'number'){
+    return currentUser.rayon_intervention_km + ' km';
+  }
+  return 'À définir';
+}
+
+async function chargerZonesPro(force){
+  if(zonesProEnMemoire && !force) return zonesProEnMemoire;
+  try{
+    const r = await fetchGroupe(API+'/api/pro/zones', { headers: authHeaders() });
+    if(!r.ok) return zonesProEnMemoire || [];
+    const liste = await safeJson(r);
+    zonesProEnMemoire = Array.isArray(liste) ? liste : [];
+  }catch(e){
+    zonesProEnMemoire = zonesProEnMemoire || [];
+  }
+  return zonesProEnMemoire;
+}
+
 function ouvrirZoneIntervention(){
   var html='<div class="modal-title"><i data-lucide="map-pin" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Zone d\'intervention</div>'+
     '<div class="modal-sub">Indiquez votre position de référence, et réglez le rayon souhaité</div>'+
