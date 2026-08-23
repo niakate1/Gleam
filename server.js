@@ -3580,8 +3580,49 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
   const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demandeId).eq('statut', 'paye').maybeSingle();
   if (!paiement) return { rembourse: false };
 
+  // ── UNE ARRIVÉE CONTESTÉE NE SE FACTURE PAS AU CLIENT ──────────────────
+  // Le barème pénalise les annulations tardives : moins de deux heures avant
+  // le créneau, aucun remboursement. C'est juste quand le client change d'avis
+  // au dernier moment.
+  //
+  // Mais quand il vient de déclarer que PERSONNE N'EST VENU, il n'y est pour
+  // rien. Le créneau étant passé, le calcul donne un temps négatif — donc
+  // moins de deux heures — et il perdait tout.
+  //
+  // Il aurait payé une prestation qui n'a pas eu lieu, en punition de l'avoir
+  // signalée.
+  const { data: demandeArrivee } = await supabase.from('demandes')
+    .select('arrivee_confirmee_client, prestation_demarree_le, creneau')
+    .eq('id', demandeId).maybeSingle();
+
+  // Cas 1 — le prestataire a déclaré son arrivée, le client la conteste.
+  const arriveeContestee = demandeArrivee && demandeArrivee.arrivee_confirmee_client === false;
+
+  // ── CAS 2 — L'ABSENCE PURE, MAIS PAS LE SIMPLE RETARD ──────────────────
+  // Un prestataire peut avoir trente minutes de retard : embouteillage,
+  // chantier précédent qui déborde, place de stationnement introuvable. Rendre
+  // l'annulation gratuite à ce moment-là reviendrait à lui faire perdre sa
+  // course pour un contretemps ordinaire.
+  //
+  // Une heure, en revanche, n'est plus un retard : celui qui n'a ni déclaré
+  // son arrivée ni écrit un mot en soixante minutes ne viendra pas.
+  //
+  // Le seuil ne juge pas le prestataire — il départage deux situations que le
+  // barème confondait : « je change d'avis au dernier moment » et « j'ai
+  // attendu une heure pour rien ».
+  const MINUTES_AVANT_ABSENCE = 60;
+  let absenceConstatee = false;
+  if (demandeArrivee && !demandeArrivee.prestation_demarree_le) {
+    const instant = instantDuCreneau(demandeArrivee.creneau);
+    if (instant) {
+      absenceConstatee = (Date.now() - instant) / 60000 >= MINUTES_AVANT_ABSENCE;
+    }
+  }
+
+  const sansFrais = arriveeContestee || absenceConstatee;
+
   let pourcentage = 1;
-  if (typeof heuresRestantes === 'number') {
+  if (!sansFrais && typeof heuresRestantes === 'number') {
     if (heuresRestantes < 2) pourcentage = 0;
     else if (heuresRestantes < 24) pourcentage = 0.7;
   }
@@ -3686,7 +3727,14 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
     // Le recours reste le signalement : il passe par vous et permet un
     // arbitrage. C'est la différence entre un litige, qu'on instruit, et un
     // désistement unilatéral, qu'on subit.
-    if (demande.prestation_demarree_le) {
+    // ── SAUF SI LE CLIENT A DÉJÀ DIT QUE PERSONNE N'EST VENU ────────────
+    // Il avait répondu « non » à la question de l'arrivée, un litige était
+    // ouvert — et l'annulation restait pourtant refusée au motif que « le
+    // prestataire est déjà sur place ».
+    //
+    // On lui opposait une déclaration qu'il venait justement de contester.
+    // Sa seule issue était d'attendre sept jours qu'on tranche.
+    if (demande.prestation_demarree_le && demande.arrivee_confirmee_client !== false) {
       return res.status(409).json({
         error: 'Le prestataire est déjà sur place et a commencé la prestation. ' +
                'Elle ne peut plus être annulée — si quelque chose ne va pas, ' +
