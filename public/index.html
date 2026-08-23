@@ -8040,7 +8040,27 @@ function renderDetail(d){
       // pour distinguer « Payée », « Prestataire attendu » et « En cours ».
       var st=libelleStatutDemande(d);
   var locked=d.statut==='acceptee'||d.statut==='en_cours'||d.statut==='terminee'||d.statut==='annulee_client';
-  var canCancel=d.statut==='acceptee'||d.statut==='en_cours';
+  // ── LE BOUTON NE S'AFFICHE QUE S'IL PEUT ABOUTIR ──────────────────────
+  // Il restait visible après la déclaration d'arrivée du prestataire, et le
+  // serveur refusait : « le prestataire est déjà sur place ». Un bouton qui
+  // échoue toujours décourage plus qu'une absence de bouton.
+  //
+  // SAUF si le client a répondu que personne n'était venu : il conteste
+  // justement cette déclaration, et doit pouvoir annuler.
+  var arriveeContestee = d.arrivee_confirmee_client === false;
+
+  // ── L'ABSENCE SE CONSTATE APRÈS UNE HEURE, PAS AVANT ──────────────────
+  // Un prestataire peut avoir trente minutes de retard — embouteillage,
+  // stationnement introuvable. Annoncer « remboursement intégral » à ce
+  // moment-là inciterait à annuler quelqu'un qui arrive.
+  var instantCreneau = null;
+  var mc = /(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2})h(\d{2})/.exec(d.creneau||'');
+  if(mc) instantCreneau = new Date(+mc[1], +mc[2]-1, +mc[3], +mc[4], +mc[5]).getTime();
+  var absenceConstatee = !d.prestation_demarree_le && instantCreneau
+                         && (Date.now() - instantCreneau) / 60000 >= 60;
+
+  var canCancel=(d.statut==='acceptee'||d.statut==='en_cours')
+    && (!d.prestation_demarree_le || arriveeContestee);
   var hasPhotos=getPhotosFromNotes(d.notes).length>0;
   var html='';
   if(locked){
@@ -8087,7 +8107,14 @@ function renderDetail(d){
     '<button class="btn-modify" onclick="openModifyDemande()">✏️ Modifier</button>'+
     '<button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>'+
   '</div>';
-  if(canCancel)html+='<button class="btn-delete" style="width:100%;margin-top:10px" onclick="annulerDemandeAcceptee()">🚫 Annuler cette prestation</button>';
+  // Le libellé change quand l'arrivée est contestée : le client vient de dire
+  // que personne n'est venu, et il doit savoir qu'il sera remboursé
+  // intégralement — sinon il n'osera pas cliquer.
+  if(canCancel)html+='<button class="btn-delete" style="width:100%;margin-top:10px" onclick="annulerDemandeAcceptee()">'
+    + ((arriveeContestee || absenceConstatee)
+        ? '🚫 Annuler et être remboursé intégralement'
+        : '🚫 Annuler cette prestation')
+    + '</button>';
   // ouvrirGererRecurrence() existait, la route serveur aussi — mais aucun bouton
   // n'y menait nulle part dans l'application. Un client ayant programmé « tous
   // les 6 mois » ne pouvait donc ni l'interrompre, ni la mettre en pause : à
@@ -8189,12 +8216,43 @@ function renderDetail(d){
 }
 async function annulerDemandeAcceptee(){
   if(!currentDetailDemande)return;
+
+  // ── LE CLIENT DOIT SAVOIR CE QU'IL PAIERA AVANT DE CLIQUER ─────────────
+  // Le barème s'affichait toujours à l'identique, y compris quand l'annulation
+  // était en réalité gratuite. Quelqu'un dont le prestataire n'est jamais venu
+  // lisait « aucun remboursement » et renonçait.
+  //
+  // Deux cas donnent droit au remboursement intégral :
+  //   le client a contesté une arrivée déclarée
+  //   le créneau est dépassé d'une heure sans aucune arrivée déclarée
+  //
+  // UNE HEURE, PAS TRENTE MINUTES : un embouteillage ou une place de
+  // stationnement introuvable ne sont pas une absence.
+  var d0 = currentDetailDemande;
+  var instantD = null;
+  var mD = /(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2})h(\d{2})/.exec(d0.creneau||'');
+  if(mD) instantD = new Date(+mD[1], +mD[2]-1, +mD[3], +mD[4], +mD[5]).getTime();
+
+  var absence = !d0.prestation_demarree_le && instantD
+                && (Date.now() - instantD) / 60000 >= 60;
+  var conteste = d0.arrivee_confirmee_client === false;
+  var sansFrais = absence || conteste;
+
+  var texteBareme = sansFrais
+    ? '<strong>Remboursement intégral.</strong><br>'
+      + (conteste
+          ? 'Vous avez signalé que le prestataire n\'est pas venu.'
+          : 'Le créneau est dépassé de plus d\'une heure et le prestataire '
+            + 'n\'a pas déclaré son arrivée.')
+      + '<br><br>Il sera prévenu et pourra s\'expliquer.'
+    : '<strong>Plus de 24 h avant</strong> — annulation gratuite.<br>'
+      + '<strong>Entre 2 h et 24 h</strong> — 70 % remboursé.<br>'
+      + '<strong>Moins de 2 h avant</strong> — aucun remboursement.'
+      + '<br><br>Le prestataire sera prévenu immédiatement.';
+
   if(!await demanderConfirmation({
-    titre:'Annuler cette prestation',
-    texte:'<strong>Plus de 24 h avant</strong> — annulation gratuite.<br>'+
-          '<strong>Entre 2 h et 24 h</strong> — 70 % remboursé.<br>'+
-          '<strong>Moins de 2 h avant</strong> — aucun remboursement.'+
-          '<br><br>Le prestataire sera prévenu immédiatement.',
+    titre: sansFrais ? 'Annuler sans frais' : 'Annuler cette prestation',
+    texte: texteBareme,
     valider:'Annuler la prestation', annuler:'La conserver',
     danger:true, icone:'calendar-x'
   }))return;
