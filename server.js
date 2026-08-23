@@ -2558,6 +2558,24 @@ app.get('/api/demandes', auth, async (req, res) => {
   //
   // On joint le devis accepté aux prestations terminées : c'est ce qui permet
   // d'ouvrir la notation directement, sur la bonne personne.
+  // ── LE NOM DU FAVORI RÉSERVATAIRE ──────────────────────────────────────
+  // Rien n'indiquait au client que sa demande était réservée à quelqu'un. Il
+  // voyait « Devis reçus » comme pour n'importe quelle demande, et un lien
+  // « Ouvrir à tous » qui semblait sorti de nulle part.
+  //
+  // Dire QUI la garde change tout : « Réservée à Arnaud » explique à la fois
+  // l'état et la raison du lien.
+  const reservees = dataAJour.filter(d => d.pro_prefere_id).map(d => d.pro_prefere_id);
+  if (reservees.length) {
+    const { data: favoris } = await supabase.from('users')
+      .select('id, prenom, nom').in('id', [...new Set(reservees)]);
+    const parId = {};
+    (favoris || []).forEach(p => { parId[p.id] = ((p.prenom || '') + ' ' + (p.nom || '')).trim(); });
+    dataAJour.forEach(d => {
+      if (d.pro_prefere_id) d.pro_prefere_nom = parId[d.pro_prefere_id] || null;
+    });
+  }
+
   const terminees = dataAJour.filter(d => d.statut === 'terminee').map(d => d.id);
   if (terminees.length) {
     const { data: devisAcceptes } = await supabase.from('devis')
