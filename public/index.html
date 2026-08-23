@@ -11887,10 +11887,6 @@ async function enregistrerZoneIntervention(){
           { method:'POST', headers:authHeaders(), body:corps });
     const d=await safeJson(r);
     if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
-    // La mémoire doit suivre : sans cela, la tuile garderait l'ancien nom
-    // jusqu'au prochain chargement complet.
-    await chargerZonesPro(true);
-    if(typeof chargerAccesRapides === 'function') chargerAccesRapides();
     toast('✅ '+d.message);
     if(currentUser){currentUser.latitude=pos.lat;currentUser.longitude=pos.lng;currentUser.rayon_intervention_km=rayon}
     fermerModale();
@@ -11911,6 +11907,20 @@ async function enregistrerZoneIntervention(){
     // pas : il bougeait, mais trois secondes plus tard, quand plus personne
     // ne regardait.
     if(typeof viderMemoireRequetes==='function')viderMemoireRequetes();
+
+    // ── LES ZONES SE RELISENT APRÈS L'OUBLI, PAS AVANT ──────────────────
+    // Je les relisais juste après l'enregistrement — donc AVANT que la
+    // mémoire des requêtes soit vidée. `fetchGroupe` renvoyait alors la
+    // réponse d'il y a trois secondes : l'ANCIENNE zone.
+    //
+    // La tuile affichait bien la nouvelle valeur… trois secondes plus tard,
+    // ou au prochain passage dans l'onglet. D'où l'impression qu'il fallait
+    // ressortir puis revenir.
+    //
+    // L'`await` compte autant que l'ordre : sans lui,
+    // `chargerParcoursDemarrage` composerait la tuile avant le retour de la
+    // lecture.
+    await chargerZonesPro(true);
 
     chargerParcoursDemarrage();
     // La zone détermine quelles demandes parviennent au prestataire : la liste
