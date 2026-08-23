@@ -8051,6 +8051,41 @@ function renderDetail(d){
   // les 6 mois » ne pouvait donc ni l'interrompre, ni la mettre en pause : à
   // chaque prestation terminée, une nouvelle demande réapparaissait sans qu'il
   // puisse rien y faire. C'est ce bouton qui manquait.
+  // ── L'ARRIVÉE EST-ELLE CRÉDIBLE ? ──────────────────────────────────────
+  // Le prestataire a déclaré son arrivée, mais loin de l'adresse ou sans
+  // position vérifiable. Seul le client sait si quelqu'un est venu — aucune
+  // donnée GPS ne le remplace.
+  //
+  // Le ton compte : on ne l'alarme pas, on lui demande. Un prestataire dont la
+  // position échoue dans un parking souterrain est honnête neuf fois sur dix,
+  // et l'écrire autrement le condamnerait sans preuve.
+  if(d.statut==='en_cours'
+     && (d.arrivee_qualite==='eloignee' || d.arrivee_qualite==='non_verifiee')
+     && d.arrivee_confirmee_client === null){
+    html+='<div class="detail-card" style="border-color:var(--gold)">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+        '<span style="font-size:22px">📍</span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-weight:700;font-size:14px">Le prestataire est-il bien venu ?</div>'+
+          '<div style="font-size:12.5px;color:var(--gray)">'+
+            (d.arrivee_qualite==='eloignee'
+              ? 'Son arrivée a été enregistrée loin de l\'adresse'
+              : 'Sa position n\'a pas pu être vérifiée')+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.5;margin-bottom:12px">'+
+        'Cela arrive souvent sans que rien n\'aille mal — un parking souterrain '+
+        'ou une adresse imprécise suffisent. Votre réponse nous aide simplement '+
+        'à savoir si tout se passe bien.'+
+      '</div>'+
+      '<button class="btn-accept" style="width:100%" '+
+        'onclick="repondreArrivee(\''+escAttr(d.id)+'\',true,this)">Oui, il est là</button>'+
+      '<button class="btn-accept" style="background:none;border:1.5px solid var(--red);color:var(--red);width:100%;margin-top:8px" '+
+        'onclick="repondreArrivee(\''+escAttr(d.id)+'\',false,this)">Non, personne n\'est venu</button>'+
+    '</div>';
+  }
+
   // ── LA DEMANDE RÉSERVÉE : L'ACTION VIT DANS LE DÉTAIL ──────────────────
   // La carte de l'accueil INFORME — « Réservée à Arnaud, ouverte à tous dans
   // 4 h ». C'est tout ce dont la plupart des clients ont besoin.
@@ -11024,12 +11059,32 @@ function obtenirPositionGPS(){
 async function demarrerPrestation(demandeId,btn){
   if(btn)btn.disabled=true;
   var position=await obtenirPositionGPS();
+
+  // ── LA POSITION MANQUE : ON DEMANDE, ON NE BLOQUE PAS ─────────────────
+  // Elle échoue légitimement — parking souterrain, immeuble ancien,
+  // permission refusée. Refuser l'arrivée empêcherait un prestataire honnête
+  // de travailler.
+  //
+  // Mais un `null` silencieux ne distingue pas l'échec technique de l'absence
+  // volontaire. On demande donc une confirmation explicite : le geste devient
+  // conscient, et il est noté.
+  var positionIndisponible = false;
+  if(!position){
+    positionIndisponible = confirm(
+      'Votre position n\'a pas pu être obtenue.\n\n' +
+      'Vous pouvez continuer, mais votre présence sur place ne sera pas ' +
+      'vérifiable : le client devra confirmer votre venue, et le versement ' +
+      'pourra prendre jusqu\'à 7 jours au lieu de 48 h.\n\n' +
+      'Déclarer votre arrivée quand même ?');
+    if(!positionIndisponible){ if(btn)btn.disabled=false; return; }
+  }
+
   try{
     const r=await fetch(API+'/api/demandes/'+demandeId+'/demarrer-prestation',{method:'POST',headers:authHeaders(),body:JSON.stringify({
       photos_avant:photosAvantParDemande[demandeId]||[],
       latitude_pro:position?position.lat:null,
       longitude_pro:position?position.lng:null
-    })});
+    ,position_indisponible:positionIndisponible})});
     const d=await safeJson(r);
     if(!r.ok){toast('❌ '+(d.error||''));if(btn)btn.disabled=false;return}
     delete photosAvantParDemande[demandeId];
@@ -12784,6 +12839,26 @@ function tempsAvantOuverture(dateIso){
   // Au-delà d'un jour on arrondit : la précision n'apporte rien, et
   // « dans 27 h » se lit moins bien que « demain ».
   return 'ouverte à tous ' + (heures < 36 ? 'demain' : 'dans ' + Math.round(heures/24) + ' jours');
+}
+
+// ── LE CLIENT RÉPOND SUR L'ARRIVÉE ─────────────────────────────────────────
+// « Non » ouvre un litige automatiquement : quelqu'un qui prend la peine de
+// répondre ne devrait pas avoir à faire une seconde démarche pour être
+// entendu. Lui demander de signaler ensuite, c'est perdre la moitié des
+// réponses.
+async function repondreArrivee(demandeId, estVenu, btn){
+  if(btn) btn.disabled = true;
+  try{
+    const r = await fetch(API+'/api/demandes/'+demandeId+'/confirmer-arrivee',
+      { method:'POST', headers:authHeaders(), body:JSON.stringify({ est_venu: estVenu }) });
+    const d = await safeJson(r);
+    if(!r.ok){ toast(messageErreur(r, d)); if(btn) btn.disabled = false; return; }
+    toast((estVenu ? '✅ ' : '📩 ') + (d.message||'C\'est noté.'), 5000);
+    if(typeof openDetail === 'function') openDetail(demandeId);
+  }catch(e){
+    toast(friendlyNetworkError(e));
+    if(btn) btn.disabled = false;
+  }
 }
 
 // ── LA CONFIRMATION ────────────────────────────────────────────────────────
