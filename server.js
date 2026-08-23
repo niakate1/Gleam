@@ -553,6 +553,61 @@ function normaliserSiret(brut) {
   return String(brut || '').replace(/[^0-9]/g, '');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GÉOCODER UNE ADRESSE
+//
+// Les coordonnées d'une demande viennent de l'autocomplétion. Si le client
+// tape son adresse sans choisir de suggestion, elles restent nulles — et sans
+// coordonnées, aucune distance ne peut être calculée à l'arrivée du
+// prestataire. Toute la vérification tombe.
+//
+// L'API Adresse du gouvernement comble ce trou : gratuite, sans clé, et
+// alimentée par la Base Adresse Nationale.
+//
+// ELLE NE DOIT JAMAIS BLOQUER UNE DEMANDE
+//
+// Un service indisponible, une adresse mal orthographiée, un lieu-dit absent
+// de la base : dans tous ces cas on renvoie null et la demande part quand
+// même. Refuser une demande parce qu'un service tiers ne répond pas serait
+// punir le client pour une panne qui ne le concerne pas.
+// ═══════════════════════════════════════════════════════════════════════════
+async function geocoderAdresse(adresse) {
+  const texte = String(adresse || '').trim();
+  if (texte.length < 8) return null;   // trop court pour être une adresse
+
+  try {
+    const reponse = await fetch(
+      'https://api-adresse.data.gouv.fr/search/?limit=1&q=' + encodeURIComponent(texte),
+      { signal: AbortSignal.timeout(4000), headers: { 'Accept': 'application/json' } }
+    );
+    if (!reponse.ok) {
+      console.warn('Géocodage — service indisponible (statut ' + reponse.status + ')');
+      return null;
+    }
+    const data = await reponse.json();
+    const trouve = data && Array.isArray(data.features) ? data.features[0] : null;
+    if (!trouve || !trouve.geometry || !Array.isArray(trouve.geometry.coordinates)) return null;
+
+    // Le score dit à quel point l'adresse trouvée ressemble à celle demandée.
+    // En dessous de 0,4, la Base Adresse Nationale a renvoyé « la commune la
+    // plus proche » plutôt que l'adresse — s'en servir placerait le point à
+    // des kilomètres, et déclencherait une alerte sur un prestataire honnête.
+    const score = typeof trouve.properties?.score === 'number' ? trouve.properties.score : 0;
+    if (score < 0.4) {
+      console.warn('Géocodage — correspondance trop faible (' + score.toFixed(2) + ') pour : ' + texte);
+      return null;
+    }
+
+    const [lng, lat] = trouve.geometry.coordinates;   // la BAN renvoie lng, lat
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    return { latitude: lat, longitude: lng, score };
+  } catch (e) {
+    // Délai dépassé, réseau coupé, réponse illisible : on continue sans.
+    console.warn('Géocodage impossible :', e.message);
+    return null;
+  }
+}
+
 async function verifierSiretOfficiel(siretBrut) {
   const siret = normaliserSiret(siretBrut);
   if (siret.length !== 14) return { statut: 'introuvable', motif: 'format' };
@@ -1688,6 +1743,25 @@ app.post('/api/demandes', auth, async (req, res) => {
 
     const notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations, photos: cheminsPhotos });
 
+    // ── LES COORDONNÉES, MÊME SANS AUTOCOMPLÉTION ────────────────────────
+    // Elles viennent normalement du choix d'une suggestion d'adresse. Si le
+    // client a tapé son adresse à la main, elles sont absentes — et sans
+    // elles, la distance du prestataire à l'arrivée ne peut pas être vérifiée.
+    //
+    // On géocode donc au serveur. Si cela échoue, la demande part quand même
+    // sans coordonnées : une panne de service tiers ne doit pas empêcher
+    // quelqu'un de commander.
+    let coordonnees = {
+      latitude: (typeof latitude === 'number' && !isNaN(latitude)) ? latitude : null,
+      longitude: (typeof longitude === 'number' && !isNaN(longitude)) ? longitude : null
+    };
+    if (coordonnees.latitude === null || coordonnees.longitude === null) {
+      const trouve = await geocoderAdresse(address);
+      if (trouve) {
+        coordonnees = { latitude: trouve.latitude, longitude: trouve.longitude };
+      }
+    }
+
     const { data, error } = await supabase.from('demandes').insert({
       client_id: req.user.id,
       prestation: prestationLabel,
@@ -1698,8 +1772,8 @@ app.post('/api/demandes', auth, async (req, res) => {
       pro_prefere_id: proPrefereValide,
       // L'exclusivité n'a de sens que s'il y a un favori désigné.
       exclusivite_jusqu_a: proPrefereValide ? finExclusivite(creneau) : null,
-      latitude: (typeof latitude === 'number' && !isNaN(latitude)) ? latitude : null,
-      longitude: (typeof longitude === 'number' && !isNaN(longitude)) ? longitude : null,
+      latitude: coordonnees.latitude,
+      longitude: coordonnees.longitude,
       statut: 'en_attente',
       recurrence: recurrenceValide,
       recurrence_active: recurrenceValide ? true : null,
@@ -2294,18 +2368,54 @@ async function cloturerPrestationsOubliees() {
     // échoue doit se voir : sinon on cherche pendant des jours pourquoi rien
     // ne se passe.
     // ═══════════════════════════════════════════════════════════════════
+    // ── DEUX DÉLAIS, SELON LA QUALITÉ DE L'ARRIVÉE ─────────────────────
+    // Une arrivée vérifiée à moins d'un kilomètre se clôture à 48 h, comme
+    // avant. Une arrivée éloignée ou non vérifiée attend SEPT JOURS.
+    //
+    // POURQUOI ALLONGER, ET NON SUSPENDRE
+    //
+    // Suspendre indéfiniment punirait le prestataire honnête dont la position
+    // a échoué — parking souterrain, immeuble ancien, permission refusée. Sa
+    // prestation est faite, son temps est passé, et il attendrait un client
+    // satisfait qui ne rouvre jamais l'application.
+    //
+    // Une suspension sans fin, c'est un impayé. Sept jours laissent au client
+    // tout le temps de contester, et le prestataire finit par être payé si
+    // personne ne dit rien.
+    //
+    // Le silence ne doit jamais valoir accusation.
+    const limiteDouteuse = new Date(Date.now() - 7 * 24 * 3600000).toISOString();
+
     const { data: aClore, error: erreurLecture } = await supabase.from('demandes')
-      .select('id, client_id, prestation, prestation_demarree_le')
+      .select('id, client_id, prestation, prestation_demarree_le, arrivee_qualite, arrivee_confirmee_client')
       .eq('statut', 'en_cours')
       .not('prestation_demarree_le', 'is', null)
+      // On lit large — toutes celles qui dépassent 48 h — puis on écarte
+      // ensuite celles dont l'arrivée est douteuse et qui n'ont pas encore
+      // atteint sept jours. Filtrer les deux délais en SQL demanderait une
+      // condition OR imbriquée, plus difficile à relire qu'un filtre en clair.
       .lt('prestation_demarree_le', limite)
-      .limit(100);
+      .limit(200);
 
     if (erreurLecture) {
       console.error('Clôture automatique — lecture impossible :', erreurLecture.message);
       throw new Error('lecture des prestations à clôturer : ' + erreurLecture.message);
     }
     if (!aClore || !aClore.length) return 0;
+
+    // ── LE SECOND DÉLAI S'APPLIQUE ICI ─────────────────────────────────
+    // Une arrivée éloignée ou non vérifiée attend sept jours — sauf si le
+    // client a explicitement confirmé que quelqu'un était bien venu. Dans ce
+    // cas, il n'y a plus de doute, et faire attendre le prestataire cinq
+    // jours de plus n'aurait aucun sens.
+    const douteuse = (d) =>
+      (d.arrivee_qualite === 'eloignee' || d.arrivee_qualite === 'non_verifiee')
+      && d.arrivee_confirmee_client !== true;
+
+    const pretes = aClore.filter(d =>
+      !douteuse(d) || d.prestation_demarree_le < limiteDouteuse
+    );
+    if (!pretes.length) return 0;
 
     // ── UN LITIGE OUVERT SUSPEND LA CLÔTURE ─────────────────────────────
     // Payer automatiquement une prestation contestée reviendrait à trancher
@@ -2317,7 +2427,7 @@ async function cloturerPrestationsOubliees() {
     // cours au passage suivant.
     const { data: litiges } = await supabase.from('signalements')
       .select('demande_id')
-      .in('demande_id', aClore.map(d => d.id))
+      .in('demande_id', pretes.map(d => d.id))
       // « traite » est le mot qu'écrit l'administration. « resolu » et « rejete »
       // sont prévus pour un arbitrage plus fin, s'il vient un jour.
       // Les trois libèrent le paiement ; tout le reste le suspend.
@@ -2325,7 +2435,7 @@ async function cloturerPrestationsOubliees() {
     const demandesEnLitige = new Set((litiges || []).map(l => l.demande_id));
     let cloturees = 0;
 
-    for (const d of aClore) {
+    for (const d of pretes) {
       if (demandesEnLitige.has(d.id)) {
         console.log('Clôture suspendue pour ' + d.id + ' : signalement ouvert.');
         continue;
@@ -4463,7 +4573,10 @@ function validerPhotos(photos, max) {
 // prestation. Rien ne change de statut ici, c'est purement informatif et rassurant pour le client.
 app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
   try {
-    const { photos_avant, latitude_pro, longitude_pro } = req.body;
+    // `position_indisponible` : le prestataire déclare explicitement ne pas
+    // pouvoir partager sa position. Un geste conscient vaut mieux qu'un null
+    // silencieux — il distingue l'échec technique de l'absence voulue.
+    const { photos_avant, latitude_pro, longitude_pro, position_indisponible } = req.body;
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
     if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (demande.statut !== 'en_cours') return res.status(400).json({ error: 'Cette prestation n\'est pas en cours.' });
@@ -4498,6 +4611,27 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
       distanceGpsMetres = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     }
 
+    // ── QUALIFIER L'ARRIVÉE ────────────────────────────────────────────
+    // DEUX kilomètres de tolérance.
+    //
+    // Une adresse approximative, un grand ensemble, une entrée de service à
+    // l'arrière du bâtiment, un lieu-dit mal géocodé — il y a trop de raisons
+    // légitimes d'être loin du point enregistré pour être strict.
+    //
+    // Le seuil ne sert pas à détecter les imprécisions, mais les absences :
+    // quelqu'un qui déclare son arrivée depuis chez lui est à des kilomètres,
+    // pas à quinze cents mètres. Deux kilomètres écartent tout le bruit sans
+    // laisser passer ce qu'on cherche.
+    const SEUIL_METRES = 2000;
+    let qualiteArrivee;
+    if (distanceGpsMetres === null) {
+      qualiteArrivee = 'non_verifiee';   // pas de position, ou pas de coordonnées
+    } else if (distanceGpsMetres <= SEUIL_METRES) {
+      qualiteArrivee = 'sur_place';
+    } else {
+      qualiteArrivee = 'eloignee';
+    }
+
     await supabase.from('demandes').update({
       photos_avant: photos_avant && photos_avant.length
         ? JSON.stringify(await televerserPhotos(photos_avant, 'demandes/' + req.params.id + '/avant'))
@@ -4506,7 +4640,13 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
       distance_gps_arrivee: distanceGpsMetres,
       // Ce qui manque est noté, pas refusé. Consultable dans l'administration
       // pour repérer un prestataire qui n'en fournit jamais.
-      arrivee_sans_photo: sansPhoto
+      arrivee_sans_photo: sansPhoto,
+
+      // Trois états, et aucun ne refuse l'arrivée. Ils servent à décider du
+      // délai de clôture et à consulter le client — jamais à empêcher
+      // quelqu'un de travailler.
+      arrivee_qualite: qualiteArrivee,
+      position_refusee_par_pro: position_indisponible === true
     }).eq('id', req.params.id);
 
     res.json({ message: 'Arrivée confirmée. Bonne prestation !' });
@@ -4832,6 +4972,78 @@ app.delete('/api/favoris/:proId', auth, async (req, res) => {
 // L'ouverture automatique couvre le cas où le client n'y pense pas ; ce bouton
 // couvre celui où il n'attend pas.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LE CLIENT RÉPOND : QUELQU'UN EST-IL VENU ?
+//
+// Quand l'arrivée déclarée est éloignée ou non vérifiée, on demande au client
+// de confirmer. C'est lui qui sait — aucune donnée GPS ne le remplace.
+//
+//   « oui »   la clôture reprend son délai normal de 48 h
+//   « non »   un litige s'ouvre automatiquement
+//
+// POURQUOI LE LITIGE EST AUTOMATIQUE
+//
+// Un client qui prend la peine de répondre « personne n'est venu » ne devrait
+// pas avoir à faire une seconde démarche pour être entendu. Lui demander de
+// signaler ensuite, c'est perdre la moitié des réponses.
+//
+// L'argent reste bloqué jusqu'à votre arbitrage — ni versé, ni remboursé.
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/demandes/:id/confirmer-arrivee', auth, async (req, res) => {
+  try {
+    const estVenu = req.body && req.body.est_venu === true;
+
+    const { data: demande } = await supabase.from('demandes')
+      .select('id, client_id, statut, arrivee_qualite, prestation')
+      .eq('id', req.params.id).maybeSingle();
+
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
+    if (demande.client_id !== req.user.id) {
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
+    }
+    if (demande.statut !== 'en_cours') {
+      return res.status(409).json({ error: 'Cette prestation n\'est plus en cours.' });
+    }
+
+    await supabase.from('demandes')
+      .update({ arrivee_confirmee_client: estVenu })
+      .eq('id', demande.id);
+
+    if (estVenu) {
+      return res.json({ message: 'Merci. Vous pourrez valider la prestation une fois terminée.' });
+    }
+
+    // ── LE LITIGE S'OUVRE SEUL ─────────────────────────────────────────
+    // On évite le doublon : si le client répond deux fois, ou s'il avait déjà
+    // signalé, un second signalement brouillerait votre arbitrage.
+    const { data: dejaSignale } = await supabase.from('signalements')
+      .select('id').eq('demande_id', demande.id)
+      .not('statut', 'in', '(traite,resolu,rejete)')
+      .maybeSingle();
+
+    if (!dejaSignale) {
+      await supabase.from('signalements').insert({
+        demande_id: demande.id,
+        // La colonne s'appelle `reporter_id`, pas `auteur_id`. Vérifié dans le
+        // schéma : une insertion sur un nom inventé aurait échoué en silence,
+        // et le litige ne se serait jamais ouvert.
+        reporter_id: req.user.id,
+        motif: 'Arrivée contestée',
+        description: 'Le client déclare que le prestataire n\'est pas venu, '
+          + 'alors qu\'une arrivée a été enregistrée'
+          + (demande.arrivee_qualite === 'eloignee' ? ' à plus d\'un kilomètre de l\'adresse.' : ' sans position vérifiable.'),
+        statut: 'nouveau'
+      });
+    }
+
+    res.json({
+      message: 'C\'est noté. Nous examinons la situation — votre paiement reste bloqué en attendant.'
+    });
+  } catch (e) {
+    erreurServeur(res, 'POST /api/demandes/:id/confirmer-arrivee', e);
+  }
+});
+
 app.patch('/api/demandes/:id/ouvrir-a-tous', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes')
