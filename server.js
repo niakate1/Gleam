@@ -1807,6 +1807,48 @@ app.post('/api/demandes', auth, async (req, res) => {
     // conservés en base. Le dossier est tiré au hasard : l'identifiant de la
     // demande n'existe pas encore à cet instant, et un chemin devinable serait
     // de toute façon inutile puisque le dépôt est privé.
+    // ── DIX DEMANDES ACTIVES AU MAXIMUM ─────────────────────────────────
+    // Un doigt qui reste appuyé, une connexion instable qui fait renvoyer le
+    // formulaire — et cinquante demandes partent. Vos prestataires reçoivent
+    // cinquante notifications et chiffrent cinquante devis dont quarante-neuf
+    // ne serviront à rien.
+    //
+    // Ce n'est pas la malveillance qu'on arrête, c'est l'accident.
+    const { count: actives } = await supabase.from('demandes')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', req.user.id)
+      .in('statut', ['en_attente', 'devis_recus', 'acceptee', 'en_cours']);
+
+    if ((actives || 0) >= 10) {
+      return res.status(409).json({
+        error: 'Vous avez déjà dix demandes en cours. Terminez-en ou annulez-en '
+             + 'une avant d\'en créer une nouvelle.'
+      });
+    }
+
+    // ── LA MÊME DEMANDE, DEUX FOIS ──────────────────────────────────────
+    // Le client ne voit pas la confirmation sur un réseau instable, alors il
+    // recommence. Les prestataires voient deux fois la même demande, et le
+    // client se retrouve avec deux devis pour un seul besoin.
+    //
+    // Deux minutes : au-delà, une demande identique est probablement voulue —
+    // deux voitures à nettoyer au même endroit, par exemple.
+    const ilYaDeuxMinutes = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: doublon } = await supabase.from('demandes')
+      .select('id')
+      .eq('client_id', req.user.id)
+      .eq('adresse', address)
+      .eq('creneau', creneau)
+      .gte('created_at', ilYaDeuxMinutes)
+      .maybeSingle();
+
+    if (doublon) {
+      // On renvoie la demande EXISTANTE plutôt qu'une erreur : du point de vue
+      // du client, sa demande est bien passée. Lui afficher un échec le ferait
+      // recommencer une troisième fois.
+      return res.json({ id: doublon.id, doublon_evite: true });
+    }
+
     const dossierPhotos = 'demandes/' + crypto.randomUUID();
     const cheminsPhotos = await televerserPhotos(photos || [], dossierPhotos);
 
@@ -2578,6 +2620,88 @@ async function cloturerPrestationsOubliees() {
   } catch (err) {
     // Une clôture qui échoue ne doit jamais empêcher la lecture des demandes.
     console.error('Clôture automatique ignorée:', err.message);
+    return 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RAPPELER AU PRESTATAIRE DE DÉCLARER SON ARRIVÉE
+//
+// Beaucoup d'oublis viennent de là : le prestataire EST sur place, mais n'a
+// pas pensé à le déclarer. Et cette déclaration décide de tout — le report,
+// l'annulation, le compte à rebours du versement.
+//
+// Trente minutes avant, il est encore en route ou vient d'arriver : c'est le
+// moment où le rappel sert. Une heure avant, il l'aurait oublié ; à l'heure
+// dite, il est déjà en train de travailler.
+//
+// LE CLIENT EST PRÉVENU AUSSI
+//
+// Il attend quelqu'un. Savoir que le prestataire a été rappelé le rassure —
+// et s'il ne voit rien venir, il saura que ce n'est pas un oubli du système.
+// ═══════════════════════════════════════════════════════════════════════════
+async function rappelerDeclarationArrivee() {
+  try {
+    // On regarde large — les prestations des trois prochaines heures — puis on
+    // filtre sur la fenêtre exacte. Le créneau est un texte en heure
+    // française : PostgreSQL ne peut pas le comparer à un instant.
+    const { data: proches, error } = await supabase.from('demandes')
+      .select('id, client_id, prestation, creneau, prestation_demarree_le')
+      .eq('statut', 'en_cours')
+      .is('prestation_demarree_le', null)
+      .is('rappel_arrivee_envoye_le', null)
+      .limit(100);
+
+    if (error) {
+      console.error('Rappel d\'arrivée — lecture impossible :', error.message);
+      return 0;
+    }
+    if (!proches || !proches.length) return 0;
+
+    const maintenant = Date.now();
+    let envoyes = 0;
+
+    for (const d of proches) {
+      const instant = instantDuCreneau(d.creneau);
+      if (!instant) continue;
+
+      const minutesAvant = (instant - maintenant) / 60000;
+      // La fenêtre est large de 30 minutes pour couvrir l'intervalle entre
+      // deux passages du balayage — sinon un créneau tomberait entre deux
+      // et ne recevrait jamais son rappel.
+      if (minutesAvant > 30 || minutesAvant < 0) continue;
+
+      // Le prestataire qui doit venir : celui dont le devis a été accepté.
+      const { data: devis } = await supabase.from('devis')
+        .select('societe_id').eq('demande_id', d.id).eq('statut', 'accepte').maybeSingle();
+      if (!devis) continue;
+
+      const quand = Math.max(0, Math.round(minutesAvant));
+
+      envoyerNotificationPush(devis.societe_id, {
+        titre: 'Prestation dans ' + quand + ' minutes',
+        corps: 'Pensez à déclarer votre arrivée une fois sur place — c\'est ce qui '
+             + 'déclenche votre paiement.',
+        url: '/#pro-devis'
+      }).catch(() => {});
+
+      envoyerNotificationPush(d.client_id, {
+        titre: 'Votre prestation approche',
+        corps: 'Le prestataire a été prévenu. Il déclarera son arrivée en arrivant.',
+        url: '/#accueil'
+      }).catch(() => {});
+
+      // On marque AVANT de compter : si le marquage échoue, mieux vaut un
+      // rappel manquant qu'une notification toutes les quinze minutes.
+      await supabase.from('demandes')
+        .update({ rappel_arrivee_envoye_le: new Date().toISOString() })
+        .eq('id', d.id);
+
+      envoyes++;
+    }
+    return envoyes;
+  } catch (e) {
+    console.error('Rappel d\'arrivée :', e.message);
     return 0;
   }
 }
@@ -3589,6 +3713,38 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
 
     const { data: devisAccepte } = await supabase.from('devis').select('*').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
 
+    // ── L'ABSENCE EST NOTÉE, PAS SANCTIONNÉE ──────────────────────────────
+    // Un prestataire qui ne vient pas ne laissait aucune trace : on ne le
+    // savait qu'en lisant les litiges un par un.
+    //
+    // On compte SEULEMENT si le créneau est passé et qu'aucune arrivée n'a été
+    // déclarée. Une annulation la veille n'est pas une absence — c'est le
+    // client qui change d'avis, et le barème s'en charge.
+    //
+    // AUCUNE SUSPENSION AUTOMATIQUE : trois absences peuvent venir d'un
+    // téléphone cassé, d'un accident, d'une hospitalisation. Le compteur sert
+    // à REGARDER. Avec quatre prestataires, un chiffre visible suffit.
+    if (devisAccepte && !demande.prestation_demarree_le) {
+      const instantPrestation = instantDuCreneau(demande.creneau);
+      if (instantPrestation && Date.now() > instantPrestation) {
+        const { data: pro } = await supabase.from('users')
+          .select('absences_constatees').eq('id', devisAccepte.societe_id).single();
+        await supabase.from('users')
+          .update({ absences_constatees: ((pro && pro.absences_constatees) || 0) + 1 })
+          .eq('id', devisAccepte.societe_id);
+
+        // Il doit l'apprendre tout de suite : s'il est en route, il fait
+        // demi-tour. Par courriel, il l'apprendrait le lendemain — après avoir
+        // fait le déplacement pour rien.
+        envoyerNotificationPush(devisAccepte.societe_id, {
+          titre: 'Prestation annulée',
+          corps: 'Le client a annulé : votre arrivée n\'avait pas été déclarée. '
+               + 'Si vous étiez en route, écrivez-lui depuis la conversation.',
+          url: '/#pro-devis'
+        }).catch(() => {});
+      }
+    }
+
     // Si la prestation était déjà payée (en cours), applique le barème de frais avant d'annuler
     const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id, heuresRestantes) : { rembourse: false };
 
@@ -3761,6 +3917,48 @@ async function prestataireEnRegle(proId) {
   return { enRegle: manques.length === 0, manques };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// UN PRIX DE DEVIS A UNE LIMITE HAUTE
+//
+// Le seul contrôle était « le prix doit être positif ». Un prestataire pouvait
+// chiffrer un nettoyage de canapé à cinquante mille euros.
+//
+// CE N'EST PAS LA MALVEILLANCE QU'ON CRAINT, C'EST LA FAUTE DE FRAPPE
+//
+// Saisir 12000 au lieu de 120 arrive. Le client qui accepte sans regarder se
+// voit débiter douze mille euros — remboursement Stripe, litige, client perdu.
+// Le mal est fait avant que quiconque s'en aperçoive.
+//
+// LE PLAFOND EST GÉNÉREUX, DÉLIBÉRÉMENT
+//
+// Dix fois le tarif de référence le plus élevé de la prestation. Un canapé
+// d'angle en cuir très sale peut légitimement coûter trois fois le tarif de
+// base ; jamais trente. Le plafond n'est pas là pour discuter un prix, mais
+// pour arrêter un chiffre impossible.
+// ═══════════════════════════════════════════════════════════════════════════
+function plafondDevis(prestationTexte) {
+  // Une demande peut porter plusieurs prestations : le plafond est la somme
+  // des plafonds, sinon un devis groupé légitime serait refusé.
+  const types = String(prestationTexte || '')
+    .split('+').map(t => t.trim().toLowerCase()).filter(Boolean);
+
+  let total = 0;
+  for (const type of types) {
+    const config = PRESTATION_CONFIG[type];
+    if (!config || !config.tierDefaults) {
+      // Prestation inconnue — « autre », par exemple. On applique un plafond
+      // large plutôt que de refuser : mieux vaut laisser passer un prix élevé
+      // que bloquer une prestation légitime qu'on n'a pas prévue.
+      total += 5000;
+      continue;
+    }
+    const plusEleve = Math.max(...Object.values(config.tierDefaults));
+    total += plusEleve * 10;
+  }
+  // Aucune prestation reconnue : on retombe sur le plafond large.
+  return total > 0 ? total : 5000;
+}
+
 app.post('/api/devis', auth, async (req, res) => {
   try {
     const { demande_id, prix_ttc, description, creneau_propose } = req.body;
@@ -3798,6 +3996,22 @@ app.post('/api/devis', auth, async (req, res) => {
     }
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', demande_id).single();
+
+    // ── LE PRIX A UNE LIMITE HAUTE ────────────────────────────────────────
+    // Le contrôle vient ICI et pas plus haut : le plafond dépend de la
+    // prestation, qu'on ne connaît qu'après avoir lu la demande.
+    //
+    // Une faute de frappe — 12 000 au lieu de 120 — passait sans obstacle.
+    if (demande) {
+      const plafond = plafondDevis(demande.prestation);
+      if (parseFloat(prix_ttc) > plafond) {
+        return res.status(400).json({
+          error: 'Ce montant dépasse la limite pour cette prestation ('
+            + plafond.toLocaleString('fr-FR') + ' € maximum). '
+            + 'Vérifiez que vous n\'avez pas ajouté un zéro de trop.'
+        });
+      }
+    }
     if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Cette demande n\'est plus disponible.' });
@@ -5589,6 +5803,21 @@ app.post('/api/evaluations', auth, async (req, res) => {
     const moyenne = notes.reduce(function(a, b) { return a + b.note; }, 0) / notes.length;
     await supabase.from('users').update({ note_moyenne: Math.round(moyenne * 100) / 100 }).eq('id', evalue_id);
 
+    // ── LA PERSONNE NOTÉE DOIT LE SAVOIR ────────────────────────────────
+    // C'est une reconnaissance autant qu'une information : un artisan qui
+    // reçoit cinq étoiles et n'en sait rien perd la seule récompense
+    // immatérielle de la plateforme.
+    //
+    // Et pour une note basse, il doit pouvoir réagir — vous écrire,
+    // s'expliquer — plutôt que de la découvrir des semaines plus tard.
+    envoyerNotificationPush(evalue_id, {
+      titre: note >= 4 ? 'Vous avez reçu ' + note + ' étoiles' : 'Vous avez reçu un avis',
+      corps: note >= 4
+        ? 'Merci pour votre travail — cet avis apparaîtra sur votre profil.'
+        : 'Un client vient de vous évaluer. Consultez son commentaire.',
+      url: '/#profile'
+    }).catch(() => {});
+
     res.status(201).json(data);
   } catch (e) {
     erreurServeur(res, 'POST /api/evaluations', e);
@@ -7230,6 +7459,12 @@ async function balayerPrestationsAValider() {
     // cela évite une quatrième minuterie.
     const ouvertes = await ouvrirExclusivitesEchues();
     if (ouvertes) console.log('🔓 ' + ouvertes + ' demande(s) ouverte(s) à tous.');
+
+    // Le rappel d'arrivée suit le même rythme. Quinze minutes de battement sur
+    // une fenêtre de trente conviennent : chaque prestation est vue au moins
+    // une fois dans sa fenêtre.
+    const rappels = await rappelerDeclarationArrivee();
+    if (rappels) console.log('🔔 ' + rappels + ' rappel(s) d\'arrivée envoyé(s).');
     const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
     CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
