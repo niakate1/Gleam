@@ -2640,6 +2640,68 @@ async function cloturerPrestationsOubliees() {
 // Il attend quelqu'un. Savoir que le prestataire a été rappelé le rassure —
 // et s'il ne voit rien venir, il saura que ce n'est pas un oubli du système.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// REPRENDRE LES VIREMENTS QUI ONT ÉCHOUÉ
+//
+// Un virement échoue pour des raisons temporaires : solde de plateforme
+// insuffisant, compte Connect pas encore actif, incident Stripe. Sans reprise,
+// le prestataire attendrait indéfiniment un argent que le client a déjà payé.
+//
+// POURQUOI UN DÉLAI D'UNE HEURE ENTRE DEUX TENTATIVES
+//
+// Réessayer toutes les quinze minutes sur un compte Connect inachevé produit
+// quatre échecs par heure et autant de lignes de journal — sans plus de chance
+// d'aboutir. Une heure laisse le temps qu'une situation change.
+//
+// POURQUOI ON S'ARRÊTE À CINQ TENTATIVES
+//
+// Au-delà, la cause n'est pas temporaire : le compte du prestataire n'est pas
+// en règle, ou le montant dépasse le solde disponible. Continuer masquerait le
+// problème au lieu de le signaler. Le paiement reste visible dans
+// l'administration, avec le motif du dernier échec.
+// ═══════════════════════════════════════════════════════════════════════════
+async function reprendreVirementsEchoues() {
+  try {
+    const ilYaUneHeure = new Date(Date.now() - 3600 * 1000).toISOString();
+
+    const { data: aReprendre, error } = await supabase.from('paiements')
+      .select('id, demande_id, transfert_tentatives')
+      .eq('statut', 'paye')
+      .not('transfert_erreur', 'is', null)
+      .lt('transfert_tentative_le', ilYaUneHeure)
+      .lt('transfert_tentatives', 5)
+      .limit(20);
+
+    if (error) {
+      console.error('Reprise des virements — lecture impossible :', error.message);
+      return 0;
+    }
+    if (!aReprendre || !aReprendre.length) return 0;
+
+    let repris = 0;
+    for (const p of aReprendre) {
+      // La prestation doit être terminée : un paiement encore en cours n'a
+      // rien à verser, et sa présence ici serait un autre défaut.
+      const { data: demande } = await supabase.from('demandes')
+        .select('statut').eq('id', p.demande_id).maybeSingle();
+      if (!demande || demande.statut !== 'terminee') continue;
+
+      const resultat = await finaliserPrestation(p.demande_id);
+      if (resultat && !resultat.erreur) {
+        // Le virement a abouti : on efface la trace de l'échec, sinon le
+        // paiement reviendrait à chaque passage.
+        await supabase.from('paiements')
+          .update({ transfert_erreur: null }).eq('id', p.id);
+        repris++;
+      }
+    }
+    return repris;
+  } catch (e) {
+    console.error('Reprise des virements :', e.message);
+    return 0;
+  }
+}
+
 async function rappelerDeclarationArrivee() {
   try {
     // On regarde large — les prestations des trois prochaines heures — puis on
@@ -5089,6 +5151,27 @@ async function finaliserPrestation(paiement) {
       });
     } catch (stripeErr) {
       console.error('Virement Stripe échoué:', stripeErr);
+
+      // ── L'ÉCHEC DOIT LAISSER UNE TRACE ──────────────────────────────────
+      // On rendait la main sans rien écrire : le paiement restait dans l'état
+      // de réservation « liberation_en_cours », posé par l'appelant.
+      //
+      // Aucun balayage ne cherche cet état — le paiement devenait invisible.
+      // Ni versé, ni remboursé, ni signalé. Le prestataire attendait un
+      // virement qui ne partirait jamais.
+      //
+      // C'est ce qui s'est produit le 19 août avec les deux virements de
+      // Christopher : on ne l'a découvert qu'en cherchant autre chose.
+      //
+      // On rend le paiement à « paye » — l'état d'où une nouvelle tentative
+      // peut repartir — et on note pourquoi.
+      await supabase.from('paiements').update({
+        statut: 'paye',
+        transfert_erreur: String(stripeErr.message || 'inconnue').slice(0, 300),
+        transfert_tentative_le: new Date().toISOString(),
+        transfert_tentatives: (paiement.transfert_tentatives || 0) + 1
+      }).eq('id', paiement.id);
+
       return { erreur: 'Le virement vers le prestataire a échoué (' + (stripeErr.message || 'compte Stripe non prêt') + '). Réessayez plus tard ou contactez le support.' };
     }
   }
@@ -7513,6 +7596,9 @@ async function balayerPrestationsAValider() {
     // une fois dans sa fenêtre.
     const rappels = await rappelerDeclarationArrivee();
     if (rappels) console.log('🔔 ' + rappels + ' rappel(s) d\'arrivée envoyé(s).');
+
+    const virements = await reprendreVirementsEchoues();
+    if (virements) console.log('💸 ' + virements + ' virement(s) repris.');
     const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
     CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
