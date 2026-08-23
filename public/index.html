@@ -11732,13 +11732,37 @@ function choisirAdresseZoneIntervention(lat,lng,label){
 }
 // Géolocalisation automatique — gratuite, fournie nativement par le navigateur, aucun service
 // payant nécessaire. Demande simplement l'autorisation au pro, comme n'importe quel site.
+// Le nom retenu pour la zone : commune trouvée par géolocalisation, ou
+// adresse choisie dans les suggestions. Sans lui, la zone repart sans nom et
+// la tuile réaffiche « Ma zone ».
+var zoneLibelleChoisi = null;
+
 function geolocaliserZoneIntervention(){
   if(!navigator.geolocation){toast('❌ La géolocalisation n\'est pas disponible sur cet appareil.');return}
   toast('📍 Recherche de votre position...');
-  navigator.geolocation.getCurrentPosition(function(position){
-    deplacerZoneIntervention(position.coords.latitude,position.coords.longitude,14);
+  navigator.geolocation.getCurrentPosition(async function(position){
+    var lat=position.coords.latitude, lng=position.coords.longitude;
+    deplacerZoneIntervention(lat,lng,14);
+
+    // ── ON NOMME LA POSITION, ON NE L'APPELLE PLUS « POSITION ACTUELLE » ──
+    // Le champ affichait ce libellé littéral. Le prestataire ne savait donc
+    // pas où il venait de se placer — et sa zone héritait ensuite d'un nom
+    // vide, d'où le « Ma zone » sur la tuile.
+    //
+    // Le serveur relaie l'API Adresse : l'appeler depuis le navigateur
+    // exposerait l'application au partage d'origine.
     var champ=document.getElementById('zone-adresse-recherche');
     if(champ)champ.value='Position actuelle';
+    try{
+      const r=await fetch(API+'/api/geo/commune?lat='+lat+'&lng='+lng,{headers:authHeaders()});
+      const d=await safeJson(r);
+      if(d && d.commune){
+        if(champ)champ.value=d.commune;
+        // Retenu pour l'enregistrement : sans cela, la zone repartirait sans
+        // nom et la tuile réafficherait « Ma zone ».
+        zoneLibelleChoisi=d.commune;
+      }
+    }catch(e){ /* le nom est un confort, pas une condition */ }
   },function(){
     toast('❌ Position refusée ou indisponible. Vous pouvez taper votre adresse à la place.');
   },{enableHighAccuracy:true,timeout:8000});
@@ -11844,9 +11868,29 @@ async function enregistrerZoneIntervention(){
   var pos=markerZoneIntervention.getLatLng();
   var rayon=parseInt(document.getElementById('curseur-rayon').value,10);
   try{
-    const r=await fetch(API+'/api/pro/zone-intervention',{method:'POST',headers:authHeaders(),body:JSON.stringify({latitude:pos.lat,longitude:pos.lng,rayon_km:rayon})});
+    // ── MODIFIER SI ELLE EXISTE, CRÉER SINON ────────────────────────────
+    // Toujours créer aurait cumulé une zone par réglage : trois ajustements
+    // du rayon, et le prestataire se retrouvait bloqué par la limite sans
+    // comprendre pourquoi.
+    //
+    // On écrit dans la table des zones, pas dans l'ancien champ : c'est elle
+    // que lit le filtre des demandes, et c'est elle qui porte le nom de la
+    // commune.
+    var zones = await chargerZonesPro(true);
+    var existante = (zones && zones.length) ? zones[0] : null;
+    var corps = JSON.stringify({ latitude:pos.lat, longitude:pos.lng, rayon_km:rayon,
+                                 libelle: zoneLibelleChoisi || '' });
+    const r = existante
+      ? await fetch(API+'/api/pro/zones/'+existante.id,
+          { method:'PATCH', headers:authHeaders(), body:corps })
+      : await fetch(API+'/api/pro/zones',
+          { method:'POST', headers:authHeaders(), body:corps });
     const d=await safeJson(r);
     if(!r.ok){if(errEl){errEl.textContent=d.error||'Erreur.';errEl.classList.add('show')}return}
+    // La mémoire doit suivre : sans cela, la tuile garderait l'ancien nom
+    // jusqu'au prochain chargement complet.
+    await chargerZonesPro(true);
+    if(typeof chargerAccesRapides === 'function') chargerAccesRapides();
     toast('✅ '+d.message);
     if(currentUser){currentUser.latitude=pos.lat;currentUser.longitude=pos.lng;currentUser.rayon_intervention_km=rayon}
     fermerModale();
