@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Gleam — comptes de test</title>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  POURQUOI CETTE PAGE REMPLACE test.html
+
+  L'ancienne contenait les adresses ET les mots de passe écrits en dur dans le
+  fichier. Netlify publie le dossier `public/` tel quel : n'importe qui pouvant
+  taper l'adresse lisait les identifiants. Un moteur de recherche pouvait même
+  l'indexer.
+
+  Celle-ci garde le raccourci et supprime le danger.
+
+  LA DIFFÉRENCE TIENT EN UNE PHRASE
+
+  Les identifiants ne sont plus DANS le fichier. Ils sont dans VOTRE
+  navigateur, sur VOTRE machine — et n'ont jamais quitté celle-ci.
+
+  Quelqu'un qui ouvre cette page depuis un autre appareil voit une liste vide.
+
+  CE QUE ÇA VAUT, HONNÊTEMENT
+
+  C'est adapté à des comptes de TEST. Le stockage d'un navigateur n'est pas un
+  coffre-fort : quelqu'un ayant accès à votre ordinateur déverrouillé y accède.
+
+  N'y mettez jamais un compte réel, ni un mot de passe que vous utilisez
+  ailleurs.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+
+<style>
+  :root {
+    --p: #0F5C56;
+    --fond: #F7F8F8;
+    --surface: #FFFFFF;
+    --bord: #E5E7EB;
+    --texte: #111827;
+    --gris: #6B7280;
+    --rouge: #B91C1C;
+    --ambre: #B4780F;
+    --ambre-clair: #FFF8E9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 60px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--fond); color: var(--texte); line-height: 1.5;
+  }
+  .page { max-width: 620px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sous { color: var(--gris); font-size: 14px; margin: 0 0 24px; }
+
+  .avis {
+    background: var(--ambre-clair); border-left: 3px solid #E0B44A;
+    padding: 12px 14px; border-radius: 8px; font-size: 13px;
+    color: #7A5A12; margin-bottom: 24px;
+  }
+  .avis strong { display: block; margin-bottom: 4px; }
+
+  .carte {
+    background: var(--surface); border: 1px solid var(--bord);
+    border-radius: 12px; padding: 16px; margin-bottom: 12px;
+  }
+  .carte h2 { font-size: 15px; margin: 0 0 12px; }
+
+  label { display: block; font-size: 12px; color: var(--gris); margin-bottom: 4px; }
+  input, select {
+    width: 100%; padding: 10px 12px; margin-bottom: 10px;
+    border: 1px solid var(--bord); border-radius: 8px;
+    font-size: 15px; font-family: inherit; background: #fff;
+  }
+  button {
+    padding: 10px 16px; border-radius: 8px; border: none;
+    background: var(--p); color: #fff; font-size: 14px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+  }
+  button.discret { background: none; color: var(--gris); border: 1px solid var(--bord); }
+  button.danger  { background: none; color: var(--rouge); border: 1px solid var(--rouge); }
+
+  .compte {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px; border: 1px solid var(--bord); border-radius: 10px;
+    margin-bottom: 8px; background: var(--surface);
+  }
+  .compte .infos { flex: 1; min-width: 0; }
+  .compte .nom { font-weight: 600; font-size: 14px; }
+  .compte .mail { font-size: 12px; color: var(--gris); overflow: hidden; text-overflow: ellipsis; }
+  .compte .role {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 10px; background: var(--fond); color: var(--gris);
+  }
+  .vide { color: var(--gris); font-size: 14px; text-align: center; padding: 24px 0; }
+  .lien { color: var(--p); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Comptes de test</h1>
+  <p class="sous">Vos raccourcis de connexion, gardés sur cet appareil.</p>
+
+  <div class="avis">
+    <strong>Rien n'est enregistré dans ce fichier.</strong>
+    Les identifiants ci-dessous vivent dans le stockage de ce navigateur, sur
+    cette machine. Ils ne partent nulle part, et quelqu'un qui ouvre cette page
+    ailleurs voit une liste vide.
+    <br><br>
+    N'y mettez que des comptes de test — jamais un mot de passe que vous
+    utilisez ailleurs.
+  </div>
+
+  <div class="carte">
+    <h2>Ajouter un compte</h2>
+    <label for="nom">Nom court</label>
+    <input id="nom" placeholder="mady — client" autocomplete="off">
+
+    <label for="mail">Adresse</label>
+    <input id="mail" type="email" placeholder="essai@exemple.fr" autocomplete="off">
+
+    <label for="mdp">Mot de passe</label>
+    <input id="mdp" type="password" placeholder="••••••••" autocomplete="new-password">
+
+    <label for="role">Type</label>
+    <select id="role">
+      <option value="client">Client</option>
+      <option value="pro">Prestataire</option>
+      <option value="entreprise">Entreprise</option>
+    </select>
+
+    <button onclick="ajouter()">Ajouter</button>
+  </div>
+
+  <div class="carte">
+    <h2>Mes comptes</h2>
+    <div id="liste"></div>
+  </div>
+
+  <div class="carte">
+    <h2>Entretien</h2>
+    <p style="font-size:13px;color:var(--gris);margin:0 0 12px">
+      Tout effacer supprime les comptes de ce navigateur uniquement. Les comptes
+      eux-mêmes ne sont pas touchés dans Gleam.
+    </p>
+    <button class="danger" onclick="toutEffacer()">Tout effacer</button>
+  </div>
+
+  <p class="sous" style="margin-top:24px">
+    <a class="lien" href="/">← Retour à Gleam</a>
+  </p>
+</div>
+
+<script>
+// ── OÙ VIVENT LES COMPTES ───────────────────────────────────────────────────
+// Dans le stockage de CE navigateur. Jamais dans le fichier, jamais sur un
+// serveur. C'est toute la différence avec l'ancienne page.
+const CLE = 'gleam_comptes_test';
+
+function lire() {
+  try { return JSON.parse(localStorage.getItem(CLE) || '[]'); }
+  catch (e) { return []; }        // stockage corrompu : on repart à zéro
+}
+function ecrire(liste) {
+  localStorage.setItem(CLE, JSON.stringify(liste));
+}
+
+function echapper(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function afficher() {
+  const liste = lire();
+  const zone = document.getElementById('liste');
+
+  if (!liste.length) {
+    zone.innerHTML = '<div class="vide">Aucun compte enregistré sur cet appareil.</div>';
+    return;
+  }
+
+  zone.innerHTML = liste.map(function (c, i) {
+    return '<div class="compte">'
+      + '<div class="infos">'
+      +   '<div class="nom">' + echapper(c.nom) + '</div>'
+      +   '<div class="mail">' + echapper(c.mail) + '</div>'
+      + '</div>'
+      + '<span class="role">' + echapper(c.role) + '</span>'
+      + '<button onclick="connecter(' + i + ')">Se connecter</button>'
+      + '<button class="discret" onclick="retirer(' + i + ')">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+function ajouter() {
+  const nom  = document.getElementById('nom').value.trim();
+  const mail = document.getElementById('mail').value.trim();
+  const mdp  = document.getElementById('mdp').value;
+  const role = document.getElementById('role').value;
+
+  if (!mail || !mdp) { alert('Adresse et mot de passe requis.'); return; }
+
+  const liste = lire();
+  liste.push({ nom: nom || mail, mail: mail, mdp: mdp, role: role });
+  ecrire(liste);
+
+  document.getElementById('nom').value = '';
+  document.getElementById('mail').value = '';
+  document.getElementById('mdp').value = '';
+  afficher();
+}
+
+function retirer(i) {
+  const liste = lire();
+  liste.splice(i, 1);
+  ecrire(liste);
+  afficher();
+}
+
+function toutEffacer() {
+  if (!confirm('Effacer tous les comptes de cet appareil ?')) return;
+  localStorage.removeItem(CLE);
+  afficher();
+}
+
+// ── LA CONNEXION ────────────────────────────────────────────────────────────
+// On dépose les identifiants pour que la page d'accueil les récupère et
+// remplisse le formulaire. Ils sont effacés IMMÉDIATEMENT après lecture —
+// c'est un passage de main, pas un stockage.
+function connecter(i) {
+  const c = lire()[i];
+  if (!c) return;
+  sessionStorage.setItem('gleam_prefill', JSON.stringify({ mail: c.mail, mdp: c.mdp }));
+  location.href = '/';
+}
+
+afficher();
+</script>
+</body>
+</html>
