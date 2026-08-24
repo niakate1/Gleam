@@ -1,3 +1,28 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// CE FICHIER NE DOIT S'EXÉCUTER QU'UNE FOIS
+//
+// Les journaux montrent « Gleam API démarrée » puis EADDRINUSE à HUIT
+// MICROSECONDES d'écart, et chaque bannière affichée en double : Sentry,
+// Stripe, les notifications push.
+//
+// Deux processus distincts ne peuvent pas être aussi proches. C'est le MÊME
+// processus qui évalue server.js deux fois — Node met les modules en cache par
+// chemin résolu, et deux chemins différents vers le même fichier
+// (« ./server » et « /app/server.js », par exemple) produisent deux
+// évaluations complètes.
+//
+// La seconde tentait d'ouvrir un port déjà pris, plantait, et le gestionnaire
+// d'exception tuait le processus — y compris le serveur qui fonctionnait.
+//
+// Ce verrou rend la seconde évaluation inoffensive : elle réutilise ce que la
+// première a construit, au lieu de tout refaire.
+if (global.__GLEAM_SERVEUR_DEMARRE__) {
+  console.warn('⚠️ server.js chargé une seconde fois — chargement ignoré.');
+  module.exports = global.__GLEAM_SERVEUR_DEMARRE__;
+  return;
+}
+global.__GLEAM_SERVEUR_DEMARRE__ = { charge: true, le: new Date().toISOString() };
+
 require('dotenv').config();
 // Suivi des erreurs en production (Sentry) — protégé : si la clé DSN est absente ou invalide, le
 // serveur démarre quand même normalement, exactement comme pour les autres services optionnels
