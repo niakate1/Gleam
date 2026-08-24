@@ -6606,6 +6606,17 @@ async function safeJson(r){
 // ─────────────────────────────────────────────────────────────────────────────
 function messageErreur(reponse, donnees, repli){
   var d = donnees || {};
+
+  // ── UNE ADRESSE NON VÉRIFIÉE OUVRE LA VÉRIFICATION ─────────────────────
+  // Le serveur refuse désormais un paiement si l'adresse n'est pas confirmée.
+  // Afficher « accès refusé » laisserait le client bloqué sans savoir quoi
+  // faire — il verrait un refus sur un écran de paiement, ce qui inquiète.
+  //
+  // On ouvre directement l'écran de confirmation : le geste attendu est à un
+  // clic, pas à trois écrans de distance.
+  if (d.email_non_verifie && typeof ouvrirConfirmerEmail === 'function') {
+    setTimeout(ouvrirConfirmerEmail, 400);
+  }
   if (d.error) return d.error;
   if (reponse) {
     if (reponse.status === 401) return 'Votre session a expiré. Reconnectez-vous pour continuer.';
@@ -6673,6 +6684,28 @@ async function forgotPassword(){
     ouvrirNouveauMotDePasse(email);
   }catch(e){toast(friendlyNetworkError(e))}
 }
+
+// ── REPRISE DEPUIS LA PAGE DES COMPTES DE TEST ─────────────────────────────
+// `comptes-test.html` dépose ici l'adresse et le mot de passe choisis, le
+// temps du changement de page. On les lit puis on les EFFACE aussitôt : c'est
+// un passage de main, pas un stockage.
+//
+// Cela remplace l'ancienne page qui contenait les identifiants EN DUR —
+// lisibles par quiconque tapait l'adresse du site.
+function reprendreIdentifiantsDeTest(){
+  try{
+    var brut = sessionStorage.getItem('gleam_prefill');
+    if(!brut) return;
+    sessionStorage.removeItem('gleam_prefill');   // effacé avant toute chose
+
+    var c = JSON.parse(brut);
+    var champMail = document.getElementById('le');
+    var champMdp  = document.getElementById('lp');
+    if(champMail && c.mail) champMail.value = c.mail;
+    if(champMdp  && c.mdp)  champMdp.value  = c.mdp;
+  }catch(e){ /* rien à reprendre, ou stockage indisponible */ }
+}
+document.addEventListener('DOMContentLoaded', reprendreIdentifiantsDeTest);
 
 async function doLogin(){
   hideErr('lerr');
