@@ -7872,7 +7872,25 @@ function renderDevisClientCards(){
         actions+='<button class="btn-accept" style="background:none;border:1.5px solid var(--border);color:var(--gray);width:100%;margin-top:8px;font-size:13px" onclick="archiverDemande(\''+safeDemandeId+'\')">'+
           '<i data-lucide="archive" style="width:14px;height:14px;vertical-align:-2px"></i> Ranger cette prestation</button>';
       }else if(v.statut==='accepte'){
-        badge='<span class="devis-badge badge-accepted"><i data-lucide="check-circle" style="width:12px;height:12px;vertical-align:-2px"></i> Accepté — Paiement requis</span>';
+        // ── LE TEMPS QU'IL RESTE POUR PAYER ─────────────────────────────
+        // Le devis est réservé trente minutes. Sans échéance affichée, le
+        // client remet à plus tard — et découvre son devis libéré sans avoir
+        // compris qu'il y avait un délai.
+        //
+        // Le compte à rebours n'est pas une pression commerciale : c'est
+        // l'information sans laquelle la règle devient une mauvaise surprise.
+        var minutesRestantes = null;
+        if(v.paiement_avant){
+          var reste = new Date(v.paiement_avant).getTime() - Date.now();
+          if(isFinite(reste)) minutesRestantes = Math.max(0, Math.round(reste / 60000));
+        }
+        badge='<span class="devis-badge badge-accepted"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> '
+          + (minutesRestantes !== null
+              ? (minutesRestantes > 0
+                  ? 'Réservé — ' + minutesRestantes + ' min pour payer'
+                  : 'Réservation expirée')
+              : 'Paiement requis')
+          + '</span>';
         cardStyle='border-color:var(--amber);background:var(--amber-clair);';
         // Deux boutons de même largeur se neutralisaient : le client hésitait,
         // et l'hésitation devant un paiement ne se solde presque jamais par un
@@ -9411,7 +9429,15 @@ function renderProDevisCards(){
         // créerait une conversation à sens unique.
         extra='<div class="attente-paiement-pro">'+
             '<i data-lucide="info"></i>'+
-            'Votre client a accepté votre devis. La prestation sera confirmée dès son paiement — vous pourrez alors échanger avec lui.'+
+            // ── L'INSTRUCTION AVANT L'EXPLICATION ─────────────────────────
+        // « La prestation sera confirmée dès son paiement » est exact, mais
+        // c'est une information. Un prestataire pressé lit « accepté » et
+        // s'organise : il bloque sa journée, refuse une autre course, part.
+        //
+        // Ce qu'il doit retenir en premier, c'est ce qu'il ne faut PAS faire.
+        '<strong>Ne vous déplacez pas encore.</strong> Le client a choisi votre '
+        + 'devis mais ne l\'a pas réglé : la prestation n\'est pas confirmée. '
+        + 'Vous serez prévenu dès son paiement, et pourrez alors échanger avec lui.'+
           '</div>'+
           '<div style="display:flex;gap:8px;margin-top:10px">'+
           '<button class="btn-refuse" onclick="annulerProDevis(\''+safeVId+'\',this)">🚫 Annuler</button>'+
@@ -10983,6 +11009,22 @@ async function loadChatMessages(){
     else{
       var lastDay='';
       data.forEach(function(m){
+        // ── LES MESSAGES DU SYSTÈME NE SONT DE PERSONNE ────────────────
+        // Un message de type « systeme » porte l'identifiant du client comme
+        // expéditeur — la table en exige un. Sans ce traitement, le client
+        // le verrait comme SON propre message, aligné à droite : il croirait
+        // l'avoir écrit lui-même.
+        //
+        // Centré, en gris, il se lit pour ce qu'il est : un fait, pas une
+        // parole.
+        if(m.type==='systeme'){
+          html+='<div style="text-align:center;margin:10px 0">'
+            + '<span style="display:inline-block;background:var(--light);'
+            + 'border-radius:12px;padding:7px 12px;font-size:12px;'
+            + 'color:var(--text-secondary);line-height:1.45;max-width:85%">'
+            + escapeHtml(m.contenu||'')+'</span></div>';
+          return;
+        }
         var mine=currentUser&&String(m.expediteur_id)===String(currentUser.id);
         var d=m.created_at?new Date(m.created_at):null;
         if(d){
