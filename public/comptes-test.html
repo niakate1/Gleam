@@ -205,6 +205,18 @@ function ajouter() {
 
   if (!mail || !mdp) { alert('Adresse et mot de passe requis.'); return; }
 
+  // ── UNE ADRESSE SANS ARROBASE NE SERT À RIEN ─────────────────────────────
+  // Une saisie comme « madymoussagmail.com » est acceptée par le champ HTML
+  // dans certains navigateurs, enregistrée telle quelle, et échoue à CHAQUE
+  // tentative de connexion — sans dire pourquoi.
+  //
+  // On préfère refuser tout de suite, avec la raison.
+  if (mail.indexOf('@') < 0 || mail.lastIndexOf('.') < mail.indexOf('@')) {
+    alert('Cette adresse ne ressemble pas à une adresse e-mail.\n\n'
+        + 'Vérifiez l\'arobase et le point : exemple@domaine.fr');
+    return;
+  }
+
   const liste = lire();
   liste.push({ nom: nom || mail, mail: mail, mdp: mdp, role: role });
   ecrire(liste);
