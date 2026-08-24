@@ -79,7 +79,28 @@ function motDePasseAdminValide(saisi) {
   if (!process.env.ADMIN_PASSWORD) return false;
   return comparaisonSure(saisi, process.env.ADMIN_PASSWORD);
 }
-const { sendEmail } = require('./email');
+// ── IMPORT IMMUNISÉ À LA DÉPENDANCE CIRCULAIRE ──────────────────────────────
+// Node avertissait : « Accessing non-existent property 'sendEmail' of module
+// exports inside circular dependency ».
+//
+// La déstructuration `const { sendEmail } = require(...)` fige la valeur AU
+// MOMENT DE L'IMPORT. Si email.js n'a pas fini de s'évaluer — parce qu'il
+// dépend en retour de server.js —, on capture `undefined` pour toujours. C'est
+// ce qui produisait « sendEmail is not a function » à chaque validation.
+//
+// On garde le MODULE et on lit la fonction à l'appel : à ce moment-là, le
+// chargement est terminé depuis longtemps.
+const moduleEmail = require('./email');
+
+function sendEmail(...args) {
+  if (typeof moduleEmail.sendEmail !== 'function') {
+    // Un courriel qui ne part pas ne doit jamais interrompre un paiement ou
+    // une validation. On le signale et on continue.
+    console.error('⚠️ sendEmail indisponible — courriel non envoyé :', args[0]);
+    return Promise.resolve();
+  }
+  return moduleEmail.sendEmail(...args);
+}
 
 // Envoie une notification push à toutes les inscriptions actives d'un utilisateur (un par
 // appareil/navigateur) — nettoie automatiquement les abonnements devenus invalides (l'utilisateur
@@ -7909,10 +7930,12 @@ process.on('uncaughtException', function(err) {
 // sortir — juste le temps que Railway relance et retrouve le port occupé. Le
 // service tournait en boucle, et personne ne pouvait se connecter.
 //
-// On attend et on réessaie plutôt que de mourir : le port se libère toujours
-// en quelques secondes. Après six tentatives — une minute — la cause n'est
-// plus un chevauchement, et s'arrêter rend le problème visible.
-let tentativesPort = 0;
+// La cause est connue : une dépendance circulaire entre server.js et email.js
+// fait évaluer ce fichier DEUX FOIS dans le même processus. La seconde
+// évaluation trouve le port ouvert par la première.
+//
+// Il ne faut ni réessayer — aucune tentative n'aboutira, la première écoute
+// pour de bon — ni mourir, ce qui tuerait le serveur qui fonctionne.
 
 function demarrerServeur() {
   serveurHttp = app.listen(PORT, function() {
@@ -7925,14 +7948,18 @@ function demarrerServeur() {
       console.error('🔴 Impossible d\'ouvrir le port ' + PORT + ' :', err.message);
       process.exit(1);
     }
-    tentativesPort++;
-    if (tentativesPort > 6) {
-      console.error('🔴 Port ' + PORT + ' occupé après six tentatives. Arrêt.');
-      process.exit(1);
-    }
-    console.warn('⏳ Port ' + PORT + ' occupé — nouvelle tentative dans 10 s ('
-      + tentativesPort + '/6)');
-    setTimeout(demarrerServeur, 10000);
+    // ── NE PAS RÉESSAYER, NE PAS MOURIR ─────────────────────────────────
+    // Le port est occupé par la PREMIÈRE évaluation de ce même fichier, dans
+    // ce même processus. Elle écoute déjà, et elle écoutera toujours : aucune
+    // tentative ne réussira jamais.
+    //
+    // Réessayer six fois puis appeler process.exit(1) revenait à tuer le
+    // serveur qui fonctionne, une minute après son démarrage. Les journaux le
+    // montraient : « tentative 1/6 », « 2/6 »… puis l'arrêt.
+    //
+    // On constate, on le dit une fois, et on laisse tourner.
+    console.warn('⚠️ Port ' + PORT + ' déjà ouvert par une première évaluation '
+      + 'de server.js — ce second démarrage est ignoré. Le service fonctionne.');
   });
 }
 
