@@ -7609,7 +7609,39 @@ async function renderActiveRequestBanner(data){
       if(rDevis.ok){
         const devisList=await safeJson(rDevis);
         var actifs=(devisList||[]).filter(function(v){return v.statut==='envoye'});
-        if(actifs.length){
+
+        // ── UN DEVIS ANNULÉ N'EST PLUS À EXAMINER ────────────────────────
+        // Le statut de la DEMANDE reste « devis_recus » même quand tous les
+        // devis ont été annulés ou refusés : il dit qu'elle en a REÇU, pas
+        // qu'il en reste.
+        //
+        // Le bandeau annonçait donc « Devis à examiner » sur une demande qui
+        // n'en avait plus un seul. Le client cliquait et ne trouvait rien.
+        //
+        // On cherche alors la demande suivante — en écartant celle-ci —
+        // plutôt que d'afficher une invitation qui ne mène nulle part.
+        if(!actifs.length){
+          var ecartee=meilleure.id;
+          meilleure=null;
+          for(var p=0;p<priorite.length&&!meilleure;p++){
+            meilleure=(data||[]).filter(function(d){
+              return d.statut===priorite[p] && d.id!==ecartee;
+            })[0];
+          }
+          if(!meilleure){ banner.innerHTML=''; return; }
+
+          // `config` est un objet littéral construit plus haut avec
+          // `meilleure.id` figé dedans. Le recomposer à la main ici
+          // dupliquerait cette table — et les deux divergeraient au premier
+          // changement.
+          //
+          // On relance donc la fonction entière sur les données déjà en main :
+          // elle refera le choix proprement, en trouvant la même demande
+          // écartée mais avec un `config` cohérent.
+          return renderActiveRequestBanner((data||[]).filter(function(d){
+            return d.id!==ecartee;
+          }));
+        } else {
           var prixMin=Math.min.apply(null,actifs.map(function(v){return parseFloat(v.prix_ttc)}));
           sousTitre=actifs.length+' devis reçu'+(actifs.length>1?'s':'')+' — à partir de '+prixMin+'€';
         }
@@ -8396,6 +8428,20 @@ async function envoyerNote(btn){
     document.getElementById('modal-overlay').classList.remove('open');
     toast('⭐ Merci pour votre avis !',4000);
     if(isPro())loadProDevis();else loadDevis();
+
+    // ── LE BANDEAU DOIT PASSER AU SUIVANT ────────────────────────────────
+    // Seul l'onglet Devis était rechargé. Le bandeau d'accueil gardait la
+    // prestation qu'on venait de noter — et pour noter la deuxième, il fallait
+    // ouvrir l'onglet et la chercher.
+    //
+    // Sur trois prestations à noter, on en notait une puis on abandonnait.
+    // C'est exactement ce qui coûte des avis à la plateforme.
+    //
+    // La mémoire des requêtes est vidée D'ABORD : sans cela, la liste des
+    // notes déjà données serait relue depuis le cache de trois secondes, et le
+    // bandeau reproposerait la prestation qu'on vient de noter.
+    if(typeof viderMemoireRequetes==='function')viderMemoireRequetes();
+    if(typeof loadDemandes==='function')loadDemandes();
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
 }
 
