@@ -50,10 +50,23 @@ const crypto = require('crypto');
 // { admin: true } sans jamais connaître le mot de passe. Définissez
 // ADMIN_JWT_SECRET (une longue chaîne aléatoire, sans rapport avec l'autre).
 // Sans elle, l'ancien comportement est conservé pour ne rien casser.
-const SECRET_ADMIN = process.env.ADMIN_JWT_SECRET || (process.env.JWT_SECRET + '_admin');
+// ── PLUS DE REPLI : LE SERVEUR REFUSE DE DÉMARRER ─────────────────────────
+// Le repli sur `JWT_SECRET + '_admin'` était une commodité de développement.
+// En production, il annulait la séparation qu'il prétendait établir : qui
+// connaît JWT_SECRET forge un jeton { admin: true } sans mot de passe.
+//
+// Un avertissement dans les journaux ne suffit pas — personne ne les lit quand
+// tout fonctionne. Le serveur s'arrête, et le problème se voit.
+//
+// Vérifié le 24 août : ADMIN_JWT_SECRET est bien définie dans Railway.
 if (!process.env.ADMIN_JWT_SECRET) {
-  console.warn('⚠️  ADMIN_JWT_SECRET absente : le secret admin est dérivé de JWT_SECRET. À corriger.');
+  console.error('🔴 ADMIN_JWT_SECRET absente. Le serveur ne démarrera pas :');
+  console.error('   sans elle, le secret administrateur dériverait du secret');
+  console.error('   utilisateur, et toute fuite du second compromettrait le premier.');
+  console.error('   Définissez une longue chaîne aléatoire, sans rapport avec JWT_SECRET.');
+  process.exit(1);
 }
+const SECRET_ADMIN = process.env.ADMIN_JWT_SECRET;
 
 // Comparaison à temps constant : `!==` s'arrête au premier caractère différent,
 // ce qui laisse fuiter la longueur du préfixe correct par le temps de réponse.
@@ -235,7 +248,56 @@ const supabaseAuth = createClient(
   }
 );
 
-app.use(helmet());
+// ═══════════════════════════════════════════════════════════════════════════
+// LA POLITIQUE DE SÉCURITÉ DU CONTENU
+//
+// `helmet()` seul posait une CSP par défaut qui aurait bloqué l'application :
+// 368 gestionnaires `onclick`, 710 styles en ligne, Stripe, les polices
+// Google. Elle était donc… désactivée de fait, faute d'avoir été réglée.
+//
+// EN MODE RAPPORT D'ABORD
+//
+// `reportOnly: true` — le navigateur SIGNALE ce qui serait bloqué, sans rien
+// bloquer. On observe quelques jours, on corrige ce qui remonte, puis on
+// passe en mode réel.
+//
+// Poser une CSP stricte d'un coup sur une application de cette taille, c'est
+// se réveiller avec un écran blanc sans savoir pourquoi.
+//
+// CE QU'ELLE NE PEUT PAS FAIRE ENCORE
+//
+// `'unsafe-inline'` reste nécessaire tant que les 368 onclick existent. La CSP
+// n'arrête donc pas un script injecté dans un attribut — mais elle bloque déjà
+// le plus courant : un script chargé depuis un domaine étranger.
+//
+// C'est une défense partielle, et c'est mieux qu'aucune.
+app.use(helmet({
+  contentSecurityPolicy: {
+    reportOnly: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      // Stripe pour le paiement ; unpkg pour les icônes Lucide.
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://js.stripe.com', 'https://unpkg.com'],
+      // Les 710 styles en ligne imposent unsafe-inline. Les polices Google
+      // servent une feuille de style depuis googleapis.
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+      // `data:` et `blob:` : les photos sont prévisualisées avant envoi.
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+      // L'API, l'adresse gouvernementale, Stripe.
+      connectSrc: ["'self'", 'https://gleam-production-9b95.up.railway.app',
+                   'https://gleam-app.fr', 'https://api-adresse.data.gouv.fr',
+                   'https://data.geopf.fr', 'https://api.stripe.com'],
+      // Le formulaire de carte Stripe s'affiche dans un cadre.
+      frameSrc: ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'],
+      // Personne ne doit pouvoir encadrer Gleam dans son propre site.
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"]
+    }
+  }
+}));
 // CORS restreint au(x) domaine(s) réel(s) de Gleam plutôt qu'ouvert à n'importe quelle origine.
 //
 // Deuxième correction, plus radicale que la première : la version précédente utilisait
@@ -263,7 +325,16 @@ const corsOptions = {
     } catch (e) { /* origine malformée, refusée ci-dessous */ }
     console.error('CORS refusé pour origine:', origin, '— autorisées:', hotesAutorises);
     return callback(new Error('Origine non autorisée par CORS.'));
-  }
+  },
+  // ── LE COOKIE DOIT POUVOIR VOYAGER ──────────────────────────────────────
+  // Sans `credentials`, le navigateur n'envoie aucun cookie vers une autre
+  // origine — et le serveur (Railway) n'est pas sur le même domaine que
+  // l'application (Netlify).
+  //
+  // C'est sans danger ici : la liste d'origines autorisées reste stricte, et
+  // `credentials: true` avec `origin: '*'` est de toute façon refusé par les
+  // navigateurs.
+  credentials: true
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
@@ -326,8 +397,52 @@ const publicLimiter = rateLimit({
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 app.use('/api/', globalLimiter);
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LIRE LE COOKIE SANS DÉPENDANCE SUPPLÉMENTAIRE
+//
+// `cookie-parser` ferait le travail, mais ajouter un paquet pour lire une
+// chaîne de caractères n'en vaut pas la peine — et chaque dépendance est une
+// surface d'attaque de plus.
+// ═══════════════════════════════════════════════════════════════════════════
+function lireCookie(req, nom) {
+  const brut = req.headers.cookie;
+  if (!brut) return null;
+  for (const morceau of brut.split(';')) {
+    const sep = morceau.indexOf('=');
+    if (sep < 0) continue;
+    if (morceau.slice(0, sep).trim() !== nom) continue;
+    try { return decodeURIComponent(morceau.slice(sep + 1).trim()); }
+    catch (e) { return null; }   // valeur mal encodée
+  }
+  return null;
+}
+
+// ── OÙ POSER LE COOKIE D'AUTHENTIFICATION ──────────────────────────────────
+// `HttpOnly`  le JavaScript ne peut pas le lire : une faille XSS ne donne plus
+//             accès au jeton, ce qui était le reproche de l'audit.
+// `Secure`    transmis uniquement en HTTPS.
+// `SameSite=None` obligatoire : l'application (Netlify) et l'API (Railway) ne
+//             partagent pas le même domaine. « Lax » bloquerait tout.
+//
+// `SameSite=None` impose `Secure` — les navigateurs refusent l'un sans l'autre.
+const COOKIE_JETON = 'gleam_session';
+const OPTIONS_COOKIE = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'none',
+  maxAge: 7 * 24 * 3600 * 1000,
+  path: '/'
+};
+
 const auth = async (req, res, next) => {
-  const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
+  // ── LE COOKIE D'ABORD, L'EN-TÊTE ENSUITE ────────────────────────────────
+  // Les deux sont acceptés pendant la transition : les sessions déjà ouvertes
+  // continuent de fonctionner avec leur jeton en localStorage, et les
+  // nouvelles connexions reçoivent un cookie.
+  //
+  // Sans ce double chemin, tout le monde serait déconnecté au déploiement.
+  const token = lireCookie(req, COOKIE_JETON)
+    || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
   if (!token) return res.status(401).json({ error: 'Votre session a expiré ou n\'est plus valide. Reconnectez-vous pour continuer.' });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
@@ -1275,11 +1390,35 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     //
     // `compteVisible` existe et filtre déjà ces champs sur /login et /me.
     // Cette route l'avait oublié.
+    res.cookie(COOKIE_JETON, token, OPTIONS_COOKIE);
     res.status(201).json({ message: 'Compte Gleam créé !', token, user: { ...compteVisible(data), firstName: data.prenom, lastName: data.nom } });
   } catch (e) {
     console.error(e);
     erreurServeur(res, 'POST /api/auth/register', e);
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LA DÉCONNEXION DOIT EFFACER LE COOKIE
+//
+// Il n'existait aucune route de déconnexion : le client se contentait de vider
+// son localStorage. Avec un cookie HttpOnly, il ne PEUT PAS l'effacer
+// lui-même — c'est précisément ce qui le protège.
+//
+// Sans cette route, se déconnecter laisserait la session ouverte côté serveur.
+// Sur un ordinateur partagé, la personne suivante reprendrait le compte.
+//
+// Aucune authentification requise : effacer un cookie qu'on possède déjà ne
+// demande pas de prouver qui l'on est, et exiger un jeton valide empêcherait
+// de se déconnecter d'une session expirée.
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/auth/logout', (req, res) => {
+  // Les options doivent correspondre à celles de la pose, sinon le navigateur
+  // considère qu'il s'agit d'un autre cookie et garde le premier.
+  res.clearCookie(COOKIE_JETON, {
+    httpOnly: true, secure: true, sameSite: 'none', path: '/'
+  });
+  res.json({ message: 'Déconnecté.' });
 });
 
 app.post('/api/auth/login', authLimiter, async (req, res) => {
@@ -1309,6 +1448,10 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     if (!user) return res.status(500).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
 
     const token = jwt.sign({ id: user.id, email: user.email, type: user.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    // Le jeton part AUSSI en cookie HttpOnly : le JavaScript ne peut pas le lire,
+    // donc une faille XSS ne le vole plus. Il reste dans la réponse le temps que
+    // les sessions déjà ouvertes migrent.
+    res.cookie(COOKIE_JETON, token, OPTIONS_COOKIE);
     res.json({ token, user: { ...compteVisible(user),
                               firstName: user.prenom, lastName: user.nom } });
   } catch (e) {
