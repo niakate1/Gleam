@@ -434,6 +434,54 @@ const OPTIONS_COOKIE = {
   path: '/'
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EXIGER UNE ADRESSE VÉRIFIÉE — LÀ OÙ L'ARGENT CIRCULE
+//
+// L'audit relevait que `email_confirm: true` chez Supabase contredisait le
+// système `email_verifie` de Gleam. En vérifiant, j'ai trouvé autre chose :
+// les deux ne se contredisent pas. Le vrai défaut est que la vérification
+// N'AVAIT AUCUN EFFET.
+//
+//     routes qui refusaient une adresse non vérifiée : 0
+//
+// L'application affichait « Confirmer mon email » dans le profil, et c'était
+// tout. Corriger `email_confirm` sans donner un effet à `email_verifie`
+// n'aurait rien changé.
+//
+// OÙ L'EXIGER, ET OÙ NE PAS L'EXIGER
+//
+//   payer                  OUI  l'argent engage, et un litige a besoin d'une
+//                               adresse joignable
+//   recevoir de l'argent   OUI  même raison, côté prestataire
+//
+//   créer une demande      non  freinerait le premier usage, sans rien protéger
+//   envoyer un devis       non  le prestataire a déjà fourni ses documents
+//   mot de passe oublié    non  c'est justement le recours de quelqu'un
+//                               qui n'accède plus à son compte
+//
+// Exiger partout ferait fuir ; exiger nulle part ne protège rien.
+// ═══════════════════════════════════════════════════════════════════════════
+const exigerEmailVerifie = async (req, res, next) => {
+  try {
+    const { data: compte } = await supabase.from('users')
+      .select('email_verifie').eq('id', req.user.id).maybeSingle();
+
+    if (compte && compte.email_verifie === false) {
+      return res.status(403).json({
+        error: 'Confirmez votre adresse e-mail avant de continuer. '
+             + 'Le code vous a été envoyé — retrouvez-le dans votre profil.',
+        email_non_verifie: true
+      });
+    }
+    next();
+  } catch (e) {
+    // Une lecture qui échoue ne doit pas bloquer un paiement : le client a
+    // peut-être déjà saisi sa carte. On laisse passer et on note.
+    console.warn('Vérification d\'email impossible :', e.message);
+    next();
+  }
+};
+
 const auth = async (req, res, next) => {
   // ── LE COOKIE D'ABORD, L'EN-TÊTE ENSUITE ────────────────────────────────
   // Les deux sont acceptés pendant la transition : les sessions déjà ouvertes
@@ -1241,6 +1289,28 @@ const CHAMPS_INTERNES = [
 //
 // `crypto.randomInt` puise dans la source d'entropie du système. Même coût,
 // même forme, aucune prévisibilité.
+// ═══════════════════════════════════════════════════════════════════════════
+// UN CODE DE RÉINITIALISATION NE SE STOCKE PAS EN CLAIR
+//
+// Il l'était. Quiconque lisait la table `users` — une fuite, un accès
+// administrateur, une sauvegarde égarée — pouvait prendre la main sur
+// n'importe quel compte pendant trente minutes.
+//
+// On enregistre l'EMPREINTE. Le serveur compare l'empreinte du code saisi à
+// celle stockée : il n'a jamais besoin de connaître le code.
+//
+// POURQUOI SHA-256 SUFFIT ICI, ALORS QU'UN MOT DE PASSE DEMANDE SCRYPT
+//
+// Un mot de passe est réutilisé, choisi par un humain, et vit des années :
+// il faut une fonction lente pour décourager l'essai en masse.
+//
+// Ce code vit trente minutes, ne vaut que pour un compte, et compte un million
+// de possibilités — protégées par un compteur de cinq tentatives. La lenteur
+// n'apporterait rien, et ralentirait chaque vérification légitime.
+function empreinteCode(code) {
+  return crypto.createHash('sha256').update(String(code).trim()).digest('hex');
+}
+
 function codeSecret6() {
   return String(crypto.randomInt(100000, 1000000));
 }
@@ -1477,7 +1547,13 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
 
     const code = codeSecret6();
     const expiration = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // valable 30 minutes
-    await supabase.from('users').update({ reset_code: code, reset_code_expire: expiration }).eq('id', user.id);
+    // On stocke l'EMPREINTE, jamais le code. Le compteur repart à zéro : une
+    // nouvelle demande annule les tentatives de la précédente.
+    await supabase.from('users').update({
+      reset_code: empreinteCode(code),
+      reset_code_expire: expiration,
+      reset_tentatives: 0
+    }).eq('id', user.id);
 
     sendEmail('reinitialisation_mot_de_passe', user.email, { compteId: user.id, prenom: user.prenom || '', code }).catch(e => console.error('Email réinitialisation:', e));
 
@@ -1494,8 +1570,40 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
     if (!email || !code || !new_password) return res.status(400).json({ error: 'Informations manquantes.' });
     if (new_password.length < 8) return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
 
-    const { data: user } = await supabase.from('users').select('id, reset_code, reset_code_expire').eq('email', email.toLowerCase().trim()).maybeSingle();
-    if (!user || !user.reset_code || user.reset_code !== String(code).trim())
+    const { data: user } = await supabase.from('users')
+      .select('id, reset_code, reset_code_expire, reset_tentatives')
+      .eq('email', email.toLowerCase().trim()).maybeSingle();
+
+    // ── CINQ TENTATIVES, PAS PLUS ───────────────────────────────────────
+    // Un code à six chiffres, c'est un million de possibilités. La limitation
+    // de débit ralentit ; un compteur par compte arrête net.
+    //
+    // Au cinquième échec le code est détruit : il faut en redemander un. Le
+    // message reste volontairement identique à celui d'un code faux, pour ne
+    // pas indiquer à un attaquant qu'il approchait du but.
+    if (user && user.reset_code && (user.reset_tentatives || 0) >= 5) {
+      await supabase.from('users')
+        .update({ reset_code: null, reset_code_expire: null, reset_tentatives: 0 })
+        .eq('id', user.id);
+      return res.status(400).json({
+        error: 'Ce code ne correspond pas. Refaites une demande de « mot de passe oublié ».'
+      });
+    }
+
+    // On compare des EMPREINTES : le code en clair ne se trouve nulle part en
+    // base, et le serveur n'a jamais besoin de le connaître.
+    const codeCorrect = user && user.reset_code
+      && user.reset_code === empreinteCode(code);
+
+    if (user && user.reset_code && !codeCorrect) {
+      // Chaque échec compte. Sans await : un compteur qui échoue ne doit pas
+      // transformer un code faux en erreur serveur.
+      supabase.from('users')
+        .update({ reset_tentatives: (user.reset_tentatives || 0) + 1 })
+        .eq('id', user.id).then(() => {}, () => {});
+    }
+
+    if (!codeCorrect)
       return res.status(400).json({ error: 'Ce code ne correspond pas. Vérifiez les six chiffres auprès du client — ils figurent dans son application.' });
     if (!user.reset_code_expire || new Date(user.reset_code_expire) < new Date())
       return res.status(400).json({ error: 'Ce code a expiré. Refaites une demande de "mot de passe oublié".' });
@@ -1503,7 +1611,7 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
     const { error: erreurMaj } = await supabase.auth.admin.updateUserById(user.id, { password: new_password });
     if (erreurMaj) return res.status(400).json({ error: erreurMaj.message });
 
-    await supabase.from('users').update({ reset_code: null, reset_code_expire: null }).eq('id', user.id);
+    await supabase.from('users').update({ reset_code: null, reset_code_expire: null, reset_tentatives: 0 }).eq('id', user.id);
 
     res.json({ message: 'Mot de passe mis à jour avec succès !' });
   } catch (e) {
@@ -5069,7 +5177,7 @@ app.get('/api/conversations', auth, async (req, res) => {
 // Crée (si besoin) le compte Stripe Connect du pro, puis renvoie un lien d'inscription hébergé
 // par Stripe lui-même — Gleam ne collecte ni ne stocke jamais l'IBAN ou l'identité du pro,
 // tout se passe directement chez Stripe, qui gère la conformité (DSP2, vérification d'identité...).
-app.post('/api/paiements/connect/onboarding', auth, async (req, res) => {
+app.post('/api/paiements/connect/onboarding', auth, exigerEmailVerifie, async (req, res) => {
   try {
     const { data: user } = await supabase.from('users').select('type, stripe_account_id, email').eq('id', req.user.id).single();
     if (!user || !isProType(user.type)) return res.status(403).json({ error: 'Cette action est réservée aux comptes prestataires. Votre compte est un compte client.' });
@@ -5167,7 +5275,7 @@ app.patch('/api/entreprises/facturation', auth, async (req, res) => {
   }
 });
 
-app.post('/api/paiements/intent', auth, async (req, res) => {
+app.post('/api/paiements/intent', auth, exigerEmailVerifie, async (req, res) => {
   try {
     const { devis_id } = req.body;
 
