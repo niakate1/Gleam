@@ -7844,24 +7844,91 @@ process.on('unhandledRejection', function(raison) {
 // Une exception synchrone non attrapée laisse le processus dans un état
 // incertain : on journalise, puis on s'arrête proprement plutôt que de servir
 // des réponses imprévisibles. Railway redémarrera.
+// Déclaré ICI, avant le gestionnaire d'exception qui doit fermer le serveur.
+// Plus bas, `typeof serveurHttp` aurait levé une ReferenceError : contrairement
+// à `var`, un `let` non encore initialisé est en « zone morte temporelle », et
+// même `typeof` y échoue.
+//
+// Le gestionnaire d'erreur aurait donc planté à son tour — en pleine gestion
+// d'une erreur.
+let serveurHttp = null;
+
 process.on('uncaughtException', function(err) {
   console.error('🔴 Exception non attrapée :', err);
   if (typeof Sentry !== 'undefined' && Sentry.captureException) {
     try { Sentry.captureException(err); } catch (e) {}
   }
+  // ── LE PORT DOIT ÊTRE LIBÉRÉ AVANT DE SORTIR ──────────────────────────
+  // On attendait une seconde avant de quitter, pour laisser aux journaux le
+  // temps de partir. Mais pendant cette seconde, le processus TENAIT ENCORE
+  // le port 3000.
+  //
+  // Railway relançait immédiatement, le nouveau processus trouvait le port
+  // occupé par l'ancien qui agonisait, et plantait à son tour. La boucle
+  // tournait toutes les deux secondes — le service n'a jamais pu servir une
+  // seule requête.
+  //
+  // Fermer d'abord, sortir ensuite : le port est rendu en quelques
+  // millisecondes, et le processus suivant le trouve libre.
+  try {
+    if (typeof serveurHttp !== 'undefined' && serveurHttp) serveurHttp.close();
+  } catch (e) { /* déjà fermé, ou jamais ouvert */ }
+
   setTimeout(function() { process.exit(1); }, 1000);
 });
 
-const serveurHttp = app.listen(PORT, function() {
-  console.log('✨ Gleam API démarrée sur le port ' + PORT);
-  console.log('   Environnement : ' + (process.env.NODE_ENV || 'development'));
-});
+// ═══════════════════════════════════════════════════════════════════════════
+// LE PORT PEUT ÊTRE ENCORE OCCUPÉ AU DÉMARRAGE
+//
+// Trois déploiements en trente-six secondes se sont chevauchés : le processus
+// précédent tenait encore le port 3000 quand le nouveau a voulu l'ouvrir.
+//
+// L'échec remontait dans `uncaughtException`, qui attend une seconde avant de
+// sortir — juste le temps que Railway relance et retrouve le port occupé. Le
+// service tournait en boucle, et personne ne pouvait se connecter.
+//
+// On attend et on réessaie plutôt que de mourir : le port se libère toujours
+// en quelques secondes. Après six tentatives — une minute — la cause n'est
+// plus un chevauchement, et s'arrêter rend le problème visible.
+let tentativesPort = 0;
+
+function demarrerServeur() {
+  serveurHttp = app.listen(PORT, function() {
+    console.log('✨ Gleam API démarrée sur le port ' + PORT);
+    console.log('   Environnement : ' + (process.env.NODE_ENV || 'development'));
+  });
+
+  serveurHttp.on('error', function(err) {
+    if (err.code !== 'EADDRINUSE') {
+      console.error('🔴 Impossible d\'ouvrir le port ' + PORT + ' :', err.message);
+      process.exit(1);
+    }
+    tentativesPort++;
+    if (tentativesPort > 6) {
+      console.error('🔴 Port ' + PORT + ' occupé après six tentatives. Arrêt.');
+      process.exit(1);
+    }
+    console.warn('⏳ Port ' + PORT + ' occupé — nouvelle tentative dans 10 s ('
+      + tentativesPort + '/6)');
+    setTimeout(demarrerServeur, 10000);
+  });
+}
+
+demarrerServeur();
 
 // Railway envoie SIGTERM avant de couper le conteneur. Sans arrêt propre, les
 // requêtes en cours sont interrompues net — y compris un paiement au milieu de
 // sa confirmation.
 process.on('SIGTERM', function() {
   console.log('SIGTERM reçu — arrêt en cours, les requêtes en cours sont servies.');
+  // `serveurHttp` peut être null si SIGTERM arrive pendant une tentative de
+  // réouverture du port : le service n'écoute alors rien, il n'y a rien à
+  // fermer, et sortir tout de suite est le comportement juste.
+  if (!serveurHttp) {
+    console.log('Aucun serveur à fermer — arrêt immédiat.');
+    process.exit(0);
+    return;
+  }
   serveurHttp.close(function() {
     console.log('Serveur arrêté proprement.');
     process.exit(0);
