@@ -1,28 +1,3 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// CE FICHIER NE DOIT S'EXÉCUTER QU'UNE FOIS
-//
-// Les journaux montrent « Gleam API démarrée » puis EADDRINUSE à HUIT
-// MICROSECONDES d'écart, et chaque bannière affichée en double : Sentry,
-// Stripe, les notifications push.
-//
-// Deux processus distincts ne peuvent pas être aussi proches. C'est le MÊME
-// processus qui évalue server.js deux fois — Node met les modules en cache par
-// chemin résolu, et deux chemins différents vers le même fichier
-// (« ./server » et « /app/server.js », par exemple) produisent deux
-// évaluations complètes.
-//
-// La seconde tentait d'ouvrir un port déjà pris, plantait, et le gestionnaire
-// d'exception tuait le processus — y compris le serveur qui fonctionnait.
-//
-// Ce verrou rend la seconde évaluation inoffensive : elle réutilise ce que la
-// première a construit, au lieu de tout refaire.
-if (global.__GLEAM_SERVEUR_DEMARRE__) {
-  console.warn('⚠️ server.js chargé une seconde fois — chargement ignoré.');
-  module.exports = global.__GLEAM_SERVEUR_DEMARRE__;
-  return;
-}
-global.__GLEAM_SERVEUR_DEMARRE__ = { charge: true, le: new Date().toISOString() };
-
 require('dotenv').config();
 // Suivi des erreurs en production (Sentry) — protégé : si la clé DSN est absente ou invalide, le
 // serveur démarre quand même normalement, exactement comme pour les autres services optionnels
@@ -7883,6 +7858,28 @@ process.on('uncaughtException', function(err) {
   if (typeof Sentry !== 'undefined' && Sentry.captureException) {
     try { Sentry.captureException(err); } catch (e) {}
   }
+  // ── UNE SECONDE ÉVALUATION NE DOIT PAS TUER LA PREMIÈRE ───────────────
+  // `server.js` est évalué deux fois dans le même processus — deux chemins
+  // différents vers le même fichier produisent deux entrées de cache Node.
+  //
+  // La seconde tentait d'ouvrir un port déjà pris, et ce gestionnaire tuait
+  // TOUT LE PROCESSUS — y compris le serveur de la première évaluation, qui
+  // fonctionnait parfaitement.
+  //
+  // J'avais d'abord posé un verrou qui interrompait la seconde évaluation par
+  // un `return`. Erreur : ce return coupait AVANT `require('./email')`, et la
+  // copie ainsi tronquée n'avait plus de `sendEmail`. Chaque validation de
+  // prestation échouait sur « sendEmail is not a function ».
+  //
+  // On laisse donc la seconde évaluation se dérouler ENTIÈREMENT — toutes les
+  // fonctions sont définies — et on ignore seulement son échec d'ouverture de
+  // port, qui est sans conséquence : la première écoute déjà.
+  if (err && err.code === 'EADDRINUSE') {
+    console.warn('⚠️ Port déjà ouvert par une première évaluation de server.js — '
+      + 'ce second démarrage est ignoré, le service continue de fonctionner.');
+    return;
+  }
+
   // ── LE PORT DOIT ÊTRE LIBÉRÉ AVANT DE SORTIR ──────────────────────────
   // On attendait une seconde avant de quitter, pour laisser aux journaux le
   // temps de partir. Mais pendant cette seconde, le processus TENAIT ENCORE
