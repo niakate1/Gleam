@@ -2660,6 +2660,124 @@ async function cloturerPrestationsOubliees() {
 // problème au lieu de le signaler. Le paiement reste visible dans
 // l'administration, avec le motif du dernier échec.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LES DEVIS ACCEPTÉS MAIS NON PAYÉS
+//
+// Deux traitements, dans le même balayage :
+//
+//   à 10 minutes de l'échéance   un rappel au client
+//   après l'échéance             le devis redevient disponible
+//
+// POURQUOI LE RAPPEL
+//
+// Trente minutes suffisent pour un paiement ordinaire, pas pour une carte
+// refusée ou un plafond bancaire à relever. Le rappel prévient celui qui a un
+// problème ; il n'importune pas celui qui a déjà payé, puisque son échéance
+// est effacée.
+//
+// POURQUOI LIBÉRER PLUTÔT QU'ANNULER
+//
+// Le devis redevient « envoye » : le client retrouve ses options, y compris
+// celle-ci. Annuler l'obligerait à tout recommencer alors qu'il n'a fait que
+// tarder.
+// ═══════════════════════════════════════════════════════════════════════════
+async function traiterEcheancesPaiement() {
+  try {
+    const maintenant = new Date();
+
+    // ── 1. LE RAPPEL, DANS LES QUINZE DERNIÈRES MINUTES ─────────────────
+    // J'avais choisi dix minutes. Or le balayage passe toutes les QUINZE :
+    // une fenêtre de dix minutes est plus courte que le battement, et un
+    // rappel sur trois tombait entre deux passages.
+    //
+    // Quinze minutes garantissent qu'aucune échéance n'est manquée — vérifié
+    // sur les quinze décalages de départ possibles.
+    const fenetreRappel = new Date(maintenant.getTime() + 15 * 60 * 1000).toISOString();
+
+    const { data: aRappeler } = await supabase.from('devis')
+      .select('id, demande_id, prix_ttc')
+      .eq('statut', 'accepte')
+      .not('paiement_avant', 'is', null)
+      .is('rappel_paiement_envoye_le', null)
+      .lt('paiement_avant', fenetreRappel)
+      .gt('paiement_avant', maintenant.toISOString())
+      .limit(50);
+
+    for (const d of (aRappeler || [])) {
+      const { data: demande } = await supabase.from('demandes')
+        .select('client_id, prestation').eq('id', d.demande_id).maybeSingle();
+      if (!demande) continue;
+
+      envoyerNotificationPush(demande.client_id, {
+        titre: 'Votre réservation expire bientôt',
+        corps: 'Réglez ' + Number(d.prix_ttc).toFixed(2).replace('.', ',')
+             + ' € pour confirmer votre prestation, sinon le devis sera libéré.',
+        url: '/#devis'
+      }).catch(() => {});
+
+      await supabase.from('devis')
+        .update({ rappel_paiement_envoye_le: maintenant.toISOString() })
+        .eq('id', d.id);
+    }
+
+    // ── 2. L'ÉCHÉANCE DÉPASSÉE ──────────────────────────────────────────
+    const { data: expires, error } = await supabase.from('devis')
+      .select('id, demande_id')
+      .eq('statut', 'accepte')
+      .not('paiement_avant', 'is', null)
+      .lt('paiement_avant', maintenant.toISOString())
+      .limit(50);
+
+    if (error) {
+      console.error('Échéances de paiement — lecture impossible :', error.message);
+      return 0;
+    }
+    if (!expires || !expires.length) return 0;
+
+    let liberes = 0;
+    for (const d of expires) {
+      // Un paiement a-t-il été enregistré entre-temps ? Le webhook Stripe peut
+      // arriver après notre lecture — libérer un devis payé serait le pire des
+      // défauts possibles ici.
+      const { data: paye } = await supabase.from('paiements')
+        .select('id').eq('devis_id', d.id)
+        .in('statut', ['paye', 'libere', 'liberation_en_cours']).maybeSingle();
+
+      if (paye) {
+        await supabase.from('devis')
+          .update({ paiement_avant: null }).eq('id', d.id);
+        continue;
+      }
+
+      await supabase.from('devis')
+        .update({ statut: 'envoye', paiement_avant: null,
+                  rappel_paiement_envoye_le: null })
+        .eq('id', d.id).eq('statut', 'accepte');
+
+      // La demande redevient ouverte : elle avait basculé en « acceptee ».
+      await supabase.from('demandes')
+        .update({ statut: 'devis_recus' })
+        .eq('id', d.demande_id).eq('statut', 'acceptee');
+
+      const { data: demande } = await supabase.from('demandes')
+        .select('client_id').eq('id', d.demande_id).maybeSingle();
+      if (demande) {
+        envoyerNotificationPush(demande.client_id, {
+          titre: 'Votre réservation a expiré',
+          corps: 'Faute de paiement, le devis a été libéré. Vous pouvez le '
+               + 'reprendre ou en choisir un autre.',
+          url: '/#devis'
+        }).catch(() => {});
+      }
+      liberes++;
+    }
+    return liberes;
+  } catch (e) {
+    console.error('Échéances de paiement :', e.message);
+    return 0;
+  }
+}
+
 async function reprendreVirementsEchoues() {
   try {
     const ilYaUneHeure = new Date(Date.now() - 3600 * 1000).toISOString();
@@ -4319,36 +4437,53 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
       return res.status(409).json({ error: 'Un devis vient d\'être accepté pour cette prestation.' });
     }
 
-    await supabase.from('devis').update({ statut: 'accepte' }).eq('id', req.params.id);
-    await supabase.from('devis').update({ statut: 'refuse' }).eq('demande_id', devis.demande_id).neq('id', req.params.id);
-
-    // 📧 Email 3/8 : devis accepté → pro gagnant
-    const { data: proAccepte } = await supabase.from('users').select('email, prenom').eq('id', devis.societe_id).single();
-    if (proAccepte) {
-      sendEmail('devis_accepte', proAccepte.email, {
-        compteId: proAccepte.id,
-        prenom: proAccepte.prenom,
-        prestation: demande.prestation,
-        creneau: devis.creneau_propose || demande.creneau,
-        demandeId: devis.demande_id
-      });
-      envoyerNotificationPush(devis.societe_id, {
-        titre: 'Devis accepté ! 🎉',
-        corps: 'Votre devis pour ' + demande.prestation + ' a été accepté',
-        url: '/#devis'
-      });
+    // ── TRENTE MINUTES POUR PAYER ─────────────────────────────────────────
+    // Le devis n'expirait qu'une heure APRÈS le créneau : accepté le lundi
+    // pour une prestation le samedi, il restait valable toute la semaine sans
+    // règlement.
+    //
+    // Il fallait donc prévenir le prestataire dès l'acceptation — sinon il
+    // prenait une autre course pour ce créneau et découvrait le paiement le
+    // vendredi. D'où les trois messages successifs, et leur confusion.
+    //
+    // Avec une échéance courte, il n'a plus rien à savoir avant le paiement :
+    // la fenêtre est trop brève pour qu'il s'engage ailleurs.
+    // ── L'ÉCHÉANCE NE DÉPASSE JAMAIS LE CRÉNEAU ───────────────────────────
+    // Trente minutes fixes créaient une contradiction : accepter un devis dix
+    // minutes avant l'heure de la prestation laissait trente minutes pour
+    // payer — le créneau passait avant l'échéance.
+    //
+    // Le devis restait alors « réservé » sur une prestation déjà manquée, et
+    // le prestataire ne recevait jamais rien.
+    //
+    // On plafonne à l'heure du créneau, avec un plancher de cinq minutes :
+    // en dessous, personne n'a le temps de saisir une carte, et refuser
+    // l'acceptation serait plus honnête qu'une échéance impossible.
+    let finEcheance = Date.now() + 30 * 60 * 1000;
+    const instantCreneauDevis = instantDuCreneau(demande.creneau);
+    if (instantCreneauDevis && instantCreneauDevis < finEcheance) {
+      finEcheance = Math.max(instantCreneauDevis, Date.now() + 5 * 60 * 1000);
     }
+    const echeance = new Date(finEcheance).toISOString();
+    await supabase.from('devis')
+      .update({ statut: 'accepte', paiement_avant: echeance })
+      .eq('id', req.params.id);
 
-    // 📧 Email "devis refusé" désactivé pour l'instant (peu actionnable, peut être mal vécu par les pros).
-    // Pour le réactiver, décommentez le bloc ci-dessous :
-    // const { data: devisRefuses } = await supabase.from('devis').select('societe_id').eq('demande_id', devis.demande_id).eq('statut', 'refuse');
-    // if (devisRefuses && devisRefuses.length) {
-    //   const idsRefuses = [...new Set(devisRefuses.map(d => d.societe_id))];
-    //   const { data: prosRefuses } = await supabase.from('users').select('email, prenom').in('id', idsRefuses);
-    //   (prosRefuses || []).forEach((pro) => {
-    //     sendEmail('devis_refuse', pro.email, { compteId: pro.id, prenom: pro.prenom, prestation: demande.prestation });
-    //   });
-    // }
+    // ── LES AUTRES DEVIS NE SONT PAS ENCORE REFUSÉS ───────────────────────
+    // Ils l'étaient immédiatement. Si le client ne payait pas, il perdait
+    // toutes ses options d'un coup — et devait tout recommencer.
+    //
+    // Ils sont désormais refusés AU PAIEMENT, quand le choix devient réel.
+
+    // ── AUCUN MESSAGE AU PRESTATAIRE À CE STADE ───────────────────────────
+    // Il en recevait deux — notification et courriel — annonçant un devis
+    // « retenu » qui ne garantissait rien. Quel que soit le soin des mots, un
+    // artisan qui lit « votre devis a été retenu » peut s'organiser, refuser
+    // une course, voire partir.
+    //
+    // Le seul message qui compte part au PAIEMENT, et il veut dire : vous
+    // pouvez y aller. Un message qui ne demande aucune interprétation vaut
+    // mieux que trois bien rédigés.
 
     res.json({ message: 'Devis accepté !', demande_id: devis.demande_id, societe_id: devis.societe_id });
   } catch (e) {
@@ -5069,6 +5204,77 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
 
   if (paiement) {
     await supabase.from('demandes').update({ statut: 'en_cours' }).eq('id', paiement.demande_id);
+
+    // ── C'EST ICI QUE LE PRESTATAIRE PEUT S'ENGAGER ──────────────────────
+    // Jusqu'à ce point, le devis était « retenu » : le client l'avait choisi
+    // mais n'avait rien payé, et la demande pouvait encore expirer.
+    //
+    // Le paiement change tout — l'argent est bloqué chez Stripe, la prestation
+    // aura lieu. C'est le moment où le prestataire peut réserver son créneau
+    // sans risque.
+    //
+    // Sans cette notification, il ne saurait jamais que la confirmation est
+    // arrivée : il resterait sur le « retenu » et continuerait de douter.
+    try {
+      const { data: devisPaye } = await supabase.from('devis')
+        .select('societe_id').eq('id', paiement.devis_id).maybeSingle();
+      const { data: demandePayee } = await supabase.from('demandes')
+        .select('prestation, creneau').eq('id', paiement.demande_id).maybeSingle();
+
+      if (devisPaye) {
+        // ── C'EST ICI QUE LE CHOIX DEVIENT RÉEL ──────────────────────────
+        // Les autres devis étaient refusés dès l'acceptation. Si le client ne
+        // payait pas, il perdait toutes ses options d'un coup et devait tout
+        // recommencer.
+        //
+        // On les refuse au paiement : jusque-là, il peut encore changer d'avis
+        // ou laisser l'échéance passer.
+        await supabase.from('devis')
+          .update({ statut: 'refuse' })
+          .eq('demande_id', paiement.demande_id)
+          .neq('id', paiement.devis_id);
+
+        // L'échéance a joué son rôle : on l'efface pour que le balayage ne
+        // reprenne pas un devis désormais payé.
+        await supabase.from('devis')
+          .update({ paiement_avant: null }).eq('id', paiement.devis_id);
+
+        // ── UN MESSAGE DANS LA CONVERSATION, PAS SEULEMENT UNE ALERTE ────
+        // Une notification se lit une fois puis disparaît. Le prestataire qui
+        // rouvre la demande trois jours plus tard ne retrouve rien — et il
+        // reste sur le « votre devis a été retenu », qui ne promet aucun
+        // paiement.
+        //
+        // Le message, lui, demeure. Il devient la preuve datée que le règlement
+        // est arrivé, visible des deux côtés, sans que le client ait à le
+        // confirmer lui-même.
+        //
+        // `expediteur_id` porte l'identifiant du CLIENT : la table exige un
+        // expéditeur réel, et c'est bien son paiement qu'on annonce.
+        await supabase.from('messages').insert({
+          demande_id: paiement.demande_id,
+          expediteur_id: paiement.client_id,
+          contenu: '💳 Paiement confirmé — la prestation est réservée. '
+                 + 'Le montant est bloqué et vous sera versé après validation.',
+          type: 'systeme'
+        });
+
+        envoyerNotificationPush(devisPaye.societe_id, {
+          titre: 'Paiement confirmé — prestation réservée',
+          // `prestation` est déjà lisible côté serveur — « voiture + canape ». Ma
+          // première version appelait une fonction de mise en forme qui n'existe
+          // qu'au client : elle aurait planté à la première notification.
+          corps: (demandePayee ? demandePayee.prestation + ' — ' : '')
+               + (demandePayee && demandePayee.creneau ? demandePayee.creneau : 'créneau confirmé')
+               + '. Vous pouvez bloquer ce créneau.',
+          url: '/#devis'
+        }).catch(() => {});
+      }
+    } catch (e) {
+      // Une notification manquée ne doit jamais compromettre un paiement
+      // abouti : le client a déjà été débité.
+      console.warn('Notification de paiement au prestataire :', e.message);
+    }
 
     // Tout ce qui touche au parrainage est protégé dans son propre bloc : une erreur ici (colonne
     // manquante, etc.) ne doit jamais empêcher la confirmation du paiement lui-même de réussir —
@@ -7599,6 +7805,9 @@ async function balayerPrestationsAValider() {
 
     const virements = await reprendreVirementsEchoues();
     if (virements) console.log('💸 ' + virements + ' virement(s) repris.');
+
+    const liberes = await traiterEcheancesPaiement();
+    if (liberes) console.log('⏱ ' + liberes + ' devis libéré(s) faute de paiement.');
     const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
     CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
