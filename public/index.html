@@ -60,7 +60,25 @@
 <link rel="icon" type="image/svg+xml" href="/gleam-logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<!-- ── LES POLICES NE DOIVENT PAS BLOQUER L'AFFICHAGE ──────────────────────
+       Un <link rel="stylesheet"> arrête le rendu jusqu'à ce que le fichier
+       soit reçu de Google. Sur un réseau lent, l'écran reste blanc pendant
+       tout ce temps — alors que le contenu est déjà là, prêt à s'afficher.
+
+       `rel="preload"` télécharge sans bloquer, puis `onload` transforme le
+       lien en feuille de style. Le texte apparaît immédiatement dans la
+       police système, puis bascule — c'est ce que fait déjà `display=swap`.
+
+       Le <noscript> garde le comportement d'origine si les scripts sont
+       désactivés : mieux vaut un écran lent qu'un écran sans style.
+  -->
+  <link rel="preload" as="style"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap"
+        onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap">
+  </noscript>
 <!-- Leaflet + OpenStreetMap : carte interactive gratuite, sans clé API et sans coût à l'usage,
      contrairement à Google Maps — choix délibéré pour éviter une nouvelle dépense récurrente. -->
 <!-- Leaflet ne sert qu'à DEUX écrans : le réglage de la zone d'intervention et
@@ -6273,6 +6291,11 @@ var DUREE_MEMOIRE_MS = 3000;
 
 function fetchGroupe(url, options){
   var opts = options || {};
+  // ── LE COOKIE DOIT PARTIR AVEC CHAQUE REQUÊTE ─────────────────────────
+  // Par défaut, le navigateur n'envoie AUCUN cookie vers une autre origine —
+  // et l'API (Railway) n'est pas sur le même domaine que l'application
+  // (Netlify). Sans cette ligne, le cookie serait posé mais jamais relu.
+  if (opts.credentials === undefined) opts.credentials = 'include';
   // Seules les lectures sont regroupées. Regrouper une écriture reviendrait à
   // en perdre une : deux enregistrements successifs doivent partir deux fois.
   if(opts.method && opts.method.toUpperCase() !== 'GET') return fetch(url, opts);
@@ -6514,6 +6537,21 @@ function initialiserPontNatif(){
   // qu'il n'y ait jamais deux écrans de chargement l'un après l'autre.
   if(SplashScreen){ try{ SplashScreen.hide() }catch(e){} }
 }
+
+// Les appels qui n'utilisent pas fetchGroupe — écritures, envois de fichiers —
+// doivent eux aussi transmettre le cookie. On enveloppe `fetch` une fois,
+// plutôt que d'ajouter `credentials` à quatre-vingt-treize endroits.
+const fetchOriginal = window.fetch.bind(window);
+window.fetch = function(url, options){
+  var o = options || {};
+  // Uniquement vers NOTRE API : ajouter les identifiants à une requête vers un
+  // service tiers les exposerait sans raison.
+  var cible = String(url && url.url ? url.url : url || '');
+  if (o.credentials === undefined && (cible.indexOf(API) === 0 || cible.indexOf('/api/') === 0)) {
+    o = Object.assign({}, o, { credentials: 'include' });
+  }
+  return fetchOriginal(url, o);
+};
 
 function authHeaders(){
   const t=localStorage.getItem('gleam_token');
@@ -6893,7 +6931,29 @@ async function supprimerCompte(){
     setTimeout(doLogout,1200);
   }catch(e){toast(friendlyNetworkError(e))}
 }
-function doLogout(){viderMemoireRequetes();stopChatPoll();stopUnreadPoll();stopDataPoll();localStorage.removeItem('gleam_token');currentUser=null;location.reload()}
+// ── LA DÉCONNEXION PASSE MAINTENANT PAR LE SERVEUR ────────────────────────
+// Le jeton vit désormais dans un cookie HttpOnly : le JavaScript ne peut PAS
+// l'effacer — c'est justement ce qui le protège d'une faille XSS.
+//
+// Vider le localStorage ne suffit donc plus. Sans appel au serveur, se
+// déconnecter laisserait la session ouverte : sur un ordinateur partagé, la
+// personne suivante reprendrait le compte.
+//
+// L'appel n'attend pas : si le réseau est coupé, on déconnecte quand même
+// localement. Mieux vaut une session résiduelle côté serveur qu'un bouton de
+// déconnexion qui ne répond pas.
+async function doLogout(){
+  try{
+    await fetch(API+'/api/auth/logout',{method:'POST',credentials:'include'});
+  }catch(e){ /* réseau coupé : on continue */ }
+  viderMemoireRequetes();
+  stopChatPoll();
+  stopUnreadPoll();
+  stopDataPoll();
+  localStorage.removeItem('gleam_token');
+  currentUser=null;
+  location.reload();
+}
 
 // ── HELPERS ──
 // Icônes vectorielles (Lucide) à la place des emojis, pour un rendu professionnel et cohérent
@@ -7455,7 +7515,7 @@ async function loadDemandes(silent){
   var c0=document.getElementById('recent-demands');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
-    const r=await fetch(API+'/api/demandes',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/demandes',{headers:authHeaders()});
     if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
     if(!r.ok)return;
     const dataAll=await safeJson(r);
@@ -8486,7 +8546,7 @@ async function loadProDemandes(silent){
   var c0=document.getElementById('pro-demandes-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
-    const r=await fetch(API+'/api/demandes/all',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/demandes/all',{headers:authHeaders()});
     const c=document.getElementById('pro-demandes-list');
     if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
     if(!r.ok){c.innerHTML='<div class="etat-vide"><i data-lucide="wifi-off" style="width:44px;height:44px;color:var(--gray);margin-bottom:14px"></i><h3>Chargement impossible</h3><p>Une erreur est survenue en récupérant les demandes. Vérifiez votre connexion et réessayez.</p><button class="btn" style="width:auto;padding:10px 22px" onclick="loadProDemandes()">Réessayer</button></div>';if(window.lucide)lucide.createIcons();document.getElementById('stat-demandes').textContent='0';return}
@@ -8507,7 +8567,7 @@ async function loadProDemandes(silent){
     proAccesRestreint = null;
     if (Array.isArray(data) && data.length === 0) {
       try {
-        const ra = await fetch(API + '/api/pro/acces', { headers: authHeaders() });
+        const ra = await fetchGroupe(API + '/api/pro/acces', { headers: authHeaders() });
         if (ra.ok) {
           const acces = await safeJson(ra);
           // Un serveur plus ancien ne connaît pas cette route : on reste alors
@@ -8747,7 +8807,7 @@ async function chargerTableauDeBordPro(){
   if(!box)return;
   try{
     var [gains,devis]=await Promise.all([
-      fetch(API+'/api/paiements/mes-gains',{headers:authHeaders()}).then(safeJson).catch(function(){return{}}),
+      fetchGroupe(API+'/api/paiements/mes-gains',{headers:authHeaders()}).then(safeJson).catch(function(){return{}}),
       fetchGroupe(API+'/api/devis/mes-devis',{headers:authHeaders()}).then(safeJson).catch(function(){return[]})
     ]);
     var liste=Array.isArray(devis)?devis:[];
@@ -9938,7 +9998,7 @@ async function majPastilleDocuments(){
   var p=document.getElementById('pastille-documents');
   if(!p||!currentUser||!isPro())return;
   try{
-    const r=await fetch(API+'/api/documents',{headers:authHeaders()});
+    const r=await fetchGroupe(API+'/api/documents',{headers:authHeaders()});
     const d=await safeJson(r);
     if(!d||!Array.isArray(d.documents)){p.textContent='';return}
 
