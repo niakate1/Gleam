@@ -29,6 +29,60 @@
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# LES FICHIERS QUI NE DOIVENT PAS ÊTRE SERVIS
+#
+# `public/test.html` contient des identifiants de comptes en clair — adresses
+# et mots de passe. Netlify publie le dossier `public/` tel quel : le fichier
+# est donc accessible à quiconque connaît son adresse.
+#
+# CETTE RÈGLE NE REMPLACE PAS SA SUPPRESSION
+#
+# Elle empêche d'y accéder, elle n'efface rien. Le fichier reste dans le dépôt,
+# et dans l'historique Git. Ces mots de passe sont à considérer comme
+# compromis : changez-les, supprimez le fichier, purgez l'historique.
+#
+# Cette règle est un garde-fou pour aujourd'hui, pas une solution.
+#
+# LE 404 EST DÉLIBÉRÉ
+#
+# Un 403 confirmerait que le fichier existe. Un 404 ne dit rien.
+# ─────────────────────────────────────────────────────────────────────────────
+[[redirects]]
+  from = "/test.html"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/test"
+  to = "/index.html"
+  status = 404
+  force = true
+
+# Les fichiers de développement et de configuration, s'ils venaient à se
+# retrouver dans `public/`. Une liste d'interdits laisse toujours passer le
+# prochain fichier ajouté — mais ici, contrairement au serveur, on ne peut pas
+# énumérer ce qui est autorisé : le site sert des pages, pas une liste fermée.
+[[redirects]]
+  from = "/*.env"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/*.sql"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/package.json"
+  to = "/index.html"
+  status = 404
+  force = true
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Le service worker
 #
 # Deux règles indispensables, sans lesquelles les notifications ne peuvent pas
