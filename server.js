@@ -1115,6 +1115,21 @@ const CHAMPS_INTERNES = [
   'siret_donnees'
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════
+// UN CODE SECRET NE SE TIRE PAS AU HASARD ORDINAIRE
+//
+// `Math.random()` n'est pas conçu pour la sécurité : sa suite est prévisible
+// pour qui observe assez de valeurs. Quatre codes en dépendaient — vérification
+// d'adresse, réinitialisation de mot de passe, validation de prestation.
+//
+// Le dernier est le plus sensible : c'est lui qui libère le paiement.
+//
+// `crypto.randomInt` puise dans la source d'entropie du système. Même coût,
+// même forme, aucune prévisibilité.
+function codeSecret6() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
 function compteVisible(compte) {
   if (!compte) return compte;
   const propre = { ...compte };
@@ -1199,7 +1214,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     // qu'un lien, mais SANS bloquer l'accès à l'application en attendant (l'utilisateur peut
     // utiliser Gleam normalement dès l'inscription, la confirmation se fait en tâche de fond,
     // avec un simple rappel non-bloquant dans l'app tant qu'elle n'est pas faite).
-    const codeVerifEmail = String(Math.floor(100000 + Math.random() * 900000));
+    const codeVerifEmail = codeSecret6();
     const codeVerifExpire = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // valable 24h
 
     const { data, error } = await supabase.from('users').insert({
@@ -1250,7 +1265,17 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
 
     const token = jwt.sign({ id: data.id, email: data.email, type: data.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({ message: 'Compte Gleam créé !', token, user: { ...data, firstName: data.prenom, lastName: data.nom } });
+    // ── LE CODE DE VÉRIFICATION NE DOIT PAS PARTIR AVEC LA RÉPONSE ────────
+    // `...data` renvoyait la ligne ENTIÈRE telle qu'insérée — y compris
+    // `email_verif_code` et `email_verif_expire`, créés quelques lignes plus
+    // haut.
+    //
+    // La personne qui s'inscrivait recevait donc le code censé prouver qu'elle
+    // contrôle l'adresse. La vérification par courriel ne prouvait plus rien.
+    //
+    // `compteVisible` existe et filtre déjà ces champs sur /login et /me.
+    // Cette route l'avait oublié.
+    res.status(201).json({ message: 'Compte Gleam créé !', token, user: { ...compteVisible(data), firstName: data.prenom, lastName: data.nom } });
   } catch (e) {
     console.error(e);
     erreurServeur(res, 'POST /api/auth/register', e);
@@ -1307,7 +1332,7 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     // inscrit chez Gleam (bonne pratique de sécurité classique).
     if (!user) return res.json({ message: 'Si ce compte existe, un email a été envoyé.' });
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const code = codeSecret6();
     const expiration = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // valable 30 minutes
     await supabase.from('users').update({ reset_code: code, reset_code_expire: expiration }).eq('id', user.id);
 
@@ -1481,7 +1506,7 @@ app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
     if (!moi) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
     if (moi.email_verifie) return res.json({ message: 'Votre email est déjà confirmé.' });
 
-    const nouveauCode = String(Math.floor(100000 + Math.random() * 900000));
+    const nouveauCode = codeSecret6();
     const nouvelleExpiration = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     await supabase.from('users').update({ email_verif_code: nouveauCode, email_verif_expire: nouvelleExpiration }).eq('id', req.user.id);
     sendEmail('verification_email', moi.email, { compteId: moi.id, prenom: moi.prenom, code: nouveauCode });
@@ -5200,7 +5225,7 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
   // Génère le code à 6 chiffres que le client devra donner au prestataire à la fin de la
   // prestation (comme un code de livraison Uber Eats) — preuve que les deux parties étaient
   // bien en contact au moment de la finalisation, plutôt qu'une simple confirmation unilatérale.
-  const codeValidation = String(Math.floor(100000 + Math.random() * 900000));
+  const codeValidation = codeSecret6();
   // Capture les identifiants du transfert et de la commission Stripe pour cette charge — permet,
   // en cas d'annulation avec remboursement partiel, d'aller lire directement chez Stripe le
   // montant réellement reçu par le pro, plutôt que de le recalculer à la main de notre côté
@@ -7644,6 +7669,58 @@ app.patch('/api/admin/users/:id/disponibilite', adminAuth, async (req, res) => {
 // site avant que les fichiers n'aient une chance d'être servis — la page
 // d'accueil renvoyait donc une erreur JSON. C'est ce qui vient d'arriver.
 const chemin = require('path');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SEULS LES FICHIERS PUBLICS SONT SERVIS
+//
+// `express.static(__dirname)` exposait la RACINE DU PROJET. N'importe qui
+// pouvait télécharger :
+//
+//     /server.js        toute la logique métier, les noms de tables
+//     /email.js         les gabarits et la configuration SendGrid
+//     /package.json     les dépendances et leurs versions
+//     /.env.example     les noms des variables d'environnement
+//
+// Les clés elles-mêmes vivent dans les variables Railway, pas dans un fichier.
+// Mais le code d'un serveur n'a aucune raison d'être téléchargeable : il
+// révèle la structure de la base, les contrôles en place — et ceux qui
+// manquent.
+//
+// LA LISTE BLANCHE PLUTÔT QUE LA LISTE NOIRE
+//
+// Interdire server.js et email.js aurait laissé passer le prochain fichier
+// ajouté. On énumère ce qui DOIT être servi, et rien d'autre.
+const FICHIERS_PUBLICS = new Set([
+  '/index.html', '/sw.js', '/manifest.json', '/manifest.webmanifest',
+  '/favicon.ico', '/apple-touch-icon.png', '/robots.txt'
+]);
+
+function estPublic(url) {
+  let propre;
+  try { propre = decodeURIComponent(String(url || '').split('?')[0]); }
+  catch (e) { return false; }          // adresse mal encodée : on refuse
+  if (FICHIERS_PUBLICS.has(propre)) return true;
+  // Les ressources d'un dossier dédié — images, polices — restent servies.
+  return /^\/(assets|icons|images|img|fonts)\//.test(propre);
+}
+
+app.use((req, res, suivant) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return suivant();
+  if (req.path === '/' || estPublic(req.path)) return suivant();
+
+  // Un fichier non public ne doit pas répondre « 404 » : cela confirmerait son
+  // existence. On rend l'application, comme pour toute adresse inconnue.
+  //
+  // TOUT CE QUI N'EST PAS EXPLICITEMENT PUBLIC EST REFUSÉ.
+  //
+  // J'avais d'abord énuméré les extensions à bloquer. Deux fichiers passaient
+  // à travers : « .env.example » — dont l'extension est « .example » — et
+  // « test.html », qui contenait des identifiants en clair.
+  //
+  // Une liste d'interdits laisse toujours passer ce qu'on n'a pas prévu. Seule
+  // la liste blanche tient dans le temps.
+  return res.sendFile(chemin.join(__dirname, 'index.html'));
+});
 
 app.use(express.static(__dirname, {
   setHeaders: (res, fichier) => {
