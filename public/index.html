@@ -8962,7 +8962,20 @@ async function chargerTableauDeBordPro(){
     ]);
     var liste=Array.isArray(devis)?devis:[];
     var acceptes=liste.filter(function(v){return v.statut==='accepte'}).length;
-    var repondus=liste.filter(function(v){return v.statut!=='envoye'}).length;
+    // ── « RÉPONDU » NE VEUT PAS DIRE « TOUT SAUF EN ATTENTE » ──────────
+      // Le taux comptait comme « répondus » tous les devis non « envoye » :
+      // les annulations du CLIENT, les expirations, les annulations du
+      // prestataire lui-même.
+      //
+      // Sur vos données : 1 accepté sur 5 « répondus » → 20 %. Or le client
+      // n'a vraiment tranché que deux fois — accepté une fois, refusé une
+      // fois. Le vrai taux est de 50 %.
+      //
+      // Un prestataire ne doit pas être jugé sur des demandes que le client a
+      // annulées de son côté.
+      var repondus=liste.filter(function(v){
+        return v.statut==='accepte'||v.statut==='refuse';
+      }).length;
     // Le taux se calcule sur les devis qui ont reçu une réponse : inclure ceux
     // encore en attente ferait chuter artificiellement le chiffre d'un pro actif.
     var taux=repondus>0?Math.round(acceptes/repondus*100):null;
@@ -9606,7 +9619,18 @@ function renderProDevisCards(){
   // Ce que la liste ne disait jamais : combien d'argent est en jeu. Un pro qui a
   // envoyé douze devis veut savoir ce que ça représente s'ils aboutissent, et
   // combien attendent encore une réponse.
-  var enAttente=data.filter(function(v){return v.statut==='envoye'});
+  // ── LE RÉCAPITULATIF DOIT SUIVRE LA MÊME RÈGLE QUE LE TRI ────────────
+      // Il ne regardait que `v.statut`. Un devis « envoye » sur une demande
+      // EXPIRÉE était donc compté « en attente de réponse » — alors que le
+      // tri, lui, le rangeait correctement dans « Terminés ».
+      //
+      // Deux règles pour la même notion : le prestataire voyait 300 € « en
+      // jeu » sur un devis auquel personne ne pouvait plus répondre.
+      //
+      // On réutilise `proDevisMainTabOf`, qui sait déjà décider.
+      var enAttente=data.filter(function(v){
+        return v.statut==='envoye' && proDevisMainTabOf(v)==='encours';
+      });
   var montantEnJeu=enAttente.reduce(function(t,v){return t+(parseFloat(v.prix_ttc)||0)},0);
   var gagnes=data.filter(function(v){
     return v.statut==='accepte'&&v.demande&&v.demande.statut==='terminee';
@@ -9849,7 +9873,20 @@ async function chargerReputationPro(){
     var devis=await fetchGroupe(API+'/api/devis/mes-devis',{headers:authHeaders()}).then(safeJson).catch(function(){return[]});
     var liste=Array.isArray(devis)?devis:[];
     var acceptes=liste.filter(function(v){return v.statut==='accepte'}).length;
-    var repondus=liste.filter(function(v){return v.statut!=='envoye'}).length;
+    // ── « RÉPONDU » NE VEUT PAS DIRE « TOUT SAUF EN ATTENTE » ──────────
+      // Le taux comptait comme « répondus » tous les devis non « envoye » :
+      // les annulations du CLIENT, les expirations, les annulations du
+      // prestataire lui-même.
+      //
+      // Sur vos données : 1 accepté sur 5 « répondus » → 20 %. Or le client
+      // n'a vraiment tranché que deux fois — accepté une fois, refusé une
+      // fois. Le vrai taux est de 50 %.
+      //
+      // Un prestataire ne doit pas être jugé sur des demandes que le client a
+      // annulées de son côté.
+      var repondus=liste.filter(function(v){
+        return v.statut==='accepte'||v.statut==='refuse';
+      }).length;
     var taux=repondus>0?Math.round(acceptes/repondus*100):null;
     var termines=liste.filter(function(v){
       return v.statut==='accepte'&&v.demande&&v.demande.statut==='terminee';
