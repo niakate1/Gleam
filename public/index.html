@@ -7010,7 +7010,9 @@ function icoStatut(nom){
   return '<i data-lucide="'+nom+'" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px"></i>';
 }
 const STATUTS={
-  en_attente:     [icoStatut('clock')+'En attente','s-attente'],
+  // « En attente » de quoi ? Le client ne savait pas s'il devait agir.
+  // Il attend des devis — et il n'a rien d'autre à faire que patienter.
+  en_attente:     [icoStatut('clock')+'En attente de devis','s-attente'],
   devis_recus:    [icoStatut('file-text')+'Devis reçus','s-devis'],
   // ── DEUX LIBELLÉS QUI MENTAIENT ──────────────────────────────────────
   // « Acceptée » laissait croire que tout était réglé : le devis était retenu,
