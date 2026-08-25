@@ -5165,6 +5165,35 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
 // « probablement absent », pour décider si l'argent part maintenant ou attend
 // votre arbitrage.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// CE QUI RESTE APRÈS UN REMBOURSEMENT
+//
+// Un remboursement partiel reprend l'argent AU PRORATA des deux côtés : sur la
+// part du prestataire et sur la commission Gleam. C'est ce que font
+// `reverse_transfer` et `refund_application_fee` chez Stripe.
+//
+// Mais les écrans additionnaient `montant_societe` tel quel. Un paiement de
+// 100 € remboursé de moitié affichait toujours 85 € de gains, alors que le
+// prestataire n'en avait gardé que 42,50.
+//
+// Quatre écrans étaient touchés : les gains du prestataire, les revenus Gleam,
+// les statistiques et la déclaration annuelle.
+//
+// UNE SEULE RÈGLE, UTILISÉE PARTOUT
+//
+// Recalculer à quatre endroits, c'est se garantir que trois divergeront.
+function partReelle(paiement, champ) {
+  const brut = parseFloat(paiement[champ]) || 0;
+  const total = parseFloat(paiement.montant_ttc) || 0;
+  const rendu = parseFloat(paiement.montant_rembourse) || 0;
+
+  if (!total || !rendu) return brut;
+  if (rendu >= total) return 0;
+
+  // Arrondi au centime : on manipule de l'argent, pas des décimales flottantes.
+  return Math.round(brut * (1 - rendu / total) * 100) / 100;
+}
+
 function preuvesDePresence(demande) {
   const preuves = [];
 
@@ -6317,8 +6346,15 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
     const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
     const demandesMap = {};
     (demandes || []).forEach(d => { demandesMap[d.id] = d; });
-    const totalLibere = paiements.filter(p => p.statut === 'libere' || p.statut === 'rembourse_partiel').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
-    const totalEnAttente = paiements.filter(p => p.statut === 'paye').reduce((a, p) => a + parseFloat(p.montant_societe), 0);
+    const totalLibere = paiements.filter(p => p.statut === 'libere' || p.statut === 'rembourse_partiel')
+      // ── UN REMBOURSEMENT REPREND AUSSI SUR LE PRESTATAIRE ──────────────
+      // On additionnait `montant_societe` tel quel. Un paiement de 100 €
+      // remboursé de moitié affichait 85 € de gains, alors que le prestataire
+      // n'en avait gardé que 42,50.
+      .reduce((a, p) => a + partReelle(p, 'montant_societe'), 0);
+    const totalEnAttente = paiements.filter(p => p.statut === 'paye')
+      // Un paiement « paye » peut déjà avoir été partiellement remboursé.
+      .reduce((a, p) => a + partReelle(p, 'montant_societe'), 0);
     // Tri logique : en attente de confirmation client (encore "actif") avant reçu (déjà réglé, historique)
     const prioriteGain = { paye: 0, libere: 1, rembourse_partiel: 1 };
     const enrichis = paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }));
@@ -7195,7 +7231,9 @@ app.get('/api/admin/mes-revenus', adminAuth, async (req, res) => {
   try {
     const annee = parseInt(req.query.annee, 10) || new Date().getFullYear();
     const { data: paiements } = await supabase.from('paiements')
-      .select('montant, commission, montant_societe, statut, created_at, numero_facture')
+      // `montant_ttc` et `montant_rembourse` : partReelle() a besoin des deux
+      // pour calculer le prorata restant après un remboursement.
+      .select('montant, montant_ttc, commission, montant_societe, montant_rembourse, statut, created_at, numero_facture')
       .in('statut', ['paye', 'libere'])
       .gte('created_at', annee + '-01-01T00:00:00.000Z')
       .lt('created_at', (annee + 1) + '-01-01T00:00:00.000Z')
@@ -7204,9 +7242,13 @@ app.get('/api/admin/mes-revenus', adminAuth, async (req, res) => {
     const mois = Array.from({ length: 12 }, () => ({ encaisse: 0, commission: 0, reverse: 0, nb: 0 }));
     (paiements || []).forEach((p) => {
       const m = new Date(p.created_at).getMonth();
-      mois[m].encaisse += parseFloat(p.montant) || 0;
-      mois[m].commission += parseFloat(p.commission) || 0;
-      mois[m].reverse += parseFloat(p.montant_societe) || 0;
+      // ── UN REMBOURSEMENT DIMINUE LES TROIS COLONNES ────────────────────
+      // Encaissé, commission et reversé étaient additionnés bruts. Une
+      // prestation remboursée de moitié gonflait donc votre chiffre d'affaires
+      // et votre commission — et fausserait une déclaration fiscale.
+      mois[m].encaisse += partReelle(p, 'montant');
+      mois[m].commission += partReelle(p, 'commission');
+      mois[m].reverse += partReelle(p, 'montant_societe');
       mois[m].nb += 1;
     });
 
@@ -7325,7 +7367,9 @@ app.get('/api/admin/declaration-annuelle', adminAuth, async (req, res) => {
     // Seuls les paiements réellement encaissés comptent : un paiement remboursé
     // ou abandonné n'a produit aucun revenu à déclarer.
     const { data: paiements } = await supabase.from('paiements')
-      .select('id, demande_id, societe_id, montant, montant_societe, commission, statut, created_at')
+      // `montant_ttc` et `montant_rembourse` : sans eux, une prestation
+      // remboursée serait déclarée à l'administration pour son montant entier.
+      .select('id, demande_id, societe_id, montant, montant_ttc, montant_societe, commission, montant_rembourse, statut, created_at')
       .in('statut', ['paye', 'libere'])
       .gte('created_at', debut).lt('created_at', fin)
       .limit(20000);
@@ -7360,9 +7404,13 @@ app.get('/api/admin/declaration-annuelle', adminAuth, async (req, res) => {
     (paiements || []).forEach((p) => {
       const f = parPro[p.societe_id];
       if (!f) return;
-      const brut = parseFloat(p.montant) || 0;
-      const commission = parseFloat(p.commission) || 0;
-      const net = parseFloat(p.montant_societe) || (brut - commission);
+      // ── UNE PRESTATION REMBOURSÉE N'EST PAS UN REVENU ──────────────────
+      // C'est le point le plus sensible : ce tableau part à l'administration.
+      // Déclarer un revenu qui a été rendu au client, c'est payer des
+      // cotisations sur de l'argent qu'on n'a jamais gardé.
+      const brut = partReelle(p, 'montant');
+      const commission = partReelle(p, 'commission');
+      const net = partReelle(p, 'montant_societe') || (brut - commission);
       const trimestre = 'T' + (Math.floor(new Date(p.created_at).getMonth() / 3) + 1);
 
       f.nb_operations += 1;
@@ -8287,9 +8335,15 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
     const { count: nbPros } = await supabase.from('users').select('id', { count: 'exact', head: true }).in('type', ['pro', 'societe', 'professionnel']);
     const { count: nbDemandesActives } = await supabase.from('demandes').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'devis_recus', 'acceptee', 'en_cours']);
     const { count: nbSignalementsOuverts } = await supabase.from('signalements').select('id', { count: 'exact', head: true }).eq('statut', 'nouveau');
-    const { data: paiementsLiberes } = await supabase.from('paiements').select('montant_ttc, commission').in('statut', ['libere', 'paye']);
-    const revenuTotal = (paiementsLiberes || []).reduce((s, p) => s + parseFloat(p.montant_ttc || 0), 0);
-    const commissionTotale = (paiementsLiberes || []).reduce((s, p) => s + parseFloat(p.commission || 0), 0);
+    const { data: paiementsLiberes } = // `montant_rembourse` est indispensable : sans lui, partReelle() ne peut
+      // rien déduire et renvoie le montant brut.
+      await supabase.from('paiements').select('montant_ttc, commission, montant_rembourse').in('statut', ['libere', 'paye']);
+    // ── LES REMBOURSEMENTS SONT DÉDUITS ─────────────────────────────────
+    // Un paiement remboursé de moitié comptait pour son montant entier : le
+    // chiffre d'affaires et la commission affichés étaient supérieurs à ce qui
+    // était réellement encaissé.
+    const revenuTotal = (paiementsLiberes || []).reduce((s, p) => s + partReelle(p, 'montant_ttc'), 0);
+    const commissionTotale = (paiementsLiberes || []).reduce((s, p) => s + partReelle(p, 'commission'), 0);
 
     res.json({
       nb_clients: nbClients || 0,
@@ -8479,7 +8533,10 @@ app.get('/api/admin/litiges', adminAuth, async (req, res) => {
     const litiges = [];
     for (const d of demandes) {
       const { data: paiement } = await supabase.from('paiements')
-        .select('id, montant_ttc, montant_societe, commission, statut, societe_id, client_id')
+        .select(// `montant_rembourse` : une prestation partiellement remboursée doit
+        // afficher son montant RESTANT dans la carte de litige, pas son montant
+        // d'origine — sinon on arbitre sur une somme qui n'existe plus.
+        'id, montant_ttc, montant_societe, commission, statut, societe_id, client_id, montant_rembourse')
         .eq('demande_id', d.id).maybeSingle();
 
       // Un paiement déjà réglé n'est plus à arbitrer.
@@ -8511,9 +8568,9 @@ app.get('/api/admin/litiges', adminAuth, async (req, res) => {
         distance_gps_arrivee: d.distance_gps_arrivee,
         prestation_demarree_le: d.prestation_demarree_le,
         code_saisi_par_pro: d.code_saisi_par_pro,
-        montant_ttc: paiement.montant_ttc,
-        montant_societe: paiement.montant_societe,
-        commission: paiement.commission,
+        montant_ttc: partReelle(paiement, 'montant_ttc'),
+        montant_societe: partReelle(paiement, 'montant_societe'),
+        commission: partReelle(paiement, 'commission'),
         statut_paiement: paiement.statut,
         client: client ? { nom: (client.prenom || '') + ' ' + (client.nom || ''), email: client.email } : null,
         pro: pro ? {
