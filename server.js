@@ -4803,7 +4803,17 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
     if (!devis || !devis.length) return res.json([]);
 
     const demandeIds = [...new Set(devis.map(d => d.demande_id))];
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse, statut, numero_anonyme, client_id, notes, creneau, photos_avant, photos_apres, prestation_demarree_le, creneau_propose, creneau_propose_par').in('id', demandeIds);
+    const { data: demandes } = await supabase.from('demandes').select(// ── LA CONTESTATION DOIT ARRIVER JUSQU'À L'ÉCRAN ────────────────────
+      // Le bandeau rouge « Le client affirme que vous n'êtes pas venu » ne
+      // s'affichait jamais : ces trois champs n'étaient pas transmis.
+      //
+      // La contestation était bien enregistrée en base, la notification
+      // partait — mais le prestataire n'avait aucun endroit où répondre, et
+      // deux heures plus tard la prestation était remboursée.
+      //
+      // `demande_modifiee` manquait aussi : le badge ambre posé ce matin ne
+      // pouvait pas apparaître non plus.
+      'id, prestation, adresse, statut, numero_anonyme, client_id, notes, creneau, photos_avant, photos_apres, prestation_demarree_le, creneau_propose, creneau_propose_par, contestation_le, reponse_pro_le, arrivee_qualite, arrivee_confirmee_client').in('id', demandeIds);
     const demandeMap = {};
     (demandes || []).forEach(d => demandeMap[d.id] = d);
 
