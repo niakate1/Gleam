@@ -1437,6 +1437,12 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
               background var(--dur-base) var(--ease-out);
 }
 .opt-btn span { display: block; font-size: 20px; margin-bottom: 5px; }
+/* Les motifs de signalement : une liste, pas une grille. Quatre entrées dont
+   trois dépassent la demi-largeur d'un petit écran — elles se coupaient sur
+   deux lignes, et la quatrième case restait vide. */
+.motifs-signalement { display: flex; flex-direction: column; gap: 8px; margin-bottom: var(--gap-4); }
+.opt-btn.motif { text-align: left; padding: 13px 14px; }
+
 .opt-btn.full { grid-column: 1 / -1; }
 .opt-btn:hover { border-color: var(--p); transform: translateY(-1px); }
 .opt-btn:active { transform: scale(.96); }
@@ -11214,12 +11220,20 @@ async function soumettreNouveauMotDePasse(){
 function ouvrirContactSupport(){
   var html='<div class="modal-title"><i data-lucide="life-buoy" style="width:20px;height:20px;vertical-align:-4px;color:var(--p)"></i> Contacter le support</div>'+
     '<div class="modal-sub">Réclamation, problème technique, question sur un paiement... Notre équipe vous répondra par email.</div>'+
-    '<div class="field-group"><label>Motif</label><div class="options-grid">'+
-      '<button class="opt-btn" data-group="support-motif" data-coef-val="reclamation" onclick="selOpt(this)">Réclamation</button>'+
-      '<button class="opt-btn" data-group="support-motif" data-coef-val="paiement" onclick="selOpt(this)">Problème de paiement</button>'+
-      '<button class="opt-btn" data-group="support-motif" data-coef-val="bug" onclick="selOpt(this)">Bug technique</button>'+
-      '<button class="opt-btn full" data-group="support-motif" data-coef-val="autre" onclick="selOpt(this)">Autre</button>'+
-    '</div></div>'+
+    // ── LES MOTIFS EN LISTE ───────────────────────────────────────────────
+    // Sur un iPhone SE, chaque case de la grille fait 151 px. « Absence /
+    // non-présentation » en demande 189 : les trois premiers motifs se
+    // coupaient sur deux lignes, et la quatrième case restait vide.
+    //
+    // En liste, chaque motif tient sur une ligne. On lit avant de choisir —
+    // ce qui compte quand on signale un problème et qu'on est déjà contrarié.
+    '<div class="field-group"><label>Que s\'est-il passé ?</label>'+
+      '<div class="motifs-signalement">'+
+      '<button class="opt-btn motif" data-group="signal-motif" data-coef-key="motif" data-coef-val="coordonnees" onclick="selOpt(this)">Demande de coordonnées</button>'+
+      '<button class="opt-btn motif" data-group="signal-motif" data-coef-key="motif" data-coef-val="comportement" onclick="selOpt(this)">Comportement inapproprié</button>'+
+      '<button class="opt-btn motif" data-group="signal-motif" data-coef-key="motif" data-coef-val="absence" onclick="selOpt(this)">Absence ou non-présentation</button>'+
+      '<button class="opt-btn motif" data-group="signal-motif" data-coef-key="motif" data-coef-val="autre" onclick="selOpt(this)">Autre motif</button>'+
+      '</div></div>'+
     '<div class="field-group"><label>Décrivez votre demande</label><textarea id="support-desc" rows="4" placeholder="Expliquez-nous ce qui se passe, avec le plus de détails possible..." style="resize:none"></textarea></div>'+
     '<button class="modal-send-btn" id="support-btn" onclick="envoyerContactSupport()">Envoyer</button>';
   document.getElementById('modal-body').innerHTML=html;
@@ -11246,12 +11260,20 @@ function ouvrirSignalement(){
   if(!info.id){toast('Impossible de signaler pour l\u2019instant.');return}
   var html='<div class="modal-title"><i data-lucide="flag" style="width:20px;height:20px;vertical-align:-4px;color:var(--red)"></i> Signaler un problème</div>'+
     '<div class="modal-sub">Votre signalement sera examiné par l\'équipe Gleam.</div>'+
-    '<div class="field-group"><label>Motif</label><div class="options-grid">'+
-      '<button class="opt-btn" data-group="signal-motif" data-coef-key="motif" data-coef-val="coordonnees" onclick="selOpt(this)">Demande de coordonnées</button>'+
-      '<button class="opt-btn" data-group="signal-motif" data-coef-key="motif" data-coef-val="comportement" onclick="selOpt(this)">Comportement inapproprié</button>'+
-      '<button class="opt-btn" data-group="signal-motif" data-coef-key="motif" data-coef-val="absence" onclick="selOpt(this)">Absence / non-présentation</button>'+
-      '<button class="opt-btn full" data-group="signal-motif" data-coef-key="motif" data-coef-val="autre" onclick="selOpt(this)">Autre</button>'+
-    '</div></div>'+
+    // ── LES MOTIFS EN LISTE ───────────────────────────────────────────────
+    // Sur un iPhone SE, chaque case de la grille fait 151 px. « Absence /
+    // non-présentation » en demande 189 : les trois premiers motifs se
+    // coupaient sur deux lignes, et la quatrième case restait vide.
+    //
+    // En liste, chaque motif tient sur une ligne. On lit avant de choisir —
+    // ce qui compte quand on signale un problème et qu'on est déjà contrarié.
+    '<div class="field-group"><label>Que s\'est-il passé ?</label>'+
+      '<div class="motifs-signalement">'+
+      '<button class="opt-btn motif" data-group="signal-motif" data-coef-key="motif" data-coef-val="coordonnees" onclick="selOpt(this)">Demande de coordonnées</button>'+
+      '<button class="opt-btn motif" data-group="signal-motif" data-coef-key="motif" data-coef-val="comportement" onclick="selOpt(this)">Comportement inapproprié</button>'+
+      '<button class="opt-btn motif" data-group="signal-motif" data-coef-key="motif" data-coef-val="absence" onclick="selOpt(this)">Absence ou non-présentation</button>'+
+      '<button class="opt-btn motif" data-group="signal-motif" data-coef-key="motif" data-coef-val="autre" onclick="selOpt(this)">Autre motif</button>'+
+      '</div></div>'+
     '<div class="field-group"><label>Description <span class="optional">(optionnel)</span></label><textarea id="signal-desc" rows="3" placeholder="Décrivez la situation..." style="resize:none"></textarea></div>'+
     '<button class="modal-send-btn" id="signal-btn" onclick="envoyerSignalement(\''+escAttr(info.id)+'\')">Envoyer le signalement</button>';
   document.getElementById('modal-body').innerHTML=html;
