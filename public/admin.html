@@ -316,8 +316,19 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
   border-left-color: #2E9E5B;
   color: #2A5C3C;
 }
-.actions-signalement { display: flex; gap: 8px; flex-wrap: wrap; }
-.actions-signalement .action { flex: 1; min-width: 140px; }
+/* ── LES ACTIONS D'UN SIGNALEMENT ────────────────────────────────────────
+   Elles étaient côte à côte, avec un minimum de 140 px. Les libellés ont été
+   allongés pour dire OÙ VA L'ARGENT — « J'ai traité — le prestataire sera
+   payé » fait près de 290 px.
+
+   Deux boutons de cette longueur sur une ligne se compriment jusqu'à couper
+   le texte. On les empile : chacun prend toute la largeur, et le libellé
+   reste lisible.
+
+   C'est aussi plus sûr. Ces boutons commandent un versement : les séparer
+   réduit le risque de cliquer sur l'un en visant l'autre. */
+.actions-signalement { display: flex; flex-direction: column; gap: 8px; }
+.actions-signalement .action { width: 100%; text-align: center; }
 .action.secondaire {
   background: transparent;
   border: 1px solid #D5DDDD;
@@ -738,10 +749,16 @@ async function chargerLitiges() {
         +   '</div>'
         + reponse
         + echanges
-        + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
-        +   '<button class="btn" onclick="trancherLitige(\'' + id + '\',\'payer_pro\')">'
+        // ── DEUX DÉCISIONS OPPOSÉES, EMPILÉES ────────────────────────────
+        // Côte à côte, ces boutons se touchent. Ils commandent des versements
+        // dans des directions contraires : cliquer sur l'un en visant l'autre
+        // enverrait l'argent au mauvais destinataire, sans retour possible.
+        //
+        // Empilés, avec un écart, la confusion devient beaucoup moins facile.
+        + '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">'
+        +   '<button class="btn" style="width:100%" onclick="trancherLitige(\'' + id + '\',\'payer_pro\')">'
         +     'Payer le prestataire</button>'
-        +   '<button class="btn secondaire" onclick="trancherLitige(\'' + id + '\',\'rembourser\')">'
+        +   '<button class="btn secondaire" style="width:100%" onclick="trancherLitige(\'' + id + '\',\'rembourser\')">'
         +     'Rembourser le client</button>'
         + '</div>'
         + '</div>';
