@@ -7035,6 +7035,19 @@ function libelleStatutDemande(d){
   var base = STATUTS[(d && d.statut)] || ['',''];
   if(!d || d.statut !== 'en_cours') return base;
 
+  // ── UN LITIGE PRIME SUR TOUT LE RESTE ─────────────────────────────────
+  // Il était testé À L'INTÉRIEUR du bloc « arrivée déclarée », donc APRÈS
+  // « Arrivée à confirmer » — qui gagnait toujours.
+  //
+  // Un arbitrage en cours est l'information la plus importante : elle prime
+  // sur l'état de l'arrivée, puisque c'est justement lui qui est contesté.
+  //
+  // Le statut en base reste « en_cours » — le changer casserait les requêtes,
+  // les filtres et les statistiques. C'est l'AFFICHAGE qui doit dire vrai.
+  if(d.contestation_le){
+    return [icoStatut('scale')+'Litige en cours','s-attente'];
+  }
+
   if(d.prestation_demarree_le){
     // ── UNE ARRIVÉE DOUTEUSE N'EST PAS « EN COURS » ──────────────────────
     // Le badge affichait « En cours » alors que l'écran demandait juste en
@@ -8247,6 +8260,22 @@ function renderDetail(d){
 
     }else if(d.statut==='expiree'){
       html+='<div class="locked-banner"><span>📅</span><div>Le créneau est passé sans qu\'un devis ait été retenu. Vous pouvez refaire une demande à une autre date.</div></div>';
+
+    // ── PENDANT UN ARBITRAGE, PERSONNE N'ATTEND POUR RIEN ───────────────
+    // Le client avait répondu « personne n'est venu » et ne voyait plus rien
+    // se passer. Il ignorait qu'une décision était en cours, et combien de
+    // temps elle prendrait.
+    }else if(d.contestation_le){
+      html+='<div class="locked-banner"><span>⚖️</span><div>'
+        + '<strong>Gleam examine cette prestation.</strong><br>'
+        + 'Vous avez signalé que le prestataire n\'était pas venu. '
+        + (d.reponse_pro_le
+            ? 'Il affirme le contraire — nous tranchons sur la base des éléments '
+              + 'disponibles.'
+            : 'Il dispose de deux heures pour répondre.')
+        + '<br><br>Votre paiement est bloqué : il ne sera versé à personne tant '
+        + 'que la situation n\'est pas réglée. Vous serez prévenu de la décision.'
+        + '</div></div>';
 
     }else if(d.statut==='en_cours' && d.prestation_demarree_le){
       // L'arrivée est déclarée. Si elle est douteuse et non confirmée, le
