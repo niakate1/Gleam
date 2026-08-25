@@ -3091,6 +3091,106 @@ async function traiterEcheancesPaiement() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LES CONTESTATIONS SANS RÉPONSE, APRÈS DEUX HEURES
+//
+// Le bandeau promettait au client : « il dispose de deux heures pour
+// répondre ». Passé ce délai, RIEN ne se produisait — aucun balayage ne
+// traitait les fenêtres échues.
+//
+// Le client devait recliquer sur « Annuler » pour déclencher le
+// remboursement. Il ne le savait pas. La prestation restait gelée
+// indéfiniment, et l'argent avec.
+//
+// DEUX ISSUES, SELON LES PREUVES
+//
+//   le prestataire a une preuve   photos, code saisi, GPS < 2 km
+//                                 → l'affaire reste en arbitrage, vous tranchez
+//
+//   il n'a rien                   → remboursement automatique
+//                                   c'est ce que le bandeau annonçait
+//
+// POURQUOI NE PAS TOUT REMBOURSER AUTOMATIQUEMENT
+//
+// Un prestataire venu, ayant simplement oublié de répondre — il conduit, il
+// dort, il n'a pas vu la notification — serait puni pour un silence. Ses
+// preuves parlent pour lui.
+// ═══════════════════════════════════════════════════════════════════════════
+async function traiterContestationsEchues() {
+  try {
+    const ilYaDeuxHeures = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+
+    const { data: echues } = await supabase.from('demandes')
+      .select('*')
+      .not('contestation_le', 'is', null)
+      .is('reponse_pro_le', null)
+      .lt('contestation_le', ilYaDeuxHeures)
+      .limit(30);
+
+    if (!echues || !echues.length) return 0;
+
+    let rembourses = 0;
+    for (const d of echues) {
+      const { data: paiement } = await supabase.from('paiements')
+        .select('*').eq('demande_id', d.id).maybeSingle();
+
+      // Un paiement déjà réglé n'a plus rien à trancher.
+      if (!paiement || ['rembourse', 'rembourse_partiel', 'libere'].includes(paiement.statut)) {
+        continue;
+      }
+
+      const preuves = preuvesDePresence(d);
+
+      if (preuves.length) {
+        // Le prestataire n'a pas répondu, mais ses preuves parlent. On laisse
+        // l'affaire à l'arbitrage — et on prévient le client, qui attendait
+        // une réponse à deux heures.
+        envoyerNotificationPush(d.client_id, {
+          titre: 'Votre signalement est examiné',
+          corps: 'Le prestataire n\'a pas répondu, mais des éléments indiquent '
+               + 'qu\'il s\'est déplacé. Gleam tranchera — votre paiement reste bloqué.',
+          url: '/#accueil'
+        }).catch(() => {});
+
+        // Marqué comme traité pour ne pas renotifier à chaque passage.
+        await supabase.from('demandes')
+          .update({ reponse_pro_le: new Date().toISOString() }).eq('id', d.id);
+        continue;
+      }
+
+      // Aucune preuve, aucune réponse : l'absence est probable. C'est
+      // exactement ce que le bandeau annonçait au client.
+      const resultat = await rembourserPaiementSiPaye(d.id, 999);
+
+      if (resultat && resultat.rembourse) {
+        await supabase.from('demandes')
+          .update({ statut: 'annulee_client', contestation_le: null }).eq('id', d.id);
+
+        envoyerNotificationPush(d.client_id, {
+          titre: 'Vous êtes remboursé',
+          corps: 'Le prestataire n\'a pas répondu et rien n\'indique qu\'il se soit '
+               + 'déplacé. Le remboursement paraîtra sous quelques jours.',
+          url: '/#accueil'
+        }).catch(() => {});
+
+        if (paiement.societe_id) {
+          envoyerNotificationPush(paiement.societe_id, {
+            titre: 'Prestation remboursée au client',
+            corps: 'Vous n\'avez pas répondu à la contestation dans les deux heures, '
+                 + 'et aucun élément n\'indiquait votre venue.',
+            url: '/#pro-devis'
+          }).catch(() => {});
+        }
+        rembourses++;
+      }
+    }
+    return rembourses;
+  } catch (e) {
+    console.error('Contestations échues :', e.message);
+    return 0;
+  }
+}
+
 async function reprendreVirementsEchoues() {
   try {
     const ilYaUneHeure = new Date(Date.now() - 3600 * 1000).toISOString();
@@ -6094,6 +6194,29 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
     const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demande_id).eq('statut', 'paye').maybeSingle();
     if (!paiement) return res.status(404).json({ error: 'Aucun paiement en attente pour cette prestation.' });
     if (paiement.societe_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
+    // ── UN LITIGE SUSPEND LA VALIDATION PAR CODE ──────────────────────────
+    // La validation verse immédiatement au prestataire. Pendant un arbitrage,
+    // elle court-circuitait donc la décision : un prestataire obtenant le code
+    // — ou un client changeant d'avis — encaissait sans que Gleam ait tranché.
+    //
+    // Le code reste SAISISSABLE : c'est une preuve de présence, et elle est
+    // enregistrée plus bas. Mais elle ne déclenche plus le paiement.
+    const { data: demandeLitige } = await supabase.from('demandes')
+      .select('contestation_le').eq('id', paiement.demande_id).maybeSingle();
+
+    if (demandeLitige && demandeLitige.contestation_le) {
+      // On note quand même la saisie : elle pèsera dans l'arbitrage.
+      if (String(code).trim() === paiement.code_validation) {
+        await supabase.from('demandes')
+          .update({ code_saisi_par_pro: true }).eq('id', paiement.demande_id);
+      }
+      return res.status(409).json({
+        error: 'Cette prestation fait l\'objet d\'un litige. Gleam doit trancher '
+             + 'avant tout versement — votre saisie du code a été enregistrée et '
+             + 'sera prise en compte.'
+      });
+    }
+
     if (String(code).trim() !== paiement.code_validation) return res.status(400).json({ error: 'Code incorrect. Vérifiez le code donné par le client.' });
 
     // ── SAISIR LE BON CODE PROUVE LA PRÉSENCE ──────────────────────────────
@@ -6110,7 +6233,7 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
     try {
       const rattrapage = { code_saisi_par_pro: true };
       const { data: dem } = await supabase.from('demandes')
-        .select('prestation_demarree_le').eq('id', paiement.demande_id).maybeSingle();
+        .select('prestation_demarree_le, contestation_le').eq('id', paiement.demande_id).maybeSingle();
       if (dem && !dem.prestation_demarree_le) {
         rattrapage.prestation_demarree_le = new Date().toISOString();
         rattrapage.arrivee_qualite = 'non_verifiee';
@@ -8837,6 +8960,9 @@ async function balayerPrestationsAValider() {
 
     const oublis = await rappelerArriveeOubliee();
     if (oublis) console.log('📍 ' + oublis + ' rappel(s) d\'arrivée oubliée.');
+
+    const contestations = await traiterContestationsEchues();
+    if (contestations) console.log('⚖️ ' + contestations + ' contestation(s) sans réponse — remboursée(s).');
     const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
     CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
