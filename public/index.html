@@ -13695,6 +13695,23 @@ function etatBlock(){
 // sans clé, sans limite d'usage raisonnable, et bien plus précise que des solutions génériques puisque Gleam ne sert que des adresses françaises.
 var adresseSearchTimer=null,adresseSearchController=null;
 function chercherAdresse(valeur){
+  // ── LES COORDONNÉES NE SURVIVENT PAS À UN CHANGEMENT D'ADRESSE ──────────
+  // L'adresse mémorisée pré-remplit `adresseChoisieLat/Lng`. Taper une AUTRE
+  // adresse ne les effaçait pas : la demande partait avec les coordonnées de
+  // la précédente.
+  //
+  // Toutes les demandes de la base portent ainsi les mêmes coordonnées —
+  // celles de Poissy — y compris celle d'Éragny, affichée « à 0 km » alors
+  // qu'elle est à dix kilomètres.
+  //
+  // Conséquences : la distance affichée est fausse, le filtre de zone laisse
+  // passer n'importe quelle adresse, et la vérification GPS à l'arrivée
+  // compare le prestataire à un point qui n'est pas le bon.
+  //
+  // On efface dès la première frappe. Elles seront reposées si — et seulement
+  // si — une suggestion est choisie.
+  adresseChoisieLat=null; adresseChoisieLng=null;
+
   clearTimeout(adresseSearchTimer);
   var box=document.getElementById('adresse-suggestions');
   if(!valeur||valeur.trim().length<3){if(box){box.classList.remove('show');box.innerHTML=''}return}
@@ -14688,7 +14705,20 @@ async function sendDemand(type){
   var caseMemoriser=document.getElementById('f-memoriser-adresse');
   if(caseMemoriser&&caseMemoriser.checked){
     fetch(API+'/api/client/adresse-memorisee',{method:'POST',headers:authHeaders(),body:JSON.stringify({adresse:addr,ville:ville,latitude:adresseChoisieLat,longitude:adresseChoisieLng})})
-      .then(function(){if(currentUser){currentUser.adresse_memorisee=addr;currentUser.ville_memorisee=ville}})
+      // ── LA COPIE LOCALE DOIT SUIVRE, COORDONNÉES COMPRISES ──────────
+          // On mettait à jour l'adresse et la ville, mais PAS les coordonnées
+          // mémorisées. Elles restaient celles de l'adresse précédente — et
+          // pré-remplissaient la demande suivante avec un point faux.
+          //
+          // C'est ainsi qu'une adresse à Éragny portait les coordonnées de
+          // Poissy, et s'affichait « à 0 km » d'un prestataire situé à dix
+          // kilomètres.
+          .then(function(){if(currentUser){
+            currentUser.adresse_memorisee=addr;
+            currentUser.ville_memorisee=ville;
+            currentUser.latitude_memorisee=adresseChoisieLat;
+            currentUser.longitude_memorisee=adresseChoisieLng;
+          }})
       .catch(function(e){console.error('Mémorisation adresse ignorée:',e)});
   }
   var adresseComplete=addr+', '+ville;
