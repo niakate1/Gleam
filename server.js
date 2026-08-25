@@ -7092,7 +7092,9 @@ app.get('/api/admin/factures', adminAuth, async (req, res) => {
   try {
     const annee = parseInt(req.query.annee, 10) || new Date().getFullYear();
     const { data: paiements } = await supabase.from('paiements')
-      .select('id, demande_id, numero_facture, montant, commission, montant_societe, statut, created_at, client_id, societe_id')
+      .select(// `montant_rembourse` est nécessaire pour savoir ce qui reste remboursable :
+      // sans lui, l'écran proposerait de rendre une somme déjà rendue.
+      'id, demande_id, numero_facture, montant, commission, montant_societe, statut, created_at, client_id, societe_id, montant_rembourse')
       .in('statut', ['paye', 'libere'])
       .gte('created_at', annee + '-01-01T00:00:00.000Z')
       .lt('created_at', (annee + 1) + '-01-01T00:00:00.000Z')
@@ -7115,6 +7117,12 @@ app.get('/api/admin/factures', adminAuth, async (req, res) => {
       date: p.created_at,
       client: nomDe[p.client_id] || '—',
       prestataire: nomDe[p.societe_id] || '—',
+      // L'identifiant est nécessaire pour rembourser depuis cet écran ; le
+      // montant déjà remboursé, pour savoir ce qui reste.
+      id: p.id,
+      demande_id: p.demande_id,
+      statut: p.statut,
+      montant_rembourse: parseFloat(p.montant_rembourse) || 0,
       montant: parseFloat(p.montant) || 0,
       commission: parseFloat(p.commission) || 0,
       net: parseFloat(p.montant_societe) || 0
@@ -8170,6 +8178,133 @@ app.get('/api/admin/signalements', adminAuth, async (req, res) => {
 // présence, la version de chacun, les montants en jeu. Aucun aller-retour dans
 // la base pour comprendre un cas.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// REMBOURSER UN CLIENT, HORS LITIGE
+//
+// L'onglet Litiges ne couvre qu'un cas : le client conteste une arrivée. Tout
+// le reste — travail bâclé, objet abîmé, geste commercial, erreur de notre
+// part — imposait d'ouvrir Stripe à la main.
+//
+// Et Gleam ne le savait pas : le paiement restait « paye » dans la base, les
+// revenus affichés devenaient faux, et la facture ne mentionnait rien.
+//
+// POURQUOI UN MONTANT LIBRE
+//
+// Tout ou rien ne correspond pas à la réalité. Une prestation à moitié faite
+// se règle par un remboursement partiel — c'est souvent la seule issue qui
+// satisfait les deux parties.
+//
+// LE PRORATA EST REPRIS DES DEUX CÔTÉS
+//
+// `reverse_transfer` et `refund_application_fee` : la part du prestataire ET
+// la commission Gleam sont reprises proportionnellement. Sans eux, Gleam
+// rembourserait seule un argent déjà versé au prestataire.
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/admin/paiements/:id/rembourser', adminAuth, async (req, res) => {
+  try {
+    const { montant, motif } = req.body || {};
+
+    if (!motif || !String(motif).trim()) {
+      return res.status(400).json({ error: 'Indiquez le motif du remboursement.' });
+    }
+
+    const { data: paiement } = await supabase.from('paiements')
+      .select('*').eq('id', req.params.id).maybeSingle();
+    if (!paiement) return res.status(404).json({ error: 'Ce paiement n\'existe pas.' });
+
+    if (!paiement.stripe_payment_intent_id) {
+      return res.status(409).json({ error: 'Ce paiement n\'a pas d\'empreinte Stripe — rien à rembourser.' });
+    }
+    if (paiement.statut === 'rembourse') {
+      return res.status(409).json({ error: 'Ce paiement a déjà été intégralement remboursé.' });
+    }
+
+    // Ce qui reste remboursable : le total, moins ce qui l'a déjà été.
+    const totalCentimes = Math.round(Number(paiement.montant_ttc) * 100);
+    const dejaCentimes = Math.round(Number(paiement.montant_rembourse || 0) * 100);
+    const restantCentimes = totalCentimes - dejaCentimes;
+
+    if (restantCentimes <= 0) {
+      return res.status(409).json({ error: 'Plus rien n\'est remboursable sur ce paiement.' });
+    }
+
+    // Sans montant précisé, on rembourse tout ce qui reste.
+    let centimes = montant === undefined || montant === null || montant === ''
+      ? restantCentimes
+      : Math.round(Number(montant) * 100);
+
+    if (!Number.isFinite(centimes) || centimes <= 0) {
+      return res.status(400).json({ error: 'Montant invalide.' });
+    }
+    if (centimes > restantCentimes) {
+      return res.status(400).json({
+        error: 'Montant trop élevé. Il reste ' + (restantCentimes / 100).toFixed(2)
+             + ' € remboursables sur ce paiement.'
+      });
+    }
+
+    const partiel = centimes < restantCentimes || dejaCentimes > 0;
+
+    // Une réservation : deux clics rapprochés ne doivent pas rembourser deux
+    // fois. Le statut repart à sa valeur d'origine si Stripe refuse.
+    const statutAvant = paiement.statut;
+    const reserve = await reserverLigne('paiements', paiement.id,
+      [statutAvant], 'remboursement_en_cours');
+    if (!reserve) {
+      return res.status(409).json({ error: 'Un remboursement est déjà en cours sur ce paiement.' });
+    }
+
+    try {
+      await stripe.refunds.create({
+        payment_intent: paiement.stripe_payment_intent_id,
+        amount: centimes,
+        // Reprend au prorata sur la part du prestataire ET sur la commission.
+        // Sans cela, Gleam rembourserait seule un argent déjà versé.
+        reverse_transfer: true,
+        refund_application_fee: true
+      });
+    } catch (err) {
+      // Stripe a refusé : on rend au paiement son état d'avant.
+      await supabase.from('paiements').update({ statut: statutAvant }).eq('id', paiement.id);
+      console.error('Remboursement Stripe refusé :', err.message);
+      return res.status(400).json({
+        error: 'Stripe a refusé le remboursement : ' + (err.message || 'raison inconnue')
+      });
+    }
+
+    const nouveauTotal = (dejaCentimes + centimes) / 100;
+    await supabase.from('paiements').update({
+      statut: nouveauTotal * 100 >= totalCentimes ? 'rembourse' : 'rembourse_partiel',
+      montant_rembourse: nouveauTotal
+    }).eq('id', paiement.id);
+
+    // La trace : dans six mois, il faudra savoir pourquoi.
+    await supabase.from('signalements').insert({
+      demande_id: paiement.demande_id,
+      reporter_id: paiement.client_id,
+      motif: 'Remboursement Gleam — ' + (centimes / 100).toFixed(2).replace('.', ',') + ' €',
+      description: String(motif).trim().slice(0, 1000),
+      statut: 'traite'
+    });
+
+    envoyerNotificationPush(paiement.client_id, {
+      titre: 'Vous avez été remboursé',
+      corps: (centimes / 100).toFixed(2).replace('.', ',') + ' € vous seront rendus. '
+           + 'Le délai dépend de votre banque, en général deux à cinq jours.',
+      url: '/#accueil'
+    }).catch(() => {});
+
+    res.json({
+      message: (centimes / 100).toFixed(2).replace('.', ',') + ' € remboursés au client.'
+             + (partiel ? ' Remboursement partiel.' : ''),
+      montant: centimes / 100,
+      restant: (restantCentimes - centimes) / 100
+    });
+  } catch (e) {
+    erreurServeur(res, 'POST /api/admin/paiements/:id/rembourser', e);
+  }
+});
+
 app.get('/api/admin/litiges', adminAuth, async (req, res) => {
   try {
     const { data: demandes } = await supabase.from('demandes')
