@@ -2069,6 +2069,28 @@ function finExclusivite(creneauTexte) {
 // d'heure compris. Cette fonction en était un doublon fautif.
 //
 // On garde le nom — huit appels en dépendent — et on délègue.
+// ═══════════════════════════════════════════════════════════════════════════
+// AFFICHER UNE DATE À L'HEURE DE PARIS
+//
+// `toLocaleString('fr-FR')` formate dans le fuseau du PROCESSUS. Sur Railway
+// c'est UTC : une ouverture calculée juste — 21h00 à Paris — s'affichait
+// « 19:00 ».
+//
+// Le calcul avait été corrigé ce matin. L'AFFICHAGE, lui, refaisait le
+// décalage dans l'autre sens : le prestataire lisait une heure fausse et
+// croyait le refus injustifié.
+//
+// Une seule fonction, utilisée partout. Trois formatages divergeaient ; ils ne
+// le pourront plus.
+function dateParis(instant, options) {
+  const d = instant instanceof Date ? instant : new Date(instant);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('fr-FR', Object.assign(
+    { timeZone: 'Europe/Paris' },
+    options || { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' }
+  ));
+}
+
 function instantDuCreneau(texte) {
   const d = creneauVersInstant(texte);
   return d ? d.getTime() : null;
@@ -4613,6 +4635,13 @@ function justificatifsManquants(user) {
 // `requis: false`. Les recopier ici aurait créé deux vérités qui finissent
 // toujours par diverger : rendre un document facultatif dans un fichier sans
 // le faire dans l'autre, et bloquer des prestataires en règle.
+// Le blocage sur les documents existe déjà dans `prestataireEnRegle`, appelée
+// par POST /api/devis. Elle vérifie les documents REQUIS, face par face — la
+// pièce d'identité exige recto ET verso.
+//
+// J'avais écrit une seconde fonction qui faisait la même chose. Deux
+// vérifications du même sujet finissent toujours par diverger : j'ai retiré
+// la mienne.
 function documentsObligatoires() {
   return Object.keys(TYPES_DOCUMENTS).filter(t => TYPES_DOCUMENTS[t].requis);
 }
@@ -6258,8 +6287,7 @@ app.post('/api/demandes/:id/demarrer-prestation', auth, async (req, res) => {
         const ouverture = new Date(instantPrestation - MARGE_AVANCE_MS);
         return res.status(409).json({
           error: 'Vous pourrez déclarer votre arrivée à partir de '
-            + ouverture.toLocaleString('fr-FR',
-                { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
+            + dateParis(ouverture)
             + ', soit deux heures avant le créneau convenu.'
         });
       }
@@ -7052,7 +7080,7 @@ app.post('/api/signalements', auth, async (req, res) => {
         const aDesPhotosApres = demandeConcernee.photos_apres ? JSON.parse(demandeConcernee.photos_apres).length : 0;
         preuves = `Statut de la demande : ${demandeConcernee.statut}. ` +
           (demandeConcernee.prestation_demarree_le
-            ? `Le prestataire a confirmé son arrivée le ${new Date(demandeConcernee.prestation_demarree_le).toLocaleString('fr-FR')}` +
+            ? `Le prestataire a confirmé son arrivée le ${dateParis(demandeConcernee.prestation_demarree_le)}` +
               (demandeConcernee.distance_gps_arrivee !== null ? ` (position GPS à ${demandeConcernee.distance_gps_arrivee}m de l'adresse déclarée).` : ' (position GPS non disponible).')
             : 'Le prestataire n\'a jamais confirmé son arrivée dans l\'app.') +
           ` Photos avant : ${aDesPhotosAvant}. Photos après : ${aDesPhotosApres}.`;
