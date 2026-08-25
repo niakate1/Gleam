@@ -435,6 +435,15 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
 
     <section id="vue-signalements" class="masque">
       <div class="titre-section">Signalements et messages au support</div>
+      <!-- La distinction entre les deux onglets doit être lisible sans avoir à
+           cliquer : ici on lève un blocage, là on décide où va l'argent. -->
+      <p class="petit" style="margin:0 0 14px;background:var(--fond-doux,#F3F4F6);
+                              border-radius:8px;padding:10px 12px">
+        Un signalement ouvert <strong>suspend</strong> le versement au prestataire.
+        Le refermer le laisse repartir — <strong>vers le prestataire</strong>, jamais
+        vers le client.<br>
+        Pour rembourser un client, utilisez l'onglet <strong>Litiges</strong>.
+      </p>
       <div id="liste-signalements"></div>
     </section>
 
@@ -623,6 +632,47 @@ async function chargerChiffres() {
 // Aucune décision n'est suggérée. Les éléments sont présentés, vous tranchez —
 // une interface qui recommande une issue oriente le jugement.
 // ═══════════════════════════════════════════════════════════════════════════
+// ── REMBOURSER UN CLIENT ───────────────────────────────────────────────────
+// Le montant est LIBRE : une prestation à moitié faite se règle par un
+// remboursement partiel, pas par tout ou rien.
+//
+// Le motif est obligatoire — dans six mois, il faudra savoir pourquoi.
+async function rembourserPaiement(paiementId, restant) {
+  const saisi = prompt(
+    'REMBOURSER LE CLIENT\n\n'
+    + 'Il reste ' + (Number(restant) || 0).toFixed(2).replace('.', ',') + ' € remboursables.\n\n'
+    + 'Montant à rembourser (laissez vide pour tout) :', '');
+  if (saisi === null) return;
+
+  const montant = saisi.trim() === '' ? null : Number(saisi.replace(',', '.'));
+  if (montant !== null && (!Number.isFinite(montant) || montant <= 0)) {
+    alert('Montant invalide.');
+    return;
+  }
+
+  const motif = prompt('Motif du remboursement ?\n\n'
+    + 'Il sera conservé au dossier — travail non conforme, objet abîmé, '
+    + 'geste commercial…');
+  if (motif === null) return;
+  if (!motif.trim()) { alert('Le motif est obligatoire.'); return; }
+
+  const somme = montant === null ? restant : montant;
+  if (!confirm('Rembourser ' + (Number(somme) || 0).toFixed(2).replace('.', ',')
+      + ' € au client ?\n\nLa part du prestataire et la commission Gleam seront '
+      + 'reprises au prorata. Cette action est irréversible.')) return;
+
+  try {
+    const r = await appel('/api/admin/paiements/' + paiementId + '/rembourser', {
+      method: 'POST',
+      body: JSON.stringify({ montant, motif: motif.trim() })
+    });
+    alert(r.message || 'Remboursement effectué.');
+    chargerDeclaration();
+  } catch (e) {
+    alert('Échec : ' + e.message);
+  }
+}
+
 async function chargerLitiges() {
   const c = $('liste-litiges');
   c.innerHTML = '<div class="squelette"></div>'.repeat(2);
@@ -765,14 +815,26 @@ async function chargerSignalements() {
         (ouvert
           ? '<div class="note-paiement">Tant que ce signalement est ouvert, ' +
             '<strong>le versement au prestataire est suspendu</strong>. ' +
-            'Le refermer autorise le paiement. Un remboursement éventuel se fait dans Stripe.</div>'
+            'Le refermer libère le paiement vers le prestataire. ' +
+            'Pour rembourser le client, passez par l\'onglet Litiges.</div>'
           : '<div class="note-paiement close">Le versement au prestataire n\'est plus suspendu.</div>') +
         '<div class="actions-signalement">' +
           (ouvert
             ? '<button class="action" onclick="basculerSignalement(\'' + s.id + '\',\'traite\')">' +
-                'Traité — libérer le paiement</button>' +
+                // ── DIRE L'EFFET, PAS L'ÉTIQUETTE ────────────────────────
+                // « Traité » et « Non fondé » nommaient un état administratif
+                // sans dire ce qui se passe. Les deux ont pourtant le MÊME
+                // effet financier : ils lèvent la suspension, et le versement
+                // au prestataire reprend son cours.
+                //
+                // Ce qui les distingue n'est pas l'argent, c'est la trace :
+                // « j'ai examiné » ou « il n'y avait rien à examiner ».
+                //
+                // Aucun des deux ne rembourse le client — pour cela, il faut
+                // l'onglet Litiges.
+                'J\'ai traité — le prestataire sera payé</button>' +
               '<button class="action secondaire" onclick="basculerSignalement(\'' + s.id + '\',\'rejete\')">' +
-                'Non fondé</button>'
+                'Sans objet — le prestataire sera payé</button>'
             : '<button class="action secondaire" onclick="basculerSignalement(\'' + s.id + '\',\'nouveau\')">' +
                 'Rouvrir — suspendre à nouveau</button>') +
         '</div>' +
@@ -787,15 +849,32 @@ async function chargerSignalements() {
 async function basculerSignalement(id, statut) {
   // On confirme avant de rouvrir : reprendre le blocage d'un paiement déjà
   // libéré n'a aucun effet si le versement est parti. Autant le dire.
+  // ── PAYER EST IRRÉVERSIBLE, ET RIEN NE LE DISAIT ─────────────────────────
+  // Refermer un signalement libère le versement vers le PRESTATAIRE. Une fois
+  // parti, l'argent ne revient pas.
+  //
+  // La confirmation existait pour la réouverture — l'action inoffensive — et
+  // pas pour celle qui engage l'argent.
+  if ((statut === 'traite' || statut === 'rejete') && !confirm(
+      (statut === 'traite'
+        ? 'VOUS AVEZ TRAITÉ CE SIGNALEMENT\n\n'
+        : 'CE SIGNALEMENT EST SANS OBJET\n\n')
+    + 'Le versement au prestataire reprend son cours : il sera payé à la '
+    + 'clôture de la prestation.\n\n'
+    + 'Cette action NE REMBOURSE PAS le client. Pour cela, utilisez l\'onglet '
+    + 'Litiges.\n\nContinuer ?')) return;
+
   if (statut === 'nouveau' && !confirm(
       'Rouvrir ce signalement suspendra à nouveau le paiement.\n\n' +
       'Si le versement a déjà été effectué, cette action ne le récupère pas — ' +
       'passez par Stripe pour un remboursement.')) return;
   try {
     await appel('/api/admin/signalements/' + id, { method: 'PATCH', body: JSON.stringify({ statut }) });
-    avis(statut === 'nouveau' ? 'Signalement rouvert, paiement suspendu.'
-       : statut === 'rejete'  ? 'Signalement classé sans suite, paiement libéré.'
-       : 'Signalement traité, paiement libéré.', 'ok');
+    // « libéré » ne disait pas VERS QUI. Un paiement libéré part au
+    // prestataire — jamais au client.
+    avis(statut === 'nouveau' ? 'Rouvert. Le versement au prestataire est de nouveau suspendu.'
+       : statut === 'rejete'  ? 'Sans objet. Le prestataire sera payé.'
+       : 'Traité. Le prestataire sera payé.', 'ok');
     chargerSignalements();
   } catch (e) { if (e.message !== '401') avis(e.message, 'ko'); }
 }
@@ -1141,12 +1220,26 @@ async function chargerFactures() {
   if (d.factures.length) $('btn-export').onclick = () => exporterFactures(d);
 
   $('liste-declaration').innerHTML = d.factures.length
-    ? grilleFiscale(['Numéro', 'Date', 'Client', 'Prestataire', 'Montant', 'Commission'],
+    // ── REMBOURSER DEPUIS L'ÉCRAN DES FACTURES ────────────────────────────
+    // Jusqu'ici, seul un litige permettait de rembourser. Tout le reste —
+    // travail bâclé, objet abîmé, geste commercial, erreur de notre part —
+    // imposait d'ouvrir Stripe à la main.
+    //
+    // Et Gleam ne le savait pas : le paiement restait « paye » dans la base,
+    // les revenus affichés devenaient faux.
+    ? grilleFiscale(['Numéro', 'Date', 'Client', 'Prestataire', 'Montant', 'Commission', ''],
         d.factures.map((f) => ({ cellules: [
           f.numero || '<span class="vide">sans numéro</span>',
           dateSeule(f.date), echapper(f.client), echapper(f.prestataire),
-          euros(f.montant), euros(f.commission)
-        ] })), '1.1fr .8fr 1.2fr 1.2fr .9fr .9fr')
+          euros(f.montant), euros(f.commission),
+          (f.montant_rembourse > 0
+            ? '<div class="petit">' + euros(f.montant_rembourse) + ' rendus</div>' : '')
+          + (f.statut === 'rembourse'
+              ? '<span class="petit">soldé</span>'
+              : '<button class="action secondaire" style="padding:4px 9px;font-size:12px" '
+                + 'onclick="rembourserPaiement(\'' + echapper(f.id || '') + '\','
+                + ((f.montant || 0) - (f.montant_rembourse || 0)) + ')">Rembourser</button>')
+        ] })), '1fr .7fr 1fr 1fr .8fr .8fr 1fr')
     : '<p class="petit">Aucune facture émise en ' + d.annee + '.</p>';
 }
 
