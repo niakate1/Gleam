@@ -6075,16 +6075,17 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
           type: 'systeme'
         });
 
-        envoyerNotificationPush(devisPaye.societe_id, {
-          titre: 'Paiement confirmé — prestation réservée',
-          // `prestation` est déjà lisible côté serveur — « voiture + canape ». Ma
-          // première version appelait une fonction de mise en forme qui n'existe
-          // qu'au client : elle aurait planté à la première notification.
-          corps: (demandePayee ? demandePayee.prestation + ' — ' : '')
-               + (demandePayee && demandePayee.creneau ? demandePayee.creneau : 'créneau confirmé')
-               + '. Vous pouvez bloquer ce créneau.',
-          url: '/#devis'
-        }).catch(() => {});
+        // ── LA NOTIFICATION EXISTAIT DÉJÀ ──────────────────────────────
+        // J'en avais ajouté une hier — « Paiement confirmé — prestation
+        // réservée » — sans voir que cette même fonction en envoyait déjà
+        // une, accompagnée d'un courriel.
+        //
+        // Le prestataire recevait DEUX notifications identiques au même
+        // instant. On garde celle qui existait : elle est plus complète, et
+        // elle détaille le montant.
+        //
+        // Le message de conversation, lui, reste : il ne fait doublon avec
+        // rien, et il demeure visible quand la notification a disparu.
       }
     } catch (e) {
       // Une notification manquée ne doit jamais compromettre un paiement
