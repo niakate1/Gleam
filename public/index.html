@@ -7036,6 +7036,18 @@ function libelleStatutDemande(d){
   if(!d || d.statut !== 'en_cours') return base;
 
   if(d.prestation_demarree_le){
+    // ── UNE ARRIVÉE DOUTEUSE N'EST PAS « EN COURS » ──────────────────────
+    // Le badge affichait « En cours » alors que l'écran demandait juste en
+    // dessous « Le prestataire est-il bien venu ? ». Les deux se
+    // contredisaient : soit on sait qu'il travaille, soit on l'ignore.
+    //
+    // Tant que le client n'a pas répondu, on dit ce qu'on sait vraiment :
+    // une arrivée a été déclarée, elle n'est pas vérifiée.
+    var douteuse=(d.arrivee_qualite==='eloignee'||d.arrivee_qualite==='non_verifiee')
+                 && d.arrivee_confirmee_client!==true;
+    if(douteuse){
+      return [icoStatut('help-circle')+'Arrivée à confirmer','s-attente'];
+    }
     return [icoStatut('wrench')+'En cours','s-acceptee'];
   }
 
@@ -8219,8 +8231,42 @@ function renderDetail(d){
         '</div></div>';
     }else if(d.statut==='annulee_client'){
       html+='<div class="locked-banner"><span>🚫</span><div>Vous avez annulé cette prestation. Le prestataire a été prévenu.</div></div>';
+
+    // ── CHAQUE ÉTAT A SON PROPRE MESSAGE ────────────────────────────────
+    // Un `else` unique disait « Cette demande est terminée » pour TOUT ce qui
+    // n'entrait pas dans les cas précédents — y compris une prestation en
+    // cours dont l'arrivée venait d'être déclarée.
+    //
+    // L'écran affichait alors trois choses contradictoires : « terminée » en
+    // bandeau, « En cours » en badge, et « Le prestataire est-il bien venu ? »
+    // juste en dessous.
+    //
+    // On nomme chaque état plutôt que de tout ranger dans le même repli.
+    }else if(d.statut==='terminee'){
+      html+='<div class="locked-banner"><span>✅</span><div>Cette prestation est terminée. Elle ne peut plus être modifiée ni annulée.</div></div>';
+
+    }else if(d.statut==='expiree'){
+      html+='<div class="locked-banner"><span>📅</span><div>Le créneau est passé sans qu\'un devis ait été retenu. Vous pouvez refaire une demande à une autre date.</div></div>';
+
+    }else if(d.statut==='en_cours' && d.prestation_demarree_le){
+      // L'arrivée est déclarée. Si elle est douteuse et non confirmée, le
+      // client a un bouton juste en dessous : le bandeau ne doit pas affirmer
+      // que tout se passe bien.
+      var arriveeDouteuse=(d.arrivee_qualite==='eloignee'||d.arrivee_qualite==='non_verifiee')
+                          && d.arrivee_confirmee_client!==true;
+      html+='<div class="locked-banner"><span>🔧</span><div>'
+        + (arriveeDouteuse
+            ? 'Le prestataire a déclaré son arrivée. Confirmez sa venue ci-dessous — '
+              + 'tant que vous n\'avez pas répondu, vous pouvez encore reprogrammer.'
+            : 'La prestation a commencé. Elle ne peut plus être modifiée ni annulée — '
+              + 'si quelque chose ne va pas, signalez-le depuis la conversation.')
+        + '</div></div>';
+
+    }else if(d.statut==='en_cours'){
+      html+='<div class="locked-banner"><span>💳</span><div>Cette prestation est payée. Le prestataire déclarera son arrivée le jour venu.</div></div>';
+
     }else{
-      html+='<div class="locked-banner"><span>🔒</span><div>Cette demande est terminée. Elle ne peut plus être modifiée ni annulée.</div></div>';
+      html+='<div class="locked-banner"><span>🔒</span><div>Cette demande ne peut plus être modifiée.</div></div>';
     }
   }
   html+='<div class="detail-card">'+
