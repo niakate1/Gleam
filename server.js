@@ -6349,9 +6349,17 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
     // garde sa part déjà transférée en compensation — ça reste donc un vrai gain pour lui, même si
     // le client a été partiellement ou pas remboursé de son côté.
     const { data: paiements } = await supabase.from('paiements').select('*').eq('societe_id', req.user.id).in('statut', ['paye', 'libere', 'rembourse_partiel']).order('created_at', { ascending: false });
-    if (!paiements || !paiements.length) return res.json({ total_libere: 0, total_en_attente: 0, paiements: [] });
+    if (!paiements || !paiements.length) return res.json({ total_libere: 0, total_en_attente: 0, total_en_litige: 0, paiements: [] });
     const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
+    const { data: demandes } = await supabase.// ── QUATRIÈME FOIS : LE LITIGE N'ARRIVAIT PAS ICI NON PLUS ──────────
+    // « En attente de confirmation client » s'affichait sur une prestation
+    // contestée. Le prestataire croyait attendre un simple clic du client,
+    // alors qu'un arbitrage était en cours et que son paiement était gelé.
+    //
+    // Même motif que pour l'écran client, l'écran prestataire et
+    // `demande_modifiee` : l'information existe en base, elle n'atteint pas
+    // l'écran qui en a besoin.
+    from('demandes').select('id, prestation, adresse, contestation_le, reponse_pro_le').in('id', demandeIds);
     const demandesMap = {};
     (demandes || []).forEach(d => { demandesMap[d.id] = d; });
     const totalLibere = paiements.filter(p => p.statut === 'libere' || p.statut === 'rembourse_partiel')
@@ -6360,8 +6368,25 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
       // remboursé de moitié affichait 85 € de gains, alors que le prestataire
       // n'en avait gardé que 42,50.
       .reduce((a, p) => a + partReelle(p, 'montant_societe'), 0);
-    const totalEnAttente = paiements.filter(p => p.statut === 'paye')
+    // ── L'ARGENT GELÉ N'EST PAS DE L'ARGENT ATTENDU ───────────────────────
+    // « En attente » additionnait tout ce qui était payé, litiges compris. Le
+    // prestataire voyait 93,50 € à venir alors que la totalité était gelée par
+    // deux contestations — il n'en verrait peut-être rien.
+    //
+    // On sépare les deux : ce qui arrivera après validation, et ce qui dépend
+    // d'un arbitrage.
+    const estEnLitige = (p) => {
+      const d = demandesMap[p.demande_id];
+      return !!(d && d.contestation_le);
+    };
+
+    const totalEnAttente = paiements
+      .filter(p => p.statut === 'paye' && !estEnLitige(p))
       // Un paiement « paye » peut déjà avoir été partiellement remboursé.
+      .reduce((a, p) => a + partReelle(p, 'montant_societe'), 0);
+
+    const totalEnLitige = paiements
+      .filter(p => p.statut === 'paye' && estEnLitige(p))
       .reduce((a, p) => a + partReelle(p, 'montant_societe'), 0);
     // Tri logique : en attente de confirmation client (encore "actif") avant reçu (déjà réglé, historique)
     const prioriteGain = { paye: 0, libere: 1, rembourse_partiel: 1 };
@@ -6370,6 +6395,8 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
     res.json({
       total_libere: Math.round(totalLibere * 100) / 100,
       total_en_attente: Math.round(totalEnAttente * 100) / 100,
+      // Séparé : ce montant dépend d'un arbitrage, il n'est pas « à venir ».
+      total_en_litige: Math.round(totalEnLitige * 100) / 100,
       paiements: enrichis
     });
   } catch (e) {
