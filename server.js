@@ -3500,6 +3500,19 @@ async function expirerDemandesEnRetard(demandes) {
     // rien annulé, et rendait indistinguables deux problèmes produit opposés — un
     // désistement d'une part, un tunnel de paiement qui décroche de l'autre.
     await supabase.from('devis').update({ statut: 'expire_sans_paiement' }).in('demande_id', aExpirerAcceptees).eq('statut', 'accepte');
+
+      // ── LES DEVIS EN ATTENTE AUSSI ────────────────────────────────────
+      // Seuls les devis « accepte » étaient refermés. Ceux restés « envoye »
+      // gardaient ce statut indéfiniment : le client ne pouvait plus y
+      // répondre — sa demande avait expiré — mais le prestataire les voyait
+      // toujours « en attente de réponse ».
+      //
+      // Un devis de 300 € sur une demande expirée gonflait ainsi son
+      // « Montant en jeu ». Il attendait une réponse qui ne viendrait jamais.
+      await supabase.from('devis')
+        .update({ statut: 'expire' })
+        .in('demande_id', aExpirer)
+        .eq('statut', 'envoye');
   }
   return demandes;
 }
