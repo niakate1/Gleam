@@ -12972,11 +12972,38 @@ async function showMesGains(){
     var sum=document.getElementById('gains-summary'),c=document.getElementById('gains-list');
     if(!r.ok){if(c)c.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>';return}
     if(sum)sum.innerHTML='<div class="stat-card stat-card-p"><div class="stat-num">'+d.total_libere+'€</div><div class="stat-label">Reçu</div></div>'+
-      '<div class="stat-card stat-card-gold"><div class="stat-num">'+d.total_en_attente+'€</div><div class="stat-label">En attente</div></div>';
+      '<div class="stat-card stat-card-gold"><div class="stat-num">'+d.total_en_attente+'€</div><div class="stat-label">En attente</div></div>'
+        // ── L'ARGENT GELÉ A SA PROPRE CASE ──────────────────────────────
+        // Il était compté dans « En attente ». Le prestataire voyait 93,50 € à
+        // venir alors que la totalité était bloquée par deux contestations.
+        //
+        // La carte n'apparaît que s'il y a quelque chose dedans : afficher
+        // « 0 € en litige » à quelqu'un qui n'en a jamais eu serait inquiétant
+        // pour rien.
+        + ((d.total_en_litige||0) > 0
+            ? '<div class="stat-card" style="background:var(--amber-clair)">'
+              + '<div class="stat-num" style="color:var(--amber)">'+d.total_en_litige+'€</div>'
+              + '<div class="stat-label">En litige</div></div>'
+            : '');
     if(!d.paiements||!d.paiements.length){if(c)c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun gain pour l\u2019instant.</p></div>';return}
-    var statutLabels={paye:['En attente de confirmation client','var(--gold)'],libere:['Reçu','var(--mint)'],bloque:['Bloqué','var(--red)'],rembourse_partiel:['Reçu (annulation tardive du client)','var(--mint)']};
+    // ── DIRE CE QUE LE PRESTATAIRE ATTEND VRAIMENT ────────────────────────
+      // « En attente de confirmation client » laissait croire qu'il suffisait
+      // d'un clic du client. Sur une prestation CONTESTÉE, c'est faux : un
+      // arbitrage est en cours et le paiement est gelé.
+      var statutLabels={
+        paye:['En attente de validation','var(--gold)'],
+        libere:['Reçu','var(--mint)'],
+        bloque:['Bloqué','var(--red)'],
+        rembourse_partiel:['Reçu (annulation tardive du client)','var(--mint)']
+      };
     if(c)c.innerHTML=d.paiements.map(function(p,i){
-      var st=statutLabels[p.statut]||['',''];
+      // ── UN LITIGE PRIME SUR L'ÉTAT DU PAIEMENT ────────────────────────
+        // « En attente de validation » sur une prestation contestée laissait
+        // croire au prestataire qu'il attendait un simple clic. Son paiement
+        // est en réalité gelé jusqu'à l'arbitrage.
+        var st = (p.demande && p.demande.contestation_le)
+          ? ['Litige — Gleam examine','var(--amber)']
+          : (statutLabels[p.statut]||['','']);
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
         '<div><div style="font-weight:700;text-transform:capitalize">'+escapeHtml(p.demande&&p.demande.prestation||'Prestation')+'</div>'+
