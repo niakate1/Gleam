@@ -398,6 +398,9 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
   <main>
     <div class="onglets">
       <button class="onglet actif" data-vue="chiffres">Chiffres</button>
+      <!-- Les litiges d'abord : ce sont les seuls cas où de l'argent est
+           immobilisé, ni versé au prestataire, ni rendu au client. -->
+      <button class="onglet" data-vue="litiges">Litiges</button>
       <button class="onglet" data-vue="signalements">Signalements</button>
       <button class="onglet" data-vue="documents">Documents<span class="pastille" id="compteur-documents"></span></button>
       <button class="onglet" data-vue="declaration">Déclaration</button>
@@ -419,6 +422,15 @@ main{max-width:980px;margin:0 auto;padding:26px 20px 60px}
         Les montants agrègent les paiements aux statuts <strong>payé</strong> et <strong>libéré</strong> :
         ce qui a été encaissé, que la prestation soit confirmée ou non.
       </p>
+    </section>
+
+    <section id="vue-litiges" class="masque">
+      <div class="titre-section">Litiges à trancher</div>
+      <p class="petit" style="margin:0 0 14px">
+        Un client a déclaré que le prestataire n'était pas venu. L'argent est
+        <strong>gelé</strong> — ni versé, ni remboursé — jusqu'à votre décision.
+      </p>
+      <div id="liste-litiges"></div>
     </section>
 
     <section id="vue-signalements" class="masque">
@@ -596,6 +608,128 @@ async function chargerChiffres() {
 }
 
 // ── Signalements ────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// LES LITIGES — TOUT CE QU'IL FAUT POUR DÉCIDER, SUR UN ÉCRAN
+//
+// Une contestation gèle l'argent : ni versé, ni remboursé. Sans cet écran, ces
+// prestations resteraient bloquées indéfiniment.
+//
+// LA DÉCISION SE PREND SUR LES PREUVES
+//
+// On les affiche en haut, avant tout le reste. Le code de validation est la
+// plus forte : le client le donne EN MAIN PROPRE à la fin de la prestation.
+// Le posséder, c'est avoir été là.
+//
+// Aucune décision n'est suggérée. Les éléments sont présentés, vous tranchez —
+// une interface qui recommande une issue oriente le jugement.
+// ═══════════════════════════════════════════════════════════════════════════
+async function chargerLitiges() {
+  const c = $('liste-litiges');
+  c.innerHTML = '<div class="squelette"></div>'.repeat(2);
+  try {
+    const liste = await appel('/api/admin/litiges');
+
+    if (!liste.length) {
+      c.innerHTML = '<div class="vide"><div class="gros">Aucun litige</div>'
+        + 'Les contestations d\'arrivée apparaîtront ici. L\'argent y est gelé '
+        + 'jusqu\'à votre décision.</div>';
+      return;
+    }
+
+    c.innerHTML = liste.map((l) => {
+      const euros = (v) => (Number(v) || 0).toFixed(2).replace('.', ',') + ' €';
+
+      // Les preuves, ou leur absence — c'est ce qui doit sauter aux yeux.
+      const preuves = (l.preuves || []).length
+        ? '<div class="ligne" style="background:#EAF6EE;border-left:3px solid #2E7D4F;'
+          + 'padding:9px 11px;border-radius:6px;margin:8px 0">'
+          + '<strong>Éléments en faveur du prestataire</strong><br>'
+          + l.preuves.map((p) => '• ' + echapper(p)).join('<br>')
+          + '</div>'
+        : '<div class="ligne" style="background:#FDECEC;border-left:3px solid #B3261E;'
+          + 'padding:9px 11px;border-radius:6px;margin:8px 0">'
+          + '<strong>Aucun élément ne prouve sa venue</strong><br>'
+          + 'Ni code saisi, ni photo, ni position exploitable.</div>';
+
+      const reponse = l.reponse_pro_le
+        ? '<div class="ligne"><strong>Le prestataire s\'est manifesté</strong> '
+          + '<span class="petit">' + dateFr(l.reponse_pro_le) + '</span></div>'
+        : '<div class="ligne petit">Le prestataire n\'a pas répondu.</div>';
+
+      const echanges = (l.echanges || []).length
+        ? '<details style="margin-top:8px"><summary class="petit">'
+          + l.echanges.length + ' message(s) au dossier</summary>'
+          + l.echanges.map((e) => '<div class="ligne petit" style="margin-top:6px">'
+              + '<strong>' + echapper(e.motif || '') + '</strong><br>'
+              + echapper(e.description || '') + '</div>').join('')
+          + '</details>'
+        : '';
+
+      const id = echapper(l.demande_id);
+
+      return '<div class="carte">'
+        + '<div class="carte-tete">'
+        +   '<div style="min-width:0">'
+        +     '<div class="ligne"><strong>' + echapper(l.prestation || '') + '</strong> '
+        +     '<span class="petit">' + echapper(l.numero_anonyme || '') + '</span></div>'
+        +     '<div class="petit">' + echapper(l.adresse || '') + '</div>'
+        +     '<div class="petit">' + echapper(l.creneau || '') + '</div>'
+        +   '</div>'
+        +   '<div style="text-align:right;flex-shrink:0">'
+        +     '<div><strong>' + euros(l.montant_ttc) + '</strong></div>'
+        +     '<div class="petit">dont ' + euros(l.commission) + ' de commission</div>'
+        +   '</div>'
+        + '</div>'
+        + preuves
+        + '<div class="ligne petit">Client : ' + echapper(l.client ? l.client.nom : '—')
+        +   ' — conteste depuis ' + dateFr(l.contestation_le) + '</div>'
+        + '<div class="ligne petit">Prestataire : ' + echapper(l.pro ? l.pro.nom : '—')
+        +   (l.pro && l.pro.absences ? ' — ' + l.pro.absences + ' absence(s) constatée(s)' : '')
+        +   '</div>'
+        + reponse
+        + echanges
+        + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+        +   '<button class="btn" onclick="trancherLitige(\'' + id + '\',\'payer_pro\')">'
+        +     'Payer le prestataire</button>'
+        +   '<button class="btn secondaire" onclick="trancherLitige(\'' + id + '\',\'rembourser\')">'
+        +     'Rembourser le client</button>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  } catch (e) {
+    c.innerHTML = '<div class="vide">Chargement impossible : ' + echapper(e.message) + '</div>';
+  }
+}
+
+// ── TRANCHER ───────────────────────────────────────────────────────────────
+// Le motif est OBLIGATOIRE. Dans six mois, face à une réclamation, vous devez
+// pouvoir dire sur quoi vous vous êtes fondé — et c'est ce que le prestataire
+// ou le client demandera en premier.
+async function trancherLitige(demandeId, decision) {
+  const versLePro = decision === 'payer_pro';
+
+  const motif = prompt(
+    versLePro
+      ? 'PAYER LE PRESTATAIRE\n\nLe virement partira immédiatement, commission incluse.\n\n'
+        + 'Sur quoi vous fondez-vous ?'
+      : 'REMBOURSER LE CLIENT\n\nLe remboursement sera intégral. Le prestataire ne '
+        + 'recevra rien.\n\nSur quoi vous fondez-vous ?'
+  );
+  if (motif === null) return;
+  if (!motif.trim()) { alert('Le motif est obligatoire.'); return; }
+
+  try {
+    const r = await appel('/api/admin/litiges/' + demandeId + '/trancher', {
+      method: 'POST',
+      body: JSON.stringify({ decision, motif: motif.trim() })
+    });
+    alert(r.message || 'Décision enregistrée.');
+    chargerLitiges();
+  } catch (e) {
+    alert('Échec : ' + e.message);
+  }
+}
+
 async function chargerSignalements() {
   const c = $('liste-signalements');
   c.innerHTML = '<div class="squelette"></div>'.repeat(3);
@@ -1502,9 +1636,10 @@ async function chargerExpirations() {
 document.querySelectorAll('.onglet').forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll('.onglet').forEach((x) => x.classList.toggle('actif', x === b));
-    ['chiffres', 'signalements', 'documents', 'declaration', 'comptes'].forEach((v) =>
+    ['chiffres', 'litiges', 'signalements', 'documents', 'declaration', 'comptes'].forEach((v) =>
       $('vue-' + v).classList.toggle('masque', v !== b.dataset.vue));
     if (b.dataset.vue === 'chiffres') { chargerChiffres(); chargerDiagnostic(); }
+    if (b.dataset.vue === 'litiges') chargerLitiges();
     if (b.dataset.vue === 'signalements') chargerSignalements();
     // L'onglet ouvre la vue par DOSSIERS : c'est l'unité de décision.
     // La liste à plat reste accessible depuis un dossier, pour refuser une
