@@ -4896,11 +4896,48 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
 
 // Vérifie que l'utilisateur connecté a le droit de participer à la conversation de cette demande
 // (le client propriétaire, ou le pro dont le devis a été accepté) — protège la confidentialité des échanges.
+// ═══════════════════════════════════════════════════════════════════════════
+// LA CONVERSATION S'OUVRE AU PAIEMENT, PAS À L'ACCEPTATION
+//
+// La fonction ouvrait l'accès dès qu'un devis portait le statut « accepte » —
+// c'est-à-dire dès que le client cliquait, AVANT tout règlement.
+//
+// L'application masquait bien le bouton « Discuter » côté client. Mais la
+// route restait ouverte : n'importe quel appel direct passait, et le
+// prestataire, lui, y accédait sans obstacle.
+//
+// POURQUOI CELA COMPTE
+//
+// Toute la protection de Gleam repose sur le fait que les deux parties ne se
+// parlent qu'une fois l'argent bloqué. Avant paiement, une conversation permet
+// d'échanger un numéro et de conclure en dehors de la plateforme — le serveur
+// bloque déjà les numéros de téléphone, précisément pour cette raison.
+//
+// Ouvrir la conversation avant le paiement, c'était laisser la porte que ce
+// blocage cherche à fermer.
+//
+// LE CLIENT NON PLUS N'Y ACCÈDE PLUS AVANT
+//
+// Il en est propriétaire, mais il n'a personne à qui parler tant qu'aucun
+// prestataire n'est engagé. Et c'est lui qui a le plus intérêt à contourner.
+// ═══════════════════════════════════════════════════════════════════════════
 async function peutAccederConversation(demandeId, userId) {
-  const { data: demande } = await supabase.from('demandes').select('client_id').eq('id', demandeId).single();
+  const { data: demande } = await supabase.from('demandes')
+    .select('client_id, statut').eq('id', demandeId).single();
   if (!demande) return false;
+
+  // Un devis retenu ne suffit pas : il faut qu'il soit PAYÉ.
+  const { data: paiement } = await supabase.from('paiements')
+    .select('id').eq('demande_id', demandeId)
+    .in('statut', ['paye', 'libere', 'liberation_en_cours', 'rembourse_partiel'])
+    .maybeSingle();
+
+  if (!paiement) return false;
+
   if (demande.client_id === userId) return true;
-  const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demandeId).eq('statut', 'accepte').maybeSingle();
+
+  const { data: devisAccepte } = await supabase.from('devis')
+    .select('societe_id').eq('demande_id', demandeId).eq('statut', 'accepte').maybeSingle();
   return !!(devisAccepte && devisAccepte.societe_id === userId);
 }
 
@@ -5117,6 +5154,26 @@ app.get('/api/conversations', auth, async (req, res) => {
     } else {
       const { data: demandes } = await supabase.from('demandes').select('id').eq('client_id', req.user.id);
       demandeIds = (demandes || []).map(d => d.id);
+    }
+
+    // ── UNE CONVERSATION N'EXISTE QU'APRÈS PAIEMENT ──────────────────────
+    // La liste retenait tout devis « accepte » — donc dès le clic du client,
+    // avant tout règlement. L'onglet Messages ouvrait ainsi une conversation
+    // que les cartes de devis, elles, masquaient correctement.
+    //
+    // Deux chemins vers le même écran, deux règles différentes : c'est le
+    // second qui laissait passer.
+    //
+    // Toute la protection de Gleam repose sur le fait que les deux parties ne
+    // se parlent qu'une fois l'argent bloqué — le serveur refuse d'ailleurs
+    // les numéros de téléphone pour cette raison exacte.
+    if (demandeIds.length) {
+      const { data: payees } = await supabase.from('paiements')
+        .select('demande_id')
+        .in('demande_id', demandeIds)
+        .in('statut', ['paye', 'libere', 'liberation_en_cours', 'rembourse_partiel']);
+      const ensemblePayees = new Set((payees || []).map(p => p.demande_id));
+      demandeIds = demandeIds.filter(id => ensemblePayees.has(id));
     }
 
     if (!demandeIds.length) return res.json([]);
