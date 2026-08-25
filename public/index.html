@@ -7939,6 +7939,37 @@ function renderDevisClientCards(){
   // La base garantit l'échelle : CHECK (note >= 1 AND note <= 5).
   var noteDevis=noteAffichable(v.pro&&v.pro.note_moyenne);
   var proNote=noteDevis?'<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold);vertical-align:-2px"></i> '+escapeHtml(noteDevis)+' / 5':'';
+
+      // ── LE PALIER DU PRESTATAIRE ────────────────────────────────────────
+      // Un client ne sait pas quoi faire d'un « 87 % de ponctualité ». Il sait
+      // immédiatement ce que vaut « Or — 120 prestations ».
+      //
+      // Rien en dessous de vingt : un badge « Débutant » condamnerait ceux qui
+      // commencent. L'absence de palier ne dit rien, et le client se décide
+      // alors sur la note et le prix — ce qui est juste pour un nouveau venu.
+      //
+      // J'ai retiré « Documents vérifiés » et « Ponctuel » : le premier
+      // devrait être une CONDITION pour envoyer un devis, pas une
+      // distinction ; le second repose sur une déclaration du prestataire
+      // lui-même.
+      var PALIERS={
+        bronze:{ nom:'Bronze', fond:'#F5EDE4', texte:'#8A5A2B' },
+        argent:{ nom:'Argent', fond:'#EFF1F3', texte:'#5B6770' },
+        or:    { nom:'Or',     fond:'#FBF3DC', texte:'#8A6A16' }
+      };
+      var indPro=v.pro||{}, reperesPro='';
+      var infoPalier=PALIERS[indPro.palier];
+      if(infoPalier){
+        reperesPro='<div style="margin-top:8px">'
+          + '<span style="display:inline-flex;align-items:center;gap:5px;'
+          + 'font-size:11.5px;font-weight:800;color:'+infoPalier.texte+';'
+          + 'background:'+infoPalier.fond+';border-radius:999px;padding:4px 11px">'
+          + '<i data-lucide="award" style="width:13px;height:13px"></i>'
+          + escapeHtml(infoPalier.nom)
+          + '<span style="font-weight:600;opacity:.75">· '
+          +   escapeHtml(String(indPro.prestations_terminees))+' prestations</span>'
+          + '</span></div>';
+      }
       var badge,actions='';
       var cardStyle='';
       var safeDemandeId=escAttr(v.demande_id),safeVId=escAttr(v.id),safeSocieteId=escAttr(v.societe_id),safeProName=escAttr(proNameRaw);
@@ -8128,6 +8159,10 @@ function renderDevisClientCards(){
           '<div class="identite-devis">'+
             '<div class="nom-pro">'+proName+'</div>'+
             (proNote?'<div class="note-pro">'+proNote+'</div>':'')+
+        // Les repères viennent APRÈS la note : elle reste le premier signal,
+        // ils la complètent. Et quand elle manque — prestataire sans avis —
+        // ils prennent le relais plutôt que de laisser un vide.
+        reperesPro+
           '</div>'+
         '</div>'+
         // Le badge de statut rejoint les repères : ce sont trois pastilles de
@@ -9900,16 +9935,51 @@ async function chargerReputationPro(){
     if(liste.length===0){
       box.innerHTML='<div class="reputation-vide">'+
         '<strong>Votre réputation se construira ici</strong>'+
-        '<span>Prestations terminées, taux d\'acceptation et fiabilité apparaîtront dès votre premier devis envoyé.</span>'+
+        '<span>Prestations terminées, ponctualité et fiabilité apparaîtront dès votre premier devis envoyé.</span>'+
       '</div>';
       return;
     }
 
-    box.innerHTML='<div class="reputation">'+
+    // ── LE TAUX D'ACCEPTATION NE DISAIT RIEN D'UTILE ──────────────────────
+      // Personne d'autre que le prestataire ne le voyait, il n'influençait
+      // aucun classement, et il PÉNALISAIT un comportement sain : refuser une
+      // demande hors de sa zone ou de ses compétences.
+      //
+      // La ponctualité le remplace. Elle se mesure sur des faits — l'arrivée
+      // déclarée face au créneau prévu — et c'est elle que le client verra
+      // sous forme de badge. Le prestataire sait donc où il en est.
+      // ── LE PALIER, ET CE QUI RESTE POUR LE SUIVANT ──────────────────────
+      // La ponctualité affichée ici reposait sur une déclaration du
+      // prestataire lui-même : elle ne mesurait pas grand-chose.
+      //
+      // Le palier, lui, se voit côté client — c'est donc le seul chiffre qui
+      // change quelque chose pour lui. Et savoir combien il en reste avant le
+      // suivant donne un cap, là où un pourcentage ne donnait rien.
+      var PALIERS_PRO=[
+        { seuil:20,  nom:'Bronze' },
+        { seuil:50,  nom:'Argent' },
+        { seuil:100, nom:'Or' }
+      ];
+      var palierActuel=null, prochain=null;
+      PALIERS_PRO.forEach(function(p){
+        if(termines >= p.seuil) palierActuel = p;
+        else if(!prochain) prochain = p;
+      });
+
+      box.innerHTML='<div class="reputation">'+
       '<div><strong>'+termines+'</strong><span>Prestations terminées</span></div>'+
-      '<div><strong>'+(taux===null?'—':taux+' %')+'</strong><span>Devis acceptés</span></div>'+
+      '<div><strong>'+(palierActuel?palierActuel.nom:'—')+'</strong><span>Palier</span></div>'+
       '<div><strong>'+fiabilite+' %</strong><span>Fiabilité</span></div>'+
-    '</div>';
+    '</div>'+
+    // Un cap plutôt qu'un constat : le prestataire sait ce qui l'attend.
+    (prochain
+      ? '<div class="petit" style="margin-top:8px;color:var(--gray)">'
+        + 'Encore <strong>'+(prochain.seuil-termines)+'</strong> prestation'
+        + ((prochain.seuil-termines)>1?'s':'')
+        + ' pour atteindre le palier <strong>'+prochain.nom+'</strong>, '
+        + 'affiché sur vos devis.</div>'
+      : '<div class="petit" style="margin-top:8px;color:var(--p)">'
+        + 'Vous avez atteint le palier le plus élevé.</div>');
   }catch(e){ box.innerHTML=''; }
 }
 
