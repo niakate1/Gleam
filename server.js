@@ -3117,6 +3117,67 @@ async function reprendreVirementsEchoues() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LE RAPPEL QUI ÉVITE LA PERTE
+//
+// Un rappel part déjà trente minutes AVANT le créneau. Il ne suffit pas : le
+// prestataire est alors en route, il le lit et l'oublie.
+//
+// Celui-ci part QUINZE MINUTES APRÈS l'heure prévue, quand il est sur place et
+// que déclarer son arrivée prend trois secondes.
+//
+// ET IL DIT POURQUOI
+//
+// « N'oubliez pas de déclarer votre arrivée » est une consigne. « Sans
+// déclaration, le client peut contester et vous ne serez pas payé » est une
+// raison — et une raison retient mieux qu'une consigne.
+//
+// La fenêtre va de +15 à +75 minutes : plus large que le battement de quinze
+// minutes du balayage, sinon un rappel sur quatre tomberait entre deux
+// passages.
+// ═══════════════════════════════════════════════════════════════════════════
+async function rappelerArriveeOubliee() {
+  try {
+    const { data: enCours } = await supabase.from('demandes')
+      .select('id, creneau, rappel_oubli_envoye_le')
+      .eq('statut', 'en_cours')
+      .is('prestation_demarree_le', null)
+      .is('rappel_oubli_envoye_le', null)
+      .limit(50);
+
+    if (!enCours || !enCours.length) return 0;
+
+    let envoyes = 0;
+    for (const d of enCours) {
+      const instant = instantDuCreneau(d.creneau);
+      if (!instant) continue;
+
+      const minutes = (Date.now() - instant) / 60000;
+      if (minutes < 15 || minutes > 75) continue;
+
+      const { data: devisPro } = await supabase.from('devis')
+        .select('societe_id').eq('demande_id', d.id).eq('statut', 'accepte').maybeSingle();
+      if (!devisPro) continue;
+
+      envoyerNotificationPush(devisPro.societe_id, {
+        titre: 'Déclarez votre arrivée',
+        corps: 'Sans déclaration, le client peut contester votre venue — et votre '
+             + 'paiement serait bloqué. Trois secondes suffisent.',
+        url: '/#pro-devis'
+      }).catch(() => {});
+
+      await supabase.from('demandes')
+        .update({ rappel_oubli_envoye_le: new Date().toISOString() })
+        .eq('id', d.id);
+      envoyes++;
+    }
+    return envoyes;
+  } catch (e) {
+    console.error('Rappel d\'arrivée oubliée :', e.message);
+    return 0;
+  }
+}
+
 async function rappelerDeclarationArrivee() {
   try {
     // On regarde large — les prestations des trois prochaines heures — puis on
@@ -4069,8 +4130,7 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
   // Il aurait payé une prestation qui n'a pas eu lieu, en punition de l'avoir
   // signalée.
   const { data: demandeArrivee } = await supabase.from('demandes')
-    .select('arrivee_confirmee_client, prestation_demarree_le, creneau')
-    .eq('id', demandeId).maybeSingle();
+    .select('*').eq('id', demandeId).maybeSingle();
 
   // Cas 1 — le prestataire a déclaré son arrivée, le client la conteste.
   const arriveeContestee = demandeArrivee && demandeArrivee.arrivee_confirmee_client === false;
@@ -4094,6 +4154,39 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
     if (instant) {
       absenceConstatee = (Date.now() - instant) / 60000 >= MINUTES_AVANT_ABSENCE;
     }
+  }
+
+  // ── UNE CONTESTATION NE VAUT PAS PREUVE D'ABSENCE ──────────────────────
+  // Le remboursement intégral partait dès que le client contestait. Un
+  // prestataire venu, ayant oublié de cliquer, n'était jamais payé.
+  //
+  // Trois situations suspendent désormais le remboursement :
+  //
+  //   le prestataire a une preuve      photos, code saisi, GPS < 2 km
+  //   il s'est manifesté               il conteste la contestation
+  //   la fenêtre de 2 h court encore   il n'a pas eu le temps de répondre
+  //
+  // Dans ces cas, l'argent ne bouge pas : il attend votre arbitrage. Ni versé,
+  // ni remboursé — c'est la seule position juste quand deux versions
+  // s'opposent.
+  let remboursementSuspendu = false;
+  if (demandeArrivee && demandeArrivee.arrivee_confirmee_client === false) {
+    const preuves = preuvesDePresence(demandeArrivee);
+    const aRepondu = !!demandeArrivee.reponse_pro_le;
+    const fenetreOuverte = demandeArrivee.contestation_le
+      && (Date.now() - new Date(demandeArrivee.contestation_le).getTime()) < 2 * 3600 * 1000;
+
+    remboursementSuspendu = preuves.length > 0 || aRepondu || fenetreOuverte;
+  }
+
+  if (remboursementSuspendu) {
+    return {
+      rembourse: false,
+      suspendu: true,
+      motif: 'Le prestataire conteste ou dispose d\'éléments prouvant sa venue. '
+           + 'Votre paiement est bloqué le temps que nous tranchions — il ne sera '
+           + 'versé à personne d\'ici là.'
+    };
   }
 
   const sansFrais = arriveeContestee || absenceConstatee;
@@ -4921,6 +5014,54 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
 // Il en est propriétaire, mais il n'a personne à qui parler tant qu'aucun
 // prestataire n'est engagé. Et c'est lui qui a le plus intérêt à contourner.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LE PRESTATAIRE A-T-IL UNE PREUVE D'AVOIR ÉTÉ SUR PLACE ?
+//
+// Un client contestant une arrivée obtenait un remboursement intégral
+// immédiat. Un prestataire venu, ayant simplement oublié de cliquer « je suis
+// arrivé », n'était donc jamais payé.
+//
+// LES PREUVES, PAR ORDRE DE FORCE
+//
+//   le code de validation   le client le donne EN MAIN PROPRE à la fin.
+//                           Le posséder, c'est avoir été là. Aucune autre
+//                           preuve n'est aussi difficile à fabriquer.
+//
+//   les photos              horodatées, prises sur place
+//
+//   la position GPS         moins de deux kilomètres — la même tolérance que
+//                           pour qualifier une arrivée
+//
+// UNE SEULE SUFFIT
+//
+// Exiger deux preuves punirait le prestataire dont le téléphone n'a pas capté.
+// Ce n'est pas un tribunal : il s'agit de distinguer « probablement venu » de
+// « probablement absent », pour décider si l'argent part maintenant ou attend
+// votre arbitrage.
+// ═══════════════════════════════════════════════════════════════════════════
+function preuvesDePresence(demande) {
+  const preuves = [];
+
+  if (demande.code_saisi_par_pro) preuves.push('le code de validation a été saisi');
+
+  const avant = demande.photos_avant;
+  const apres = demande.photos_apres;
+  const aDesPhotos = (t) => {
+    if (!t) return false;
+    try { const l = JSON.parse(t); return Array.isArray(l) && l.length > 0; }
+    catch (e) { return String(t).length > 2; }
+  };
+  if (aDesPhotos(avant)) preuves.push('des photos avant prestation');
+  if (aDesPhotos(apres)) preuves.push('des photos après prestation');
+
+  if (typeof demande.distance_gps_arrivee === 'number'
+      && demande.distance_gps_arrivee <= 2000) {
+    preuves.push('une position à ' + demande.distance_gps_arrivee + ' m de l\'adresse');
+  }
+
+  return preuves;
+}
+
 async function peutAccederConversation(demandeId, userId) {
   const { data: demande } = await supabase.from('demandes')
     .select('client_id, statut').eq('id', demandeId).single();
@@ -5917,6 +6058,31 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
     if (paiement.societe_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (String(code).trim() !== paiement.code_validation) return res.status(400).json({ error: 'Code incorrect. Vérifiez le code donné par le client.' });
 
+    // ── SAISIR LE BON CODE PROUVE LA PRÉSENCE ──────────────────────────────
+    // Le client donne ce code EN MAIN PROPRE, à la fin de la prestation.
+    // Le posséder, c'est avoir été là — aucune autre preuve n'est aussi
+    // difficile à fabriquer.
+    //
+    // On le note, et on rattrape l'arrivée si elle n'a pas été déclarée : un
+    // prestataire qui valide avec le bon code était forcément sur place, qu'il
+    // ait pensé à cliquer « je suis arrivé » ou non.
+    //
+    // C'est ce qui transforme l'oubli en simple détail, au lieu d'une perte de
+    // paiement.
+    try {
+      const rattrapage = { code_saisi_par_pro: true };
+      const { data: dem } = await supabase.from('demandes')
+        .select('prestation_demarree_le').eq('id', paiement.demande_id).maybeSingle();
+      if (dem && !dem.prestation_demarree_le) {
+        rattrapage.prestation_demarree_le = new Date().toISOString();
+        rattrapage.arrivee_qualite = 'non_verifiee';
+      }
+      await supabase.from('demandes').update(rattrapage).eq('id', paiement.demande_id);
+    } catch (e) {
+      // Un rattrapage manqué ne doit pas empêcher une validation légitime.
+      console.warn('Rattrapage d\'arrivée à la validation :', e.message);
+    }
+
     const erreurPhotos = validerPhotos(photos_apres, 5);
     if (erreurPhotos) return res.status(400).json({ error: erreurPhotos });
     if (photos_apres && photos_apres.length) {
@@ -6238,12 +6404,78 @@ app.delete('/api/favoris/:proId', auth, async (req, res) => {
 //
 // L'argent reste bloqué jusqu'à votre arbitrage — ni versé, ni remboursé.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LE PRESTATAIRE RÉPOND À UNE CONTESTATION
+//
+// Deux heures pour se manifester. Répondre ne prouve rien en soi — mais un
+// prestataire absent ne répond pas, et celui qui a oublié de cliquer se
+// rattrape.
+//
+// L'effet est immédiat : l'argent est gelé jusqu'à votre arbitrage. Ni versé,
+// ni remboursé. C'est la seule position juste quand deux versions s'opposent.
+//
+// AUCUNE PREUVE N'EST EXIGÉE POUR RÉPONDRE
+//
+// En demander une écarterait précisément celui qu'on cherche à protéger :
+// le prestataire dont le téléphone n'a pas capté, qui n'a pas pensé aux
+// photos, et qui découvre la contestation en rentrant chez lui.
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/demandes/:id/repondre-contestation', auth, async (req, res) => {
+  try {
+    const { data: demande } = await supabase.from('demandes')
+      .select('*').eq('id', req.params.id).maybeSingle();
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
+
+    // Seul le prestataire retenu peut répondre.
+    const { data: devisAccepte } = await supabase.from('devis')
+      .select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
+    if (!devisAccepte || devisAccepte.societe_id !== req.user.id) {
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
+    }
+
+    if (!demande.contestation_le) {
+      return res.status(409).json({ error: 'Aucune contestation en cours sur cette prestation.' });
+    }
+
+    const message = String((req.body && req.body.message) || '').trim().slice(0, 500);
+
+    await supabase.from('demandes')
+      .update({ reponse_pro_le: new Date().toISOString() })
+      .eq('id', demande.id);
+
+    // La réponse rejoint le signalement : c'est ce que vous lirez pour trancher.
+    if (message) {
+      await supabase.from('signalements').insert({
+        demande_id: demande.id,
+        reporter_id: req.user.id,
+        motif: 'Réponse du prestataire à une contestation',
+        description: message,
+        statut: 'nouveau'
+      });
+    }
+
+    envoyerNotificationPush(demande.client_id, {
+      titre: 'Le prestataire a répondu',
+      corps: 'Il affirme s\'être déplacé. Nous examinons la situation — votre '
+           + 'paiement reste bloqué en attendant.',
+      url: '/#accueil'
+    }).catch(() => {});
+
+    res.json({
+      message: 'Votre réponse est enregistrée. Le paiement est gelé le temps que '
+             + 'Gleam tranche — il ne sera versé à personne d\'ici là.'
+    });
+  } catch (e) {
+    erreurServeur(res, 'POST /api/demandes/:id/repondre-contestation', e);
+  }
+});
+
 app.post('/api/demandes/:id/confirmer-arrivee', auth, async (req, res) => {
   try {
     const estVenu = req.body && req.body.est_venu === true;
 
     const { data: demande } = await supabase.from('demandes')
-      .select('id, client_id, statut, arrivee_qualite, prestation')
+      .select('*')
       .eq('id', req.params.id).maybeSingle();
 
     if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
@@ -6269,6 +6501,39 @@ app.post('/api/demandes/:id/confirmer-arrivee', auth, async (req, res) => {
       .select('id').eq('demande_id', demande.id)
       .not('statut', 'in', '(traite,resolu,rejete)')
       .maybeSingle();
+
+    // ── LE PRESTATAIRE N'EST PAS CONDAMNÉ SANS ÊTRE ENTENDU ──────────────
+    // La contestation ouvrait la voie à un remboursement intégral immédiat.
+    // Un prestataire venu, ayant oublié de déclarer son arrivée, n'était donc
+    // jamais payé — et l'arbitrage portait sur un argent déjà rendu.
+    //
+    // On note l'heure de la contestation : elle ouvre une fenêtre de deux
+    // heures pendant laquelle le remboursement est suspendu.
+    await supabase.from('demandes')
+      .update({ contestation_le: new Date().toISOString() })
+      .eq('id', demande.id);
+
+    // Les preuves décident de la suite.
+    const preuves = preuvesDePresence(demande);
+
+    // Le prestataire est prévenu IMMÉDIATEMENT — c'est ce qui lui donne une
+    // chance de se rattraper s'il a simplement oublié de cliquer.
+    try {
+      const { data: devisPro } = await supabase.from('devis')
+        .select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
+      if (devisPro) {
+        envoyerNotificationPush(devisPro.societe_id, {
+          titre: 'Le client conteste votre venue',
+          corps: preuves.length
+            ? 'Votre présence est étayée. Nous examinons la situation — votre paiement n\'est pas annulé.'
+            : 'Répondez dans les 2 h : déclarez votre arrivée ou écrivez au client. '
+              + 'Sans réponse, la prestation sera remboursée.',
+          url: '/#pro-devis'
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Notification de contestation :', e.message);
+    }
 
     if (!dejaSignale) {
       await supabase.from('signalements').insert({
@@ -7894,6 +8159,188 @@ app.get('/api/admin/signalements', adminAuth, async (req, res) => {
 
 // Marque un signalement comme traité — simple bascule de statut, l'essentiel pour ne plus le voir
 // remonter dans la liste des cas encore ouverts.
+// ═══════════════════════════════════════════════════════════════════════════
+// LES LITIGES À ARBITRER — LA LISTE
+//
+// Une contestation d'arrivée gèle l'argent : ni versé, ni remboursé. Il fallait
+// donc un écran pour trancher, sinon ces prestations resteraient bloquées
+// indéfiniment.
+//
+// La route rassemble tout ce qui est nécessaire à la décision : les preuves de
+// présence, la version de chacun, les montants en jeu. Aucun aller-retour dans
+// la base pour comprendre un cas.
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/admin/litiges', adminAuth, async (req, res) => {
+  try {
+    const { data: demandes } = await supabase.from('demandes')
+      .select('*')
+      .not('contestation_le', 'is', null)
+      .order('contestation_le', { ascending: true })
+      .limit(100);
+
+    if (!demandes || !demandes.length) return res.json([]);
+
+    const litiges = [];
+    for (const d of demandes) {
+      const { data: paiement } = await supabase.from('paiements')
+        .select('id, montant_ttc, montant_societe, commission, statut, societe_id, client_id')
+        .eq('demande_id', d.id).maybeSingle();
+
+      // Un paiement déjà réglé n'est plus à arbitrer.
+      if (!paiement || ['rembourse', 'rembourse_partiel', 'libere'].includes(paiement.statut)) continue;
+
+      const { data: client } = await supabase.from('users')
+        .select('prenom, nom, email').eq('id', d.client_id).maybeSingle();
+      const { data: pro } = paiement.societe_id
+        ? await supabase.from('users').select('prenom, nom, email, note_moyenne, absences_constatees')
+            .eq('id', paiement.societe_id).maybeSingle()
+        : { data: null };
+
+      const { data: messages } = await supabase.from('signalements')
+        .select('motif, description, created_at, reporter_id')
+        .eq('demande_id', d.id).order('created_at', { ascending: true });
+
+      litiges.push({
+        demande_id: d.id,
+        paiement_id: paiement.id,
+        prestation: d.prestation,
+        adresse: d.adresse,
+        creneau: d.creneau,
+        numero_anonyme: d.numero_anonyme,
+        contestation_le: d.contestation_le,
+        reponse_pro_le: d.reponse_pro_le,
+        // Ce qui fait pencher la balance.
+        preuves: preuvesDePresence(d),
+        arrivee_qualite: d.arrivee_qualite,
+        distance_gps_arrivee: d.distance_gps_arrivee,
+        prestation_demarree_le: d.prestation_demarree_le,
+        code_saisi_par_pro: d.code_saisi_par_pro,
+        montant_ttc: paiement.montant_ttc,
+        montant_societe: paiement.montant_societe,
+        commission: paiement.commission,
+        statut_paiement: paiement.statut,
+        client: client ? { nom: (client.prenom || '') + ' ' + (client.nom || ''), email: client.email } : null,
+        pro: pro ? {
+          nom: (pro.prenom || '') + ' ' + (pro.nom || ''),
+          email: pro.email,
+          note: pro.note_moyenne,
+          absences: pro.absences_constatees
+        } : null,
+        echanges: messages || []
+      });
+    }
+
+    res.json(litiges);
+  } catch (e) {
+    erreurServeur(res, 'GET /api/admin/litiges', e);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TRANCHER UN LITIGE
+//
+// Deux issues, et une seule décision par litige.
+//
+//   payer_pro     le prestataire est venu. Le virement part, commission incluse.
+//   rembourser    il n'est pas venu. Le client récupère l'intégralité.
+//
+// POURQUOI CETTE ROUTE CONTOURNE LA SUSPENSION
+//
+// `rembourserPaiementSiPaye` refuse de rembourser tant que le doute existe —
+// c'est ce qui protège le prestataire. Mais ici le doute est levé : c'est vous
+// qui tranchez, et votre décision doit pouvoir s'appliquer.
+//
+// On lève donc la contestation AVANT d'appeler le remboursement.
+//
+// LA DÉCISION EST TRACÉE
+//
+// Un signalement enregistre qui a tranché, quand, et pourquoi. Dans six mois,
+// face à une réclamation, vous devez pouvoir dire sur quoi vous vous êtes
+// fondé.
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/admin/litiges/:demandeId/trancher', adminAuth, async (req, res) => {
+  try {
+    const { decision, motif } = req.body || {};
+    if (!['payer_pro', 'rembourser'].includes(decision)) {
+      return res.status(400).json({ error: 'Décision inconnue : « payer_pro » ou « rembourser ».' });
+    }
+    if (!motif || !String(motif).trim()) {
+      return res.status(400).json({ error: 'Indiquez le motif de votre décision.' });
+    }
+
+    const { data: demande } = await supabase.from('demandes')
+      .select('*').eq('id', req.params.demandeId).maybeSingle();
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
+    if (!demande.contestation_le) {
+      return res.status(409).json({ error: 'Aucun litige en cours sur cette prestation.' });
+    }
+
+    const { data: paiement } = await supabase.from('paiements')
+      .select('*').eq('demande_id', demande.id).maybeSingle();
+    if (!paiement) return res.status(404).json({ error: 'Aucun paiement pour cette prestation.' });
+
+    // La trace, écrite AVANT l'action : si le virement échoue, la décision
+    // reste consignée et vous savez où vous en êtes.
+    await supabase.from('signalements').insert({
+      demande_id: demande.id,
+      reporter_id: demande.client_id,
+      motif: 'Arbitrage Gleam — ' + (decision === 'payer_pro' ? 'paiement au prestataire' : 'remboursement du client'),
+      description: String(motif).trim().slice(0, 1000),
+      statut: 'traite'
+    });
+
+    // La contestation est levée : le doute n'existe plus.
+    await supabase.from('demandes')
+      .update({ contestation_le: null, reponse_pro_le: null,
+                arrivee_confirmee_client: decision === 'payer_pro' })
+      .eq('id', demande.id);
+
+    let resultat;
+    if (decision === 'payer_pro') {
+      await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', demande.id);
+      resultat = await finaliserPrestation(demande.id);
+
+      envoyerNotificationPush(paiement.societe_id, {
+        titre: 'Litige tranché en votre faveur',
+        corps: 'Gleam a examiné la situation. Votre paiement est en route.',
+        url: '/#pro-devis'
+      }).catch(() => {});
+      envoyerNotificationPush(demande.client_id, {
+        titre: 'Litige tranché',
+        corps: 'Après examen, la prestation a été considérée comme réalisée. '
+             + 'Le prestataire a été payé.',
+        url: '/#accueil'
+      }).catch(() => {});
+    } else {
+      resultat = await rembourserPaiementSiPaye(demande.id, 999);
+
+      envoyerNotificationPush(demande.client_id, {
+        titre: 'Litige tranché en votre faveur',
+        corps: 'Vous êtes remboursé intégralement. Le remboursement paraîtra sous '
+             + 'quelques jours selon votre banque.',
+        url: '/#accueil'
+      }).catch(() => {});
+      if (paiement.societe_id) {
+        envoyerNotificationPush(paiement.societe_id, {
+          titre: 'Litige tranché',
+          corps: 'Après examen, la prestation a été considérée comme non réalisée. '
+               + 'Le client a été remboursé.',
+          url: '/#pro-devis'
+        }).catch(() => {});
+      }
+    }
+
+    res.json({
+      message: decision === 'payer_pro'
+        ? 'Le prestataire est payé. Les deux parties sont prévenues.'
+        : 'Le client est remboursé. Les deux parties sont prévenues.',
+      resultat
+    });
+  } catch (e) {
+    erreurServeur(res, 'POST /api/admin/litiges/:demandeId/trancher', e);
+  }
+});
+
 app.patch('/api/admin/signalements/:id', adminAuth, async (req, res) => {
   try {
     // ── CE STATUT COMMANDE UN PAIEMENT ──────────────────────────────────
@@ -8214,6 +8661,9 @@ async function balayerPrestationsAValider() {
 
     const liberes = await traiterEcheancesPaiement();
     if (liberes) console.log('⏱ ' + liberes + ' devis libéré(s) faute de paiement.');
+
+    const oublis = await rappelerArriveeOubliee();
+    if (oublis) console.log('📍 ' + oublis + ' rappel(s) d\'arrivée oubliée.');
     const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
     CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
