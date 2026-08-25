@@ -4873,8 +4873,16 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
       // vide et le document n'était pas conforme.
       select('id, prenom, nom, note_moyenne, taux_fiabilite, photo, siret').in('id', proIds);
     await signerPhotosDeLot(pros);
+    // ── LES INDICATEURS DE CONFIANCE ──────────────────────────────────────
+    // Le client ne voyait qu'une note. Pour un prestataire sans avis, il
+    // n'avait donc RIEN sur quoi se décider — que le prix.
+    const indicateurs = await indicateursPrestataires(proIds);
+
     const proMap = {};
-    (pros || []).forEach(p => proMap[p.id] = p);
+    (pros || []).forEach(p => {
+      const ind = indicateurs[p.id] || { prestations_terminees: 0, badges: [] };
+      proMap[p.id] = { ...p, ...ind };
+    });
 
     // Codes de validation des demandes en cours, récupérés en une seule requête groupée
     const demandeIdsEnCours = demandes.filter(d => d.statut === 'en_cours').map(d => d.id);
@@ -5195,6 +5203,110 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
 // UNE SEULE RÈGLE, UTILISÉE PARTOUT
 //
 // Recalculer à quatre endroits, c'est se garantir que trois divergeront.
+// ═══════════════════════════════════════════════════════════════════════════
+// LES INDICATEURS DE CONFIANCE D'UN PRESTATAIRE
+//
+// Sur une place de marché, la confiance est le produit : sans historique
+// visible, un client n'ose pas choisir. Aujourd'hui il ne voyait qu'une note —
+// et rien du tout pour un prestataire qui n'a pas encore d'avis.
+//
+// TROIS INDICATEURS, TOUS CALCULÉS SUR DES DONNÉES EXISTANTES
+//
+//   prestations terminées   l'expérience réelle, pas les promesses
+//   ponctualité             arrivé dans le créneau, ou en retard
+//   documents vérifiés      assurance et immatriculation à jour
+//
+// POURQUOI DES BADGES PLUTÔT QUE DES POURCENTAGES
+//
+// « 68 % de ponctualité » condamne. Un badge absent ne dit rien — il laisse
+// simplement la note et le prix décider.
+//
+// Et les seuils sont volontairement atteignables : il s'agit de distinguer un
+// prestataire éprouvé, pas d'exclure les autres.
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LE PALIER D'UN PRESTATAIRE
+//
+// Un client ne sait pas quoi faire d'un « 87 % de ponctualité ». Il sait
+// immédiatement ce que vaut « Or — plus de 100 prestations ».
+//
+// LES PALIERS
+//
+//     moins de 20    rien du tout
+//     20 à 49        Bronze
+//     50 à 99        Argent
+//     100 et plus    Or
+//
+// POURQUOI RIEN EN DESSOUS DE VINGT
+//
+// Un badge « Débutant » condamnerait ceux qui commencent. L'absence de palier
+// ne dit rien : le client se décide alors sur la note et le prix, ce qui est
+// exactement ce qu'on veut pour un nouveau venu.
+//
+// POURQUOI L'ORDRE BRONZE / ARGENT / OR
+//
+// Le platine est ordinairement AU-DESSUS de l'or. Afficher « Platine » puis
+// « Or » ferait hésiter un client sur lequel est le meilleur. On garde la
+// progression que tout le monde connaît.
+//
+// CE QUE J'AI RETIRÉ, ET POURQUOI
+//
+//   documents vérifiés   la bonne réponse n'est pas un badge mais un BLOCAGE :
+//                        un prestataire sans assurance ne devrait pas pouvoir
+//                        envoyer de devis du tout. Aujourd'hui rien ne l'en
+//                        empêche — trois de vos quatre prestataires n'ont
+//                        aucun document. C'est un chantier séparé.
+//
+//   ponctualité          elle repose sur une déclaration du prestataire
+//                        LUI-MÊME. Un badge fondé sur une donnée qu'il
+//                        contrôle ne prouve rien.
+// ═══════════════════════════════════════════════════════════════════════════
+async function indicateursPrestataires(proIds) {
+  const vide = {};
+  if (!proIds || !proIds.length) return vide;
+
+  try {
+    const { data: devisAcceptes } = await supabase.from('devis')
+      .select('societe_id, demande_id')
+      .in('societe_id', proIds)
+      .eq('statut', 'accepte');
+
+    const demandeIds = [...new Set((devisAcceptes || []).map(d => d.demande_id))];
+    const { data: demandes } = demandeIds.length
+      ? await supabase.from('demandes').select('id, statut').in('id', demandeIds)
+      : { data: [] };
+
+    const terminee = new Set(
+      (demandes || []).filter(d => d.statut === 'terminee').map(d => d.id)
+    );
+
+    const compte = {};
+    proIds.forEach(id => { compte[id] = 0; });
+    for (const dv of (devisAcceptes || [])) {
+      if (terminee.has(dv.demande_id) && compte[dv.societe_id] !== undefined) {
+        compte[dv.societe_id]++;
+      }
+    }
+
+    const resultat = {};
+    proIds.forEach(id => {
+      const n = compte[id];
+      let palier = null;
+      if (n >= 100) palier = 'or';
+      else if (n >= 50) palier = 'argent';
+      else if (n >= 20) palier = 'bronze';
+
+      resultat[id] = { prestations_terminees: n, palier };
+    });
+
+    return resultat;
+  } catch (e) {
+    // Un palier manquant ne doit jamais empêcher l'affichage d'un devis.
+    console.warn('Indicateurs prestataires :', e.message);
+    return vide;
+  }
+}
+
 function partReelle(paiement, champ) {
   const brut = parseFloat(paiement[champ]) || 0;
   const total = parseFloat(paiement.montant_ttc) || 0;
