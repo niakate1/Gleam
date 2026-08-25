@@ -12964,14 +12964,29 @@ function buildFactureHtml(d,vuePro){
     '</body></html>';
 }
 async function showMesGains(){
-  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="wallet" style="width:20px;height:20px;vertical-align:-4px"></i> Mes gains</div><div class="modal-sub">Récapitulatif de vos revenus Gleam</div><div id="gains-summary" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div><div id="gains-list">'+skeletonCards(3)+'</div>';
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="wallet" style="width:20px;height:20px;vertical-align:-4px"></i> Mes gains</div><div class="modal-sub">Récapitulatif de vos revenus Gleam</div><div id="gains-summary" style="display:grid;gap:10px;margin-bottom:16px"></div><div id="gains-list">'+skeletonCards(3)+'</div>';
   document.getElementById('modal-overlay').classList.add('open');
   try{
     const r=await fetch(API+'/api/paiements/mes-gains',{headers:authHeaders()});
     const d=await safeJson(r);
     var sum=document.getElementById('gains-summary'),c=document.getElementById('gains-list');
     if(!r.ok){if(c)c.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>';return}
-    if(sum)sum.innerHTML='<div class="stat-card stat-card-p"><div class="stat-num">'+d.total_libere+'€</div><div class="stat-label">Reçu</div></div>'+
+    // ── LA GRILLE SUIT LE NOMBRE DE CARTES ──────────────────────────────
+      // Elle était figée à deux colonnes. La troisième carte — « En litige »,
+      // ajoutée aujourd'hui — passait seule à la ligne sur une demi-largeur.
+      //
+      // Deux cartes se partagent la largeur, trois aussi. On compte, et on
+      // pose le bon nombre de colonnes.
+      // ── TROIS COLONNES SERAIENT ILLISIBLES SUR UN TÉLÉPHONE ─────────────
+      // Sur un iPhone SE, trois cartes laissent 97 px chacune — « En attente »
+      // et un montant n'y tiennent pas sans se couper.
+      //
+      // La carte « En litige » prend donc toute la largeur, SOUS les deux
+      // autres. Elle y gagne : c'est l'information la moins attendue, et celle
+      // qui mérite qu'on s'y arrête.
+      if(sum) sum.style.gridTemplateColumns = 'repeat(2, 1fr)';
+
+      if(sum)sum.innerHTML='<div class="stat-card stat-card-p"><div class="stat-num">'+d.total_libere+'€</div><div class="stat-label">Reçu</div></div>'+
       '<div class="stat-card stat-card-gold"><div class="stat-num">'+d.total_en_attente+'€</div><div class="stat-label">En attente</div></div>'
         // ── L'ARGENT GELÉ A SA PROPRE CASE ──────────────────────────────
         // Il était compté dans « En attente ». Le prestataire voyait 93,50 € à
@@ -12981,9 +12996,18 @@ async function showMesGains(){
         // « 0 € en litige » à quelqu'un qui n'en a jamais eu serait inquiétant
         // pour rien.
         + ((d.total_en_litige||0) > 0
-            ? '<div class="stat-card" style="background:var(--amber-clair)">'
-              + '<div class="stat-num" style="color:var(--amber)">'+d.total_en_litige+'€</div>'
+            // `grid-column: 1 / -1` : la carte occupe toute la ligne, quelle
+            // que soit le nombre de colonnes.
+            ? '<div class="stat-card" style="grid-column:1/-1;background:var(--amber-clair);'
+              + 'border-color:var(--amber);display:flex;align-items:center;'
+              + 'justify-content:space-between;text-align:left;gap:12px">'
+              + '<div><div class="stat-num" style="color:var(--amber);font-size:20px">'
+              +   d.total_en_litige+'€</div>'
               + '<div class="stat-label">En litige</div></div>'
+              + '<div style="font-size:11px;color:var(--amber);line-height:1.4;max-width:60%">'
+              + 'Gleam examine ces prestations. Ce montant ne vous sera versé '
+              + 'que si la décision vous est favorable.</div>'
+              + '</div>'
             : '');
     if(!d.paiements||!d.paiements.length){if(c)c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun gain pour l\u2019instant.</p></div>';return}
     // ── DIRE CE QUE LE PRESTATAIRE ATTEND VRAIMENT ────────────────────────
