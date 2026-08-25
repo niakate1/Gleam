@@ -2049,13 +2049,29 @@ function finExclusivite(creneauTexte) {
 
 // Le créneau est stocké en texte lisible — « 2026-08-25 à 9h00 ». On en tire
 // un instant, ou null si la forme est inattendue.
+// ═══════════════════════════════════════════════════════════════════════════
+// LE CRÉNEAU EST EN HEURE FRANÇAISE, LE SERVEUR TOURNE EN UTC
+//
+// `new Date(2026, 7, 25, 13, 0)` interprète 13h00 dans le fuseau du PROCESSUS.
+// Sur Railway, c'est UTC — le serveur comprenait donc 13h00 UTC, soit 15h00 à
+// Paris. Deux heures de trop en été, une en hiver.
+//
+// CE QUE ÇA CASSAIT
+//
+// Un prestataire à 11h04, pour un créneau à 13h00, se voyait refuser sa
+// déclaration d'arrivée : le serveur croyait la fenêtre ouverte à 13h00 UTC.
+// Le message affichait « à partir de 11:00 » — l'heure UTC, lue comme locale.
+//
+// Et huit mécanismes en dépendaient : le rappel d'arrivée, l'absence
+// constatée, le barème d'annulation, l'échéance de paiement…
+//
+// `creneauVersInstant` existait déjà et gère le décalage réel, changement
+// d'heure compris. Cette fonction en était un doublon fautif.
+//
+// On garde le nom — huit appels en dépendent — et on délègue.
 function instantDuCreneau(texte) {
-  if (!texte) return null;
-  const m = String(texte).match(/(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2})h(\d{2})/);
-  if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]),
-                     Number(m[4]), Number(m[5]));
-  return isNaN(d.getTime()) ? null : d.getTime();
+  const d = creneauVersInstant(texte);
+  return d ? d.getTime() : null;
 }
 
 app.post('/api/demandes', auth, async (req, res) => {
@@ -5749,8 +5765,20 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
         await supabase.from('messages').insert({
           demande_id: paiement.demande_id,
           expediteur_id: paiement.client_id,
+          // ── UN MESSAGE SYSTÈME EST LU PAR LES DEUX ──────────────────────
+          // J'avais écrit « le montant vous sera versé après validation ».
+          // Juste pour le prestataire, FAUX pour le client : il vient de
+          // payer, il ne recevra rien.
+          //
+          // Un message posé dans une conversation partagée ne peut pas
+          // s'adresser à l'un des deux. On décrit donc le FAIT, sans « vous » :
+          // le montant est bloqué, il partira au prestataire à la validation.
+          //
+          // Chacun y trouve ce qui le concerne, et personne n'y lit une
+          // promesse qui ne le vise pas.
           contenu: '💳 Paiement confirmé — la prestation est réservée. '
-                 + 'Le montant est bloqué et vous sera versé après validation.',
+                 + 'Le montant est conservé par Gleam et sera versé au '
+                 + 'prestataire une fois la prestation validée.',
           type: 'systeme'
         });
 
