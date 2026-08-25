@@ -6319,7 +6319,15 @@ app.get('/api/paiements/mes-paiements', auth, async (req, res) => {
     const { data: paiements } = await supabase.from('paiements').select('*').eq('client_id', req.user.id).in('statut', ['paye', 'libere', 'rembourse', 'rembourse_partiel']).order('created_at', { ascending: false });
     if (!paiements || !paiements.length) return res.json([]);
     const demandeIds = [...new Set(paiements.map(p => p.demande_id))];
-    const { data: demandes } = await supabase.from('demandes').select('id, prestation, adresse').in('id', demandeIds);
+    const { data: demandes } = // ── LE LITIGE DOIT REMONTER JUSQU'À L'HISTORIQUE ────────────────────
+    // Le client voyait « Payé — en attente de confirmation » sur une
+    // prestation qu'il avait lui-même contestée. Le libellé décrivait l'état
+    // du PAIEMENT, sans savoir qu'un arbitrage était en cours.
+    //
+    // Troisième fois que ce motif apparaît : une information existe en base,
+    // mais n'atteint pas l'écran qui en a besoin.
+    await supabase.from('demandes')
+      .select('id, prestation, adresse, contestation_le, reponse_pro_le').in('id', demandeIds);
     const demandesMap = {};
     (demandes || []).forEach(d => { demandesMap[d.id] = d; });
     // Tri logique : payé (en attente de confirmation, encore "actif") avant libéré (réglé, historique),
