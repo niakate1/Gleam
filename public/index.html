@@ -8557,6 +8557,42 @@ function selectNote(n){
   document.getElementById('note-label').textContent=noteLabels[n]||'';
   document.getElementById('note-label').style.color=n>=4?'var(--green)':(n>=3?'#D97706':'var(--red)');
 }
+// ── RÉPONDRE À UNE CONTESTATION ────────────────────────────────────────────
+// Le message est facultatif : exiger une justification écarterait celui qu'on
+// cherche à protéger — le prestataire qui découvre la contestation en rentrant
+// et veut simplement dire « j'y étais ».
+async function repondreContestation(demandeId){
+  // `demanderTexte` n'existe pas dans cette application — je l'avais appelée
+  // par habitude. Seule `demanderConfirmation` est disponible, et elle suffit :
+  // ce qui compte ici est le GESTE de répondre, pas le texte.
+  //
+  // Le prestataire pourra détailler dans la conversation, qui est ouverte
+  // puisque la prestation est payée.
+  if(!await demanderConfirmation({
+    titre: 'Vous étiez bien sur place ?',
+    texte: 'Le client affirme que vous n\'êtes pas venu.<br><br>'
+         + 'En confirmant, le paiement sera <strong>gelé</strong> le temps que Gleam '
+         + 'tranche — il ne sera versé à personne d\'ici là.<br><br>'
+         + 'Ne confirmez que si vous vous êtes réellement déplacé.',
+    valider: 'J\'étais sur place',
+    annuler: 'Annuler',
+    icone: 'map-pin'
+  })) return;
+
+  var message = '';
+
+  try{
+    const r = await fetch(API+'/api/demandes/'+demandeId+'/repondre-contestation',{
+      method:'POST', headers:authHeaders(), body:JSON.stringify({ message: message || '' })
+    });
+    const d = await safeJson(r);
+    if(!r.ok){ toast(messageErreur(r, d)); return; }
+    toast(d.message || 'Votre réponse est enregistrée.', 6000);
+    viderMemoireRequetes();
+    loadProDevis();
+  }catch(e){ toast(friendlyNetworkError(e)); }
+}
+
 async function envoyerNote(btn){
   if(!noteSelectionnee){toast('Sélectionnez une note.');return}
   var comment=document.getElementById('note-comment')&&document.getElementById('note-comment').value.trim()||'';
@@ -9580,7 +9616,27 @@ function renderProDevisCards(){
         // place, donc lui qui aurait cliqué en premier.
         creneauBlockHtml(v.demande_id,v.demande&&v.demande.creneau,v.demande&&v.demande.creneau_propose,v.demande&&v.demande.creneau_propose_par,v.demande&&v.demande.prestation_demarree_le,v.demande);
         var creneauHtmlPro=(v.demande&&v.demande.creneau)?'<div style="display:flex;align-items:center;gap:6px;background:var(--surface-alt);border-radius:8px;padding:8px 10px;margin-top:10px;font-size:13px;font-weight:700;color:var(--text)"><i data-lucide="calendar" style="width:15px;height:15px;color:var(--p);flex-shrink:0"></i> '+formatCreneau(v.demande.creneau)+'</div>':'';
-        extra='<div style="margin-top:10px">'+creneauHtmlPro+
+        // ── LE CLIENT CONTESTE VOTRE VENUE ─────────────────────────────
+        // Sans ce bloc, le prestataire apprend la contestation par
+        // notification et n'a aucun endroit où répondre. Deux heures plus
+        // tard, la prestation est remboursée.
+        //
+        // Répondre ne prouve rien en soi — mais un absent ne répond pas, et
+        // celui qui a oublié de déclarer son arrivée se rattrape ici.
+        var blocContestation='';
+        if(v.demande && v.demande.contestation_le && !v.demande.reponse_pro_le){
+          blocContestation='<div class="attente-paiement-pro" style="background:var(--red-clair);'
+            + 'color:var(--red);margin-bottom:10px">'
+            + '<i data-lucide="alert-octagon"></i>'
+            + '<span><strong>Le client affirme que vous n\'êtes pas venu.</strong><br>'
+            + 'Répondez sous 2 h, sinon la prestation sera remboursée. Si vous étiez '
+            + 'sur place, dites-le : le paiement sera gelé jusqu\'à ce que Gleam '
+            + 'tranche.</span></div>'
+            + '<button class="btn-accept" style="width:100%;margin-bottom:10px;background:var(--red)" '
+            + 'onclick="repondreContestation(\''+safeDemandeId+'\')">J\'étais bien sur place</button>';
+        }
+
+        extra='<div style="margin-top:10px">'+creneauHtmlPro+blocContestation+
           '<button class="btn-accept" style="width:100%;margin-top:10px;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
         if(!demandeeDemarree){
           // Étape 1 : le pro vient d'arriver — photo de l'état initial avant de commencer
