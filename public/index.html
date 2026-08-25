@@ -11648,10 +11648,33 @@ async function showMesPaiements(){
     var c=document.getElementById('paiements-list');
     if(!c)return;
     if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>💳</span><p>Aucun paiement pour l\u2019instant.</p></div>';return}
-    var statutLabels={paye:['Payé — en attente de confirmation','var(--gold)'],libere:['Confirmé','var(--mint)'],bloque:['Bloqué',' var(--red)'],rembourse:['Remboursé intégralement','var(--gray)']};
+    // ── DIRE QUI ATTEND QUOI ────────────────────────────────────────────
+      // « En attente de confirmation » ne disait pas de QUI. Le client pouvait
+      // croire qu'il devait agir, alors que l'argent attend simplement la fin
+      // de la prestation.
+      //
+      // « Confirmé » ne disait pas non plus ce qui s'était passé : le
+      // prestataire a été payé.
+      var statutLabels={
+        paye:['Payé — versé au prestataire après la prestation','var(--gold)'],
+        libere:['Terminé — prestataire payé','var(--mint)'],
+        bloque:['Bloqué','var(--red)'],
+        rembourse:['Remboursé intégralement','var(--gray)']
+      };
     c.innerHTML=d.map(function(p,i){
       var libelle,couleur;
-      if(p.statut==='rembourse_partiel'){
+
+      // ── UN LITIGE PRIME SUR L'ÉTAT DU PAIEMENT ──────────────────────
+      // Le client lisait « Payé — en attente de confirmation » sur une
+      // prestation qu'il avait LUI-MÊME contestée. Le libellé décrivait
+      // l'état du paiement, sans savoir qu'un arbitrage était en cours.
+      //
+      // « En attente de confirmation » laissait de surcroît croire qu'il
+      // devait agir — alors qu'il attend une décision de Gleam.
+      if(p.demande && p.demande.contestation_le){
+        libelle='Litige — Gleam examine';
+        couleur='var(--amber)';
+      }else if(p.statut==='rembourse_partiel'){
         var montantRemb=parseFloat(p.montant_rembourse||0);
         libelle=montantRemb>0?('Remboursé partiellement ('+montantRemb+'€ sur '+p.montant_ttc+'€)'):'Aucun remboursement (annulation à moins de 2h)';
         couleur=montantRemb>0?'var(--gold)':'var(--red)';
