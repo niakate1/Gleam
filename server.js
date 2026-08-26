@@ -4295,6 +4295,45 @@ app.post('/api/demandes/:id/proposer-creneau', auth, async (req, res) => {
     if (!['acceptee', 'en_cours'].includes(demande.statut))
       return res.status(400).json({ error: 'La reprogrammation n\'est possible que pour une prestation acceptée ou en cours.' });
 
+    // ── PAS DE REPROGRAMMATION PENDANT UN LITIGE ──────────────────────────
+    // Un prestataire contesté pouvait proposer un nouveau créneau. Le client
+    // acceptait — de bonne foi, ou par lassitude — et l'arbitrage n'avait
+    // jamais lieu.
+    //
+    // La question posée est « êtes-vous venu ce jour-là ». Déplacer le
+    // rendez-vous ne la règle pas : elle porte sur le passé.
+    if (demande.contestation_le) {
+      return res.status(409).json({
+        error: 'Cette prestation fait l\'objet d\'un litige. Gleam doit trancher '
+             + 'avant toute reprogrammation.'
+      });
+    }
+
+    // ── UNE PRESTATION COMMENCÉE NE SE REPROGRAMME PLUS ───────────────────
+    // Déclarer son arrivée, puis proposer un autre jour, n'a pas de sens : le
+    // travail a commencé. S'il s'est mal passé, cela relève du signalement.
+    if (demande.prestation_demarree_le) {
+      return res.status(409).json({
+        error: 'La prestation a déjà commencé. Si quelque chose ne va pas, '
+             + 'signalez-le depuis la conversation.'
+      });
+    }
+
+    // ── ET PAS INDÉFINIMENT APRÈS LE CRÉNEAU RATÉ ─────────────────────────
+    // Rien ne limitait la reprogrammation dans le temps. Trois semaines après
+    // un créneau manqué, un prestataire pouvait encore proposer une date — sur
+    // un argent bloqué depuis tout ce temps.
+    //
+    // Vingt-quatre heures : le même délai qu'avant le remboursement
+    // automatique. Au-delà, les deux mécanismes se contrediraient.
+    const instantRate = instantDuCreneau(demande.creneau);
+    if (instantRate && Date.now() - instantRate > 24 * 3600 * 1000) {
+      return res.status(409).json({
+        error: 'Le créneau est passé depuis plus de 24 heures. Cette prestation '
+             + 'sera remboursée au client — il pourra republier sa demande.'
+      });
+    }
+
     // ── LE PRESTATAIRE EST DÉJÀ SUR PLACE ───────────────────────────────
     // Avant son arrivée, un report ne coûte rien : il n'a pas bougé, et il
     // peut refuser — la reprogrammation exige l'accord des deux.
