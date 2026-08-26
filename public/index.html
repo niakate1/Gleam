@@ -9737,13 +9737,25 @@ function renderProDevisCards(){
         // celui qui a oublié de déclarer son arrivée se rattrape ici.
         var blocContestation='';
         if(v.demande && v.demande.contestation_le && !v.demande.reponse_pro_le){
+          // ── DEUX CAS, DEUX MESSAGES ─────────────────────────────────
+          // Le client peut avoir contesté — ou l'arrivée peut simplement
+          // n'avoir jamais été déclarée. Le second n'est pas une accusation :
+          // c'est un oubli, et le dire ainsi évite une réaction défensive.
+          var arriveeJamaisDeclaree = !(v.demande && v.demande.prestation_demarree_le);
           blocContestation='<div class="attente-paiement-pro" style="background:var(--red-clair);'
             + 'color:var(--red);margin-bottom:10px">'
             + '<i data-lucide="alert-octagon"></i>'
-            + '<span><strong>Le client affirme que vous n\'êtes pas venu.</strong><br>'
-            + 'Répondez sous 2 h, sinon la prestation sera remboursée. Si vous étiez '
-            + 'sur place, dites-le : le paiement sera gelé jusqu\'à ce que Gleam '
-            + 'tranche.</span></div>'
+            + '<span>'
+            + (arriveeJamaisDeclaree
+                ? '<strong>Votre arrivée n\'a jamais été déclarée.</strong><br>'
+                  + 'Sans réponse, cette prestation sera remboursée au client. '
+                  + 'Si vous vous êtes déplacé, confirmez-le : le paiement sera '
+                  + 'gelé jusqu\'à ce que Gleam tranche.'
+                : '<strong>Le client affirme que vous n\'êtes pas venu.</strong><br>'
+                  + 'Répondez sous 2 h, sinon la prestation sera remboursée. Si vous '
+                  + 'étiez sur place, dites-le : le paiement sera gelé jusqu\'à ce que '
+                  + 'Gleam tranche.')
+            + '</span></div>'
             + '<button class="btn-accept" style="width:100%;margin-bottom:10px;background:var(--red)" '
             + 'onclick="repondreContestation(\''+safeDemandeId+'\')">J\'étais bien sur place</button>';
         }
