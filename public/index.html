@@ -11890,6 +11890,34 @@ function boutonReprogrammer(safeId){
 function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposePar,prestationDemarreeLe,demande){
   var safeId=escAttr(demandeId);
 
+  // ── UN LITIGE SUSPEND LA REPROGRAMMATION ────────────────────────────────
+  // Un prestataire contesté pouvait proposer un nouveau créneau. Le client
+  // acceptait — de bonne foi, ou par lassitude — et l'arbitrage n'avait jamais
+  // lieu.
+  //
+  // La question posée est « êtes-vous venu ce jour-là ». Déplacer le
+  // rendez-vous ne la règle pas : elle porte sur le passé.
+  if(demande && demande.contestation_le){
+    return '<div class="petit" style="margin-top:8px;color:var(--gray)">'
+      + 'Reprogrammation suspendue : Gleam examine cette prestation.</div>';
+  }
+
+  // ── ET PAS AU-DELÀ DE VINGT-QUATRE HEURES ───────────────────────────────
+  // Le serveur refuse désormais un report plus de 24 h après le créneau raté —
+  // c'est le délai au terme duquel le client est remboursé. Laisser le bouton
+  // afficherait une action vouée à échouer.
+  if(creneauActuel && !prestationDemarreeLe){
+    var mCr=/(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2})h(\d{2})/.exec(creneauActuel);
+    if(mCr){
+      var instantCr=new Date(+mCr[1], +mCr[2]-1, +mCr[3], +mCr[4], +mCr[5]).getTime();
+      if(Date.now() - instantCr > 24*3600*1000){
+        return '<div class="petit" style="margin-top:8px;color:var(--gray)">'
+          + 'Le créneau est passé depuis plus de 24 h. Cette prestation sera '
+          + 'remboursée au client.</div>';
+      }
+    }
+  }
+
   // ── LE PRESTATAIRE EST ARRIVÉ : PLUS DE REPORT ──────────────────────────
   // Le serveur refuse désormais la reprogrammation à ce stade, comme il refuse
   // déjà l'annulation. Laisser le bouton afficherait une action qui échoue —
