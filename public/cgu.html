@@ -2,83 +2,372 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Conditions Générales d'Utilisation et de Vente — Gleam</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conditions Générales d'Utilisation — Gleam</title>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  CE DOCUMENT DOIT ÊTRE RELU PAR UN AVOCAT AVANT MISE EN LIGNE
+
+  Il reprend la structure et les clauses d'usage des plateformes de mise en
+  relation françaises. Mais deux points appellent un avis professionnel :
+
+  1. LE STATUT D'INTERMÉDIAIRE
+     Gleam encaisse les fonds, fixe sa commission, valide les documents,
+     bloque les prestataires non conformes et arbitre les litiges. Une clause
+     « simple intermédiaire » qui contredirait ces faits ne protégerait pas.
+     Ces CGU décrivent donc ce que Gleam FAIT réellement — c'est ce qui tient
+     devant un juge, pas une formule.
+
+  2. L'ENCAISSEMENT POUR COMPTE DE TIERS
+     Détenir des fonds appartenant à un tiers relève du monopole bancaire
+     (article L.521-1 du Code monétaire et financier). Gleam s'appuie sur
+     Stripe Connect, prestataire agréé — cette architecture doit être
+     confirmée conforme par un professionnel.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#7C3AED;--p2:#5B21B6;--gray:#6B7280;--border:#E5E7EB;--light:#F5F3FF;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--text:#111827;--text-secondary:#374151}
-@media (prefers-color-scheme: dark){
-  :root{--p:#A78BFA;--p2:#C4B5FD;--gray:#9CA3AF;--border:#333846;--light:#2D2440;--gold:#FBC85C;--mint:#2DD4BF;--bg:#0F1115;--surface:#1A1D23;--text:#F3F4F6;--text-secondary:#D1D5DB}
-}
-body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
-.navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0}
-.navbar a{font-size:22px;font-weight:800;color:var(--p);text-decoration:none}
-.back{font-size:14px;color:var(--gray);text-decoration:none;font-weight:600}
-.wrap{max-width:720px;margin:0 auto;padding:32px 20px 60px}
-h1{font-size:26px;font-weight:800;margin-bottom:6px}
-.updated{color:var(--gray);font-size:13px;margin-bottom:28px}
-h2{font-size:18px;font-weight:700;margin:28px 0 10px;color:var(--p)}
-p,li{font-size:15px;color:var(--text-secondary);margin-bottom:10px}
-ul{padding-left:22px;margin-bottom:14px}
-.todo{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:24px}
-.placeholder{background:#FEF3C7;padding:1px 6px;border-radius:4px;font-family:monospace;font-size:13px;color:#92400E}
+  :root {
+    --p: #0F5C56; --fond: #FBFBFA; --surface: #FFFFFF;
+    --bord: #E5E7EB; --texte: #1A1A1A; --gris: #6B7280;
+    --ambre-clair: #FFF8E9; --ambre: #8A6A16;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 18px 80px; background: var(--fond); color: var(--texte);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.65;
+  }
+  .page { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .maj { color: var(--gris); font-size: 13px; margin: 0 0 28px; }
+  h2 {
+    font-size: 17px; margin: 34px 0 10px; padding-top: 22px;
+    border-top: 1px solid var(--bord);
+  }
+  h3 { font-size: 15px; margin: 20px 0 6px; }
+  p, li { margin: 0 0 11px; }
+  ul { padding-left: 20px; margin: 0 0 14px; }
+  strong { font-weight: 700; }
+  .encadre {
+    background: var(--ambre-clair); border-left: 3px solid #E0B44A;
+    padding: 14px 16px; border-radius: 0 8px 8px 0; margin: 18px 0;
+    font-size: 14px; color: var(--ambre);
+  }
+  .cle {
+    background: var(--surface); border: 1px solid var(--bord);
+    border-radius: 10px; padding: 15px 17px; margin: 18px 0;
+  }
+  .cle strong { display: block; margin-bottom: 5px; color: var(--p); }
+  a { color: var(--p); }
+  .retour { display: inline-block; margin-top: 34px; font-size: 14px; }
 </style>
 </head>
 <body>
-<div class="navbar"><a href="./">✨ Gleam</a><a class="back" href="./">← Retour à l'app</a></div>
-<div class="wrap">
-  <h1>Conditions Générales d'Utilisation et de Vente</h1>
-  <p class="updated">Dernière mise à jour : version de test — informations à finaliser</p>
-  <div class="todo">⚠️ Version de test pendant la phase de développement de Gleam. Une relecture par un professionnel du droit est recommandée avant ouverture publique complète.</div>
+<div class="page">
 
-  <h2>Article 1 — Objet</h2>
-  <p>Les présentes Conditions Générales d'Utilisation et de Vente (« CGU/CGV ») définissent les modalités dans lesquelles <span class="placeholder">[NOM DE LA SOCIÉTÉ]</span>, <span class="placeholder">[FORME JURIDIQUE]</span> au capital de <span class="placeholder">[MONTANT]</span> €, immatriculée sous le numéro SIRET <span class="placeholder">[SIRET]</span>, dont le siège social est situé <span class="placeholder">[ADRESSE]</span> (« Gleam ») met à disposition sa plateforme de mise en relation entre des Clients recherchant des prestations de nettoyage à domicile et des Prestataires indépendants proposant ces services.</p>
+<h1>Conditions Générales d'Utilisation</h1>
+<p class="maj">Version du 25 août 2026 — applicable à compter de sa mise en ligne.</p>
 
-  <h2>Article 2 — Statut de Gleam</h2>
-  <p>Gleam est un intermédiaire technique de mise en relation. Gleam n'est pas partie au contrat de prestation conclu entre le Client et le Prestataire, n'est pas l'employeur des Prestataires (qui exercent leur activité de manière indépendante), et n'exécute pas elle-même les prestations. Gleam facilite la mise en relation, la prise de rendez-vous, la communication et le paiement sécurisé.</p>
+<h2>1. Qui nous sommes</h2>
 
-  <h2>Article 3 — Inscription et comptes utilisateurs</h2>
-  <p><strong>Compte Client :</strong> gratuit, nécessite email, prénom, nom, téléphone et mot de passe.</p>
-  <p><strong>Compte Prestataire :</strong> nécessite en plus une déclaration sur l'honneur du statut légal permettant l'exercice de l'activité, et une attestation d'assurance responsabilité civile professionnelle (RC Pro) en cours de validité. Gleam se réserve le droit de suspendre tout compte Prestataire ne fournissant pas les justificatifs demandés.</p>
+<p>
+  Gleam est une plateforme numérique qui met en relation des particuliers ou
+  des entreprises souhaitant faire nettoyer un bien — véhicule, canapé,
+  matelas, tapis, vitres — avec des professionnels indépendants du nettoyage.
+</p>
+<p>
+  L'éditeur du service est identifié dans les
+  <a href="mentions-legales.html">mentions légales</a>.
+</p>
 
-  <h2>Article 4 — Fonctionnement de la mise en relation</h2>
-  <p>Le Client publie une demande de prestation (nature du service, adresse, créneau, photos éventuelles). Les Prestataires disponibles peuvent répondre par une proposition tarifaire. Le Client choisit librement le Prestataire avec lequel il souhaite contracter.</p>
+<h2>2. Ce que Gleam fait, et ce que Gleam ne fait pas</h2>
 
-  <h2>Article 5 — Tarifs et commission</h2>
-  <p>Les tarifs affichés au Client incluent la rémunération du Prestataire et la commission de Gleam, fixée à 15% du montant de la prestation à la date des présentes, pouvant évoluer sur simple information préalable. Le Prestataire perçoit 85% du montant TTC facturé.</p>
+<div class="cle">
+  <strong>Gleam n'exécute aucune prestation de nettoyage.</strong>
+  Le contrat de prestation est conclu directement entre le client et le
+  prestataire. Gleam n'y est pas partie.
+</div>
 
-  <h2>Article 6 — Paiement</h2>
-  <p>Le paiement s'effectue en ligne par carte bancaire via un prestataire de paiement sécurisé tiers (Stripe). Le montant est prélevé à l'acceptation du devis, puis conservé par Gleam jusqu'à confirmation de la bonne exécution de la prestation, avant reversement au Prestataire.</p>
+<h3>2.1 Le rôle de Gleam</h3>
 
-  <h2>Article 7 — Annulation</h2>
-  <p>Le Client peut annuler une demande sans frais tant qu'aucun devis n'est accepté. Une fois un devis accepté et la prestation payée, les conditions d'annulation suivantes s'appliquent :</p>
-  <ul>
-    <li><strong>Plus de 24 heures avant le créneau prévu :</strong> annulation gratuite, remboursement intégral</li>
-    <li><strong>Entre 2 et 24 heures avant le créneau prévu :</strong> remboursement de 70% du montant payé ; les 30% restants sont répartis entre le Prestataire (à titre de compensation pour le créneau réservé) et Gleam, dans les mêmes proportions que la commission habituelle</li>
-    <li><strong>Moins de 2 heures avant le créneau prévu :</strong> aucun remboursement, le montant est intégralement versé comme si la prestation avait eu lieu</li>
-  </ul>
-  <p>Si l'annulation est à l'initiative du Prestataire, le Client est intégralement remboursé dans tous les cas, quel que soit le délai. Des annulations répétées de la part d'un Prestataire après acceptation d'un devis peuvent entraîner une suspension temporaire de son compte.</p>
+<p>Gleam fournit un service technique et un service de confiance. À ce titre, Gleam :</p>
+<ul>
+  <li>met en relation clients et prestataires ;</li>
+  <li>héberge les demandes, les devis et les échanges ;</li>
+  <li>vérifie que les prestataires ont déposé les justificatifs exigés
+      (identité, immatriculation, assurance de responsabilité civile
+      professionnelle) et refuse l'accès aux demandes tant qu'ils ne sont pas
+      validés ;</li>
+  <li>encaisse le prix pour le compte du prestataire, par l'intermédiaire d'un
+      prestataire de services de paiement agréé, et le lui reverse après
+      exécution ;</li>
+  <li>perçoit une commission sur chaque prestation réalisée ;</li>
+  <li>intervient en cas de litige, dans les conditions de l'article 9.</li>
+</ul>
 
-  <h2>Article 8 — Évaluations</h2>
-  <p>À l'issue de chaque prestation, le Client et le Prestataire peuvent chacun évaluer l'autre partie. Les évaluations doivent refléter une expérience réelle et ne pas comporter de propos injurieux ou diffamatoires.</p>
+<h3>2.2 Ce qui relève du prestataire seul</h3>
 
-  <h2>Article 9 — Responsabilité</h2>
-  <p>Gleam ne saurait être tenue responsable de la qualité d'exécution des prestations réalisées par les Prestataires (seuls responsables de leur travail), ni des dommages éventuels relevant de la responsabilité civile professionnelle du Prestataire.</p>
+<p>Le prestataire agit en toute indépendance. Il détermine seul :</p>
+<ul>
+  <li>ses tarifs, ses zones et ses horaires d'intervention ;</li>
+  <li>les demandes auxquelles il répond ou non ;</li>
+  <li>les moyens, produits et méthodes qu'il emploie ;</li>
+  <li>l'organisation de son travail.</li>
+</ul>
+<p>
+  Aucun lien de subordination n'existe entre Gleam et le prestataire. Gleam ne
+  lui donne aucune instruction sur l'exécution de la prestation et n'exerce
+  aucun pouvoir de direction ou de sanction disciplinaire.
+</p>
 
-  <h2>Article 10 — Protection des données personnelles</h2>
-  <p>Voir notre <a href="confidentialite.html" style="color:var(--p)">Politique de Confidentialité</a>, conforme au RGPD.</p>
+<div class="encadre">
+  <strong>Ce que cela implique concrètement.</strong>
+  En cas de malfaçon, de dommage causé lors de l'intervention, de retard ou
+  d'inexécution, la responsabilité incombe au prestataire. C'est son assurance
+  de responsabilité civile professionnelle qui est mobilisée, et non celle de
+  Gleam.
+</div>
 
-  <h2>Article 11 — Réclamations et médiation</h2>
-  <p>Toute réclamation peut être adressée via la rubrique « Contacter le support » directement accessible dans l'application, ou par email à contact@gleam-app.fr. En cas de litige non résolu à l'amiable, le Client consommateur peut recourir gratuitement à un médiateur de la consommation (article L.616-1 du Code de la consommation).</p>
+<h2>3. Inscription et comptes</h2>
 
-  <h2>Article 12 — Droit applicable</h2>
-  <p>Les présentes CGU/CGV sont soumises au droit français. Tout litige relève de la compétence des tribunaux français, sous réserve des règles impératives applicables aux consommateurs.</p>
+<h3>3.1 Conditions</h3>
+<p>
+  L'inscription est réservée aux personnes majeures et capables. Les
+  informations fournies doivent être exactes et tenues à jour.
+</p>
 
-  <h2>Article 13 — Modification des CGU/CGV</h2>
-  <p>Gleam peut modifier les présentes CGU/CGV à tout moment. Les utilisateurs seront informés de toute modification substantielle par email ou notification sur la plateforme.</p>
+<h3>3.2 Prestataires</h3>
+<p>
+  Le prestataire déclare exercer une activité indépendante régulièrement
+  déclarée. Il fournit et maintient à jour :
+</p>
+<ul>
+  <li>une pièce d'identité en cours de validité (recto et verso) ;</li>
+  <li>un justificatif d'immatriculation de moins de six mois ;</li>
+  <li>une attestation d'assurance de responsabilité civile professionnelle en
+      cours de validité.</li>
+</ul>
+<p>
+  <strong>Tant que ces documents ne sont pas validés, le prestataire n'accède
+  pas aux demandes et ne peut envoyer aucun devis.</strong>
+</p>
+<p>
+  Au-delà de 5 000 € HT cumulés sur une année civile, une attestation de
+  vigilance URSSAF de moins de six mois est également exigée, en application
+  de l'article L.8222-1 du Code du travail.
+</p>
+
+<h3>3.3 Suspension</h3>
+<p>
+  Gleam peut suspendre ou fermer un compte en cas de manquement aux présentes
+  conditions, de document expiré ou faux, de comportement portant atteinte à
+  la sécurité des personnes, ou de tentative de contournement du service.
+</p>
+
+<h2>4. Déroulement d'une prestation</h2>
+
+<ol>
+  <li>Le client publie une demande décrivant le bien à nettoyer, l'adresse et
+      le créneau souhaité.</li>
+  <li>Les prestataires dont la zone couvre l'adresse peuvent proposer un
+      devis.</li>
+  <li>Le client retient un devis. Il dispose alors de trente minutes pour
+      régler, faute de quoi le devis redevient disponible.</li>
+  <li>Le paiement conclut le contrat entre le client et le prestataire.</li>
+  <li>Le prestataire déclare son arrivée sur place.</li>
+  <li>Le client remet un code de validation à l'issue de la prestation. Sans
+      remise du code, la prestation est validée automatiquement dans un délai
+      de quarante-huit heures.</li>
+</ol>
+
+<h2>5. Prix, paiement et commission</h2>
+
+<h3>5.1 Prix</h3>
+<p>
+  Le prix est fixé librement par le prestataire dans son devis. Il est exprimé
+  toutes taxes comprises et n'est pas modifiable après acceptation.
+</p>
+
+<h3>5.2 Encaissement</h3>
+<p>
+  Le paiement est effectué par carte bancaire, par l'intermédiaire de Stripe,
+  prestataire de services de paiement agréé. Les données de carte ne
+  transitent jamais par les serveurs de Gleam.
+</p>
+<p>
+  <strong>Les fonds sont conservés jusqu'à la validation de la
+  prestation</strong>, puis reversés au prestataire déduction faite de la
+  commission.
+</p>
+
+<h3>5.3 Commission</h3>
+<p>
+  Gleam perçoit une commission de 15 % du prix TTC, prélevée sur la somme
+  reversée au prestataire. Elle rémunère la mise en relation, le service de
+  paiement, la vérification des justificatifs et le traitement des litiges.
+</p>
+
+<h3>5.4 Facturation</h3>
+<p>
+  Le prestataire émet la facture de la prestation au client. Gleam émet au
+  prestataire une facture de commission. Les deux documents sont accessibles
+  depuis l'application.
+</p>
+
+<h2>6. Annulation</h2>
+
+<h3>6.1 Par le client</h3>
+<ul>
+  <li>plus de 24 heures avant le créneau : remboursement intégral ;</li>
+  <li>entre 2 et 24 heures avant : remboursement de 70 % ;</li>
+  <li>moins de 2 heures avant : aucun remboursement.</li>
+</ul>
+<p>
+  Ces retenues indemnisent le prestataire, qui a réservé le créneau et
+  organisé son déplacement.
+</p>
+
+<h3>6.2 Absence du prestataire</h3>
+<p>
+  Si le prestataire ne s'est pas présenté et n'a pas déclaré son arrivée dans
+  l'heure suivant le créneau, l'annulation est sans frais et le remboursement
+  intégral.
+</p>
+
+<h3>6.3 Par le prestataire</h3>
+<p>
+  Le prestataire qui annule une prestation payée entraîne le remboursement
+  intégral du client. Les annulations répétées peuvent conduire à une
+  suspension.
+</p>
+
+<h2>7. Droit de rétractation</h2>
+
+<p>
+  Le client consommateur dispose d'un délai de quatorze jours pour se
+  rétracter, conformément à l'article L.221-18 du Code de la consommation.
+</p>
+<p>
+  <strong>Toutefois</strong>, lorsque la prestation est fixée à une date
+  déterminée, le droit de rétractation ne s'applique pas — article L.221-28,
+  12° du même code. Les conditions d'annulation de l'article 6 s'appliquent
+  alors.
+</p>
+
+<h2>8. Obligations des utilisateurs</h2>
+
+<h3>8.1 Contournement de la plateforme</h3>
+<p>
+  Il est interdit d'échanger des coordonnées personnelles avant paiement, ou
+  de conclure hors de la plateforme une prestation initiée sur Gleam.
+</p>
+<p>
+  Cette règle protège les deux parties : hors plateforme, il n'y a ni
+  paiement sécurisé, ni vérification des assurances, ni recours en cas de
+  litige.
+</p>
+
+<h3>8.2 Comportement</h3>
+<p>
+  Les utilisateurs s'engagent à un comportement respectueux. Tout propos
+  injurieux, discriminatoire ou menaçant entraîne la fermeture du compte.
+</p>
+
+<h2>9. Litiges entre client et prestataire</h2>
+
+<div class="cle">
+  <strong>Gleam n'est pas juge du contrat.</strong>
+  Gleam décide uniquement de la destination des fonds qu'il détient — au
+  prestataire, ou remboursés au client. Cette décision ne préjuge pas des
+  droits de chacun devant les tribunaux.
+</div>
+
+<h3>9.1 Contestation d'une prestation</h3>
+<p>
+  Un client qui estime que le prestataire ne s'est pas présenté peut le
+  signaler depuis l'application. Le prestataire en est informé et dispose de
+  deux heures pour répondre.
+</p>
+<p>
+  Pendant l'examen, les fonds sont gelés : ils ne sont versés à personne.
+</p>
+
+<h3>9.2 Décision</h3>
+<p>
+  Gleam examine les éléments disponibles — position enregistrée à l'arrivée,
+  photographies, remise du code de validation, échanges — et décide du
+  versement ou du remboursement. La décision et son motif sont conservés.
+</p>
+
+<h3>9.3 Recours</h3>
+<p>
+  Cette décision est sans préjudice de toute action que le client ou le
+  prestataire pourrait engager l'un contre l'autre.
+</p>
+
+<h2>10. Responsabilité</h2>
+
+<h3>10.1 Ce dont Gleam répond</h3>
+<ul>
+  <li>la disponibilité et le bon fonctionnement de la plateforme, dans la
+      limite d'une obligation de moyens ;</li>
+  <li>la sécurité des paiements, assurée par son prestataire agréé ;</li>
+  <li>la vérification que les justificatifs exigés ont été déposés et
+      contrôlés.</li>
+</ul>
+
+<h3>10.2 Ce dont Gleam ne répond pas</h3>
+<ul>
+  <li>la qualité, la conformité ou les délais de la prestation ;</li>
+  <li>les dommages causés par le prestataire lors de son intervention ;</li>
+  <li>l'exactitude des informations fournies par les utilisateurs ;</li>
+  <li>les conséquences d'une prestation conclue hors de la plateforme.</li>
+</ul>
+
+<div class="encadre">
+  <strong>La vérification des documents n'est pas une garantie.</strong>
+  Gleam contrôle que les justificatifs exigés existent et sont en cours de
+  validité. Ce contrôle documentaire ne constitue ni une garantie de
+  compétence, ni un engagement sur la qualité du travail fourni.
+</div>
+
+<h2>11. Données personnelles</h2>
+
+<p>
+  Le traitement des données est décrit dans la
+  <a href="confidentialite.html">politique de confidentialité</a>.
+</p>
+
+<h2>12. Modification des conditions</h2>
+
+<p>
+  Gleam peut modifier les présentes conditions. Les utilisateurs sont informés
+  au moins quinze jours avant l'entrée en vigueur. La poursuite de
+  l'utilisation vaut acceptation.
+</p>
+<p>
+  Les prestations en cours restent régies par les conditions applicables au
+  jour de leur paiement.
+</p>
+
+<h2>13. Droit applicable et litiges</h2>
+
+<p>Les présentes conditions sont soumises au droit français.</p>
+<p>
+  En cas de désaccord, le client est invité à nous contacter directement : la
+  plupart des situations se règlent ainsi.
+</p>
+<p>
+  Il peut également utiliser la plateforme européenne de règlement en ligne
+  des litiges :
+  <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener">
+  ec.europa.eu/consumers/odr</a>.
+</p>
+
+<p class="retour"><a href="javascript:history.back()">← Retour</a></p>
+
 </div>
 </body>
 </html>
