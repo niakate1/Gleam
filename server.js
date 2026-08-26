@@ -3138,6 +3138,102 @@ async function traiterEcheancesPaiement() {
 // dort, il n'a pas vu la notification — serait puni pour un silence. Ses
 // preuves parlent pour lui.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LES PRESTATIONS QUE PERSONNE N'A DÉCLARÉES
+//
+// La clôture automatique n'examine que les prestations dont l'arrivée A ÉTÉ
+// déclarée — `.not('prestation_demarree_le', 'is', null)`.
+//
+// Une prestation payée dont le prestataire ne déclare jamais rien n'était donc
+// JAMAIS examinée. Elle restait « En cours » indéfiniment, et l'argent avec :
+// ni versé, ni remboursé.
+//
+// C'est le même cul-de-sac que les contestations sans réponse, mais du côté du
+// silence du prestataire.
+//
+// POURQUOI 24 HEURES APRÈS LE CRÉNEAU
+//
+// Le rappel part quinze minutes après. Une journée entière laisse largement le
+// temps de se rattraper — en déclarant, ou en validant avec le code du client,
+// qui rattrape l'oubli.
+//
+// Passé ce délai sans aucun signe, la prestation n'a pas eu lieu.
+//
+// LE CLIENT EST REMBOURSÉ, SANS AVOIR RIEN À FAIRE
+//
+// C'est le point important. Aujourd'hui il devait contester lui-même — et s'il
+// ne le faisait pas, son argent restait bloqué sans que personne ne s'en
+// aperçoive.
+// ═══════════════════════════════════════════════════════════════════════════
+async function cloturerPrestationsSansArrivee() {
+  try {
+    const { data: candidates } = await supabase.from('demandes')
+      .select('id, client_id, prestation, creneau, contestation_le')
+      .eq('statut', 'en_cours')
+      .is('prestation_demarree_le', null)
+      .is('contestation_le', null)
+      .limit(30);
+
+    if (!candidates || !candidates.length) return 0;
+
+    let traitees = 0;
+    for (const d of candidates) {
+      const instant = instantDuCreneau(d.creneau);
+      if (!instant) continue;
+
+      // Vingt-quatre heures après le créneau, et pas avant.
+      if (Date.now() - instant < 24 * 3600 * 1000) continue;
+
+      const { data: paiement } = await supabase.from('paiements')
+        .select('*').eq('demande_id', d.id).maybeSingle();
+      if (!paiement || paiement.statut !== 'paye') continue;
+
+      // Le code saisi prouve la présence même sans déclaration : dans ce cas,
+      // ce n'est pas une absence, et la clôture normale s'en chargera.
+      if (preuvesDePresence(d).length) continue;
+
+      const resultat = await rembourserPaiementSiPaye(d.id, 999);
+      if (!resultat || !resultat.rembourse) continue;
+
+      await supabase.from('demandes')
+        .update({ statut: 'annulee_client' }).eq('id', d.id);
+
+      // L'absence est constatée : elle pèsera sur la fiabilité du prestataire.
+      if (paiement.societe_id) {
+        try {
+          const { data: pro } = await supabase.from('users')
+            .select('absences_constatees').eq('id', paiement.societe_id).maybeSingle();
+          await supabase.from('users')
+            .update({ absences_constatees: ((pro && pro.absences_constatees) || 0) + 1 })
+            .eq('id', paiement.societe_id);
+        } catch (e) {
+          console.warn('Compteur d\'absences :', e.message);
+        }
+
+        envoyerNotificationPush(paiement.societe_id, {
+          titre: 'Prestation remboursée au client',
+          corps: 'Vous n\'avez pas déclaré votre arrivée dans les 24 h suivant le '
+               + 'créneau. La prestation a été considérée comme non réalisée.',
+          url: '/#pro-devis'
+        }).catch(() => {});
+      }
+
+      envoyerNotificationPush(d.client_id, {
+        titre: 'Vous êtes remboursé',
+        corps: 'Le prestataire ne s\'est pas manifesté. Vous êtes remboursé '
+             + 'intégralement — le versement paraîtra sous quelques jours.',
+        url: '/#accueil'
+      }).catch(() => {});
+
+      traitees++;
+    }
+    return traitees;
+  } catch (e) {
+    console.error('Prestations sans arrivée :', e.message);
+    return 0;
+  }
+}
+
 async function traiterContestationsEchues() {
   try {
     const ilYaDeuxHeures = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
@@ -9209,6 +9305,9 @@ async function balayerPrestationsAValider() {
 
     const contestations = await traiterContestationsEchues();
     if (contestations) console.log('⚖️ ' + contestations + ' contestation(s) sans réponse — remboursée(s).');
+
+    const sansArrivee = await cloturerPrestationsSansArrivee();
+    if (sansArrivee) console.log('🕳 ' + sansArrivee + ' prestation(s) sans arrivée déclarée — remboursée(s).');
     const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
     CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
