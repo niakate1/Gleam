@@ -8335,7 +8335,23 @@ function renderDetail(d){
         + '</div></div>';
 
     }else if(d.statut==='en_cours'){
-      html+='<div class="locked-banner"><span>💳</span><div>Cette prestation est payée. Le prestataire déclarera son arrivée le jour venu.</div></div>';
+      // ── LE CRÉNEAU EST PASSÉ ET PERSONNE N'A RIEN DÉCLARÉ ──────────────
+      // Le client voyait « le prestataire déclarera son arrivée le jour venu »
+      // sur une prestation dont le créneau datait de la veille. Le message
+      // était devenu faux, et rien ne lui disait quoi faire.
+      var instantPasse=null;
+      var mc=/(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2})h(\d{2})/.exec(d.creneau||'');
+      if(mc) instantPasse=new Date(+mc[1], +mc[2]-1, +mc[3], +mc[4], +mc[5]).getTime();
+      var creneauDepasse = instantPasse && (Date.now() - instantPasse) > 60*60*1000;
+
+      html+= creneauDepasse
+        ? '<div class="locked-banner"><span>⏳</span><div>'
+          + '<strong>Le prestataire ne s\'est pas encore manifesté.</strong><br>'
+          + 'S\'il ne déclare rien dans les 24 h suivant le créneau, vous serez '
+          + 'remboursé intégralement — sans avoir à le demander.<br><br>'
+          + 'S\'il est venu malgré tout, remettez-lui simplement votre code de '
+          + 'validation.</div></div>'
+        : '<div class="locked-banner"><span>💳</span><div>Cette prestation est payée. Le prestataire déclarera son arrivée le jour venu.</div></div>';
 
     }else{
       html+='<div class="locked-banner"><span>🔒</span><div>Cette demande ne peut plus être modifiée.</div></div>';
