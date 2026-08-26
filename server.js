@@ -3168,7 +3168,7 @@ async function traiterEcheancesPaiement() {
 async function cloturerPrestationsSansArrivee() {
   try {
     const { data: candidates } = await supabase.from('demandes')
-      .select('id, client_id, prestation, creneau, contestation_le')
+      .select('id, client_id, prestation, creneau, contestation_le, reponse_pro_le, rappel_oubli_envoye_le, code_saisi_par_pro, photos_avant, photos_apres, distance_gps_arrivee, montant_rembourse')
       .eq('statut', 'en_cours')
       .is('prestation_demarree_le', null)
       .is('contestation_le', null)
@@ -3181,24 +3181,63 @@ async function cloturerPrestationsSansArrivee() {
       const instant = instantDuCreneau(d.creneau);
       if (!instant) continue;
 
-      // Vingt-quatre heures après le créneau, et pas avant.
-      if (Date.now() - instant < 24 * 3600 * 1000) continue;
+      const heures = (Date.now() - instant) / 3600000;
 
       const { data: paiement } = await supabase.from('paiements')
         .select('*').eq('demande_id', d.id).maybeSingle();
       if (!paiement || paiement.statut !== 'paye') continue;
 
-      // Le code saisi prouve la présence même sans déclaration : dans ce cas,
-      // ce n'est pas une absence, et la clôture normale s'en chargera.
+      // Le code saisi prouve la présence même sans déclaration : la clôture
+      // normale s'en chargera, ce n'est pas une absence.
       if (preuvesDePresence(d).length) continue;
+
+      // ── LE PRESTATAIRE EST AVERTI AVANT, PAS APRÈS ─────────────────────
+      // Ma première version remboursait à 24 h sans aucun avertissement. Un
+      // prestataire venu, ayant oublié de déclarer ET n'ayant pas obtenu le
+      // code — parce qu'il ne l'a pas demandé, ou parce que le client a
+      // refusé de le donner — perdait son paiement sans avoir pu dire un mot.
+      //
+      // Pire : le client n'avait même plus besoin de mentir. Le silence
+      // suffisait.
+      //
+      // La contestation, elle, donne deux heures de réponse. Il n'y avait
+      // aucune raison que ce chemin-ci n'en donne aucune.
+      //
+      // On ouvre donc la même fenêtre : un avertissement à six heures, le
+      // remboursement à vingt-quatre. Dix-huit heures pour se manifester.
+      if (heures >= 6 && heures < 24 && !d.reponse_pro_le) {
+        // `contestation_le` sert de marqueur : il ouvre le droit de réponse
+        // et fait apparaître le bandeau rouge côté prestataire, exactement
+        // comme une contestation du client.
+        if (!d.contestation_le) {
+          await supabase.from('demandes')
+            .update({ contestation_le: new Date().toISOString() }).eq('id', d.id);
+
+          if (paiement.societe_id) {
+            envoyerNotificationPush(paiement.societe_id, {
+              titre: 'Votre paiement va être annulé',
+              corps: 'Vous n\'avez pas déclaré votre arrivée pour la prestation du '
+                   + (d.creneau || 'créneau passé') + '. Sans réponse d\'ici ce soir, '
+                   + 'le client sera remboursé.',
+              url: '/#pro-devis'
+            }).catch(() => {});
+          }
+        }
+        continue;
+      }
+
+      if (heures < 24) continue;
+
+      // Le prestataire s'est manifesté : l'affaire devient un litige à
+      // arbitrer, elle ne se règle plus automatiquement.
+      if (d.reponse_pro_le) continue;
 
       const resultat = await rembourserPaiementSiPaye(d.id, 999);
       if (!resultat || !resultat.rembourse) continue;
 
       await supabase.from('demandes')
-        .update({ statut: 'annulee_client' }).eq('id', d.id);
+        .update({ statut: 'annulee_client', contestation_le: null }).eq('id', d.id);
 
-      // L'absence est constatée : elle pèsera sur la fiabilité du prestataire.
       if (paiement.societe_id) {
         try {
           const { data: pro } = await supabase.from('users')
@@ -3212,8 +3251,8 @@ async function cloturerPrestationsSansArrivee() {
 
         envoyerNotificationPush(paiement.societe_id, {
           titre: 'Prestation remboursée au client',
-          corps: 'Vous n\'avez pas déclaré votre arrivée dans les 24 h suivant le '
-               + 'créneau. La prestation a été considérée comme non réalisée.',
+          corps: 'Vous n\'avez ni déclaré votre arrivée, ni répondu à notre '
+               + 'avertissement. La prestation a été considérée comme non réalisée.',
           url: '/#pro-devis'
         }).catch(() => {});
       }
