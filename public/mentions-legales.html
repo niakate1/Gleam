@@ -2,71 +2,251 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mentions légales — Gleam</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  LES CHAMPS À COMPLÉTER SONT MARQUÉS [À COMPLÉTER]
+
+  Ils ne peuvent pas être devinés : ce sont vos données d'entreprise. Les
+  laisser vides serait une infraction — l'article 6-III de la LCEN impose ces
+  mentions, et leur absence est punie d'un an d'emprisonnement et 75 000 €
+  d'amende pour une personne physique.
+
+  DEUX POINTS DEMANDENT UNE DÉMARCHE DE VOTRE PART
+
+  1. LE MÉDIATEUR DE LA CONSOMMATION
+     Obligatoire dès lors que vous avez des clients consommateurs (article
+     L.612-1 du Code de la consommation). Il faut adhérer à un médiateur agréé
+     — comptez 300 à 800 € par an selon l'organisme.
+
+  2. L'HÉBERGEUR
+     Ses coordonnées complètes doivent figurer. Railway et Netlify sont
+     américains : leurs adresses exactes sont dans leurs mentions légales.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#7C3AED;--p2:#5B21B6;--gray:#6B7280;--border:#E5E7EB;--light:#F5F3FF;--gold:#F5B942;--mint:#0D9488;--bg:#F9FAFB;--surface:#FFFFFF;--text:#111827;--text-secondary:#374151}
-@media (prefers-color-scheme: dark){
-  :root{--p:#A78BFA;--p2:#C4B5FD;--gray:#9CA3AF;--border:#333846;--light:#2D2440;--gold:#FBC85C;--mint:#2DD4BF;--bg:#0F1115;--surface:#1A1D23;--text:#F3F4F6;--text-secondary:#D1D5DB}
-}
-body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
-.navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0}
-.navbar a{font-size:22px;font-weight:800;color:var(--p);text-decoration:none}
-.back{font-size:14px;color:var(--gray);text-decoration:none;font-weight:600}
-.wrap{max-width:720px;margin:0 auto;padding:32px 20px 60px}
-h1{font-size:26px;font-weight:800;margin-bottom:6px}
-.updated{color:var(--gray);font-size:13px;margin-bottom:28px}
-h2{font-size:18px;font-weight:700;margin:28px 0 10px;color:var(--p)}
-p,li{font-size:15px;color:var(--text-secondary);margin-bottom:10px}
-ul{padding-left:22px;margin-bottom:14px}
-.todo{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:24px}
-.placeholder{background:#FEF3C7;padding:1px 6px;border-radius:4px;font-family:monospace;font-size:13px;color:#92400E}
+  :root {
+    --p: #0F5C56; --fond: #FBFBFA; --surface: #FFFFFF;
+    --bord: #E5E7EB; --texte: #1A1A1A; --gris: #6B7280;
+    --ambre-clair: #FFF8E9; --ambre: #8A6A16;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 18px 80px; background: var(--fond); color: var(--texte);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.65;
+  }
+  .page { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .maj { color: var(--gris); font-size: 13px; margin: 0 0 28px; }
+  h2 {
+    font-size: 17px; margin: 32px 0 10px; padding-top: 20px;
+    border-top: 1px solid var(--bord);
+  }
+  p, li { margin: 0 0 11px; }
+  ul { padding-left: 20px; }
+  .fiche {
+    background: var(--surface); border: 1px solid var(--bord);
+    border-radius: 10px; padding: 16px 18px; margin: 14px 0;
+  }
+  .fiche dt { font-size: 12.5px; color: var(--gris); margin-top: 10px; }
+  .fiche dt:first-child { margin-top: 0; }
+  .fiche dd { margin: 2px 0 0; font-weight: 600; }
+  .acompleter {
+    background: var(--ambre-clair); color: var(--ambre);
+    padding: 1px 7px; border-radius: 4px; font-weight: 700; font-size: 13px;
+  }
+  .encadre {
+    background: var(--ambre-clair); border-left: 3px solid #E0B44A;
+    padding: 13px 15px; border-radius: 0 8px 8px 0; margin: 16px 0;
+    font-size: 14px; color: var(--ambre);
+  }
+  a { color: var(--p); }
+  .retour { display: inline-block; margin-top: 32px; font-size: 14px; }
 </style>
 </head>
 <body>
-<div class="navbar"><a href="./">✨ Gleam</a><a class="back" href="./">← Retour à l'app</a></div>
-<div class="wrap">
-  <h1>Mentions légales</h1>
-  <p class="updated">Dernière mise à jour : version de test — informations à finaliser</p>
-  <div class="todo">⚠️ Les champs marqués <span class="placeholder">[À COMPLÉTER]</span> sont les seuls éléments encore en attente — ils concernent uniquement les informations officielles de la société (SIRET, statut juridique, adresse), reçues après l'immatriculation.</div>
+<div class="page">
 
-  <h2>1. Éditeur du site</h2>
-  <p>Le site et l'application Gleam (accessible notamment à l'adresse gleam-app.fr) sont édités par :</p>
-  <ul>
-    <li><strong>Nom / Raison sociale :</strong> <span class="placeholder">[À COMPLÉTER]</span></li>
-    <li><strong>Statut juridique :</strong> <span class="placeholder">[À COMPLÉTER]</span></li>
-    <li><strong>Numéro SIRET / SIREN :</strong> <span class="placeholder">[À COMPLÉTER]</span></li>
-    <li><strong>Adresse du siège social :</strong> <span class="placeholder">[À COMPLÉTER]</span></li>
-    <li><strong>Directeur de la publication :</strong> <span class="placeholder">[À COMPLÉTER]</span></li>
-    <li><strong>Contact :</strong> via la rubrique « Contacter le support » de l'application, ou contact@gleam-app.fr</li>
-  </ul>
+<h1>Mentions légales</h1>
+<p class="maj">Version du 25 août 2026.</p>
 
-  <h2>2. Hébergement</h2>
-  <p><strong>Hébergement du site (frontend) :</strong> GitHub, Inc. (GitHub Pages) — 88 Colin P Kelly Jr St, San Francisco, CA 94107, États-Unis</p>
-  <p><strong>Hébergement de l'API (backend) :</strong> Railway Corporation</p>
-  <p><strong>Hébergement de la base de données :</strong> Supabase Inc.</p>
+<h2>Éditeur du site</h2>
 
-  <h2>3. Nom de domaine</h2>
-  <p>Le nom de domaine gleam-app.fr est enregistré auprès d'OVH SAS — 2 rue Kellermann, 59100 Roubaix, France.</p>
+<dl class="fiche">
+  <dt>Dénomination sociale</dt>
+  <dd><span class="acompleter">[À COMPLÉTER]</span></dd>
 
-  <h2>4. Propriété intellectuelle</h2>
-  <p>L'ensemble des éléments composant le site et l'application Gleam (textes, graphismes, logo, icônes, structure, base de données, code source) est la propriété exclusive de la société éditrice mentionnée à l'article 1, sauf mention contraire. Toute reproduction non autorisée est interdite.</p>
+  <dt>Forme juridique</dt>
+  <dd><span class="acompleter">[À COMPLÉTER — SAS, SASU, EI…]</span></dd>
 
-  <h2>5. Responsabilité</h2>
-  <p>Gleam s'efforce d'assurer au mieux de ses possibilités l'exactitude et la mise à jour des informations diffusées sur le site. Gleam décline toute responsabilité en cas d'indisponibilité temporaire du service liée à des opérations de maintenance ou des pannes techniques.</p>
+  <dt>Capital social</dt>
+  <dd><span class="acompleter">[À COMPLÉTER]</span></dd>
 
-  <h2>6. Statut de la plateforme</h2>
-  <p>Gleam agit en tant qu'intermédiaire technique de mise en relation entre des clients particuliers et des prestataires de services indépendants. Gleam n'est pas l'employeur des prestataires référencés sur la plateforme. Voir nos <a href="cgu.html" style="color:var(--p)">Conditions Générales d'Utilisation et de Vente</a> pour le détail.</p>
+  <dt>Siège social</dt>
+  <dd><span class="acompleter">[À COMPLÉTER — adresse complète]</span></dd>
 
-  <h2>7. Droit applicable</h2>
-  <p>Les présentes mentions légales sont soumises au droit français. En cas de litige et à défaut de résolution amiable, les tribunaux français seront seuls compétents.</p>
+  <dt>Immatriculation</dt>
+  <dd>RCS <span class="acompleter">[VILLE]</span> —
+      SIREN <span class="acompleter">[À COMPLÉTER]</span></dd>
 
-  <h2>8. Contact</h2>
-  <p>Pour toute question relative aux présentes mentions légales : via la rubrique « Contacter le support » de l'application, ou contact@gleam-app.fr</p>
+  <dt>Numéro de TVA intracommunautaire</dt>
+  <dd><span class="acompleter">[À COMPLÉTER]</span></dd>
+
+  <dt>Directeur de la publication</dt>
+  <dd><span class="acompleter">[À COMPLÉTER — nom du représentant légal]</span></dd>
+
+  <dt>Contact</dt>
+  <dd><span class="acompleter">[À COMPLÉTER — adresse e-mail et téléphone]</span></dd>
+</dl>
+
+<div class="encadre">
+  <strong>Ces mentions sont obligatoires.</strong>
+  L'article 6-III de la loi du 21 juin 2004 pour la confiance dans l'économie
+  numérique impose leur publication. Leur absence est sanctionnée pénalement.
+</div>
+
+<h2>Hébergement</h2>
+
+<p>L'application est hébergée par :</p>
+
+<dl class="fiche">
+  <dt>Interface et contenus statiques</dt>
+  <dd>Netlify, Inc.<br>
+      <span class="acompleter">[adresse à relever sur netlify.com/legal]</span></dd>
+
+  <dt>Serveur applicatif</dt>
+  <dd>Railway Corporation<br>
+      <span class="acompleter">[adresse à relever sur railway.com/legal/terms]</span></dd>
+
+  <dt>Base de données</dt>
+  <dd>Supabase Pte. Ltd.<br>
+      65 Chulia Street, #38-02/03, OCBC Centre, Singapour 049513<br>
+      <span style="font-weight:400;color:var(--gris);font-size:13px">
+      Données hébergées dans l'Union européenne (région eu-west).</span></dd>
+</dl>
+
+<div class="encadre">
+  <strong>L'adresse et le téléphone de l'hébergeur sont obligatoires.</strong>
+  L'article 6-III de la LCEN les vise expressément, au même titre que sa
+  dénomination. Leur absence — comme leur inexactitude — est punie d'un an
+  d'emprisonnement et 75 000 € d'amende, portés à 375 000 € pour une société.
+  <br><br>
+  <strong>Où les trouver, en deux minutes chacune :</strong>
+  <br>
+  • Netlify — <a href="https://www.netlify.com/legal/" target="_blank"
+    rel="noopener">netlify.com/legal</a>, ou l'onglet « Legal » de votre
+    tableau de bord.
+  <br>
+  • Railway — <a href="https://railway.com/legal/terms" target="_blank"
+    rel="noopener">railway.com/legal/terms</a>.
+  <br><br>
+  Je n'ai pas rempli ces champs de mémoire : j'ai trouvé quatre adresses
+  différentes pour Netlify sur des sites qui se recopient, sans qu'aucune ne
+  vienne d'une source officielle. Une adresse fausse vous exposerait autant
+  qu'une adresse absente.
+</div>
+
+<h2>Prestataire de services de paiement</h2>
+
+<p>
+  Les paiements sont traités par <strong>Stripe Payments Europe, Limited</strong>,
+  établissement de monnaie électronique agréé, immatriculé en Irlande.
+</p>
+<p>
+  Gleam n'a accès à aucune donnée de carte bancaire : celles-ci sont saisies et
+  conservées par Stripe seul.
+</p>
+
+<h2>Activité</h2>
+
+<p>
+  Gleam édite une plateforme de mise en relation entre des clients et des
+  professionnels indépendants du nettoyage.
+</p>
+<p>
+  <strong>Gleam n'exécute aucune prestation de nettoyage</strong> et n'emploie
+  aucun des prestataires référencés. Le détail de son rôle et de ses
+  responsabilités figure dans les
+  <a href="cgu.html">conditions générales d'utilisation</a>.
+</p>
+
+<h2>Propriété intellectuelle</h2>
+
+<p>
+  La marque Gleam, le nom de domaine, la charte graphique, les textes et le
+  code source sont protégés. Toute reproduction sans autorisation écrite est
+  interdite.
+</p>
+<p>
+  Les photographies déposées par les utilisateurs restent leur propriété. En
+  les déposant, ils autorisent Gleam à les afficher aux seules parties
+  concernées par la prestation.
+</p>
+
+<h2>Données personnelles</h2>
+
+<p>
+  Les traitements sont décrits dans la
+  <a href="confidentialite.html">politique de confidentialité</a>.
+</p>
+<p>
+  Vous disposez d'un droit d'accès, de rectification, d'effacement, de
+  limitation, d'opposition et de portabilité. Pour l'exercer :
+  <span class="acompleter">[À COMPLÉTER — adresse e-mail dédiée]</span>.
+</p>
+<p>
+  En cas de désaccord, vous pouvez saisir la Commission nationale de
+  l'informatique et des libertés —
+  <a href="https://www.cnil.fr" target="_blank" rel="noopener">cnil.fr</a>.
+</p>
+
+<h2>Règlement des litiges</h2>
+
+<p>
+  En cas de désaccord, contactez-nous d'abord directement : la plupart des
+  situations se règlent ainsi. Nos coordonnées figurent en haut de cette page.
+</p>
+<p>
+  Le consommateur peut également recourir à la plateforme européenne de
+  règlement en ligne des litiges :
+  <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener">
+  ec.europa.eu/consumers/odr</a>.
+</p>
+
+<div class="encadre">
+  <strong>Une désignation de médiateur reste à faire.</strong>
+  L'article L.612-1 du Code de la consommation impose à tout professionnel de
+  permettre à ses clients consommateurs de recourir gratuitement à un
+  médiateur. Cette obligation naît dès le premier client, et son absence est
+  passible d'une amende administrative pouvant atteindre 15 000 €.
+</div>
+
+<h2>Signalement de contenu illicite</h2>
+
+<p>
+  Conformément à l'article 6-I-5 de la loi pour la confiance dans l'économie
+  numérique, tout contenu manifestement illicite peut être signalé à
+  <span class="acompleter">[À COMPLÉTER — adresse e-mail]</span>.
+</p>
+<p>
+  Le signalement doit préciser la date, la description des faits, leur
+  localisation précise et les motifs pour lesquels le contenu devrait être
+  retiré.
+</p>
+
+<h2>Droit applicable</h2>
+
+<p>
+  Les présentes mentions sont soumises au droit français. À défaut de
+  résolution amiable, les tribunaux français sont compétents.
+</p>
+
+<p class="retour"><a href="javascript:history.back()">← Retour</a></p>
+
 </div>
 </body>
 </html>
