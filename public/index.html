@@ -8649,6 +8649,38 @@ function selectNote(n){
 // Le message est facultatif : exiger une justification écarterait celui qu'on
 // cherche à protéger — le prestataire qui découvre la contestation en rentrant
 // et veut simplement dire « j'y étais ».
+// ── RÉCLAMER APRÈS UN REMBOURSEMENT ────────────────────────────────────────
+// Ici le message est OBLIGATOIRE, contrairement à la réponse à une
+// contestation. La différence tient au moment : l'argent est déjà parti, et
+// le reprendre au client suppose des éléments concrets — ce qui a été fait,
+// quand, comment.
+//
+// Un simple « j'y étais » ne suffirait pas à justifier de rouvrir un dossier
+// clos.
+async function reclamerRemboursement(demandeId){
+  var message = prompt(
+    'CETTE PRESTATION A ÉTÉ REMBOURSÉE AU CLIENT\n\n'
+    + 'Décrivez ce que vous avez fait — heure d\'arrivée, travail réalisé, '
+    + 'personne rencontrée.\n\n'
+    + 'Gleam réexaminera la situation avec le client.');
+  if(message === null) return;
+  if(!message.trim()){
+    toast('Décrivez ce que vous avez fait : c\'est sur cette base que Gleam tranchera.');
+    return;
+  }
+
+  try{
+    const r = await fetch(API+'/api/demandes/'+demandeId+'/reclamer-remboursement',{
+      method:'POST', headers:authHeaders(), body:JSON.stringify({ message: message.trim() })
+    });
+    const d = await safeJson(r);
+    if(!r.ok){ toast(messageErreur(r, d)); return; }
+    toast(d.message || 'Votre réclamation est enregistrée.', 7000);
+    viderMemoireRequetes();
+    loadProDevis();
+  }catch(e){ toast(friendlyNetworkError(e)); }
+}
+
 async function repondreContestation(demandeId){
   // `demanderTexte` n'existe pas dans cette application — je l'avais appelée
   // par habitude. Seule `demanderConfirmation` est disponible, et elle suffit :
@@ -9063,7 +9095,16 @@ async function chargerTableauDeBordPro(){
     // « où en suis-je, et qu'est-ce qui m'attend », pas dresser un bilan.
     // La note, la fiabilité et le taux d'acceptation ont rejoint le profil :
     // on va les consulter, on ne travaille pas avec.
-    var enAttenteReponse=liste.filter(function(v){return v.statut==='envoye'}).length;
+    // ── LE MÊME FILTRE QUE « MES DEVIS » ────────────────────────────────────
+  // Corrigé hier dans l'onglet des devis, oublié ici. Un devis sur une demande
+  // EXPIRÉE comptait encore comme « sans réponse » : le prestataire croyait
+  // attendre quelqu'un qui ne pouvait plus répondre.
+  //
+  // On réutilise la fonction du tri, pour que les deux écrans ne divergent
+  // plus.
+  var enAttenteReponse=liste.filter(function(v){
+    return v.statut==='envoye' && proDevisMainTabOf(v)==='encours';
+  }).length;
     box.innerHTML='<div class="bord-pro trois">'+
       bloc(euros(gains.total_libere),'Reçu à ce jour','gain')+
       bloc(euros(gains.total_en_attente),'En attente de validation','attente')+
@@ -9267,8 +9308,12 @@ async function majEnteteClientChiffres(){
   try{
     const r=await fetchGroupe(API+'/api/devis/mes-devis-recus',{headers:authHeaders()});
     const d=await safeJson(r);
+    // ── LE MÊME FILTRE QUE LE TRI ────────────────────────────────────
+    // Un devis reçu sur une demande EXPIRÉE ou annulée comptait encore comme
+    // « à examiner ». Le client voyait un chiffre l'invitant à agir sur
+    // quelque chose qui n'existe plus.
     devisAExaminer=(Array.isArray(d)?d:[]).filter(function(v){
-      return v.statut==='envoye';
+      return v.statut==='envoye' && devisMainTabOf(v)!=='termines';
     }).length;
   }catch(e){}
 
@@ -9735,6 +9780,27 @@ function renderProDevisCards(){
         //
         // Répondre ne prouve rien en soi — mais un absent ne répond pas, et
         // celui qui a oublié de déclarer son arrivée se rattrape ici.
+        // ── LA PRESTATION A ÉTÉ REMBOURSÉE AU CLIENT ───────────────────
+        // Un prestataire venu, ayant oublié de déclarer son arrivée ET de
+        // faire saisir le code, n'avait PLUS AUCUN recours : la conversation
+        // se ferme au remboursement, le bouton de réponse disparaît, et le
+        // support générique n'est rattaché à aucune prestation.
+        //
+        // Il pouvait perdre un travail réalisé sans jamais s'expliquer.
+        var blocReclamation='';
+        if(v.statut==='accepte'
+           && (v.statut_paiement==='rembourse' || v.statut_paiement==='rembourse_partiel')
+           && !(v.demande && v.demande.contestation_le)){
+          blocReclamation='<div class="attente-paiement-pro" style="background:var(--amber-clair);'
+            + 'color:var(--amber);margin-bottom:10px">'
+            + '<i data-lucide="alert-circle"></i>'
+            + '<span><strong>Cette prestation a été remboursée au client.</strong><br>'
+            + 'Si vous l\'avez réalisée, dites-le : Gleam réexaminera la situation. '
+            + 'Vous avez sept jours après le créneau.</span></div>'
+            + '<button class="btn-accept" style="width:100%;margin-bottom:10px;background:var(--amber)" '
+            + 'onclick="reclamerRemboursement(\''+safeDemandeId+'\')">J\'ai réalisé cette prestation</button>';
+        }
+
         var blocContestation='';
         if(v.demande && v.demande.contestation_le && !v.demande.reponse_pro_le){
           // ── DEUX CAS, DEUX MESSAGES ─────────────────────────────────
@@ -9760,7 +9826,7 @@ function renderProDevisCards(){
             + 'onclick="repondreContestation(\''+safeDemandeId+'\')">J\'étais bien sur place</button>';
         }
 
-        extra='<div style="margin-top:10px">'+creneauHtmlPro+blocContestation+
+        extra='<div style="margin-top:10px">'+creneauHtmlPro+blocReclamation+blocContestation+
           '<button class="btn-accept" style="width:100%;margin-top:10px;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
         if(!demandeeDemarree){
           // Étape 1 : le pro vient d'arriver — photo de l'état initial avant de commencer
