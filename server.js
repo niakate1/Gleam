@@ -4495,6 +4495,22 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
   // ni remboursé — c'est la seule position juste quand deux versions
   // s'opposent.
   let remboursementSuspendu = false;
+
+  // ── LE VERROU NE VOYAIT QU'UN SEUL CAS ─────────────────────────────────
+  // Il exigeait `arrivee_confirmee_client === false` — c'est-à-dire une
+  // contestation EXPLICITE du client.
+  //
+  // Or `contestation_le` est aussi posé quand PERSONNE n'a déclaré d'arrivée :
+  // le prestataire est alors averti et dispose de dix-huit heures. Pendant ce
+  // temps, le client pouvait annuler et récupérer son argent, court-circuitant
+  // le délai de réponse qu'on venait de lui accorder.
+  //
+  // On teste donc le marqueur lui-même, quel que soit ce qui l'a posé.
+  if (demandeArrivee && demandeArrivee.contestation_le
+      && demandeArrivee.arrivee_confirmee_client !== false) {
+    remboursementSuspendu = true;
+  }
+
   if (demandeArrivee && demandeArrivee.arrivee_confirmee_client === false) {
     const preuves = preuvesDePresence(demandeArrivee);
     const aRepondu = !!demandeArrivee.reponse_pro_le;
@@ -5138,18 +5154,31 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
       // `demande_modifiee` manquait aussi : le badge ambre posé ce matin ne
       // pouvait pas apparaître non plus.
       'id, prestation, adresse, statut, numero_anonyme, client_id, notes, creneau, photos_avant, photos_apres, prestation_demarree_le, creneau_propose, creneau_propose_par, contestation_le, reponse_pro_le, arrivee_qualite, arrivee_confirmee_client').in('id', demandeIds);
+    // ── LE STATUT DU PAIEMENT, POUR LA RÉCLAMATION ────────────────────────
+    // Sans lui, l'écran ne peut pas savoir qu'une prestation a été remboursée
+    // — et donc pas proposer au prestataire de contester ce remboursement.
+    const { data: paiementsDevis } = demandeIds.length
+      ? await supabase.from('paiements')
+          .select('demande_id, statut').in('demande_id', demandeIds)
+      : { data: [] };
+    const paiementParDemande = {};
+    (paiementsDevis || []).forEach(p => { paiementParDemande[p.demande_id] = p.statut; });
+
     const demandeMap = {};
     (demandes || []).forEach(d => demandeMap[d.id] = d);
 
     const enriched = devis.map(d => {
       const demandeInfo = demandeMap[d.demande_id];
+      // Le statut du paiement conditionne la réclamation : seul un
+      // remboursement effectif ouvre ce recours au prestataire.
+      const statutPaiement = paiementParDemande[d.demande_id] || null;
       const demandeAvecPhotos = demandeInfo ? {
         ...demandeInfo,
         photos_avant: demandeInfo.photos_avant ? JSON.parse(demandeInfo.photos_avant) : [],
         photos_apres: demandeInfo.photos_apres ? JSON.parse(demandeInfo.photos_apres) : [],
         prestation_demarree: Boolean(demandeInfo.prestation_demarree_le)
       } : null;
-      return { ...d, demande: demandeAvecPhotos };
+      return { ...d, demande: demandeAvecPhotos, statut_paiement: statutPaiement };
     });
     // Ici les photos sont portées par l'objet `demande` imbriqué dans chaque devis.
     await signerPhotosDesDemandes(enriched.map(d => d.demande).filter(Boolean));
@@ -5263,7 +5292,32 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     if (devis.statut !== 'accepte') return res.status(400).json({ error: 'Ce devis n\'est pas accepté.' });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
-    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
+
+    // ── UNE ANNULATION NE DOIT PAS SERVIR D'ÉCHAPPATOIRE ──────────────────
+    // Un prestataire contesté pouvait annuler lui-même. Le client était
+    // remboursé, la demande refermée — et l'arbitrage n'avait jamais lieu.
+    //
+    // Le résultat lui était même favorable : une annulation se lit comme un
+    // désistement, pas comme une absence, et ne compte pas dans ses absences
+    // constatées.
+    if (demande.contestation_le) {
+      return res.status(409).json({
+        error: 'Cette prestation fait l\'objet d\'un litige. Gleam doit trancher '
+             + 'avant toute annulation — répondez depuis votre écran de devis.'
+      });
+    }
+
+    // ── ET PAS APRÈS AVOIR COMMENCÉ ───────────────────────────────────────
+    // Déclarer son arrivée puis annuler laisserait le client sans prestation
+    // ET sans explication. Si le travail ne peut pas se faire une fois sur
+    // place, cela relève du signalement.
+    if (demande.prestation_demarree_le) {
+      return res.status(409).json({
+        error: 'Vous avez déclaré votre arrivée : la prestation ne peut plus être '
+             + 'annulée. Signalez le problème depuis la conversation.'
+      });
+    }
 
     // Vérifie le délai de 24h avant le créneau (signalé, mais jamais bloquant — cohérent avec l'annulation côté client)
     let tardive = false;
@@ -6980,6 +7034,114 @@ app.delete('/api/favoris/:proId', auth, async (req, res) => {
 // le prestataire dont le téléphone n'a pas capté, qui n'a pas pensé aux
 // photos, et qui découvre la contestation en rentrant chez lui.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTESTER UN REMBOURSEMENT DÉJÀ EFFECTUÉ
+//
+// Un prestataire venu, ayant oublié de déclarer son arrivée et de faire saisir
+// le code, voyait la prestation remboursée au client. Après quoi il n'avait
+// PLUS AUCUN RECOURS dans l'application :
+//
+//   la conversation se ferme      le statut « rembourse » n'y donne plus accès
+//   le bouton disparaît           `contestation_le` est remis à null
+//   la route de réponse refuse    elle exige un litige ouvert
+//
+// Il lui restait le support générique, sans lien avec la prestation — à
+// charge pour lui d'expliquer laquelle, et pour vous de la retrouver.
+//
+// SEPT JOURS
+//
+// Assez pour qu'un prestataire s'aperçoive du problème en faisant ses comptes
+// en fin de semaine. Au-delà, les preuves s'effacent et la mémoire du client
+// aussi.
+//
+// CE N'EST PAS UN DROIT AU PAIEMENT
+//
+// La réclamation rouvre le dossier et vous le signale. Vous tranchez avec les
+// mêmes éléments qu'ailleurs — le remboursement ayant déjà eu lieu, un
+// versement au prestataire supposerait de le reprendre au client, ce qui est
+// votre décision, pas un automatisme.
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/demandes/:id/reclamer-remboursement', auth, async (req, res) => {
+  try {
+    const { data: demande } = await supabase.from('demandes')
+      .select('*').eq('id', req.params.id).maybeSingle();
+    if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
+
+    // Seul le prestataire dont le devis avait été retenu peut réclamer.
+    const { data: devisAccepte } = await supabase.from('devis')
+      .select('societe_id, prix_ttc').eq('demande_id', demande.id)
+      .eq('statut', 'accepte').maybeSingle();
+    if (!devisAccepte || devisAccepte.societe_id !== req.user.id) {
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
+    }
+
+    const { data: paiement } = await supabase.from('paiements')
+      .select('statut, montant_ttc, created_at').eq('demande_id', demande.id).maybeSingle();
+    if (!paiement || !['rembourse', 'rembourse_partiel'].includes(paiement.statut)) {
+      return res.status(409).json({
+        error: 'Cette prestation n\'a pas été remboursée — il n\'y a rien à réclamer.'
+      });
+    }
+
+    // Sept jours après le créneau, pas après le remboursement : c'est la date
+    // dont le prestataire se souvient.
+    const instant = instantDuCreneau(demande.creneau);
+    if (instant && Date.now() - instant > 7 * 24 * 3600 * 1000) {
+      return res.status(409).json({
+        error: 'Le délai de réclamation est dépassé — il court sept jours après '
+             + 'le créneau. Écrivez au support si la situation le justifie.'
+      });
+    }
+
+    const { data: dejaReclame } = await supabase.from('signalements')
+      .select('id').eq('demande_id', demande.id)
+      .eq('reporter_id', req.user.id)
+      .ilike('motif', 'Réclamation%').maybeSingle();
+    if (dejaReclame) {
+      return res.status(409).json({
+        error: 'Vous avez déjà réclamé pour cette prestation. Gleam l\'examine.'
+      });
+    }
+
+    const message = String((req.body && req.body.message) || '').trim().slice(0, 800);
+    if (!message) {
+      return res.status(400).json({
+        error: 'Décrivez ce que vous avez fait : c\'est sur cette base que Gleam tranchera.'
+      });
+    }
+
+    await supabase.from('signalements').insert({
+      demande_id: demande.id,
+      reporter_id: req.user.id,
+      motif: 'Réclamation du prestataire — remboursement contesté',
+      description: message,
+      statut: 'nouveau'
+    });
+
+    // Le dossier réapparaît dans l'onglet Litiges : sans cela, la réclamation
+    // dormirait dans une table que personne ne consulte.
+    await supabase.from('demandes')
+      .update({ contestation_le: new Date().toISOString(),
+                reponse_pro_le: new Date().toISOString() })
+      .eq('id', demande.id);
+
+    envoyerNotificationPush(demande.client_id, {
+      titre: 'Le prestataire conteste le remboursement',
+      corps: 'Il affirme avoir réalisé la prestation. Gleam examine la situation '
+           + 'et reviendra vers vous.',
+      url: '/#accueil'
+    }).catch(() => {});
+
+    res.json({
+      message: 'Votre réclamation est enregistrée. Gleam examine la situation et '
+             + 'vous répondra — le remboursement ayant déjà eu lieu, seul un '
+             + 'arbitrage peut le remettre en cause.'
+    });
+  } catch (e) {
+    erreurServeur(res, 'POST /api/demandes/:id/reclamer-remboursement', e);
+  }
+});
+
 app.post('/api/demandes/:id/repondre-contestation', auth, async (req, res) => {
   try {
     const { data: demande } = await supabase.from('demandes')
@@ -8902,8 +9064,25 @@ app.get('/api/admin/litiges', adminAuth, async (req, res) => {
         'id, montant_ttc, montant_societe, commission, statut, societe_id, client_id, montant_rembourse')
         .eq('demande_id', d.id).maybeSingle();
 
-      // Un paiement déjà réglé n'est plus à arbitrer.
-      if (!paiement || ['rembourse', 'rembourse_partiel', 'libere'].includes(paiement.statut)) continue;
+      // ── UN DOSSIER RÉGLÉ PEUT ÊTRE ROUVERT ──────────────────────────────
+      // J'écartais tous les paiements réglés. Or la réclamation du prestataire
+      // intervient précisément APRÈS un remboursement : elle n'apparaissait
+      // donc jamais ici.
+      //
+      // Il écrivait dans le vide, et vous ne voyiez rien.
+      //
+      // On garde l'exclusion — un dossier clos n'a rien à faire dans cette
+      // liste — sauf s'il a été explicitement rouvert par une réclamation.
+      if (!paiement) continue;
+
+      const { data: reclamation } = await supabase.from('signalements')
+        .select('id, description, created_at')
+        .eq('demande_id', d.id)
+        .ilike('motif', 'Réclamation du prestataire%')
+        .maybeSingle();
+
+      const regle = ['rembourse', 'rembourse_partiel', 'libere'].includes(paiement.statut);
+      if (regle && !reclamation) continue;
 
       const { data: client } = await supabase.from('users')
         .select('prenom, nom, email').eq('id', d.client_id).maybeSingle();
@@ -8925,6 +9104,11 @@ app.get('/api/admin/litiges', adminAuth, async (req, res) => {
         numero_anonyme: d.numero_anonyme,
         contestation_le: d.contestation_le,
         reponse_pro_le: d.reponse_pro_le,
+        // Trois origines possibles, et elles n'appellent pas la même décision.
+        origine: reclamation ? 'reclamation'
+               : (d.arrivee_confirmee_client === false ? 'contestation' : 'sans_arrivee'),
+        deja_rembourse: regle,
+        reclamation: reclamation ? reclamation.description : null,
         // Ce qui fait pencher la balance.
         preuves: preuvesDePresence(d),
         arrivee_qualite: d.arrivee_qualite,
@@ -9010,6 +9194,23 @@ app.post('/api/admin/litiges/:demandeId/trancher', adminAuth, async (req, res) =
       .update({ contestation_le: null, reponse_pro_le: null,
                 arrivee_confirmee_client: decision === 'payer_pro' })
       .eq('id', demande.id);
+
+    // ── UN DOSSIER DÉJÀ REMBOURSÉ NE PEUT PLUS ÊTRE VERSÉ ─────────────────
+    // Sur une réclamation du prestataire, l'argent est déjà revenu au client.
+    // Appeler `finaliserPrestation` échouerait silencieusement — Stripe n'a
+    // plus rien à transférer.
+    //
+    // Le dire franchement vaut mieux qu'un bouton qui ne fait rien : la
+    // décision existe, mais elle se règle hors de la plateforme.
+    if (decision === 'payer_pro'
+        && ['rembourse', 'rembourse_partiel'].includes(paiement.statut)) {
+      return res.status(409).json({
+        error: 'Le client a déjà été remboursé : les fonds ne sont plus détenus '
+             + 'par Gleam et ne peuvent pas être versés au prestataire. '
+             + 'Si vous estimez la réclamation fondée, il faut le dédommager '
+             + 'par un autre moyen — et le noter ici en clôturant le dossier.'
+      });
+    }
 
     let resultat;
     if (decision === 'payer_pro') {
