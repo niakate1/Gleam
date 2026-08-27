@@ -6327,9 +6327,20 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
           //
           // Chacun y trouve ce qui le concerne, et personne n'y lit une
           // promesse qui ne le vise pas.
-          contenu: '💳 Paiement confirmé — la prestation est réservée. '
-                 + 'Le montant est conservé par Gleam et sera versé au '
-                 + 'prestataire une fois la prestation validée.',
+          // ── UN REPÈRE, PAS UN TEXTE FIGÉ ─────────────────────────────
+          // Le message est lu par les DEUX parties. Écrire « vous sera
+          // versé » trompait le client ; écrire « versé au prestataire »
+          // sonne faux quand c'est le prestataire qui lit.
+          //
+          // On stocke donc un repère — `[paiement-confirme]` — et
+          // l'application écrit la phrase qui convient à celui qui regarde.
+          //
+          // Le texte qui suit le repère sert de repli : si une version
+          // ancienne de l'application ne connaît pas ce code, elle affiche
+          // une phrase correcte, simplement moins personnelle.
+          contenu: '[paiement-confirme] 💳 Paiement confirmé — la prestation '
+                 + 'est réservée. Le montant est conservé par Gleam jusqu\'à '
+                 + 'la validation.',
           type: 'systeme'
         });
 
