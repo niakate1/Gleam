@@ -9106,7 +9106,14 @@ async function chargerTableauDeBordPro(){
     return v.statut==='envoye' && proDevisMainTabOf(v)==='encours';
   }).length;
     box.innerHTML='<div class="bord-pro trois">'+
-      bloc(euros(gains.total_libere),'Reçu à ce jour','gain')+
+      // ── « À CE JOUR » SE LIT COMME « AUJOURD'HUI » ────────────────────────
+    // Le français est correct — « à ce jour » veut dire « jusqu'à
+    // maintenant » — mais sur un écran, à côté d'un chiffre « ce mois », il
+    // se lit naturellement comme « reçu aujourd'hui ».
+    //
+    // « Total reçu » ne laisse aucun doute : c'est le cumul depuis le début,
+    // et il ne repart jamais à zéro.
+    bloc(euros(gains.total_libere),'Total reçu','gain')+
       bloc(euros(gains.total_en_attente),'En attente de validation','attente')+
       bloc(enAttenteReponse,'Devis sans réponse')+
     '</div>';
