@@ -60,6 +60,26 @@
 <link rel="icon" type="image/svg+xml" href="/gleam-logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- ── LA CARTE : PRÉPARER LA CONNEXION, PAS LA CHARGER ──────────────────
+       Leaflet et les tuiles ne sont demandés qu'à l'ouverture d'une carte —
+       c'est déjà le bon comportement, et je ne l'ai pas changé.
+
+       Mais à cette première ouverture, le navigateur découvre DEUX domaines
+       neufs : il doit résoudre le DNS, puis négocier TLS. Cela coûte 100 à
+       300 ms avant même le premier octet.
+
+       `dns-prefetch` fait cette résolution pendant que l'utilisateur lit la
+       page. `preconnect` sur unpkg va plus loin : il ouvre aussi la
+       connexion, parce que Leaflet est TOUJOURS le premier demandé.
+
+       Pour les tuiles, on se limite au DNS : trois sous-domaines (a, b, c)
+       et préconnecter les trois monopoliserait des connexions souvent
+       inutiles — beaucoup d'écrans n'affichent aucune carte. -->
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="dns-prefetch" href="https://a.tile.openstreetmap.org">
+  <link rel="dns-prefetch" href="https://b.tile.openstreetmap.org">
+  <link rel="dns-prefetch" href="https://c.tile.openstreetmap.org">
 <!-- ── LES POLICES NE DOIVENT PAS BLOQUER L'AFFICHAGE ──────────────────────
        Un <link rel="stylesheet"> arrête le rendu jusqu'à ce que le fichier
        soit reçu de Google. Sur un réseau lent, l'écran reste blanc pendant
@@ -11536,11 +11556,30 @@ async function loadChatMessages(){
         // Centré, en gris, il se lit pour ce qu'il est : un fait, pas une
         // parole.
         if(m.type==='systeme'){
+          // ── LE TEXTE S'ADAPTE À CELUI QUI LIT ──────────────────────────
+          // Un message système est stocké UNE fois et lu par les deux
+          // parties. « vous sera versé » trompait le client ; « versé au
+          // prestataire » sonne faux quand c'est le prestataire qui regarde.
+          //
+          // Le serveur pose donc un repère, et on écrit ici la phrase juste.
+          // Un message sans repère — ancien, ou d'un autre type — s'affiche
+          // tel qu'il a été enregistré.
+          var texteSysteme = m.contenu || '';
+          if(texteSysteme.indexOf('[paiement-confirme]') === 0){
+            var jeSuisLePro = currentUser && (currentUser.type === 'pro'
+                                           || currentUser.type === 'societe');
+            texteSysteme = jeSuisLePro
+              ? '💳 Paiement confirmé — la prestation est réservée. Le montant '
+                + 'est conservé par Gleam et vous sera versé après validation.'
+              : '💳 Paiement confirmé — la prestation est réservée. Le montant '
+                + 'est conservé par Gleam jusqu\'à la fin de la prestation.';
+          }
+
           html+='<div style="text-align:center;margin:10px 0">'
             + '<span style="display:inline-block;background:var(--light);'
             + 'border-radius:12px;padding:7px 12px;font-size:12px;'
             + 'color:var(--text-secondary);line-height:1.45;max-width:85%">'
-            + escapeHtml(m.contenu||'')+'</span></div>';
+            + escapeHtml(texteSysteme)+'</span></div>';
           return;
         }
         var mine=currentUser&&String(m.expediteur_id)===String(currentUser.id);
