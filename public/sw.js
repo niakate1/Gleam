@@ -28,17 +28,29 @@
 //    développeur, quelle version est réellement active sur l'appareil.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VERSION = 'gleam-sw-2026-08-03';
+// ── CETTE VERSION DOIT CHANGER À CHAQUE DÉPLOIEMENT ──────────────────────
+// Elle nomme le cache. Si elle ne bouge pas, le navigateur continue de servir
+// l'ancienne coquille indéfiniment — vos corrections ne parviendraient jamais
+// aux utilisateurs déjà venus.
+//
+// La date suffit : une par jour de déploiement.
+const VERSION = 'gleam-sw-2026-08-27';
 
-self.addEventListener('install', function () {
-  // La nouvelle version prend la main immédiatement, sans attendre la fermeture
-  // des onglets ouverts.
-  self.skipWaiting();
-});
+// L'installation est désormais gérée plus bas, avec le précache de la
+// coquille : deux gestionnaires `install` s'exécuteraient tous les deux, et le
+// second `skipWaiting` masquerait l'échec du premier.
 
 self.addEventListener('activate', function (event) {
   // Et prend le contrôle des pages déjà chargées, sans exiger un rechargement.
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    // Les caches des versions précédentes n'ont plus lieu d'être : sans ce
+    // ménage, ils s'accumuleraient à chaque déploiement.
+    caches.keys().then(function (noms) {
+      return Promise.all(noms
+        .filter(function (n) { return n.startsWith('gleam-coquille-') && n !== CACHE_COQUILLE; })
+        .map(function (n) { return caches.delete(n); }));
+    }).then(function () { return self.clients.claim(); })
+  );
   console.log('[Gleam] Service worker actif —', VERSION);
 });
 
@@ -46,6 +58,88 @@ self.addEventListener('activate', function (event) {
 //   navigator.serviceWorker.controller.postMessage({ type: 'PASSER_EN_ACTIF' })
 self.addEventListener('message', function (event) {
   if (event.data && event.data.type === 'PASSER_EN_ACTIF') self.skipWaiting();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LA MISE EN CACHE — CE QUI REND UNE APPLICATION INSTANTANÉE
+//
+// Jusqu'ici ce service worker ne servait qu'aux notifications. Aucun
+// événement `fetch`, aucun cache : à chaque lancement, le navigateur
+// retéléchargeait 224 Ko et réinterprétait 563 Ko de JavaScript.
+//
+// C'est exactement la différence avec les applications qui s'affichent dès
+// que leur icône a fini de charger. Elles ne retéléchargent rien : elles
+// servent depuis le disque, puis vérifient en arrière-plan.
+//
+// LA STRATÉGIE : SERVIR D'ABORD, METTRE À JOUR ENSUITE
+//
+// À l'ouverture, la version en cache s'affiche IMMÉDIATEMENT. En parallèle,
+// le réseau est interrogé et le cache mis à jour pour la fois suivante.
+//
+// Le prix à payer est honnête : après un déploiement, l'utilisateur voit
+// encore l'ancienne version UNE fois. Au lancement suivant, il a la nouvelle.
+//
+// CE QUI N'EST JAMAIS MIS EN CACHE
+//
+// Les appels à l'API. Un devis, un paiement, un litige doivent toujours
+// venir du serveur — servir un solde périmé serait pire que lent.
+// ═══════════════════════════════════════════════════════════════════════════
+const CACHE_COQUILLE = 'gleam-coquille-' + VERSION;
+
+// Le strict nécessaire pour afficher quelque chose. Les icônes et la police
+// arrivent ensuite, à l'usage.
+const COQUILLE = [
+  './',
+  './index.html',
+  './icon-192.png',
+  './gleam-logo.svg'
+];
+
+self.addEventListener('install', function (event) {
+  event.waitUntil(
+    caches.open(CACHE_COQUILLE)
+      .then(function (cache) { return cache.addAll(COQUILLE); })
+      // Un fichier absent ne doit pas empêcher l'installation : mieux vaut un
+      // cache partiel que pas de service worker du tout.
+      .catch(function (e) { console.warn('[Gleam] Précache partiel :', e); })
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('fetch', function (event) {
+  const requete = event.request;
+
+  // Seules les lectures sont mises en cache. Un POST doit toujours partir.
+  if (requete.method !== 'GET') return;
+
+  const url = new URL(requete.url);
+
+  // L'API, jamais. Ni les autres origines : tuiles, polices, Stripe ont
+  // leur propre cache navigateur, et les intercepter compliquerait sans gain.
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
+
+  event.respondWith(
+    caches.match(requete).then(function (enCache) {
+      const surLeReseau = fetch(requete).then(function (reponse) {
+        // On ne met en cache que ce qui a réussi. Une page d'erreur mise en
+        // cache resservirait l'erreur indéfiniment.
+        if (reponse && reponse.status === 200 && reponse.type === 'basic') {
+          const copie = reponse.clone();
+          caches.open(CACHE_COQUILLE).then(function (cache) {
+            cache.put(requete, copie);
+          });
+        }
+        return reponse;
+      }).catch(function () {
+        // Hors ligne : la version en cache, ou rien.
+        return enCache;
+      });
+
+      // Le cache d'abord — c'est ce qui rend l'affichage immédiat.
+      return enCache || surLeReseau;
+    })
+  );
 });
 
 self.addEventListener('push', function (event) {
