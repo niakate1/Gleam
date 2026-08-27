@@ -273,7 +273,20 @@ const supabaseAuth = createClient(
 // C'est une défense partielle, et c'est mieux qu'aucune.
 app.use(helmet({
   contentSecurityPolicy: {
-    reportOnly: true,
+    // ── LA CSP BLOQUE DÉSORMAIS, ELLE NE SE CONTENTE PLUS DE SIGNALER ────
+    // Trois jours en mode rapport, et la console ne montre AUCUN
+    // signalement — seulement des requêtes réseau réussies : tuiles de carte,
+    // Leaflet depuis unpkg, l'API Railway, le géocodage.
+    //
+    // Tout cela est déjà autorisé par les directives ci-dessous. Le passage
+    // en mode réel ne devrait donc rien casser.
+    //
+    // SI QUELQUE CHOSE CASSAIT MALGRÉ TOUT
+    //
+    // Le symptôme serait visible : une carte vide, un formulaire de paiement
+    // qui ne s'affiche pas, une icône manquante. Remettre `reportOnly: true`
+    // rétablit tout en un déploiement.
+    reportOnly: false,
     directives: {
       defaultSrc: ["'self'"],
       // Stripe pour le paiement ; unpkg pour les icônes Lucide.
@@ -334,7 +347,24 @@ const corsOptions = {
   // C'est sans danger ici : la liste d'origines autorisées reste stricte, et
   // `credentials: true` avec `origin: '*'` est de toute façon refusé par les
   // navigateurs.
-  credentials: true
+  credentials: true,
+
+  // ── LE NAVIGATEUR REDEMANDAIT L'AUTORISATION À CHAQUE APPEL ────────────
+  // L'API n'est pas sur le même domaine que l'application. Chaque requête part
+  // donc EN DEUX FOIS : une demande d'autorisation (OPTIONS), puis la vraie.
+  //
+  // Dans votre console : 148 ms de préflight pour 354 ms de requête utile.
+  // Près d'un tiers du temps passé à redemander une permission déjà accordée.
+  //
+  // `maxAge` autorise le navigateur à la mémoriser. Vingt-quatre heures :
+  // c'est le maximum accepté par Chrome, et Firefox plafonne de son côté.
+  // Au-delà, la valeur serait simplement ramenée à leur limite.
+  //
+  // Le risque est nul : si les origines autorisées changent, un utilisateur
+  // pourrait garder une autorisation périmée pendant vingt-quatre heures.
+  // Comme la liste ne bouge qu'au déploiement d'un nouveau domaine, cela ne
+  // concerne personne en pratique.
+  maxAge: 86400
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
