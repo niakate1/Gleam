@@ -701,6 +701,30 @@ async function chargerLitiges() {
       const euros = (v) => (Number(v) || 0).toFixed(2).replace('.', ',') + ' €';
 
       // Les preuves, ou leur absence — c'est ce qui doit sauter aux yeux.
+      // ── TROIS ORIGINES, TROIS DÉCISIONS DIFFÉRENTES ──────────────────
+      // Toutes les cartes se ressemblaient. Or arbitrer une contestation du
+      // client, un silence du prestataire ou une réclamation après
+      // remboursement n'appelle pas le même jugement — ni les mêmes options.
+      const ORIGINES = {
+        contestation: { texte: 'Le client affirme que le prestataire n\'est pas venu.',
+                        fond: '#FDECEC', bord: '#B3261E' },
+        sans_arrivee: { texte: 'Personne n\'a déclaré d\'arrivée. Le prestataire a été '
+                             + 'averti et n\'a pas répondu dans le délai.',
+                        fond: '#FFF7E6', bord: '#D97706' },
+        reclamation:  { texte: 'Le prestataire conteste un remboursement DÉJÀ EFFECTUÉ. '
+                             + 'Les fonds ne sont plus détenus par Gleam.',
+                        fond: '#EEF2FF', bord: '#4F5BD5' }
+      };
+      const org = ORIGINES[l.origine] || ORIGINES.contestation;
+      const enTeteOrigine =
+        '<div style="background:' + org.fond + ';border-left:3px solid ' + org.bord + ';'
+        + 'padding:9px 11px;border-radius:0 6px 6px 0;margin:8px 0;font-size:13px">'
+        + echapper(org.texte)
+        + (l.reclamation
+            ? '<br><br><em>« ' + echapper(l.reclamation.slice(0, 300)) + ' »</em>'
+            : '')
+        + '</div>';
+
       const preuves = (l.preuves || []).length
         ? '<div class="ligne" style="background:#EAF6EE;border-left:3px solid #2E7D4F;'
           + 'padding:9px 11px;border-radius:6px;margin:8px 0">'
@@ -741,6 +765,7 @@ async function chargerLitiges() {
         +     '<div class="petit">dont ' + euros(l.commission) + ' de commission</div>'
         +   '</div>'
         + '</div>'
+        + enTeteOrigine
         + preuves
         + '<div class="ligne petit">Client : ' + echapper(l.client ? l.client.nom : '—')
         +   ' — conteste depuis ' + dateFr(l.contestation_le) + '</div>'
@@ -756,8 +781,13 @@ async function chargerLitiges() {
         //
         // Empilés, avec un écart, la confusion devient beaucoup moins facile.
         + '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">'
-        +   '<button class="btn" style="width:100%" onclick="trancherLitige(\'' + id + '\',\'payer_pro\')">'
-        +     'Payer le prestataire</button>'
+        +   (l.deja_rembourse
+              // Les fonds sont partis : afficher un bouton qui échouerait
+              // serait pire que de ne rien afficher.
+              ? '<div class="petit" style="padding:8px 0">Le client a déjà été '
+                + 'remboursé — un versement au prestataire ne peut plus se faire ici.</div>'
+              : '<button class="btn" style="width:100%" onclick="trancherLitige(\'' + id + '\',\'payer_pro\')">'
+                + 'Payer le prestataire</button>')
         +   '<button class="btn secondaire" style="width:100%" onclick="trancherLitige(\'' + id + '\',\'rembourser\')">'
         +     'Rembourser le client</button>'
         + '</div>'
