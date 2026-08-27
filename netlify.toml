@@ -113,6 +113,14 @@
 # Toujours revalidées : c'est ce qui garantit qu'une correction déployée arrive
 # immédiatement chez vos utilisateurs, sans qu'ils aient à vider leur cache.
 # ─────────────────────────────────────────────────────────────────────────────
+# ── CET EN-TÊTE RESTE JUSTE, ET NE GÊNE PAS LE SERVICE WORKER ────────────────
+# `must-revalidate` s'adresse au cache du NAVIGATEUR. Le service worker, lui,
+# intercepte la requête AVANT que ce cache n'entre en jeu : il sert sa propre
+# copie immédiatement, puis rafraîchit en arrière-plan.
+#
+# Les deux mécanismes se complètent : le service worker donne l'affichage
+# instantané, cet en-tête garantit qu'un utilisateur sans service worker —
+# première visite, navigateur ancien — reçoit toujours la dernière version.
 [[headers]]
   for = "/*.html"
   [headers.values]
