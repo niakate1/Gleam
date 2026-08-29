@@ -84,10 +84,40 @@ function comparaisonSure(a, b) {
 function motDePasseAdminValide(saisi) {
   const empreinte = process.env.ADMIN_PASSWORD_HASH;
   if (empreinte) {
-    const [algo, selHex, attenduHex] = String(empreinte).split('$');
-    if (algo !== 'scrypt' || !selHex || !attenduHex) return false;
-    const calcule = crypto.scryptSync(String(saisi || ''), Buffer.from(selHex, 'hex'), 64);
-    return comparaisonSure(calcule.toString('hex'), attenduHex);
+    const parts = String(empreinte).split('$');
+    const algo = parts[0];
+
+    // ── DEUX FORMATS, PARCE QUE DEUX OUTILS ────────────────────────────────
+    // `scrypt$sel$empreinte` vient de generer-hash-admin.js, qui tourne dans
+    // Node. C'est le format d'origine.
+    //
+    // `pbkdf2$iterations$sel$empreinte` vient de la page HTML que j'ai écrite
+    // pour éviter d'avoir à ouvrir un terminal. Les navigateurs ne proposent
+    // pas scrypt : seul PBKDF2 est disponible dans leur API de chiffrement.
+    //
+    // Les deux sont solides. PBKDF2 avec 210 000 itérations est la
+    // recommandation de l'OWASP pour SHA-512 — le nombre est stocké dans
+    // l'empreinte, ce qui permettra de l'augmenter un jour sans invalider
+    // les mots de passe existants.
+    if (algo === 'scrypt') {
+      const [, selHex, attenduHex] = parts;
+      if (!selHex || !attenduHex) return false;
+      const calcule = crypto.scryptSync(String(saisi || ''), Buffer.from(selHex, 'hex'), 64);
+      return comparaisonSure(calcule.toString('hex'), attenduHex);
+    }
+
+    if (algo === 'pbkdf2') {
+      const [, iterations, selHex, attenduHex] = parts;
+      const tours = parseInt(iterations, 10);
+      if (!tours || !selHex || !attenduHex) return false;
+      // 512 bits = 64 octets, la même longueur que côté navigateur.
+      const calcule = crypto.pbkdf2Sync(
+        String(saisi || ''), Buffer.from(selHex, 'hex'), tours, 64, 'sha512');
+      return comparaisonSure(calcule.toString('hex'), attenduHex);
+    }
+
+    // Un format inconnu ne doit jamais laisser passer.
+    return false;
   }
   if (!process.env.ADMIN_PASSWORD) return false;
   return comparaisonSure(saisi, process.env.ADMIN_PASSWORD);
