@@ -1890,7 +1890,9 @@ app.patch('/api/users/photo', auth, async (req, res) => {
     if (!photo || typeof photo !== 'string' || !format) {
       return res.status(400).json({ error: 'Format d\'image non supporté (JPEG, PNG ou WEBP uniquement).' });
     }
-    if (photo.length > 600 * 1024) {
+    // Même correction : on mesure le décodé, pas la chaîne Base64.
+    const donneesPhoto = photo.slice(photo.indexOf(',') + 1);
+    if (Buffer.byteLength(donneesPhoto, 'base64') > 600 * 1024) {
       return res.status(413).json({ error: 'Photo trop volumineuse. Réessayez avec une image plus légère.' });
     }
 
@@ -2174,8 +2176,23 @@ app.post('/api/demandes', auth, async (req, res) => {
         if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
           return res.status(400).json({ error: 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).' });
         }
-        if (p.length > 800 * 1024) {  // 800 ko : une demande reste sous 4 Mo au total
-          return res.status(400).json({ error: 'Une photo est trop volumineuse. Réessayez avec une photo plus légère.' });
+        // ── UNE LIMITE EN OCTETS, PAS EN CARACTÈRES ────────────────────────
+        // On mesurait la longueur de la CHAÎNE Base64, qui pèse environ un
+        // tiers de plus que le fichier d'origine. La limite réelle était donc
+        // d'environ 600 ko, sans que rien ne le dise.
+        //
+        // Ce n'était pas dangereux — plus strict que prévu, jamais plus
+        // permissif — mais un plafond qui ne correspond pas à ce qu'il annonce
+        // finit par se retourner : un jour on l'ajuste en croyant régler une
+        // taille de fichier, et on règle autre chose.
+        //
+        // `Buffer.byteLength(..., 'base64')` donne le poids réel du décodé,
+        // sans avoir à construire le tampon en mémoire.
+        const donnees = p.slice(p.indexOf(',') + 1);
+        if (Buffer.byteLength(donnees, 'base64') > 800 * 1024) {
+          return res.status(400).json({
+            error: 'Une photo dépasse 800 ko. Réessayez avec une photo plus légère.'
+          });
         }
       }
     }
@@ -3329,6 +3346,70 @@ async function cloturerPrestationsSansArrivee() {
     return traitees;
   } catch (e) {
     console.error('Prestations sans arrivée :', e.message);
+    return 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PURGER LES DOCUMENTS EXPIRÉS — OBLIGATION RGPD
+//
+// Les documents passaient de « valide » à « expire », et y restaient
+// indéfiniment. Une pièce d'identité, une attestation d'assurance, un
+// justificatif URSSAF conservés sans limite.
+//
+// L'article 5.1.e du RGPD impose une durée de conservation « n'excédant pas
+// celle nécessaire au regard des finalités ». Un document expiré ne sert plus
+// à rien : le conserver n'a plus de base légale.
+//
+// POURQUOI 90 JOURS ET NON ZÉRO
+//
+// Un prestataire dont l'attestation expire doit pouvoir la remplacer sans que
+// son dossier soit détruit entre-temps. Trois mois couvrent largement le
+// renouvellement d'une assurance ou d'une attestation URSSAF.
+//
+// C'est aussi le délai qui permet de répondre à un contrôle portant sur une
+// prestation récente.
+//
+// LE FICHIER PART AVANT LA LIGNE
+//
+// Si la suppression du fichier échoue, la ligne reste — et la purge
+// réessaiera demain. L'inverse laisserait un fichier orphelin dans le
+// Storage, sans plus aucune trace permettant de le retrouver.
+// ═══════════════════════════════════════════════════════════════════════════
+async function purgerDocumentsExpires() {
+  try {
+    const limite = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+
+    const { data: aPurger } = await supabase.from('documents_pro')
+      .select('id, chemin_fichier, type, pro_id, date_expiration')
+      .eq('statut', 'expire')
+      // `updated_at` n'existe pas sur cette table — je l'avais supposée.
+      // `date_expiration` est de toute façon le bon repère : les 90 jours
+      // courent depuis la péremption du document, pas depuis la dernière
+      // modification de sa ligne.
+      .lt('date_expiration', limite)
+      .limit(50);
+
+    if (!aPurger || !aPurger.length) return 0;
+
+    let purges = 0;
+    for (const doc of aPurger) {
+      if (doc.chemin_fichier) {
+        const { error } = await supabase.storage
+          .from('documents-pro').remove([doc.chemin_fichier]);
+        // Un fichier déjà absent n'est pas une erreur : on continue.
+        if (error && !/not found/i.test(error.message || '')) {
+          console.warn('Purge — fichier non supprimé :', doc.id, error.message);
+          continue;
+        }
+      }
+
+      await supabase.from('documents_pro').delete().eq('id', doc.id);
+      purges++;
+    }
+    return purges;
+  } catch (e) {
+    console.error('Purge des documents expirés :', e.message);
     return 0;
   }
 }
@@ -6088,6 +6169,28 @@ app.post('/api/paiements/intent', auth, exigerEmailVerifie, async (req, res) => 
     }
     if (!devis_id) return res.status(400).json({ error: 'Devis requis.' });
 
+    // ── L'APPARTENANCE SE VÉRIFIE AVANT TOUT LE RESTE ───────────────────
+    // Le garde contre la double intention lisait un paiement existant AVANT
+    // qu'on ait vérifié que le devis appartenait bien au demandeur.
+    //
+    // Concrètement : quelqu'un connaissant l'identifiant d'un devis d'autrui
+    // récupérait le `client_secret` de l'intention Stripe correspondante — la
+    // clé qui permet de piloter ce paiement côté navigateur.
+    //
+    // L'ordre est le seul correctif : contrôler d'abord, lire ensuite.
+    const { data: devisCible } = await supabase.from('devis')
+      .select('id, demande_id, prix_ttc, societe_id, statut')
+      .eq('id', devis_id).maybeSingle();
+    if (!devisCible) return res.status(404).json({ error: 'Ce devis n\'existe plus.' });
+
+    const { data: demandeCible } = await supabase.from('demandes')
+      .select('id, client_id').eq('id', devisCible.demande_id).maybeSingle();
+    if (!demandeCible) return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
+
+    if (demandeCible.client_id !== req.user.id) {
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
+    }
+
     // ── GARDE CONTRE LA DOUBLE INTENTION ────────────────────────────────
     // Deux appuis rapprochés sur le bouton de paiement créaient deux
     // intentions Stripe pour le même devis. En mode test c'était sans
@@ -6443,6 +6546,31 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
 app.post('/api/paiements/confirmer', auth, async (req, res) => {
   try {
     const { payment_intent_id } = req.body;
+    if (!payment_intent_id) {
+      return res.status(400).json({ error: 'Référence de paiement requise.' });
+    }
+
+    // ── CONFIRMER LE PAIEMENT D'AUTRUI ÉTAIT POSSIBLE ─────────────────────
+    // La route acceptait n'importe quelle référence Stripe et déclenchait la
+    // finalisation, sans vérifier que le paiement appartenait au demandeur.
+    //
+    // Ce que cela permettait : connaissant une référence `pi_…`, un
+    // utilisateur connecté déclenchait la confirmation d'une prestation qui
+    // n'était pas la sienne — libérant un devis, refusant les concurrents,
+    // notifiant un prestataire.
+    //
+    // Le webhook Stripe, lui, appelle `finaliserConfirmationPaiement`
+    // directement — il ne passe pas par cette route et n'est donc pas gêné.
+    const { data: paiementCible } = await supabase.from('paiements')
+      .select('client_id').eq('stripe_payment_intent_id', payment_intent_id).maybeSingle();
+
+    if (!paiementCible) {
+      return res.status(404).json({ error: 'Ce paiement est introuvable.' });
+    }
+    if (paiementCible.client_id !== req.user.id) {
+      return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
+    }
+
     await finaliserConfirmationPaiement(payment_intent_id);
     res.json({ message: 'Paiement confirmé ✨' });
   } catch (e) {
@@ -6538,7 +6666,9 @@ function validerPhotos(photos, max) {
     if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
       return 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).';
     }
-    if (p.length > 800 * 1024) {  // 800 ko : une demande reste sous 4 Mo au total
+    // Même correction qu'à la création d'une demande.
+      const octetsPhoto = Buffer.byteLength(p.slice(p.indexOf(',') + 1), 'base64');
+      if (octetsPhoto > 800 * 1024) {  // 800 ko : une demande reste sous 4 Mo au total
       return 'Une photo est trop volumineuse. Réessayez avec une photo plus légère.';
     }
   }
@@ -7451,6 +7581,53 @@ app.post('/api/signalements', auth, async (req, res) => {
   try {
     const { signale_id, demande_id, motif, description } = req.body;
     if (!motif) return res.status(400).json({ error: 'Motif requis.' });
+
+    // ── ON NE SIGNALE QUE SES PROPRES PRESTATIONS ─────────────────────────
+    // La route acceptait n'importe quel `demande_id` et n'importe quel
+    // `signale_id`, sans vérifier que l'auteur participait à la prestation.
+    //
+    // Ce que cela permettait : salir la réputation d'un prestataire qu'on n'a
+    // jamais rencontré, en accumulant des signalements sur des prestations
+    // dont on ne fait pas partie. Les signalements comptent dans votre
+    // administration, et un signalement ouvert SUSPEND un versement.
+    //
+    // UN SIGNALEMENT SANS DEMANDE RESTE POSSIBLE
+    //
+    // C'est le contact au support : « je n'arrive pas à me connecter » n'est
+    // rattaché à aucune prestation. On ne contrôle donc que si `demande_id`
+    // est fourni.
+    if (demande_id) {
+      const { data: demandeSignalee } = await supabase.from('demandes')
+        .select('id, client_id').eq('id', demande_id).maybeSingle();
+      if (!demandeSignalee) {
+        return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
+      }
+
+      // Le prestataire de la prestation est celui dont le devis a été retenu.
+      const { data: devisRetenu } = await supabase.from('devis')
+        .select('societe_id').eq('demande_id', demande_id)
+        .eq('statut', 'accepte').maybeSingle();
+      const proId = devisRetenu ? devisRetenu.societe_id : null;
+
+      const estClient = demandeSignalee.client_id === req.user.id;
+      const estPro = proId && proId === req.user.id;
+
+      if (!estClient && !estPro) {
+        return res.status(403).json({
+          error: 'Vous ne participez pas à cette prestation.'
+        });
+      }
+
+      // Et on ne peut signaler que l'autre partie — ni soi-même, ni un tiers.
+      if (signale_id) {
+        const autrePartie = estClient ? proId : demandeSignalee.client_id;
+        if (!autrePartie || signale_id !== autrePartie) {
+          return res.status(400).json({
+            error: 'La personne signalée ne participe pas à cette prestation.'
+          });
+        }
+      }
+    }
 
     const { data: signalement, error } = await supabase.from('signalements').insert({
       reporter_id: req.user.id,
@@ -9658,6 +9835,9 @@ async function balayerPrestationsAValider() {
 
     const sansArrivee = await cloturerPrestationsSansArrivee();
     if (sansArrivee) console.log('🕳 ' + sansArrivee + ' prestation(s) sans arrivée déclarée — remboursée(s).');
+
+    const purges = await purgerDocumentsExpires();
+    if (purges) console.log('🗑 ' + purges + ' document(s) expiré(s) depuis 90 jours — supprimé(s).');
     const closes = await cloturerPrestationsOubliees();
     await avertirValidationProche();
     CLOTURE_DERNIER_RESULTAT = (typeof closes === 'number')
