@@ -48,6 +48,46 @@ const LOGO_EMAIL = `<svg width="26" height="26" viewBox="0 0 100 100" style="ver
 //
 // L'identifiant n'est pas un secret : il ne donne aucun accès, il sert
 // uniquement à comparer. Sans jeton valide, il ne permet rien.
+// ═══════════════════════════════════════════════════════════════════════════
+// UNE DATE LISIBLE EN FRANÇAIS
+//
+// Les créneaux sont stockés « 2026-08-25 à 23h00 » — un format pratique pour
+// trier en base, illisible dans un courriel. On y lit l'année en premier,
+// alors qu'en France la date se lit du jour vers l'année.
+//
+// « lundi 25 août 2026 à 23h00 » se comprend d'un coup d'œil, et le jour de
+// la semaine évite l'erreur la plus fréquente : confondre deux dates proches.
+//
+// CE QUI N'EST PAS RECONNU RESTE INTACT
+//
+// Un créneau au format inattendu — ancien, ou saisi autrement — est renvoyé
+// tel quel. Mieux vaut une date brute qu'un « Invalid Date » dans un courriel
+// qui part chez un client.
+// ═══════════════════════════════════════════════════════════════════════════
+const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+              'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+function dateFrancaise(creneau) {
+  if (!creneau) return '';
+  const texte = String(creneau);
+
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:\s*(?:à|a|T)\s*(\d{1,2})[h:](\d{2}))?/.exec(texte);
+  if (!m) return texte;
+
+  const annee = Number(m[1]), mois = Number(m[2]) - 1, jour = Number(m[3]);
+  if (mois < 0 || mois > 11) return texte;
+
+  // On construit la date en heure locale : le créneau n'a pas de fuseau, il
+  // désigne une heure de rendez-vous, pas un instant universel.
+  const d = new Date(annee, mois, jour);
+  if (isNaN(d.getTime())) return texte;
+
+  let rendu = JOURS[d.getDay()] + ' ' + jour + ' ' + MOIS[mois] + ' ' + annee;
+  if (m[4] !== undefined) rendu += ' à ' + m[4] + 'h' + m[5];
+  return rendu;
+}
+
 function lienAvecCompte(url, compteId) {
   if (!url || !compteId) return url;
   return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(compteId);
@@ -137,7 +177,7 @@ const templates = {
                Vous recevrez un second message dès son paiement — c'est celui-là
                qui vaut réservation.
              </p>
-             <p><strong>Créneau prévu :</strong> ${d.creneau}</p>`,
+             <p><strong>Créneau prévu :</strong> ${dateFrancaise(d.creneau)}</p>`,
       ctaLabel: 'Voir la demande',
       compteId: d.compteId,
       ctaUrl: `${APP_URL}#demande-${d.demandeId}`,
@@ -214,7 +254,7 @@ const templates = {
     subject: `Votre prestataire a annulé la prestation`,
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
-      body: `<p>Le prestataire a annulé la prestation <strong>${d.prestation}</strong> prévue le ${d.creneau}.</p>
+      body: `<p>Le prestataire a annulé la prestation <strong>${d.prestation}</strong> prévue le ${dateFrancaise(d.creneau)}.</p>
              <p>Votre demande a été remise à disposition des autres prestataires. Vous recevrez de nouveaux devis prochainement.</p>`,
       ctaLabel: 'Voir ma demande',
       compteId: d.compteId,
@@ -233,7 +273,7 @@ const templates = {
     subject: `Votre demande de ${d.prestation} n'a pas trouvé de prestataire`,
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
-      body: `<p>Le créneau que vous aviez choisi pour votre demande de <strong>${d.prestation}</strong> — ${d.creneau} — est maintenant passé.</p>
+      body: `<p>Le créneau que vous aviez choisi pour votre demande de <strong>${d.prestation}</strong> — ${dateFrancaise(d.creneau)} — est maintenant passé.</p>
              <p>${d.avaitDevis
                ? `Vous aviez reçu des devis, mais aucun n'a été réglé avant l'heure prévue.`
                : `Aucun prestataire disponible n'a pu répondre à temps sur votre secteur.`}</p>
@@ -298,7 +338,7 @@ const templates = {
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
       body: `<p>Votre prestation récurrente (${d.prestation}) a bien été réalisée — la prochaine est déjà programmée automatiquement :</p>
-             <p style="font-size:18px;font-weight:700;color:#0E5A63;text-align:center;margin:20px 0">${d.date} à ${d.heure}</p>
+             <p style="font-size:18px;font-weight:700;color:#0E5A63;text-align:center;margin:20px 0">${dateFrancaise(d.date)} à ${d.heure}</p>
              <p>Vous pouvez la modifier, la mettre en pause, ou l'annuler à tout moment depuis l'application.</p>`,
     }),
   }),
@@ -330,7 +370,7 @@ const templates = {
     subject: `Le client a annulé la prestation`,
     html: wrapTemplate({
       title: `Bonjour ${d.prenom},`,
-      body: `<p>Le client a annulé la prestation <strong>${d.prestation}</strong>${d.creneau ? ` prévue le ${d.creneau}` : ''}.</p>
+      body: `<p>Le client a annulé la prestation <strong>${d.prestation}</strong>${d.creneau ? ` prévue le ${dateFrancaise(d.creneau)}` : ''}.</p>
              ${d.tardive ? `<p style="color:#D97706;"><strong>Annulation tardive</strong> (moins de 24h avant le créneau prévu).</p>` : ''}
              <p>Vous n'avez plus besoin de vous rendre à ce rendez-vous.</p>`,
       ctaLabel: 'Voir mes devis',
@@ -349,7 +389,7 @@ const templates = {
       body: `<p>Une demande publiée il y a 24 heures près de chez vous n'a encore reçu <strong>aucun devis</strong>.</p>
              <p><strong>Prestation :</strong> ${d.prestation}<br/>
                 <strong>Ville :</strong> ${d.ville || 'Non précisée'}${d.distance ? `<br/><strong>Distance :</strong> ${d.distance} km` : ''}
-                ${d.creneau ? `<br/><strong>Créneau souhaité :</strong> ${d.creneau}` : ''}</p>
+                ${d.creneau ? `<br/><strong>Créneau souhaité :</strong> ${dateFrancaise(d.creneau)}` : ''}</p>
              <p>Le client attend. Vous êtes pour l'instant seul à pouvoir y répondre.</p>`,
       ctaLabel: 'Envoyer mon devis',
       compteId: d.compteId,
@@ -373,7 +413,7 @@ const templates = {
                <li>Ajouter des photos : les prestataires répondent plus volontiers à une demande
                    dont ils mesurent précisément le travail</li>
              </ul>
-             <p>Votre demande reste active${d.creneau ? ` jusqu'au ${d.creneau}` : ''}. Vous pouvez la
+             <p>Votre demande reste active${d.creneau ? ` jusqu'au ${dateFrancaise(d.creneau)}` : ''}. Vous pouvez la
                 modifier à tout moment depuis l'application.</p>`,
       ctaLabel: 'Modifier ma demande',
       compteId: d.compteId,
