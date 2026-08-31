@@ -6032,9 +6032,24 @@ function libellePrestation(cle) {
   // Une demande peut porter plusieurs prestations, séparées par « + ».
   return brut.split('+').map(function (part) {
     var c = part.trim().toLowerCase();
+
+    // ── UN NOMBRE PEUT PRÉCÉDER LA CLÉ ───────────────────────────────────
+    // Depuis que le client peut demander deux véhicules, le libellé stocké
+    // ressemble à « 2 voiture + canape ». Sans ce traitement, « 2 voiture »
+    // ne correspondait à aucune clé et s'affichait tel quel — sans accent et
+    // sans pluriel.
+    var m = /^(\d+)\s+(.+)$/.exec(c);
+    var nombre = m ? parseInt(m[1], 10) : 1;
+    if (m) c = m[2];
+
     var trouve = (typeof PANIERS_MOYENS !== 'undefined')
       ? PANIERS_MOYENS.filter(function (p) { return p.cle === c; })[0] : null;
-    return trouve ? trouve.nom : (c.charAt(0).toUpperCase() + c.slice(1));
+    var nom = trouve ? trouve.nom : (c.charAt(0).toUpperCase() + c.slice(1));
+
+    // Le pluriel se contente d'un « s » : aucun nom de prestation n'a de
+    // pluriel irrégulier, et « Tapis » se termine déjà par un s.
+    if (nombre > 1) return nombre + ' ' + nom + (/s$/i.test(nom) ? '' : 's');
+    return nom;
   }).join(' + ');
 }
 
@@ -10808,9 +10823,11 @@ async function envoyerDevis(demandeId){
 
 // ── TARIFICATION (Vague 2) ──
 const TARIF_CATEGORIES=[
-  {key:'voiture',label:'🚗 Voiture',tiers:['citadine','berline','suv_4x4','monospace','utilitaire'],
-    tierLabels:{citadine:'Citadine',berline:'Berline',suv_4x4:'SUV / 4x4',monospace:'Monospace',utilitaire:'Utilitaire / Van'},
-    tierPlaceholders:{citadine:85,berline:105,suv_4x4:128,monospace:132,utilitaire:153},
+  {key:'voiture',label:'🚗 Voiture',// Le haut de gamme est ajouté ici aussi : le prestataire doit pouvoir en
+    // fixer le prix, sinon il recevrait des demandes qu'il ne sait pas tarifer.
+    tiers:['citadine','berline','suv_4x4','monospace','utilitaire','haut_de_gamme'],
+    tierLabels:{citadine:'Citadine',berline:'Berline',suv_4x4:'SUV / 4x4',monospace:'Monospace',utilitaire:'Utilitaire / Van',haut_de_gamme:'Haut de gamme'},
+    tierPlaceholders:{citadine:85,berline:105,suv_4x4:128,monospace:132,utilitaire:153,haut_de_gamme:190},
     note:'Prix pour un nettoyage intérieur + extérieur complet, état propre. Le type de nettoyage (intérieur seul/extérieur seul) ajuste ensuite automatiquement.'},
   {key:'canape',label:'🛋️ Canapé',tiers:['A','B','C','D'],
     tierLabels:{A:'2 places',B:'3 places',C:'4 places',D:'5+ places / angle'},
@@ -11836,7 +11853,35 @@ async function validerCodePro(demandeId,btn){
 // retirait au lieu de l'ajouter.
 function majAffichageSelectionPrestations(){
   document.querySelectorAll('.svc-card[data-svc]').forEach(function(c){
-    c.classList.toggle('selected',selectedServices.indexOf(c.getAttribute('data-svc'))>=0);
+    var svc=c.getAttribute('data-svc');
+    var n=compterArticles(svc);
+    c.classList.toggle('selected',n>0);
+
+    // ── LE COMPTEUR N'APPARAÎT QU'UNE FOIS LA CARTE CHOISIE ─────────────
+    // Afficher « + / − » sur toutes les cartes encombrerait l'écran de
+    // commandes inutiles. Il ne sert qu'après le premier clic — au moment
+    // où la question « j'en ai deux » se pose.
+    var barre=c.querySelector('.compteur-articles');
+    if(n>1||(n===1&&c.classList.contains('selected'))){
+      if(!barre){
+        barre=document.createElement('div');
+        barre.className='compteur-articles';
+        barre.style.cssText='display:flex;align-items:center;justify-content:center;'
+          +'gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.06)';
+        c.appendChild(barre);
+      }
+      barre.innerHTML=
+        '<button type="button" onclick="retirerUnDeplus(event,\''+escAttr(svc)+'\')" '
+        + 'style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bord);'
+        + 'background:#fff;font-size:16px;line-height:1;cursor:pointer;color:var(--text)"'
+        + (n<=1?' disabled':'')+'>−</button>'
+        + '<span style="font-weight:800;font-size:14px;min-width:20px;text-align:center">'+n+'</span>'
+        + '<button type="button" onclick="ajouterUnDeplus(event,\''+escAttr(svc)+'\')" '
+        + 'style="width:26px;height:26px;border-radius:50%;border:1px solid var(--bord);'
+        + 'background:#fff;font-size:16px;line-height:1;cursor:pointer;color:var(--text)">+</button>';
+    } else if(barre){
+      barre.remove();
+    }
   });
   ['continue-svc-btn','continue-svc-btn-invite'].forEach(function(idBtn){
     var btn=document.getElementById(idBtn);
@@ -11850,11 +11895,74 @@ function viderSelectionPrestations(){
   selectedServices=[];
   majAffichageSelectionPrestations();
 }
+// ── UN CLIENT PEUT AVOIR DEUX VOITURES ──────────────────────────────────
+// La sélection multiple de TYPES existait déjà : cocher « canapé » et
+// « voiture » ouvre une file, et toutes les questions de chacun sont posées.
+//
+// Ce qui manquait : cocher DEUX FOIS « voiture ». Un client avec une citadine
+// et un SUV devait faire deux demandes séparées — donc deux déplacements
+// facturés, deux créneaux, deux paiements.
+//
+// `selectedServices` est un TABLEAU, pas un ensemble. Y placer deux fois le
+// même type suffit : la file ouvrira deux fois le formulaire, avec des
+// réponses indépendantes.
 function toggleSvc(card,svc){
   var idx=selectedServices.indexOf(svc);
-  if(idx>=0)selectedServices.splice(idx,1);
-  else selectedServices.push(svc);
+  if(idx>=0){
+    // On retire TOUTES les occurrences : décocher une carte doit l'effacer
+    // entièrement, pas en enlever une sur trois.
+    selectedServices=selectedServices.filter(function(s){return s!==svc});
+  } else {
+    selectedServices.push(svc);
+  }
   majAffichageSelectionPrestations();
+}
+
+// Cinq articles au maximum. Au-delà, ce n'est plus un particulier — et le
+// questionnaire deviendrait décourageant : cinq voitures, c'est vingt
+// questions d'affilée.
+var MAX_ARTICLES=5;
+
+function ajouterUnDeplus(evenement,svc){
+  // Le clic ne doit pas atteindre la carte, sinon toggleSvc désélectionne
+  // tout juste après.
+  if(evenement)evenement.stopPropagation();
+  if(selectedServices.length>=MAX_ARTICLES){
+    toast('Cinq articles au maximum par demande.');
+    return;
+  }
+  selectedServices.push(svc);
+  majAffichageSelectionPrestations();
+}
+
+function retirerUnDeplus(evenement,svc){
+  if(evenement)evenement.stopPropagation();
+  var idx=selectedServices.lastIndexOf(svc);
+  if(idx>=0)selectedServices.splice(idx,1);
+  majAffichageSelectionPrestations();
+}
+
+// ── « VOITURE 1 SUR 2 » PLUTÔT QUE « PRESTATION 1 SUR 3 » ───────────────
+// Quand le même type revient plusieurs fois, le numéro global ne dit rien.
+// Le client a besoin de savoir QUEL article il décrit — sinon il saisit deux
+// fois la même voiture sans s'en apercevoir.
+function libelleEtapeMulti(file, position) {
+  var type = file[position];
+  var total = file.filter(function(t){ return t === type }).length;
+
+  if (total <= 1) {
+    return 'Prestation ' + (position + 1) + ' sur ' + file.length;
+  }
+
+  // Le rang de cet article parmi ceux de son type.
+  var rang = 0;
+  for (var i = 0; i <= position; i++) if (file[i] === type) rang++;
+
+  return libellePrestation(type) + ' ' + rang + ' sur ' + total;
+}
+
+function compterArticles(svc){
+  return selectedServices.filter(function(s){return s===svc}).length;
 }
 function startMultiServiceFlow(){
   if(!selectedServices.length)return;
@@ -13366,7 +13474,15 @@ async function openServiceForm(type){
     }
     dotsMultiService='<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
       '<div style="display:flex;gap:5px">'+dots+'</div>'+
-      '<span style="font-size:11px;color:var(--gray);font-weight:700">Prestation '+(multiFlow.current+1)+' sur '+multiFlow.queue.length+'</span>'+
+      // ── DIRE DE QUEL ARTICLE IL S'AGIT ─────────────────────────────────
+    // « Prestation 1 sur 2 » suffisait quand les deux étaient de types
+    // différents. Avec deux voitures, le client ne sait plus laquelle il
+    // décrit — et il risque de saisir deux fois le même véhicule.
+    //
+    // On numérote donc au sein du type : « Voiture 1 sur 2 ».
+    '<span style="font-size:11px;color:var(--gray);font-weight:700">'
+      + escapeHtml(libelleEtapeMulti(multiFlow.queue, multiFlow.current))
+      + '</span>'+
     '</div>';
   }
   var modalBody=document.getElementById('modal-body');
@@ -14375,7 +14491,13 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="berline" onclick="selOpt(this)"><span>🚘</span>Berline</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
   '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="monospace" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
-  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚚</span>Utilitaire</button></div></div>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚚</span>Utilitaire</button>'+
+  // ── LE HAUT DE GAMME EST UN MÉTIER À PART ──────────────────────────────
+  // Cuir pleine fleur, plastiques fragiles, jantes qui ne supportent pas les
+  // produits courants. Sans ce choix, une sportive ou une berline de luxe
+  // devait être classée en « berline » — et le prestataire travaillait deux
+  // heures de plus au même prix, ou refusait la demande.
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="haut_de_gamme" onclick="selOpt(this)"><span>✨</span>Haut de gamme</button></div></div>'+
   '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
