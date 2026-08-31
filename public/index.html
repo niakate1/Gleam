@@ -11944,6 +11944,52 @@ var MAX_ARTICLES=5;
 // quantité se règle dans le questionnaire.
 var TYPES_QUANTITE_INTERNE = ['vitres', 'tapis'];
 
+// ── LE NOM AU SINGULIER, DANS LA PHRASE ─────────────────────────────────────
+// « + Ajouter un autre Voiture » se lit mal. Quelques noms suffisent : les
+// autres prestations n'acceptent pas les doublons.
+var NOMS_ARTICLE = {
+  voiture: 'véhicule',
+  canape: 'canapé',
+  matelas: 'matelas',
+  terrasse: 'espace',
+  toiture: 'toit',
+  piscine: 'bassin',
+  autre: 'article'
+};
+
+function nomArticle(type) {
+  return NOMS_ARTICLE[type] || 'article';
+}
+
+// ── AJOUTER UN ARTICLE SANS PERDRE CE QUI VIENT D'ÊTRE SAISI ────────────────
+// Le client a décrit sa première voiture. En cliquant, on enregistre ce
+// qu'il a répondu, on ajoute une place dans la file, et on rouvre un
+// formulaire VIERGE pour la suivante.
+//
+// C'est exactement ce que fait déjà `sendDemand` entre deux prestations
+// différentes — on réutilise le même chemin plutôt que d'en écrire un second
+// qui finirait par diverger.
+function ajouterArticleEtRecommencer(type) {
+  if (selectedServices.length >= MAX_ARTICLES) {
+    toast('Cinq articles au maximum par demande.');
+    return;
+  }
+
+  // La file doit exister : un client qui n'a coché qu'une carte n'est pas
+  // encore passé par startMultiServiceFlow.
+  if (!multiFlow.active) {
+    multiFlow = { active: true, queue: [type], current: 0, results: [] };
+  }
+
+  // On insère le nouvel article JUSTE APRÈS celui en cours, pour que les
+  // véhicules restent groupés plutôt que renvoyés en fin de file.
+  selectedServices.push(type);
+  multiFlow.queue.splice(multiFlow.current + 1, 0, type);
+
+  // `sendDemand` enregistre les réponses courantes et passe à la suivante.
+  sendDemand(type);
+}
+
 function accepteDoublons(svc) {
   return TYPES_QUANTITE_INTERNE.indexOf(svc) < 0;
 }
@@ -11997,58 +12043,23 @@ function libelleEtapeMulti(file, position) {
 // voit d'un coup ce qu'il a demandé.
 //
 // La zone n'apparaît que s'il y a une sélection, et disparaît sinon.
+// ── LA QUANTITÉ NE SE DEMANDE PLUS À L'AVANCE ───────────────────────────────
+// Ma première version posait « Combien en avez-vous ? » dès qu'une carte était
+// cochée. Neuf clients sur dix ont UNE voiture : ils subissaient une question
+// pour rien.
+//
+// La quantité se règle désormais À LA FIN du questionnaire, par un bouton
+// « Ajouter un autre véhicule ». Celui qui n'en a qu'un ne voit rien de plus,
+// et celui qui en a deux le dit au moment où il y pense — juste après avoir
+// décrit le premier.
+//
+// La fonction reste, vidée : elle est appelée depuis l'affichage des cartes et
+// la retirer demanderait de toucher trois endroits pour aucun gain.
 function majReglageQuantites() {
-  // Deux grilles existent : celle de l'invité et celle du client connecté.
-  // Une seule est visible à la fois, mais remplir les deux évite de deviner
-  // laquelle — et le coût est nul.
-  var zones = ['reglage-quantites', 'reglage-quantites-invite']
-    .map(function (id) { return document.getElementById(id); })
-    .filter(Boolean);
-  if (!zones.length) return;
-
-  // Les types choisis, sans répétition et dans l'ordre de sélection.
-  // Seuls les types qui acceptent les doublons ont besoin d'un réglage :
-  // « vitres » et « tapis » comptent déjà leurs unités dans le questionnaire.
-  var types = [];
-  selectedServices.forEach(function (s) {
-    if (types.indexOf(s) < 0 && accepteDoublons(s)) types.push(s);
+  ['reglage-quantites', 'reglage-quantites-invite'].forEach(function (id) {
+    var z = document.getElementById(id);
+    if (z) { z.innerHTML = ''; z.style.display = 'none'; }
   });
-
-  if (!types.length) {
-    zones.forEach(function (z) { z.innerHTML = ''; z.style.display = 'none'; });
-    return;
-  }
-
-  var html =
-    '<div class="petit" style="margin:14px 0 8px;font-weight:700;color:var(--text)">'
-    + 'Combien en avez-vous ?</div>'
-    + types.map(function (svc) {
-        var n = compterArticles(svc);
-        return '<div style="display:flex;align-items:center;justify-content:space-between;'
-          + 'gap:12px;padding:10px 12px;background:var(--surface-alt);'
-          + 'border-radius:10px;margin-bottom:6px">'
-          + '<span style="font-size:14px;font-weight:600">'
-          +   escapeHtml(libellePrestation(svc)) + '</span>'
-          + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0">'
-          +   '<button type="button" onclick="retirerUnDeplus(event,\'' + escAttr(svc) + '\')" '
-          +     'aria-label="Retirer un ' + escAttr(libellePrestation(svc)) + '" '
-          +     'style="width:30px;height:30px;border-radius:50%;border:1px solid var(--bord);'
-          +     'background:#fff;font-size:18px;line-height:1;cursor:pointer;color:var(--text)"'
-          +     (n <= 1 ? ' disabled style="opacity:.4"' : '') + '>\u2212</button>'
-          +   '<span style="font-weight:800;font-size:15px;min-width:18px;text-align:center">'
-          +     n + '</span>'
-          +   '<button type="button" onclick="ajouterUnDeplus(event,\'' + escAttr(svc) + '\')" '
-          +     'aria-label="Ajouter un ' + escAttr(libellePrestation(svc)) + '" '
-          +     'style="width:30px;height:30px;border-radius:50%;border:1px solid var(--bord);'
-          +     'background:#fff;font-size:18px;line-height:1;cursor:pointer;color:var(--text)">+</button>'
-          + '</div></div>';
-      }).join('')
-    + (selectedServices.length >= MAX_ARTICLES
-        ? '<div class="petit" style="color:var(--amber);margin-top:4px">'
-          + 'Cinq articles au maximum par demande.</div>'
-        : '');
-
-  zones.forEach(function (z) { z.style.display = 'block'; z.innerHTML = html; });
 }
 
 // ── COMBIEN DE PHOTOS POUR CETTE DEMANDE ────────────────────────────────────
@@ -14247,6 +14258,25 @@ function sendBtn(type){
   if(!multiFlow.active||isLast){
     html+='<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin:10px 0;font-size:11.5px;color:var(--gray)"><i data-lucide="lock" style="width:13px;height:13px"></i> Paiement sécurisé, débité seulement après la prestation</div>';
   }
+  // ── AJOUTER UN AUTRE ARTICLE, AU BON MOMENT ──────────────────────────────
+  // Demander « combien en avez-vous ? » avant le questionnaire imposait une
+  // question à tout le monde pour servir la minorité qui en a deux.
+  //
+  // Ici, le client vient de décrire sa voiture. S'il en a une seconde, c'est
+  // maintenant qu'il y pense — et un seul clic suffit. S'il n'en a qu'une, il
+  // ne voit qu'un lien discret sous le bouton.
+  //
+  // Vitres et tapis comptent déjà leurs unités dans leur propre questionnaire.
+  if (accepteDoublons(type) && selectedServices.length < MAX_ARTICLES) {
+    html += '<button type="button" class="btn-ajouter-article" '
+      + 'onclick="ajouterArticleEtRecommencer(\'' + escAttr(type) + '\')" '
+      + 'style="width:100%;margin-top:10px;padding:12px;border:1px dashed var(--bord);'
+      + 'border-radius:12px;background:transparent;color:var(--p);font-size:14px;'
+      + 'font-weight:700;font-family:inherit;cursor:pointer">'
+      + '+ Ajouter un autre ' + escapeHtml(nomArticle(type))
+      + '</button>';
+  }
+
   html+='<button class="modal-send-btn" id="send-demand-btn" onclick="sendDemand(\''+type+'\')">'+label+'</button>';
   return html;
 }
