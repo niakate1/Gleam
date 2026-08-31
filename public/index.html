@@ -11871,7 +11871,9 @@ function majAffichageSelectionPrestations(){
     // Une pastille dans le coin ne coûte rien en largeur. Le réglage de la
     // quantité se fait juste en dessous de la grille, où la place existe.
     var pastille = c.querySelector('.badge-quantite');
-    if (n > 1) {
+    // Vitres et tapis n'atteignent jamais n > 1, mais la condition rend
+    // l'intention lisible pour qui relira ce code.
+    if (n > 1 && accepteDoublons(svc)) {
       if (!pastille) {
         pastille = document.createElement('span');
         pastille.className = 'badge-quantite';
@@ -11929,10 +11931,29 @@ function toggleSvc(card,svc){
 // questions d'affilée.
 var MAX_ARTICLES=5;
 
+// ── DEUX PRESTATIONS COMPTENT DÉJÀ LEURS UNITÉS ─────────────────────────────
+// Le formulaire « vitres » demande combien de fenêtres, et « tapis » combien
+// de petits, moyens et grands tapis.
+//
+// Leur proposer en plus « combien de fois ? » sur la carte poserait deux fois
+// la même question, avec deux réponses possibles — et un client qui coche
+// « ×2 » puis saisit « 8 fenêtres » ne sait plus s'il en a demandé huit ou
+// seize.
+//
+// Ces deux-là gardent donc le comportement d'origine : un seul article, et la
+// quantité se règle dans le questionnaire.
+var TYPES_QUANTITE_INTERNE = ['vitres', 'tapis'];
+
+function accepteDoublons(svc) {
+  return TYPES_QUANTITE_INTERNE.indexOf(svc) < 0;
+}
+
 function ajouterUnDeplus(evenement,svc){
   // Le clic ne doit pas atteindre la carte, sinon toggleSvc désélectionne
   // tout juste après.
   if(evenement)evenement.stopPropagation();
+  // Vitres et tapis comptent leurs unités dans le questionnaire.
+  if(!accepteDoublons(svc))return;
   if(selectedServices.length>=MAX_ARTICLES){
     toast('Cinq articles au maximum par demande.');
     return;
@@ -11986,9 +12007,11 @@ function majReglageQuantites() {
   if (!zones.length) return;
 
   // Les types choisis, sans répétition et dans l'ordre de sélection.
+  // Seuls les types qui acceptent les doublons ont besoin d'un réglage :
+  // « vitres » et « tapis » comptent déjà leurs unités dans le questionnaire.
   var types = [];
   selectedServices.forEach(function (s) {
-    if (types.indexOf(s) < 0) types.push(s);
+    if (types.indexOf(s) < 0 && accepteDoublons(s)) types.push(s);
   });
 
   if (!types.length) {
