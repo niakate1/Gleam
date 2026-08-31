@@ -1067,9 +1067,20 @@ const PRESTATION_CONFIG = {
     // parc français. Une berline devait être classée en citadine ou en SUV, deux
     // réponses fausses. 105 € : la recherche de marché donne 85 à 110 € pour un
     // nettoyage complet de berline (2 h), c'est le seul chiffre précis disponible.
-    tiers: ['citadine', 'berline', 'suv_4x4', 'monospace', 'utilitaire'],
-    tierLabels: { citadine: 'Citadine', berline: 'Berline', suv_4x4: 'SUV / 4x4', monospace: 'Monospace', utilitaire: 'Utilitaire / Van' },
-    tierDefaults: { citadine: 85, berline: 105, suv_4x4: 128, monospace: 132, utilitaire: 153 }, // intérieur+extérieur, propre
+    // ── LE HAUT DE GAMME EST UN MÉTIER À PART ──────────────────────────────
+    // Une berline allemande de collection, une sportive, un véhicule de luxe :
+    // le travail n'est pas le même. Cuir pleine fleur, plastiques fragiles,
+    // jantes qui ne supportent pas les produits courants.
+    //
+    // Sans ce palier, un prestataire devait classer une Porsche en « berline »
+    // et travailler deux heures de plus au même prix — ou refuser la demande.
+    //
+    // 190 € : le marché du detailing haut de gamme démarre autour de 180 € pour
+    // un nettoyage complet, contre 105 € pour une berline ordinaire. L'écart
+    // tient au temps et aux produits, pas à une majoration arbitraire.
+    tiers: ['citadine', 'berline', 'suv_4x4', 'monospace', 'utilitaire', 'haut_de_gamme'],
+    tierLabels: { citadine: 'Citadine', berline: 'Berline', suv_4x4: 'SUV / 4x4', monospace: 'Monospace', utilitaire: 'Utilitaire / Van', haut_de_gamme: 'Haut de gamme' },
+    tierDefaults: { citadine: 85, berline: 105, suv_4x4: 128, monospace: 132, utilitaire: 153, haut_de_gamme: 190 }, // intérieur+extérieur, propre
     coefPortee: { interieur: 0.70, exterieur: 0.55, complet: 1.0 },
     // Le nombre de places est un facteur secondaire : à type de véhicule identique, plus de places
     // signifie plus de surface à nettoyer (ex: un SUV 5 places vs un SUV 7 places).
@@ -2213,7 +2224,23 @@ app.post('/api/demandes', auth, async (req, res) => {
       ? prestations
       : [{ type: type || 'autre', description: description || '', details: details || {} }];
 
-    const prestationLabel = listePrestations.map(p => p.type).join(' + ');
+    // ── « 2 voitures + canape » PLUTÔT QUE « voiture + voiture + canape » ──
+    // Un client peut désormais demander deux véhicules dans une même
+    // prestation. Répéter le mot était illisible dès trois articles, et le
+    // prestataire devait compter les occurrences pour savoir ce qu'on lui
+    // demandait.
+    //
+    // Le libellé reste une CLÉ technique — sans accent, en minuscules. Il est
+    // affiché tel quel dans les listes, et `libellePrestation()` côté client
+    // s'occupe de le rendre lisible.
+    const compteParType = {};
+    for (const p of listePrestations) {
+      const t = p.type || 'autre';
+      compteParType[t] = (compteParType[t] || 0) + 1;
+    }
+    const prestationLabel = Object.keys(compteParType)
+      .map(t => (compteParType[t] > 1 ? compteParType[t] + ' ' + t : t))
+      .join(' + ');
 
     // Les photos partent dans le dépôt de fichiers ; seuls leurs chemins sont
     // conservés en base. Le dossier est tiré au hasard : l'identifiant de la
@@ -9547,9 +9574,34 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     // Le téléphone manquait. C'est pourtant l'information la plus utile de cet
     // écran : quand un dossier coince, un appel règle en trente secondes ce que
     // trois échanges d'emails n'ont pas réglé.
-    let requete = supabase.from('users').select('id, prenom, nom, email, telephone, type, disponible, compte_supprime, created_at, note_moyenne, taux_fiabilite, siret, siret_statut, siret_doublon').order('created_at', { ascending: false }).limit(100);
+    // ── LA LIMITE CACHAIT LES COMPTES SUIVANTS ────────────────────────────
+    // `limit(100)` sans pagination : au-delà du centième compte, les autres
+    // devenaient invisibles. Pas lents — invisibles, et sans que l'écran ne le
+    // dise.
+    //
+    // Avec de la publicité, ce seuil se franchit en quelques jours.
+    //
+    // `range(debut, fin)` remplace `limit`, et `count: 'exact'` renvoie le
+    // total : c'est lui qui permet d'afficher « 100 sur 3 412 » plutôt que de
+    // laisser croire qu'il n'y a que cent comptes.
+    const PAR_PAGE = 100;
+    const page = Math.max(0, parseInt(req.query.page, 10) || 0);
+    const debut = page * PAR_PAGE;
+
+    let requete = supabase.from('users')
+      .select('id, prenom, nom, email, telephone, type, disponible, compte_supprime, created_at, note_moyenne, taux_fiabilite, siret, siret_statut, siret_doublon',
+              { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(debut, debut + PAR_PAGE - 1);
+
     if (recherche) requete = requete.or(`email.ilike.%${recherche}%,prenom.ilike.%${recherche}%,nom.ilike.%${recherche}%`);
-    const { data } = await requete;
+
+    const { data, count } = await requete;
+
+    // L'écran attend un TABLEAU. Renvoyer un objet le casserait — le total
+    // voyage donc dans un en-tête, que l'écran lit s'il le veut.
+    res.set('X-Total-Comptes', String(count || 0));
+    res.set('X-Page', String(page));
     res.json(data || []);
   } catch (e) {
     erreurServeur(res, 'GET /api/admin/users', e);
