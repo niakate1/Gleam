@@ -2182,7 +2182,27 @@ app.post('/api/demandes', auth, async (req, res) => {
     // entre 3 jours et 1 an pour rester raisonnable, sans imposer de valeurs prédéfinies.
     const recurrenceValide = (Number.isInteger(recurrence) && recurrence >= 3 && recurrence <= 365) ? recurrence : null;
     if (photos && Array.isArray(photos)) {
-      if (photos.length > 5) return res.status(400).json({ error: 'Maximum 5 photos par demande.' });
+      // ── LA LIMITE SUIT LE NOMBRE D'ARTICLES ─────────────────────────────
+      // Cinq photos suffisaient pour un canapé. Pour deux voitures et un
+      // matelas, c'est moins de deux par article — le client devait choisir
+      // lesquelles montrer, ce qui dessert le devis autant que lui.
+      //
+      // Cinq pour le premier article, trois par article suivant, douze au
+      // total. Le plafond global compte autant que la règle : à quatre
+      // mégaoctets, la demande met du temps à partir, et un prestataire qui
+      // fait défiler quinze images n'en regarde plus aucune.
+      //
+      // Le nombre d'articles est celui de `prestations`, pas une valeur
+      // envoyée par le client : elle serait manipulable.
+      const nbArticles = (prestations && Array.isArray(prestations) && prestations.length)
+        ? prestations.length : 1;
+      const plafondPhotos = Math.min(5 + (nbArticles - 1) * 3, 12);
+
+      if (photos.length > plafondPhotos) {
+        return res.status(400).json({
+          error: 'Maximum ' + plafondPhotos + ' photos pour cette demande.'
+        });
+      }
       for (const p of photos) {
         if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
           return res.status(400).json({ error: 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).' });
