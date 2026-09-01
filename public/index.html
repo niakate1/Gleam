@@ -12126,8 +12126,27 @@ function plafondPhotos() {
 function compterArticles(svc){
   return selectedServices.filter(function(s){return s===svc}).length;
 }
+// ── LES ARTICLES DE MÊME TYPE SE SUIVENT ────────────────────────────────────
+// Le client coche voiture, puis canapé, puis ajoute un de chaque. La file
+// donnait alors : voiture, canapé, voiture, canapé.
+//
+// Il devait décrire une voiture, un canapé, puis revenir à une voiture — en
+// changeant de contexte à chaque écran. On regroupe donc par type, dans
+// l'ordre où il les a choisis la première fois.
+function regrouperParType(liste) {
+  var ordre = [];
+  liste.forEach(function (t) { if (ordre.indexOf(t) < 0) ordre.push(t); });
+
+  var groupee = [];
+  ordre.forEach(function (t) {
+    liste.forEach(function (x) { if (x === t) groupee.push(x); });
+  });
+  return groupee;
+}
+
 function startMultiServiceFlow(){
   if(!selectedServices.length)return;
+  selectedServices = regrouperParType(selectedServices);
   multiFlow={active:true,queue:selectedServices.slice(),current:0,results:[]};
   photos=[];
   openServiceForm(multiFlow.queue[0]);
@@ -14499,8 +14518,12 @@ async function updateEstimationMaintenant(){
   try{
     var url=API+'/api/tarifs/estimation?prestation='+encodeURIComponent(currentFormType)+'&etat='+encodeURIComponent(etat);
     if(UNIT_CATEGORIES_CLIENT.indexOf(currentFormType)>=0){
+// ── LE MATELAS N'A PLUS DE CHAMP « NOMBRE » ────────────────────────────
+      // Il est compté par la carte : un formulaire par matelas, chacun avec sa
+      // taille. Le serveur exige pourtant une quantité pour les catégories à
+      // l'unité — on lui envoie donc 1, ce qui est exact.
       var qEl=document.getElementById('f-quantite');
-      var quantite=qEl?parseInt(qEl.value,10):0;
+      var quantite=qEl?parseInt(qEl.value,10):(currentFormType==='matelas'?1:0);
       if(!quantite||quantite<=0){
         box.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic">💡 Indiquez une quantité ci-dessus pour voir une estimation de prix</div>';
         return;
@@ -14733,7 +14756,17 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
 
   '<button class="opt-btn" data-group="matelas-options" data-option-val="sommier" onclick="toggleOption(this)"><span>🪵</span>Sommier / tête de lit à traiter</button>'+
   '<button class="opt-btn full" data-group="matelas-options" data-option-val="tache_ancienne" onclick="toggleOption(this)"><span>🔴</span>Tache ancienne / tenace (urine, sang...)</button></div></div>'+
-  quantiteBlock('Nombre exact de matelas','Ex: 2')+
+  // ── LE NOMBRE SE RÈGLE SUR LA CARTE ────────────────────────────────────
+  // Ce champ demandait « combien de matelas ? » alors que le compteur de la
+  // carte pose déjà la question — et il la posait MOINS BIEN.
+  //
+  // « 2 matelas » suppose deux matelas identiques. Or on demande la taille
+  // juste au-dessus : un 90×190 et un 160×200 ne se nettoient pas au même
+  // prix, et le client n'avait aucun moyen de le dire.
+  //
+  // Le compteur de carte ouvre un formulaire par matelas, chacun avec sa
+  // taille et son état. C'est plus juste, et cela retire une question.
+
   etatBlock()+descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
 
 var DETAIL_TERRASSE_BASE='Balayage et dégagement • Nettoyage haute pression ou brossage adapté au revêtement • Démoussage • Rinçage';
@@ -15264,9 +15297,12 @@ function validateCurrentForm(type){
       return 'Merci de renseigner : '+getGroupLabel(groups[i]);
     }
   }
-  if(UNIT_CATEGORIES_CLIENT.indexOf(type)>=0){
-    var qEl=document.getElementById('f-quantite');
-    var q=qEl?parseFloat(qEl.value):NaN;
+  // Le matelas n'a plus de champ « nombre » : la carte en ouvre un formulaire
+  // par matelas. Exiger une quantité ici bloquerait l'envoi sur un champ qui
+  // n'existe plus.
+  if(UNIT_CATEGORIES_CLIENT.indexOf(type)>=0 && type!=='matelas'){
+      var qEl=document.getElementById('f-quantite');
+      var q=qEl?parseFloat(qEl.value):NaN;
     if(!qEl||!qEl.value.trim()||isNaN(q)||q<=0){
       var qLabel=qEl&&qEl.closest('.field-group')&&qEl.closest('.field-group').querySelector('label');
       return 'Merci d\'indiquer '+(qLabel?qLabel.textContent.trim().toLowerCase():'la quantité exacte')+' pour continuer.';
@@ -15325,9 +15361,16 @@ async function sendDemand(type){
   });
   if(type==='autre'){var t=document.getElementById('f-autre-type')&&document.getElementById('f-autre-type').value.trim();if(t)details['type-prestation']=t}
   if(UNIT_CATEGORIES_CLIENT.indexOf(type)>=0){
-    var qEl=document.getElementById('f-quantite');
-    if(qEl&&qEl.value.trim())details['quantite']=qEl.value.trim();
-  }
+      var qEl=document.getElementById('f-quantite');
+      if(qEl&&qEl.value.trim()){
+        details['quantite']=qEl.value.trim();
+      } else if(type==='matelas'){
+        // Le champ « nombre de matelas » a été retiré : la carte en ouvre un
+        // formulaire par matelas. Chacun en vaut donc exactement un, et le
+        // serveur exige une quantité pour les catégories à l'unité.
+        details['quantite']='1';
+      }
+    }
   if(window.nbVitresCalcule)details['nb_vitres']=String(window.nbVitresCalcule);
   // Le compte par matière : « Laine ×2, Synthétique ×1 ». Sans lui, le
   // prestataire connaît les matières mais pas les quantités, et ne peut ni
