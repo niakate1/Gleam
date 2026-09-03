@@ -4217,7 +4217,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 .champ-icone { position: relative; }
 
-/* `> i` ET `> svg` : lucide.createIcons() remplace l'élément <i> par un <svg>.
+/* `> i` ET `> svg` : dessinerIcones() remplace l'élément <i> par un <svg>.
    Selon la version, le sélecteur `> i` peut donc ne plus rien viser après le
    rendu des icônes — l'icône retomberait dans le flux, au-dessus du champ,
    au lieu d'être positionnée dedans. Viser les deux couvre les deux cas. */
@@ -5351,7 +5351,22 @@ textarea { min-height: 92px; padding-top: 13px; }
 <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotos(this)">
 
 <script src="https://js.stripe.com/v3/"></script>
-<script src="https://unpkg.com/lucide@1.28.0/dist/umd/lucide.js"></script>
+<!-- ── LUCIDE 1.x N'A PLUS DE BUILD UMD ─────────────────────────────────
+     La version 1.28.0 chargeait `dist/umd/lucide.js`. Or Lucide 1.0 a
+     SUPPRIMÉ ce format : « we have removed the UMD build from Lucide
+     Version 1. We now only support ESM and CJS ».
+
+     unpkg répondait 200 — mais avec une page de repli, pas le script.
+     `window.lucide` restait indéfini, et les 26 appels à
+     `dessinerIcones()` levaient chacun une exception.
+
+     Résultat : aucune icône, et toute fonction qui en appelait une
+     s'interrompait — y compris l'affichage des cartes de prestation.
+
+     0.544.0 est la dernière version à fournir l'UMD. Version figée,
+     et non `@latest` : c'est précisément une mise à jour automatique
+     qui a causé ce défaut. -->
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script></script>
 <script>
 // L'API est désormais servie par le MÊME serveur que cette page. On utilise
 // donc une adresse relative : la requête ne sort plus du domaine, il n'y a
@@ -5455,7 +5470,7 @@ function majIconeTheme(){
   var systemeSombre=window.matchMedia('(prefers-color-scheme: dark)').matches;
   var estSombre=actuel?actuel==='dark':systemeSombre;
   icones.forEach(function(e){ e.setAttribute('data-lucide',estSombre?'sun':'moon') });
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 (function(){
   var themeMemorise=localStorage.getItem('gleam-theme');
@@ -5933,7 +5948,7 @@ function goTabInvite(cle){
     if(barre)barre.innerHTML=construireNavInvite(cle);
   });
   show(onglet.ecran);
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 // Au chargement, la barre doit exister avant le premier affichage : sans cela
@@ -5944,7 +5959,7 @@ function initNavInvite(){
     var barre=document.querySelector('#'+o.ecran+' .bottom-nav');
     if(barre&&!barre.innerHTML.trim())barre.innerHTML=construireNavInvite('accueil');
   });
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 // La demande qu'un visiteur a composée avant de créer son compte. Elle survit
@@ -6115,7 +6130,7 @@ function initDecouvertePro(){
   // s'appliquait à la voiture au premier affichage — soit 62 h de travail par
   // semaine, un chiffre qui décrédibilise tout le reste.
   choisirPrestationSimulee(simuPrestation);
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 function prestationSimulee(){
@@ -6289,7 +6304,7 @@ function demanderConfirmation(options){
     document.addEventListener('keydown',surTouche);
 
     overlay.classList.add('open');
-    if(window.lucide)lucide.createIcons();
+    if(window.lucide)dessinerIcones();
     setTimeout(function(){ (motAttendu?champ:btnNon).focus() },60);
   });
 }
@@ -6312,7 +6327,7 @@ function basculerVisibiliteMdp(idChamp,bouton){
   var icone=bouton.querySelector('i');
   var estMasque=champ.type==='password';
   champ.type=estMasque?'text':'password';
-  if(icone){icone.setAttribute('data-lucide',estMasque?'eye-off':'eye');if(window.lucide)lucide.createIcons()}
+  if(icone){icone.setAttribute('data-lucide',estMasque?'eye-off':'eye');if(window.lucide)dessinerIcones()}
 }
 function majForceMotDePasse(valeur){
   var barresBox=document.getElementById('force-mdp-barres'),texteBox=document.getElementById('force-mdp-texte');
@@ -6635,6 +6650,31 @@ function authHeaders(){
   if(t)base.Authorization='Bearer '+t;
   return base;
 }
+// ── LES ICÔNES NE DOIVENT JAMAIS CASSER L'APPLICATION ───────────────────────
+// `dessinerIcones()` était appelé 26 fois, directement. Le jour où le
+// script n'a plus été servi — Lucide 1.0 a supprimé le build UMD — chacun de
+// ces appels a levé une exception.
+//
+// Une exception interrompt la fonction qui la déclenche. Résultat : l'affichage
+// des cartes de prestation s'arrêtait à la première, et la page paraissait
+// vide.
+//
+// Une bibliothèque d'icônes est un CONFORT. Son absence doit dégrader
+// l'apparence, jamais empêcher de réserver ou de payer.
+function dessinerIcones() {
+  try {
+    if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  } catch (e) {
+    // Une seule alerte, pas 26 : la console resterait illisible.
+    if (!window.__iconesSignalees) {
+      window.__iconesSignalees = true;
+      console.warn('Icônes indisponibles :', e && e.message);
+    }
+  }
+}
+
 function escapeHtml(s){if(s===null||s===undefined)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML}
 function escAttr(s){// Les guillemets doubles, < et > sont désormais neutralisés : sans cela, un
 // prénom contenant un guillemet permettait de sortir de l'attribut HTML.
@@ -7526,7 +7566,7 @@ function renderNoteGlobale(elId,noteMoyenne){
   // illisible — contraste mesuré à 1:1.
   el.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px;background:var(--light);padding:5px 14px;border-radius:20px;font-weight:800;font-size:15px;color:var(--p)"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold)"></i> '+noteTxt+' <span style="font-weight:600;font-size:12px;color:var(--text-secondary)">/ 5</span></span>';
   el.style.display='block';
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 // Gère la sélection d'une nouvelle photo de profil : compression, envoi au serveur, mise à jour visuelle
@@ -7772,7 +7812,7 @@ async function renderActiveRequestBanner(data){
             '</div>'+
             '<i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--gray);flex-shrink:0"></i>'+
           '</div>';
-          if(window.lucide)lucide.createIcons();
+          if(window.lucide)dessinerIcones();
           return;
         }
       }catch(e){}
@@ -7848,7 +7888,7 @@ async function renderActiveRequestBanner(data){
     '</div>'+
     '<i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--gray);flex-shrink:0"></i>'+
   '</div>';
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 var devisClientCache={all:[],notesDonnees:[]};
@@ -8848,7 +8888,7 @@ async function loadProDemandes(silent){
     const r=await fetchGroupe(API+'/api/demandes/all',{headers:authHeaders()});
     const c=document.getElementById('pro-demandes-list');
     if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
-    if(!r.ok){c.innerHTML='<div class="etat-vide"><i data-lucide="wifi-off" style="width:44px;height:44px;color:var(--gray);margin-bottom:14px"></i><h3>Chargement impossible</h3><p>Une erreur est survenue en récupérant les demandes. Vérifiez votre connexion et réessayez.</p><button class="btn" style="width:auto;padding:10px 22px" onclick="loadProDemandes()">Réessayer</button></div>';if(window.lucide)lucide.createIcons();document.getElementById('stat-demandes').textContent='0';return}
+    if(!r.ok){c.innerHTML='<div class="etat-vide"><i data-lucide="wifi-off" style="width:44px;height:44px;color:var(--gray);margin-bottom:14px"></i><h3>Chargement impossible</h3><p>Une erreur est survenue en récupérant les demandes. Vérifiez votre connexion et réessayez.</p><button class="btn" style="width:auto;padding:10px 22px" onclick="loadProDemandes()">Réessayer</button></div>';if(window.lucide)dessinerIcones();document.getElementById('stat-demandes').textContent='0';return}
     const data=await safeJson(r);
 
     // ── POURQUOI LA LISTE EST VIDE ────────────────────────────────────────
@@ -8931,7 +8971,7 @@ function renderProDemandesCards(){
       ctaLabel: dossierIncomplet ? 'Déposer mes documents' : 'Régler ma zone',
       ctaAction: dossierIncomplet ? 'ouvrirDocumentsPro()' : "goProTab('pro-profile')"
     })+exempleDemandePro();
-    if(window.lucide)lucide.createIcons();
+    if(window.lucide)dessinerIcones();
     return;
   }
 
@@ -9151,7 +9191,7 @@ async function chargerTableauDeBordPro(){
         '<span>Gains reçus, montants en attente, taux d\'acceptation et note moyenne — '+
         'dès votre premier devis envoyé.</span></div>'+
       '</div>';
-      if(window.lucide)lucide.createIcons();
+      if(window.lucide)dessinerIcones();
       return;
     }
 
@@ -9298,7 +9338,7 @@ function ouvrirPageInterne(fichier,titre){
   cadre.onload=function(){ nettoyerPageInterne(cadre) };
   cadre.src=fichier;
   show('s-page-interne');
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 function fermerPageInterne(){
@@ -9558,7 +9598,7 @@ async function chargerAccesRapides(){
       '</span>'+
     '</button>';
   }).join('')+'</div>';
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 async function chargerParcoursDemarrage(){
@@ -9636,7 +9676,7 @@ async function chargerParcoursDemarrage(){
       }).join('')+
     '</div>'+
   '</div>';
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 async function verifierConfigurationPro(){
@@ -9674,7 +9714,7 @@ async function _ancienRappelConfigurationPro(){
             : 'Sans eux, vous n\'apparaissez pas dans l\'estimation de prix montrée aux clients avant leur inscription.'))+
       '<br><button onclick="'+premier.action+'">'+premier.bouton+'</button>'+
     '</div></div>';
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 async function loadProDevisCount(){
@@ -10766,7 +10806,7 @@ async function rappelTarifsPro(demandeId, prestation){
       '<div class="note">Ajustez selon l\'état décrit et la distance. Le prix reste le vôtre.</div>'+
     '</div>';
   }
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
 }
 
 function basculerFormulaireDevis(id,prestation){
@@ -11026,7 +11066,7 @@ async function loadProTarifs(){
     html+='</div></div>';
   });
   c.innerHTML=html;
-  if(window.lucide)lucide.createIcons();
+  if(window.lucide)dessinerIcones();
   try{
     const r=await fetchGroupe(API+'/api/societes/tarifs',{headers:authHeaders()});
     if(!r.ok)return;
@@ -11419,7 +11459,7 @@ function goToChat(demandeId,otherName){
   }
   var subEl=document.getElementById('chat-subtitle');
   if(subEl){
-    if(info.note){subEl.style.display='block';subEl.innerHTML='<i data-lucide="star" style="width:11px;height:11px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(info.note)+' / 5';if(window.lucide)lucide.createIcons()}
+    if(info.note){subEl.style.display='block';subEl.innerHTML='<i data-lucide="star" style="width:11px;height:11px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(info.note)+' / 5';if(window.lucide)dessinerIcones()}
     else{subEl.style.display='none';subEl.textContent=''}
   }
   document.getElementById('chat-messages').innerHTML='';
@@ -12742,7 +12782,7 @@ async function ajouterFavori(proId,proName,btn){
     const d=await safeJson(r);
     if(!r.ok){toast(messageErreur(r, d));if(btn)btn.disabled=false;return}
     toast('⭐ '+escapeHtml(proName)+' ajouté à vos favoris !');
-    if(btn){btn.innerHTML='<i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)lucide.createIcons()}
+    if(btn){btn.innerHTML='<i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)dessinerIcones()}
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
   // La liste en mémoire doit suivre : sans cela, le bouton resterait affiché
   // jusqu'au prochain chargement complet.
@@ -12951,7 +12991,7 @@ function chercherAdresseZoneIntervention(valeur){
           '</div>';
         }).join('');
         box.classList.add('show');
-        if(window.lucide)lucide.createIcons();
+        if(window.lucide)dessinerIcones();
       }).catch(function(){});
   },300);
 }
@@ -13886,7 +13926,7 @@ async function openServiceForm(type){
     if(document.getElementById('favori-cible-block'))await chargerFavoriCible(type);
     if(document.getElementById('recurrence-block'))afficherBlocRecurrence();
     activerAssistantEtapes();
-    if(window.lucide)lucide.createIcons();
+    if(window.lucide)dessinerIcones();
   }finally{
     modalBody.style.visibility='visible';
   }
@@ -14636,7 +14676,7 @@ function chercherAdresse(valeur){
           '</div>';
         }).join('');
         box.classList.add('show');
-        if(window.lucide)lucide.createIcons();
+        if(window.lucide)dessinerIcones();
       }).catch(function(){});
   },300);
 }
@@ -15754,7 +15794,7 @@ async function sendDemand(type){
 
 // ── ICÔNES (Lucide) ──
 // Convertit automatiquement toute balise <i data-lucide="..."> en icône vectorielle dès qu'elle
-// apparaît dans la page, sans avoir besoin d'appeler manuellement lucide.createIcons() partout
+// apparaît dans la page, sans avoir besoin d'appeler manuellement dessinerIcones() partout
 // où le contenu est régénéré. Protégé contre les boucles : l'observateur est mis en pause pendant
 // la conversion elle-même (qui modifie le DOM), et les appels rapprochés sont regroupés (debounce).
 if(window.lucide){
@@ -15763,7 +15803,7 @@ if(window.lucide){
   function runLucideIcons(){
     if(!window.lucide)return;
     if(lucideObserver)lucideObserver.disconnect();
-    try{lucide.createIcons()}catch(e){}
+    try{dessinerIcones()}catch(e){}
     if(lucideObserver)lucideObserver.observe(document.body,{childList:true,subtree:true});
   }
   lucideObserver=new MutationObserver(function(){
