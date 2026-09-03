@@ -5737,7 +5737,10 @@ let currentUser=null,userRole='client',photos=[],disponible=true,currentChatDema
 // dans l'en-tête du chat sans avoir à embarquer de longues photos en base64 dans des attributs HTML.
 var chatPartnerInfo={};
 let selectedServices=[],multiFlow={active:false,queue:[],current:0,results:[]};
-let stripeInstance=null,cardElement=null,currentPaymentIntent=null,currentDevisId=null;
+// `stripeElements` est nouveau : le Payment Element a besoin de son groupe
+// au moment de confirmer, contrairement au Card Element qu'on passait
+// directement à confirmCardPayment.
+let stripeInstance=null,cardElement=null,stripeElements=null,currentPaymentIntent=null,currentDevisId=null;
 let isSubmittingPhotos=false;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11709,26 +11712,84 @@ async function openPayment(devisId,montant){
     }
     currentPaymentIntent=d.client_secret;
     if(!stripeInstance)stripeInstance=Stripe(d.publishable_key);
-    var elements=stripeInstance.elements();
+    // ── DU CARD ELEMENT AU PAYMENT ELEMENT ────────────────────────────────
+    // Le `card` ne proposait que la saisie d'un numéro. Le `payment` affiche
+    // aussi Apple Pay, Google Pay et le paiement fractionné — sans une ligne
+    // de code de plus : c'est Stripe qui décide quoi montrer selon l'appareil
+    // et le pays.
+    //
+    // Sur une prestation à 150 €, la saisie manuelle d'une carte est le moment
+    // où l'on perd le plus de clients. Apple Pay la supprime : deux secondes,
+    // une empreinte digitale.
+    //
+    // POURQUOI ON PASSE LE clientSecret ICI
+    //
+    // Le Payment Element a besoin de connaître le montant et la devise pour
+    // décider des moyens à proposer — Apple Pay ne s'affiche pas sur un
+    // paiement de 0 €, le fractionné pas en dessous d'un seuil.
+    var themeManuel=document.documentElement.getAttribute('data-theme');
+    var isDark=themeManuel?themeManuel==='dark':(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    var elements=stripeInstance.elements({
+      clientSecret: d.client_secret,
+      appearance: {
+        theme: isDark ? 'night' : 'stripe',
+        variables: {
+          colorPrimary: '#0F5C56',
+          colorText: isDark ? '#F3F4F6' : '#111827',
+          fontSizeBase: '16px',
+          borderRadius: '10px'
+        }
+      }
+    });
+
     if(cardElement)cardElement.destroy();
-    var themeManuel=document.documentElement.getAttribute('data-theme');var isDark=themeManuel?themeManuel==='dark':(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
-    cardElement=elements.create('card',{style:{base:{fontSize:'16px',color:isDark?'#F3F4F6':'#111827','::placeholder':{color:isDark?'#9CA3AF':'#6B7280'}}}});
+    cardElement=elements.create('payment', {
+      // Le nom et l'adresse sont déjà connus : les redemander allonge le
+      // formulaire sans rien apporter.
+      fields: { billingDetails: { name: 'never', email: 'never', address: 'never' } },
+      // Un seul écran plutôt qu'un accordéon : le client voit tous les moyens
+      // disponibles d'un coup d'œil.
+      layout: { type: 'tabs', defaultCollapsed: false }
+    });
     cardElement.mount('#card-element');
+
+    // `elements` sert à la confirmation : on le garde sous la main.
+    stripeElements = elements;
   }catch(e){document.getElementById('payment-error').textContent=friendlyNetworkError(e);document.getElementById('payment-error').classList.add('show')}
 }
 function closePayment(){
   document.getElementById('payment-overlay').classList.remove('open');
   if(cardElement){cardElement.destroy();cardElement=null}
+  // Le groupe `elements` doit être libéré aussi : le garder pointerait vers
+  // un élément détruit, et la prochaine confirmation échouerait.
+  stripeElements=null;
   currentPaymentIntent=null;currentDevisId=null;
 }
 async function confirmPayment(){
-  if(!stripeInstance||!cardElement||!currentPaymentIntent)return;
+  // `stripeElements` s'ajoute aux gardes : sans lui, confirmPayment
+  // échouerait avec un message obscur sur un élément non monté.
+  if(!stripeInstance||!cardElement||!stripeElements||!currentPaymentIntent)return;
   var btn=document.getElementById('payment-btn');
   btn.disabled=true;btn.textContent='⏳ Traitement...';
   document.getElementById('payment-error').classList.remove('show');
   var result;
   try{
-    result=await stripeInstance.confirmCardPayment(currentPaymentIntent,{payment_method:{card:cardElement}});
+    // ── LA CONFIRMATION CHANGE AVEC LE PAYMENT ELEMENT ─────────────────
+    // `confirmCardPayment` ne connaît que les cartes. `confirmPayment` gère
+    // tous les moyens — Apple Pay, Google Pay, fractionné.
+    //
+    // `redirect: 'if_required'` est essentiel : sans lui, Stripe quitterait
+    // l'application pour une page externe même quand ce n'est pas nécessaire.
+    // Avec, il ne redirige que si le moyen l'exige — un virement, une
+    // authentification bancaire — et reste dans l'application sinon.
+    //
+    // Dans une application iOS, une redirection non nécessaire ferait sortir
+    // l'utilisateur de Gleam sans qu'il comprenne pourquoi.
+    result=await stripeInstance.confirmPayment({
+      elements: stripeElements,
+      redirect: 'if_required'
+    });
   }catch(e){
     document.getElementById('payment-error').textContent=friendlyNetworkError(e);
     document.getElementById('payment-error').classList.add('show');
@@ -14512,6 +14573,27 @@ async function updateEstimationMaintenant(){
   if(!currentFormType)return;
   var box=document.getElementById('prix-estime-box');
   if(!box)return;
+
+  // ── « AUTRE » NE PEUT PAS ÊTRE ESTIMÉ ────────────────────────────────────
+  // Cette rubrique reçoit tout ce que la grille ne couvre pas : chaises,
+  // moquette, rideaux, tête de lit. Le serveur y répond 60 € — un prix unique,
+  // faute de dimension à mesurer.
+  //
+  // Or 60 € est FAUX dans les deux sens : trop cher pour une chaise, cinq fois
+  // trop bas pour quinze mètres carrés de moquette.
+  //
+  // Une estimation fausse est pire qu'aucune estimation : le client s'y fie,
+  // puis découvre un devis à 240 € et se sent trompé.
+  //
+  // On dit donc la vérité — les prestataires chiffreront sur la description.
+  if(currentFormType==='autre'){
+    box.innerHTML='<div style="font-size:12.5px;color:var(--gray);line-height:1.5">'
+      + '💬 <strong>Pas d\'estimation pour cette demande.</strong><br>'
+      + 'Décrivez précisément votre besoin — nombre d\'articles, matière, '
+      + 'dimensions — et les prestataires vous proposeront leur prix.</div>';
+    return;
+  }
+
   var etatBtn=document.querySelector('[data-group="etat"].sel');
   var etat=etatBtn?etatBtn.getAttribute('data-etat-val'):'propre';
   box.innerHTML='<div style="font-size:12px;color:var(--gray)">Calcul de l\'estimation...</div>';
@@ -15054,8 +15136,21 @@ function calculerSurfaceTapisDepuisCompteur(){
 }
 
 function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
-  '<div class="field-group"><label>De quoi s\'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: Bateau, jacuzzi..."></div>'+
-  '<div class="field-group"><label>Décrivez votre besoin</label><textarea id="f-desc" rows="4" placeholder="Taille, état actuel..." style="resize:none"></textarea></div>'+
+  // ── DES EXEMPLES QUI CORRESPONDENT AUX VRAIES DEMANDES ──────────────────
+  // « Bateau, jacuzzi » suggérait des cas rares et décourageait ceux qui ont
+  // un besoin banal — six chaises, de la moquette, des rideaux.
+  //
+  // Cette rubrique reçoit tout ce que la grille ne couvre pas. Les exemples
+  // doivent le dire, sinon le client renonce en croyant qu'on ne fait pas.
+  '<div class="field-group"><label>De quoi s\'agit-il ?</label><input type="text" id="f-autre-type" placeholder="Ex: chaises, moquette, rideaux, fauteuil..."></div>'+
+  // ── LA DESCRIPTION REMPLACE L'ESTIMATION ────────────────────────────────
+  // Aucun prix n'est calculé ici : le prestataire chiffre sur ce texte seul.
+  // Un client qui écrit « des chaises » recevra des devis très dispersés ;
+  // celui qui écrit « 6 chaises tissu, taches de café » sera chiffré juste.
+  '<div class="field-group"><label>Décrivez votre besoin</label>'
+  + '<textarea id="f-desc" rows="4" placeholder="Combien d\'articles, quelle matière, quelles dimensions, quel état — plus vous êtes précis, plus les devis seront justes." style="resize:none"></textarea>'
+  + '<div class="petit" style="margin-top:6px;color:var(--gray)">'
+  + 'Ex : « 6 chaises de salle à manger en tissu beige, taches de café »</div></div>'+
   dateTimeBlock(isLastInFlow())+sendBtn('autre')}
 
 // ─────────────────────────────────────────────────────────────────────────────
