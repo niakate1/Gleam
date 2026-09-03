@@ -6368,9 +6368,23 @@ app.post('/api/paiements/intent', auth, exigerEmailVerifie, async (req, res) => 
       }
     } catch (e) { console.error('Vérification Stripe Connect ignorée:', e.message); }
 
+    // ── LAISSER STRIPE PROPOSER LES BONS MOYENS ───────────────────────
+    // Sans `automatic_payment_methods`, l'intention n'accepte que la carte —
+    // et le Payment Element n'afficherait qu'elle, même sur un iPhone.
+    //
+    // Avec, Stripe décide selon l'appareil et le pays : Apple Pay sur iOS,
+    // Google Pay sur Android, la carte partout.
+    //
+    // `allow_redirects: 'never'` écarte les moyens qui exigent de quitter
+    // l'application. Dans une application iOS, cette sortie déroute
+    // l'utilisateur, et le retour n'est pas garanti.
+    //
+    // Ce que vous cochez dans votre tableau de bord Stripe décide du reste :
+    // rien ne s'affiche ici sans y être activé.
     const paramsIntent = {
       amount: montant,
       currency: 'eur',
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
       metadata: { devis_id: devis_id, gleam: 'true' }
     };
     if (proConfigure) {
@@ -9662,6 +9676,19 @@ app.patch('/api/admin/users/:id/disponibilite', adminAuth, async (req, res) => {
 // d'accueil renvoyait donc une erreur JSON. C'est ce qui vient d'arriver.
 const chemin = require('path');
 
+// ── UNE SEULE SOURCE POUR L'INTERFACE ──────────────────────────────────────
+// Le dépôt contenait DEUX `index.html` : celui de la racine, servi par
+// Railway, et `public/index.html`, publié par Netlify.
+//
+// Ils avaient déjà divergé. Le premier ne contenait ni le palier « Haut de
+// gamme » ni le compteur d'articles : quiconque ouvrait l'adresse Railway
+// recevait une application vieille de plusieurs jours.
+//
+// Déclaré ICI, juste après `chemin` — sa seule dépendance. Ma première
+// version le posait plus bas, après son propre usage : le serveur aurait
+// planté au démarrage.
+const DOSSIER_PUBLIC = chemin.join(__dirname, 'public');
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SEULS LES FICHIERS PUBLICS SONT SERVIS
 //
@@ -9711,10 +9738,23 @@ app.use((req, res, suivant) => {
   //
   // Une liste d'interdits laisse toujours passer ce qu'on n'a pas prévu. Seule
   // la liste blanche tient dans le temps.
-  return res.sendFile(chemin.join(__dirname, 'index.html'));
+  return res.sendFile(chemin.join(DOSSIER_PUBLIC, 'index.html'));
 });
 
-app.use(express.static(__dirname, {
+// ── UNE SEULE SOURCE POUR L'INTERFACE ────────────────────────────────────
+// Le dépôt contenait DEUX `index.html` : celui de la racine, servi par
+// Railway, et `public/index.html`, publié par Netlify.
+//
+// Ils avaient déjà divergé. Le premier ne contenait pas le palier « Haut de
+// gamme » ni le compteur d'articles : quiconque ouvrait l'adresse Railway
+// recevait une application vieille de plusieurs jours.
+//
+// Deux copies du même fichier finissent toujours par diverger. On ne sert
+// donc plus que `public/`, le dossier que Netlify publie déjà.
+//
+// La liste blanche `FICHIERS_PUBLICS` reste indispensable : `public/`
+// contient aussi `comptes-test.html`, qu'il n'y a aucune raison d'exposer.
+app.use(express.static(DOSSIER_PUBLIC, {
   setHeaders: (res, fichier) => {
     // index.html porte le numéro de version, et sw.js pilote le cache : les
     // laisser en cache quelques heures suffit à faire croire qu'un
@@ -9732,7 +9772,7 @@ app.get('*', (req, res) => {
   if (req.path.startsWith('/api/') || req.path.startsWith('/webhooks/')) {
     return res.status(404).json({ error: 'Route inconnue.' });
   }
-  res.sendFile(chemin.join(__dirname, 'index.html'));
+  res.sendFile(chemin.join(DOSSIER_PUBLIC, 'index.html'));
 });
 
 
