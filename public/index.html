@@ -11731,9 +11731,17 @@ function remplirRecapPaiement(montant, devis) {
   }
 
   if (devis) {
+    // Les noms de champs viennent de `/api/devis/mes-devis-recus`, vérifiés
+    // dans le serveur. Le prestataire vit dans un sous-objet `pro`, et le
+    // créneau peut avoir été REPROPOSÉ — auquel cas c'est le nouveau qui
+    // compte, pas celui de la demande initiale.
+    var p = devis.pro || {};
+    var nomPro = p.nom_societe || p.societe || p.prenom || '';
+    var creneau = devis.creneau_propose || devis.creneau || '';
+
     lignes += ligne('Prestation', libellePrestation(devis.prestation || ''));
-    lignes += ligne('Prestataire', devis.societe_nom || devis.nom_societe || '');
-    lignes += ligne('Créneau', dateFrancaiseCourte(devis.creneau || ''));
+    lignes += ligne('Prestataire', nomPro);
+    lignes += ligne('Créneau', dateFrancaiseCourte(creneau));
     lignes += ligne('Adresse', devis.adresse || '');
   }
 
@@ -11780,10 +11788,23 @@ async function openPayment(devisId,montant,devis){
   // Le devis n'est pas toujours passé en argument : les boutons sont
   // construits en chaîne de caractères, où l'on ne peut pas transporter un
   // objet. On le retrouve donc dans les données déjà chargées.
-  if (!devis && typeof mesDevis !== 'undefined' && Array.isArray(mesDevis)) {
-    devis = mesDevis.filter(function(x){ return String(x.id) === String(devisId) })[0];
-  }
-  remplirRecapPaiement(montant, devis);
+  // `devisClientCache.all` est la vraie source — j'avais supposé une variable
+  // `mesDevis` qui n'existait pas, et la fonction levait une exception avant
+  // même d'atteindre Stripe.
+  //
+  // Le `try` autour est délibéré : ce récapitulatif est un CONFORT. S'il
+  // échoue, le paiement doit continuer — un écran moins beau vaut mieux qu'un
+  // paiement impossible.
+  try {
+    if (!devis && typeof devisClientCache !== 'undefined'
+        && devisClientCache && Array.isArray(devisClientCache.all)) {
+      devis = devisClientCache.all.filter(function(x){
+        return String(x.id) === String(devisId);
+      })[0];
+    }
+  } catch (e) { devis = null; }
+  // Même précaution ici : un défaut d'affichage ne doit pas empêcher de payer.
+  try { remplirRecapPaiement(montant, devis); } catch (e) { console.warn('Récapitulatif :', e); }
   document.getElementById('payment-sub').textContent='Montant : '+montant+' € TTC';
   document.getElementById('payment-error').classList.remove('show');
   document.getElementById('payment-overlay').classList.add('open');
