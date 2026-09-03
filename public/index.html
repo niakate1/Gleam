@@ -11805,7 +11805,11 @@ async function openPayment(devisId,montant,devis){
   } catch (e) { devis = null; }
   // Même précaution ici : un défaut d'affichage ne doit pas empêcher de payer.
   try { remplirRecapPaiement(montant, devis); } catch (e) { console.warn('Récapitulatif :', e); }
-  document.getElementById('payment-sub').textContent='Montant : '+montant+' € TTC';
+  // `payment-sub` a été remplacé par le récapitulatif. J'avais retiré
+  // l'élément de la page en laissant le code qui l'appelait : `textContent`
+  // sur `null` levait une exception, et l'écran ne s'ouvrait plus du tout.
+  //
+  // Le montant est déjà affiché par `remplirRecapPaiement`, juste au-dessus.
   document.getElementById('payment-error').classList.remove('show');
   document.getElementById('payment-overlay').classList.add('open');
   document.getElementById('payment-btn').disabled=false;
@@ -11816,8 +11820,27 @@ async function openPayment(devisId,montant,devis){
     if(!r.ok){document.getElementById('payment-error').textContent=d.error||'Erreur';document.getElementById('payment-error').classList.add('show');return}
     if(!d.client_secret||!d.publishable_key){document.getElementById('payment-error').textContent='Réponse de paiement invalide.';document.getElementById('payment-error').classList.add('show');return}
     if(d.reduction_parrainage){
+      // ── LA RÉDUCTION S'AFFICHE DANS LE RÉCAPITULATIF ────────────────────
+      // Elle visait `payment-sub`, un élément que j'avais retiré de la page.
+      // Le total du récapitulatif est le bon endroit : c'est le chiffre que
+      // le client regarde, et c'est celui qui doit changer.
       var montantReduit=(montant*0.9).toFixed(2);
-      document.getElementById('payment-sub').innerHTML='<span style="text-decoration:line-through;color:var(--gray)">'+montant+' €</span> <strong style="color:var(--green)">'+montantReduit+' € TTC</strong> — 🎁 réduction de parrainage appliquée !';
+      var totalEl=document.getElementById('payment-total');
+      if(totalEl){
+        totalEl.innerHTML='<span style="text-decoration:line-through;color:var(--gray);'
+          + 'font-size:15px;font-weight:600;margin-right:8px">'+montant+' €</span>'
+          + montantReduit+' €';
+      }
+      var recap=document.getElementById('payment-recap');
+      if(recap){
+        recap.insertAdjacentHTML('beforeend',
+          '<div style="margin-top:10px;padding:8px 10px;background:var(--vert-clair);'
+          + 'border-radius:8px;font-size:12.5px;color:var(--green);font-weight:600">'
+          + '🎁 Réduction de parrainage appliquée</div>');
+      }
+      // Le bouton doit dire le montant RÉELLEMENT débité.
+      var btnP=document.getElementById('payment-btn');
+      if(btnP)btnP.textContent='Payer '+montantReduit+' €';
     }
     currentPaymentIntent=d.client_secret;
     if(!stripeInstance)stripeInstance=Stripe(d.publishable_key);
