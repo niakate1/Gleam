@@ -5307,10 +5307,23 @@ textarea { min-height: 92px; padding-top: 13px; }
 <div class="modal-overlay" id="payment-overlay">
   <div class="modal" style="max-height:80vh">
     <div class="modal-handle"></div>
-    <div class="modal-title">💳 Paiement sécurisé</div>
-    <div class="modal-sub" id="payment-sub">Montant : --</div>
-    <div id="payment-error" class="err"></div>
-    <div id="card-element" style="border:1.5px solid var(--border);border-radius:10px;padding:14px;margin:16px 0;background:var(--surface)"></div>
+    <div class="modal-title">Confirmer et payer</div>
+
+      <!-- ── LE RÉCAPITULATIF MANQUAIT ─────────────────────────────────────
+           L'écran affichait « Montant : 150 € TTC » sur une ligne, sans dire
+           CE QU'ON PAIE. Les applications les mieux faites — Uber, Doctolib —
+           rappellent la prestation, la date et l'adresse avant le total.
+
+           Un client qui ne reconnaît pas ce qu'il paie hésite, et parfois
+           abandonne. -->
+      <div id="payment-recap" style="background:var(--surface-alt);border-radius:12px;padding:14px 16px;margin:4px 0 16px"></div>
+
+      <div id="payment-error" class="err"></div>
+
+      <!-- Stripe dessine déjà ses propres champs, avec ses bordures et son
+           espacement. Un cadre par-dessus donnait un « formulaire dans un
+           formulaire ». On le retire. -->
+      <div id="card-element" style="margin:4px 0 16px"></div>
     <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--gray);margin-bottom:14px"><i data-lucide="shield-check" style="width:14px;height:14px;color:var(--mint)"></i> Paiement chiffré via Stripe — débité seulement après la prestation</div>
     <button class="modal-send-btn" id="payment-btn" onclick="confirmPayment()">🔒 Payer maintenant</button>
     <button onclick="closePayment()" style="width:100%;padding:12px;background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;margin-top:8px">Annuler</button>
@@ -11694,13 +11707,88 @@ async function sendChatMsg(){
 // bouton ne réagit pas assez vite et qu'on insiste.
 var paiementEnPreparation = false;
 
-async function openPayment(devisId,montant){
+async // ── CE QU'ON PAIE, AVANT DE PAYER ───────────────────────────────────────────
+// L'écran affichait « Montant : 150 € TTC » sur une ligne. Les applications
+// les mieux faites rappellent d'abord la prestation, la date et l'adresse.
+//
+// Un client qui ne reconnaît pas ce qu'il paie hésite — et l'hésitation devant
+// un paiement se solde rarement par un paiement.
+//
+// Le devis est optionnel : sans lui, on affiche le total seul plutôt que rien.
+function remplirRecapPaiement(montant, devis) {
+  var zone = document.getElementById('payment-recap');
+  if (!zone) return;
+
+  var lignes = '';
+
+  function ligne(libelle, valeur) {
+    if (!valeur) return '';
+    return '<div style="display:flex;justify-content:space-between;gap:14px;'
+      + 'margin-bottom:8px;font-size:13.5px">'
+      + '<span style="color:var(--gray);flex-shrink:0">' + escapeHtml(libelle) + '</span>'
+      + '<span style="text-align:right;font-weight:600">' + escapeHtml(valeur) + '</span>'
+      + '</div>';
+  }
+
+  if (devis) {
+    lignes += ligne('Prestation', libellePrestation(devis.prestation || ''));
+    lignes += ligne('Prestataire', devis.societe_nom || devis.nom_societe || '');
+    lignes += ligne('Créneau', dateFrancaiseCourte(devis.creneau || ''));
+    lignes += ligne('Adresse', devis.adresse || '');
+  }
+
+  // Le total se détache : trait de séparation, corps plus gros, couleur de la
+  // charte. C'est le chiffre que le client cherche.
+  lignes += '<div style="display:flex;justify-content:space-between;align-items:baseline;'
+    + 'margin-top:' + (lignes ? '12px;padding-top:12px;border-top:1px solid var(--bord)' : '0')
+    + '">'
+    + '<span style="font-size:14px;font-weight:700">Total à payer</span>'
+    + '<span id="payment-total" style="font-size:22px;font-weight:800;color:var(--p)">'
+    +   escapeHtml(String(montant)) + ' €</span>'
+    + '</div>'
+    + '<div class="petit" style="color:var(--gray);margin-top:6px;text-align:right">TTC</div>';
+
+  zone.innerHTML = lignes;
+}
+
+// Une version courte de la date : « mardi 25 août à 14h » suffit sur cet
+// écran, l'année encombrerait sans rien apporter.
+function dateFrancaiseCourte(creneau) {
+  if (!creneau) return '';
+  var JOURS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  var MOIS = ['janvier','février','mars','avril','mai','juin',
+              'juillet','août','septembre','octobre','novembre','décembre'];
+  var m = /^(\d{4})-(\d{2})-(\d{2})(?:\s*(?:à|a|T)\s*(\d{1,2})[h:](\d{2}))?/.exec(String(creneau));
+  if (!m) return String(creneau);
+  var mois = Number(m[2]) - 1;
+  if (mois < 0 || mois > 11) return String(creneau);
+  var d = new Date(Number(m[1]), mois, Number(m[3]));
+  if (isNaN(d.getTime())) return String(creneau);
+  var rendu = JOURS[d.getDay()] + ' ' + Number(m[3]) + ' ' + MOIS[mois];
+  if (m[4] !== undefined) rendu += ' à ' + m[4] + 'h' + (m[5] === '00' ? '' : m[5]);
+  return rendu;
+}
+
+// ── LE RÉCAPITULATIF A BESOIN DU CONTEXTE ─────────────────────────────────
+// `openPayment` ne recevait que l'identifiant et le montant. Pour rappeler la
+// prestation, la date et l'adresse, il faut le devis — passé en troisième
+// argument, optionnel : les anciens appels continuent de fonctionner, ils
+// afficheront simplement un récapitulatif réduit au total.
+async function openPayment(devisId,montant,devis){
   currentDevisId=devisId;
+
+  // Le devis n'est pas toujours passé en argument : les boutons sont
+  // construits en chaîne de caractères, où l'on ne peut pas transporter un
+  // objet. On le retrouve donc dans les données déjà chargées.
+  if (!devis && typeof mesDevis !== 'undefined' && Array.isArray(mesDevis)) {
+    devis = mesDevis.filter(function(x){ return String(x.id) === String(devisId) })[0];
+  }
+  remplirRecapPaiement(montant, devis);
   document.getElementById('payment-sub').textContent='Montant : '+montant+' € TTC';
   document.getElementById('payment-error').classList.remove('show');
   document.getElementById('payment-overlay').classList.add('open');
   document.getElementById('payment-btn').disabled=false;
-  document.getElementById('payment-btn').textContent='🔒 Payer maintenant';
+  document.getElementById('payment-btn').textContent='Payer '+montant+' €';
   try{
     const r=await fetch(API+'/api/paiements/intent',{method:'POST',headers:authHeaders(),body:JSON.stringify({devis_id:devisId})});
     const d=await safeJson(r);
@@ -11793,13 +11881,13 @@ async function confirmPayment(){
   }catch(e){
     document.getElementById('payment-error').textContent=friendlyNetworkError(e);
     document.getElementById('payment-error').classList.add('show');
-    btn.disabled=false;btn.textContent='🔒 Payer maintenant';
+    btn.disabled=false;btn.textContent='Payer '+(document.getElementById('payment-total')?document.getElementById('payment-total').textContent:'maintenant');
     return;
   }
   if(result.error){
     document.getElementById('payment-error').textContent=result.error.message;
     document.getElementById('payment-error').classList.add('show');
-    btn.disabled=false;btn.textContent='🔒 Payer maintenant';
+    btn.disabled=false;btn.textContent='Payer '+(document.getElementById('payment-total')?document.getElementById('payment-total').textContent:'maintenant');
     return;
   }
   if(result.paymentIntent&&result.paymentIntent.status==='succeeded'){
@@ -11808,13 +11896,13 @@ async function confirmPayment(){
       if(!cr.ok){
         document.getElementById('payment-error').textContent='Paiement effectué mais la confirmation a échoué. Contactez le support.';
         document.getElementById('payment-error').classList.add('show');
-        btn.disabled=false;btn.textContent='🔒 Payer maintenant';
+        btn.disabled=false;btn.textContent='Payer '+(document.getElementById('payment-total')?document.getElementById('payment-total').textContent:'maintenant');
         return;
       }
     }catch(e){
       document.getElementById('payment-error').textContent='Paiement effectué mais la confirmation a échoué. Contactez le support.';
       document.getElementById('payment-error').classList.add('show');
-      btn.disabled=false;btn.textContent='🔒 Payer maintenant';
+      btn.disabled=false;btn.textContent='Payer '+(document.getElementById('payment-total')?document.getElementById('payment-total').textContent:'maintenant');
       return;
     }
     closePayment();
