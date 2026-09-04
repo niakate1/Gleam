@@ -7033,9 +7033,31 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
       .filter(p => p.statut === 'paye' && estEnLitige(p))
       .reduce((a, p) => a + partReelle(p, 'montant_societe'), 0);
     // Tri logique : en attente de confirmation client (encore "actif") avant reçu (déjà réglé, historique)
-    const prioriteGain = { paye: 0, libere: 1, rembourse_partiel: 1 };
+    // ── TROIS GROUPES, PUIS LA DATE ────────────────────────────────────────
+    // Le tri ne comparait QUE le statut. À statut égal, l'ordre dépendait de
+    // ce que la base avait renvoyé — correct par chance, pas par construction.
+    //
+    // Et les litiges se mélangeaient aux paiements en attente, alors qu'ils
+    // n'appellent pas la même chose : l'un attend le client, l'autre attend
+    // votre arbitrage.
+    //
+    //   0  en litige              vous devez trancher
+    //   1  en attente             le client doit valider
+    //   2  reçu                   historique
+    //
+    // À rang égal, le plus récent d'abord — c'est ce qu'on cherche en premier.
     const enrichis = paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }));
-    enrichis.sort((a, b) => (prioriteGain[a.statut] ?? 9) - (prioriteGain[b.statut] ?? 9));
+
+    const rangGain = (p) => {
+      if (p.statut === 'paye') return estEnLitige(p) ? 0 : 1;
+      return 2;
+    };
+
+    enrichis.sort((a, b) => {
+      const ra = rangGain(a), rb = rangGain(b);
+      if (ra !== rb) return ra - rb;
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
     res.json({
       total_libere: Math.round(totalLibere * 100) / 100,
       total_en_attente: Math.round(totalEnAttente * 100) / 100,
