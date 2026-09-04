@@ -12695,7 +12695,17 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
     var douteuse = (d.arrivee_qualite === 'eloignee' || d.arrivee_qualite === 'non_verifiee');
     var confirmee = d.arrivee_confirmee_client === true;
 
-    if(douteuse && !confirmee){
+    // ── CE MESSAGE S'ADRESSE AU CLIENT, PAS AU PRESTATAIRE ────────────────
+    // `creneauBlockHtml` sert aux DEUX écrans. Le texte parle du prestataire
+    // à la troisième personne — « le prestataire a déclaré son arrivée » — et
+    // propose de reprogrammer, ce qui est une décision du client.
+    //
+    // Le prestataire lisait donc un message écrit sur lui, qui lui suggérait
+    // d'annuler son propre déplacement.
+    var estPrestataire = (typeof userRole !== 'undefined')
+      && (userRole === 'pro' || userRole === 'entreprise');
+
+    if(douteuse && !confirmee && !estPrestataire){
       // On ne ferme pas, mais on prévient : reprogrammer alors que le
       // prestataire est peut-être devant la porte serait maladroit.
       return '<div style="margin-top:8px;font-size:12px;color:var(--text-secondary);'+
