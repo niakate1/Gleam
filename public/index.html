@@ -11919,7 +11919,13 @@ async function openPayment(devisId,montant,devis){
     cardElement=elements.create('payment', {
       // Le nom et l'adresse sont déjà connus : les redemander allonge le
       // formulaire sans rien apporter.
-      fields: { billingDetails: { name: 'never', email: 'never', address: 'never' } },
+      // `address` repasse en « auto » : Stripe ne demande alors qu'un code postal
+      // quand la carte l'exige, et nous n'avons pas à fournir une adresse
+      // complète que nous ne stockons pas de façon fiable.
+      //
+      // Le nom et l'adresse électronique restent masqués — nous les avons, et
+      // ils sont transmis à la confirmation.
+      fields: { billingDetails: { name: 'never', email: 'never' } },
       // Un seul écran plutôt qu'un accordéon : le client voit tous les moyens
       // disponibles d'un coup d'œil.
       layout: { type: 'tabs', defaultCollapsed: false }
@@ -11958,9 +11964,35 @@ async function confirmPayment(){
     //
     // Dans une application iOS, une redirection non nécessaire ferait sortir
     // l'utilisateur de Gleam sans qu'il comprenne pourquoi.
+    // ── LES CHAMPS MASQUÉS DOIVENT ÊTRE FOURNIS ICI ────────────────────
+    // J'avais réglé `fields.billingDetails` sur « never » pour ne pas
+    // redemander le nom et l'adresse électronique — nous les avons déjà.
+    //
+    // Mais Stripe exige alors qu'on les passe à la confirmation :
+    //
+    //   IntegrationError: You specified "never" for
+    //   fields.billing_details.name … but did not pass
+    //   confirmParams.payment_method_data.billing_details.name
+    //
+    // Masquer un champ ne dispense pas de fournir sa valeur. Sans cela,
+    // le paiement échouait au dernier moment — après la saisie de la carte.
+    var nomComplet = ((currentUser && currentUser.prenom) || '') + ' '
+                   + ((currentUser && currentUser.nom) || '');
+    nomComplet = nomComplet.trim();
+
     result=await stripeInstance.confirmPayment({
       elements: stripeElements,
-      redirect: 'if_required'
+      redirect: 'if_required',
+      confirmParams: {
+        payment_method_data: {
+          billing_details: {
+            // Stripe refuse une chaîne vide : on met `null` plutôt, ce qui
+            // signifie « non renseigné » et reste accepté.
+            name: nomComplet || null,
+            email: (currentUser && currentUser.email) || null
+          }
+        }
+      }
     });
   }catch(e){
     document.getElementById('payment-error').textContent=friendlyNetworkError(e);
