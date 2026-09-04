@@ -1277,7 +1277,30 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
 
 .demand-icon { font-size: 26px; color: var(--p); flex-shrink: 0; }
 .demand-info { flex: 1; min-width: 0; }
-.demand-type { font-size: 14.5px; font-weight: 700; text-transform: capitalize; }
+.demand-type {
+  /* ── LES BADGES NE DOIVENT PLUS ÊTRE COUPÉS ────────────────────────────
+     « 2 Voitures + Canapé + Matelas » dépasse la largeur de la carte. Le
+     badge « ACTION REQUISE », collé au texte, se retrouvait coupé en deux
+     par le retour à la ligne.
+
+     `flex` avec `wrap` traite le titre et les badges comme des blocs
+     insécables : ils passent à la ligne ENTIERS, jamais au milieu.
+
+     `align-items: center` les aligne sur le texte plutôt que sur le haut,
+     ce qui les faisait flotter. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.demand-type > span {
+  /* Un badge ne se coupe jamais : il passe entier à la ligne suivante. */
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .demand-addr {
   font-size: 12.5px; color: var(--gray); margin-top: 2px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -2609,7 +2632,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   padding: var(--gap-3) var(--gap-4);
   background: #FFF8E9;
   border: 1px solid #F0DCA8;
-  border-radius: var(--radius-3);
+  border-radius: var(--r-lg);
 }
 .bandeau-facturation-texte { flex: 1; min-width: 0; }
 .bandeau-facturation-texte strong {
@@ -2628,7 +2651,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   flex: 0 0 auto;
   padding: 8px 16px;
   border: none;
-  border-radius: var(--radius-2);
+  border-radius: var(--r-md);
   background: #7A5A12;
   color: #fff;
   font-size: 13px;
@@ -3638,7 +3661,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 .rappel-tarifs .grille strong.manquant { color: #B4780F; font-style: italic; }
 .rappel-tarifs .note.manquant {
   margin-top: 8px; padding: 8px 10px;
-  background: #FFF8E9; border-radius: var(--radius-2);
+  background: #FFF8E9; border-radius: var(--r-md);
   color: #7A5A12; font-weight: 600;
 }
 /* ── LA DEMANDE RÉSERVÉE ───────────────────────────────────────────────────
@@ -3678,7 +3701,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   padding: 12px;
   background: var(--surface-2, #F9FAFB);
   border: 1px solid var(--border, #E5E7EB);
-  border-radius: var(--radius-2);
+  border-radius: var(--r-md);
 }
 .proposition-favori-texte {
   font-size: 13px;
@@ -3689,7 +3712,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 .proposition-favori-actions button {
   flex: 1;
   padding: 9px 12px;
-  border-radius: var(--radius-2);
+  border-radius: var(--r-md);
   border: 1.5px solid var(--gold);
   background: none;
   color: var(--amber);
@@ -5305,28 +5328,61 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- MODAL PAIEMENT -->
 <div class="modal-overlay" id="payment-overlay">
-  <div class="modal" style="max-height:80vh">
+  <!-- ── L'ÉCRAN DE PAIEMENT ──────────────────────────────────────────────
+       Refait pour ressembler à ce que font les applications sérieuses.
+
+       LA STRUCTURE, DE HAUT EN BAS
+
+       1. le prestataire, avec sa photo — on paie une personne
+       2. ce qu'on achète, et quand
+       3. le total, isolé et lisible
+       4. les moyens de paiement, dessinés par Stripe
+       5. la mention de sécurité, PRÈS du bouton
+       6. le bouton, qui annonce le montant
+
+       LA HAUTEUR
+
+       `max-height: 80vh` coupait le bouton sur les petits écrans. Le corps
+       défile désormais, et le bouton reste visible en bas — c'est ce que font
+       toutes les applications de paiement. -->
+  <div class="modal" style="max-height:92vh;display:flex;flex-direction:column;padding-bottom:0">
     <div class="modal-handle"></div>
-    <div class="modal-title">Confirmer et payer</div>
 
-      <!-- ── LE RÉCAPITULATIF MANQUAIT ─────────────────────────────────────
-           L'écran affichait « Montant : 150 € TTC » sur une ligne, sans dire
-           CE QU'ON PAIE. Les applications les mieux faites — Uber, Doctolib —
-           rappellent la prestation, la date et l'adresse avant le total.
+    <div style="flex:1;overflow-y:auto;padding-bottom:8px">
+      <div class="modal-title" style="margin-bottom:2px">Confirmer et payer</div>
+      <div class="modal-sub" style="margin-bottom:18px">Vous ne serez débité qu'après la prestation</div>
 
-           Un client qui ne reconnaît pas ce qu'il paie hésite, et parfois
-           abandonne. -->
-      <div id="payment-recap" style="background:var(--surface-alt);border-radius:12px;padding:14px 16px;margin:4px 0 16px"></div>
+      <!-- Le prestataire, sa photo et sa note. On paie quelqu'un, pas un
+           formulaire — et le voir rassure au moment de sortir sa carte. -->
+      <div id="payment-pro" style="display:none;align-items:center;gap:12px;padding:12px 14px;background:var(--surface-alt);border-radius:14px;margin-bottom:10px"></div>
+
+      <!-- Ce qu'on achète, et quand. -->
+      <div id="payment-recap" style="background:var(--surface-alt);border-radius:14px;padding:14px 16px;margin-bottom:10px"></div>
+
+      <!-- Le total, seul. C'est le chiffre que le client cherche : il ne doit
+           pas être noyé dans une liste. -->
+      <div id="payment-total-bloc" style="display:flex;align-items:baseline;justify-content:space-between;padding:14px 16px;background:var(--green-clair);border-radius:14px;margin-bottom:18px"></div>
 
       <div id="payment-error" class="err"></div>
 
-      <!-- Stripe dessine déjà ses propres champs, avec ses bordures et son
-           espacement. Un cadre par-dessus donnait un « formulaire dans un
-           formulaire ». On le retire. -->
-      <div id="card-element" style="margin:4px 0 16px"></div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--gray);margin-bottom:14px"><i data-lucide="shield-check" style="width:14px;height:14px;color:var(--mint)"></i> Paiement chiffré via Stripe — débité seulement après la prestation</div>
-    <button class="modal-send-btn" id="payment-btn" onclick="confirmPayment()">🔒 Payer maintenant</button>
-    <button onclick="closePayment()" style="width:100%;padding:12px;background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;margin-top:8px">Annuler</button>
+      <div class="petit" style="font-weight:700;color:var(--text);margin-bottom:8px">Moyen de paiement</div>
+
+      <!-- Stripe dessine ses propres champs : Apple Pay, Google Pay et la
+           carte, selon l'appareil. Aucun cadre par-dessus — cela faisait un
+           « formulaire dans un formulaire ». -->
+      <div id="card-element"></div>
+    </div>
+
+    <!-- Le pied reste visible, quoi qu'il arrive au défilement. Sur mobile,
+         un bouton de paiement qu'il faut chercher fait abandonner. -->
+    <div style="flex-shrink:0;padding:14px 0 18px;background:var(--surface);border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;color:var(--gray);margin-bottom:10px">
+        <i data-lucide="shield-check" style="width:14px;height:14px;color:var(--mint)"></i>
+        Paiement chiffré — l'argent n'est versé qu'à la fin
+      </div>
+      <button class="modal-send-btn" id="payment-btn" onclick="confirmPayment()" style="margin:0">Payer</button>
+      <button onclick="closePayment()" style="width:100%;padding:12px;background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;margin-top:6px">Annuler</button>
+    </div>
   </div>
 </div>
 
@@ -7724,7 +7780,7 @@ async function loadDemandes(silent){
       var st=libelleStatutDemande(d);
       var icon=ICONS_get((d.prestation||'').split(' + ')[0]);
       var urgentStyle=d.statut==='en_cours'?'border-color:var(--green);background:var(--green-clair);':'';
-      var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px;margin-left:6px">ACTION REQUISE</span>':'';
+      var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px">ACTION REQUISE</span>':'';
       // La carte affichait la date de CRÉATION de la demande. Une prestation
       // programmée pour le 31 janvier 2027 s'affichait donc « 03/08/2026 » — la
       // date à laquelle elle avait été créée. C'est le créneau qui compte pour
@@ -7736,7 +7792,7 @@ async function loadDemandes(silent){
       // apparaissait comme un doublon inexplicable à côté de la prestation
       // terminée qui l'avait engendrée.
       var badgeRecurrence=(d.recurrence&&d.recurrence_active)
-        ? '<span style="font-size:10px;background:var(--light);color:var(--p);padding:2px 8px;border-radius:10px;margin-left:6px;white-space:nowrap">🔁 '+libelleRecurrence(d.recurrence)+'</span>'
+        ? '<span style="font-size:10px;background:var(--light);color:var(--p);padding:2px 8px;border-radius:10px;white-space:nowrap">🔁 '+libelleRecurrence(d.recurrence)+'</span>'
         : '';
       html+='<div class="demand-row fade-in-item" style="animation-delay:'+(i*0.04)+'s;'+urgentStyle+'" onclick="openDetail(\''+escAttr(d.id)+'\')">'+
         '<span class="demand-icon">'+icon+'</span>'+
@@ -11756,47 +11812,83 @@ var paiementEnPreparation = false;
 //
 // Le devis est optionnel : sans lui, on affiche le total seul plutôt que rien.
 function remplirRecapPaiement(montant, devis) {
-  var zone = document.getElementById('payment-recap');
-  if (!zone) return;
+  var p = (devis && devis.pro) || {};
 
-  var lignes = '';
-
-  function ligne(libelle, valeur) {
-    if (!valeur) return '';
-    return '<div style="display:flex;justify-content:space-between;gap:14px;'
-      + 'margin-bottom:8px;font-size:13.5px">'
-      + '<span style="color:var(--gray);flex-shrink:0">' + escapeHtml(libelle) + '</span>'
-      + '<span style="text-align:right;font-weight:600">' + escapeHtml(valeur) + '</span>'
-      + '</div>';
-  }
-
-  if (devis) {
-    // Les noms de champs viennent de `/api/devis/mes-devis-recus`, vérifiés
-    // dans le serveur. Le prestataire vit dans un sous-objet `pro`, et le
-    // créneau peut avoir été REPROPOSÉ — auquel cas c'est le nouveau qui
-    // compte, pas celui de la demande initiale.
-    var p = devis.pro || {};
+  // ── LE PRESTATAIRE, AVEC SA PHOTO ──────────────────────────────────────
+  // On paie une personne, pas un formulaire. La voir au moment de sortir sa
+  // carte rassure — c'est ce que font Uber et Doctolib.
+  var zonePro = document.getElementById('payment-pro');
+  if (zonePro) {
     var nomPro = p.nom_societe || p.societe || p.prenom || '';
-    var creneau = devis.creneau_propose || devis.creneau || '';
+    if (nomPro) {
+      var initiale = nomPro.charAt(0).toUpperCase();
+      // `noteAffichable` est la fonction unique qui décide : elle écarte les
+      // notes à zéro — trois de vos quatre prestataires n'ont aucun avis, et
+      // afficher « 0,0 » les condamnerait sans qu'aucun client se soit
+      // prononcé.
+      var note = noteAffichable(p.note_moyenne);
 
-    lignes += ligne('Prestation', libellePrestation(devis.prestation || ''));
-    lignes += ligne('Prestataire', nomPro);
-    lignes += ligne('Créneau', dateFrancaiseCourte(creneau));
-    lignes += ligne('Adresse', devis.adresse || '');
+      zonePro.style.display = 'flex';
+      zonePro.innerHTML =
+          (p.photo_url
+            ? '<img src="' + escAttr(p.photo_url) + '" alt="" style="width:44px;height:44px;'
+              + 'border-radius:50%;object-fit:cover;flex-shrink:0">'
+            : '<div style="width:44px;height:44px;border-radius:50%;background:var(--p);'
+              + 'color:#fff;display:flex;align-items:center;justify-content:center;'
+              + 'font-weight:800;font-size:17px;flex-shrink:0">' + escapeHtml(initiale) + '</div>')
+        + '<div style="min-width:0">'
+        +   '<div style="font-weight:700;font-size:14.5px;overflow:hidden;'
+        +     'text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(nomPro) + '</div>'
+        +   '<div class="petit" style="color:var(--gray)">'
+        +     // « ★ 4.8 » seul laisse croire à une note sur 10 ou sur 100.
+        //  L'échelle doit être dite.
+        (note ? '★ ' + note + ' / 5 · ' : '') + 'Prestataire vérifié</div>'
+        + '</div>';
+    } else {
+      zonePro.style.display = 'none';
+    }
   }
 
-  // Le total se détache : trait de séparation, corps plus gros, couleur de la
-  // charte. C'est le chiffre que le client cherche.
-  lignes += '<div style="display:flex;justify-content:space-between;align-items:baseline;'
-    + 'margin-top:' + (lignes ? '12px;padding-top:12px;border-top:1px solid var(--bord)' : '0')
-    + '">'
-    + '<span style="font-size:14px;font-weight:700">Total à payer</span>'
-    + '<span id="payment-total" style="font-size:22px;font-weight:800;color:var(--p)">'
-    +   escapeHtml(String(montant)) + ' €</span>'
-    + '</div>'
-    + '<div class="petit" style="color:var(--gray);margin-top:6px;text-align:right">TTC</div>';
+  // ── CE QU'ON ACHÈTE ────────────────────────────────────────────────────
+  var zone = document.getElementById('payment-recap');
+  if (zone) {
+    function ligne(libelle, valeur, icone) {
+      if (!valeur) return '';
+      return '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">'
+        + '<i data-lucide="' + icone + '" style="width:15px;height:15px;color:var(--gray);'
+        +   'flex-shrink:0;margin-top:2px"></i>'
+        + '<div style="min-width:0">'
+        +   '<div class="petit" style="color:var(--gray);line-height:1.3">' + escapeHtml(libelle) + '</div>'
+        +   '<div style="font-size:14px;font-weight:600;line-height:1.35">' + escapeHtml(valeur) + '</div>'
+        + '</div></div>';
+    }
 
-  zone.innerHTML = lignes;
+    var creneau = (devis && (devis.creneau_propose || devis.creneau)) || '';
+    var html = '';
+    if (devis) {
+      html += ligne('Prestation', libellePrestation(devis.prestation || ''), 'sparkles');
+      html += ligne('Créneau', dateFrancaiseCourte(creneau), 'calendar');
+      html += ligne('Adresse', devis.adresse || '', 'map-pin');
+    }
+    // La dernière ligne n'a pas besoin de marge basse.
+    html = html.replace(/margin-bottom:10px">(?![\s\S]*margin-bottom:10px">)/, 'margin-bottom:0">');
+
+    zone.innerHTML = html;
+    zone.style.display = html ? 'block' : 'none';
+  }
+
+  // ── LE TOTAL, ISOLÉ ────────────────────────────────────────────────────
+  // C'est le chiffre que le client cherche. Il ne doit pas être noyé.
+  var bloc = document.getElementById('payment-total-bloc');
+  if (bloc) {
+    bloc.innerHTML =
+        '<div><div style="font-size:14px;font-weight:700">Total à payer</div>'
+      + '<div class="petit" style="color:var(--gray)">TTC, tout compris</div></div>'
+      + '<div id="payment-total" style="font-size:26px;font-weight:800;color:var(--p);'
+      +   'white-space:nowrap">' + escapeHtml(String(montant)) + ' €</div>';
+  }
+
+  dessinerIcones();
 }
 
 // Une version courte de la date : « mardi 25 août à 14h » suffit sur cet
@@ -11874,7 +11966,7 @@ async function openPayment(devisId,montant,devis){
       var recap=document.getElementById('payment-recap');
       if(recap){
         recap.insertAdjacentHTML('beforeend',
-          '<div style="margin-top:10px;padding:8px 10px;background:var(--vert-clair);'
+          '<div style="margin-top:10px;padding:8px 10px;background:var(--green-clair);'
           + 'border-radius:8px;font-size:12.5px;color:var(--green);font-weight:600">'
           + '🎁 Réduction de parrainage appliquée</div>');
       }
@@ -12163,7 +12255,7 @@ function majAffichageSelectionPrestations(){
         c.appendChild(barre);
       }
       var styleBouton = 'width:20px;height:20px;flex:0 0 20px;border-radius:50%;'
-        + 'border:1px solid var(--bord);background:#fff;font-size:14px;line-height:1;'
+        + 'border:1px solid var(--border);background:#fff;font-size:14px;line-height:1;'
         + 'padding:0;cursor:pointer;color:var(--text);font-family:inherit';
       barre.innerHTML =
           '<button type="button" aria-label="Retirer un" style="' + styleBouton
