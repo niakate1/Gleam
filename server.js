@@ -5752,7 +5752,32 @@ async function indicateursPrestataires(proIds) {
   }
 }
 
+// ── LA PART DU PRO EST DÉJÀ CORRIGÉE, PAS LA COMMISSION ─────────────────────
+// Lors d'un remboursement partiel, `montant_societe` est RÉÉCRIT avec le
+// montant réel lu chez Stripe — le transfert net, commission déduite.
+//
+// `commission`, elle, garde sa valeur d'origine.
+//
+// `partReelle` appliquait le prorata aux DEUX. La part du pro subissait donc
+// une double réduction :
+//
+//   400 € payés, 280 € remboursés
+//   montant_societe réécrit à 102 €   ← exact, vient de Stripe
+//   partReelle le ramenait à 30,60 €  ← faux, réduit deux fois
+//
+// Le prestataire voyait un tiers de ce qu'il avait réellement gardé.
+//
+// La règle : on ne proratise que ce qui n'a pas déjà été corrigé.
 function partReelle(paiement, champ) {
+  // `montant_societe` sur un remboursement partiel a déjà été recalculé à
+  // partir des montants réels de Stripe. Le toucher à nouveau fausserait.
+  if (champ === 'montant_societe' && paiement.statut === 'rembourse_partiel') {
+    return parseFloat(paiement[champ]) || 0;
+  }
+  return partReelleBrute(paiement, champ);
+}
+
+function partReelleBrute(paiement, champ) {
   const brut = parseFloat(paiement[champ]) || 0;
   const total = parseFloat(paiement.montant_ttc) || 0;
   const rendu = parseFloat(paiement.montant_rembourse) || 0;
