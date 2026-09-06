@@ -162,6 +162,9 @@
   --bg:             #F4F7F7;
   --surface:        #FFFFFF;
   --surface-alt:    #E9EFEF;
+  /* Le fond d'une demande cochée : assez visible pour se distinguer, assez
+     discret pour ne pas masquer le texte. */
+  --vert-selection: #DCEEEE;
   --border:         #DCE5E5;
   --border-fort:    #BECCCC;
   --text:           #14132B;
@@ -4832,8 +4835,42 @@ textarea { min-height: 92px; padding-top: 13px; }
            77 px de large sur mobile, une barre « − 2 + » y débordait. -->
       <div id="reglage-quantites" style="display:none"></div>
       <button class="modal-send-btn" id="continue-svc-btn" style="display:none;margin-bottom:24px" onclick="startMultiServiceFlow()">Continuer (<span id="svc-count">0</span> sélectionnée(s))</button>
-    <div class="section-title">Mes dernières demandes</div>
-    <div id="recent-demands"><div class="etat-vide-amorce">
+    <!-- ── L'EN-TÊTE, AVEC L'ENTRÉE EN MODE SÉLECTION ─────────────────────
+           Le bouton « Sélectionner » n'apparaît qu'à partir de trois demandes.
+           En dessous, ranger une par une va plus vite que d'entrer dans un
+           mode. -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div class="section-title" style="margin:0">Mes dernières demandes</div>
+        <button id="btn-selection" onclick="basculerModeSelection()"
+          style="display:none;background:none;border:none;color:var(--p);
+                 font-size:13.5px;font-weight:700;cursor:pointer;padding:6px 2px;
+                 font-family:inherit">Sélectionner</button>
+      </div>
+
+      <!-- La barre d'action. Elle n'apparaît qu'en mode sélection, et reste
+           au-dessus de la liste : on doit voir combien on a coché sans avoir
+           à remonter. -->
+      <div id="barre-selection" style="display:none;align-items:center;gap:10px;
+           background:var(--surface-alt);border-radius:14px;padding:12px 14px;
+           margin-bottom:12px;flex-wrap:wrap">
+        <button onclick="toutCocher()" style="background:none;border:none;
+          color:var(--p);font-size:13px;font-weight:700;cursor:pointer;
+          font-family:inherit;padding:4px">Tout</button>
+        <span id="compteur-selection" class="petit"
+          style="color:var(--gray);font-weight:600">Aucune sélectionnée</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button id="btn-ranger" onclick="agirSurSelection('ranger')"
+            style="background:#fff;border:1px solid var(--border);border-radius:10px;
+                   padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;
+                   font-family:inherit;color:var(--text)">Ranger</button>
+          <button id="btn-supprimer" onclick="agirSurSelection('supprimer')"
+            style="background:#fff;border:1px solid var(--red);border-radius:10px;
+                   padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;
+                   font-family:inherit;color:var(--red)">Supprimer</button>
+        </div>
+      </div>
+
+      <div id="recent-demands"><div class="etat-vide-amorce">
       <div class="eva-titre">Votre première demande</div>
       <p class="eva-texte">Décrivez ce qu'il faut nettoyer. Des professionnels vérifiés de votre zone vous répondent avec un prix ferme — vous ne payez qu'après la prestation.</p>
       <div class="eva-reperes">
@@ -7737,8 +7774,127 @@ function hasDataChanged(key,data){
   return true;
 }
 
+// ── LA SÉLECTION MULTIPLE ───────────────────────────────────────────────────
+// Ranger ou supprimer trente demandes une par une est décourageant. Ce mode
+// permet d'en cocher plusieurs et d'agir d'un coup.
+//
+// C'est une OPTION : tant qu'il n'est pas activé, l'écran ne change pas d'un
+// pixel. Un client qui a trois demandes n'a aucune raison de voir des cases
+// à cocher.
+var modeSelection = false;
+var demandesCochees = [];
+
+function basculerModeSelection() {
+  modeSelection = !modeSelection;
+  demandesCochees = [];
+  loadDemandes();
+}
+
+function cocherDemande(evenement, id) {
+  // Le clic ne doit pas ouvrir la demande : en mode sélection, on coche.
+  if (evenement) { evenement.stopPropagation(); evenement.preventDefault(); }
+  var i = demandesCochees.indexOf(id);
+  if (i >= 0) demandesCochees.splice(i, 1);
+  else demandesCochees.push(id);
+  majBarreSelection();
+  var ligne = document.querySelector('[data-demande="' + id + '"]');
+  if (ligne) {
+    var coche = ligne.querySelector('.case-coche');
+    var pris = demandesCochees.indexOf(id) >= 0;
+    ligne.style.background = pris ? 'var(--vert-selection)' : '';
+    if (coche) {
+      coche.style.background = pris ? 'var(--p)' : '#fff';
+      coche.style.borderColor = pris ? 'var(--p)' : 'var(--border)';
+      coche.textContent = pris ? '✓' : '';
+    }
+  }
+}
+
+function toutCocher() {
+  var lignes = document.querySelectorAll('[data-demande]');
+  var tout = demandesCochees.length === lignes.length;
+  demandesCochees = tout ? [] : Array.prototype.map.call(lignes, function (l) {
+    return l.getAttribute('data-demande');
+  });
+  loadDemandes();
+}
+
+function majBarreSelection() {
+  var barre = document.getElementById('barre-selection');
+  if (!barre) return;
+  var n = demandesCochees.length;
+  barre.style.display = modeSelection ? 'flex' : 'none';
+  var compteur = document.getElementById('compteur-selection');
+  if (compteur) compteur.textContent = n === 0 ? 'Aucune sélectionnée'
+    : (n === 1 ? '1 demande' : n + ' demandes');
+  ['btn-ranger', 'btn-supprimer'].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (b) { b.disabled = n === 0; b.style.opacity = n === 0 ? '.4' : '1'; }
+  });
+}
+
+// ── AGIR SUR PLUSIEURS DEMANDES ─────────────────────────────────────────────
+// Le serveur n'a pas de route « en lot ». On appelle donc la route existante
+// pour chacune — mais SÉQUENTIELLEMENT, pas toutes en même temps.
+//
+// Trente appels simultanés déclencheraient la limite de débit du serveur, et
+// la moitié échouerait sans qu'on sache lesquelles.
+async function agirSurSelection(action) {
+  if (!demandesCochees.length) return;
+
+  var n = demandesCochees.length;
+  var libelle = action === 'supprimer' ? 'supprimer' : 'ranger';
+  if (!confirm('Voulez-vous ' + libelle + ' ' + n + ' demande' + (n > 1 ? 's' : '') + ' ?')) return;
+
+  var btn = document.getElementById(action === 'supprimer' ? 'btn-supprimer' : 'btn-ranger');
+  var texte = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'En cours…'; }
+
+  var reussies = 0, echouees = [];
+  for (var i = 0; i < demandesCochees.length; i++) {
+    var id = demandesCochees[i];
+    try {
+      var r = action === 'supprimer'
+        ? await fetch(API + '/api/demandes/' + encodeURIComponent(id),
+            { method: 'DELETE', headers: authHeaders() })
+        : await fetch(API + '/api/demandes/' + encodeURIComponent(id) + '/archiver',
+            { method: 'PATCH', headers: authHeaders() });
+      if (r.ok) reussies++;
+      else {
+        var d = await safeJson(r);
+        echouees.push((d && d.error) || 'refusé');
+      }
+    } catch (e) {
+      echouees.push(friendlyNetworkError(e));
+    }
+    if (btn) btn.textContent = (i + 1) + ' / ' + n + '…';
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = texte; }
+
+  // On dit ce qui a marché ET ce qui a échoué. Un « c'est fait » global
+  // masquerait le fait qu'une demande en cours ne peut pas être supprimée.
+  if (echouees.length === 0) {
+    toast('✅ ' + reussies + ' demande' + (reussies > 1 ? 's' : '')
+      + (action === 'supprimer' ? ' supprimée' : ' rangée') + (reussies > 1 ? 's' : ''));
+  } else {
+    toast('⚠️ ' + reussies + ' traitée' + (reussies > 1 ? 's' : '')
+      + ', ' + echouees.length + ' refusée' + (echouees.length > 1 ? 's' : '')
+      + ' — ' + echouees[0]);
+  }
+
+  modeSelection = false;
+  demandesCochees = [];
+  loadDemandes();
+}
+
 async function loadDemandes(silent){
   var c0=document.getElementById('recent-demands');
+
+  // Le bouton « Sélectionner » n'a de sens qu'avec plusieurs demandes.
+  // En dessous de trois, en ranger une par une va plus vite.
+  var btnSel = document.getElementById('btn-selection');
+  if (btnSel) btnSel.style.display = 'none';
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
   try{
     const r=await fetchGroupe(API+'/api/demandes',{headers:authHeaders()});
@@ -7794,7 +7950,25 @@ async function loadDemandes(silent){
       var badgeRecurrence=(d.recurrence&&d.recurrence_active)
         ? '<span style="font-size:10px;background:var(--light);color:var(--p);padding:2px 8px;border-radius:10px;white-space:nowrap">🔁 '+libelleRecurrence(d.recurrence)+'</span>'
         : '';
-      html+='<div class="demand-row fade-in-item" style="animation-delay:'+(i*0.04)+'s;'+urgentStyle+'" onclick="openDetail(\''+escAttr(d.id)+'\')">'+
+      // ── EN MODE SÉLECTION, LA LIGNE SE COCHE AU LIEU DE S'OUVRIR ──────
+      // Deux comportements pour le même clic seraient déroutants. On remplace
+      // donc l'action d'ouverture tant que le mode est actif.
+      var pris = modeSelection && demandesCochees.indexOf(d.id) >= 0;
+      var caseCoche = modeSelection
+        ? '<span class="case-coche" style="width:26px;height:26px;border-radius:8px;'
+          + 'border:2px solid ' + (pris ? 'var(--p)' : 'var(--border)') + ';'
+          + 'background:' + (pris ? 'var(--p)' : '#fff') + ';color:#fff;flex-shrink:0;'
+          + 'display:flex;align-items:center;justify-content:center;font-size:15px;'
+          + 'font-weight:800;margin-right:4px">' + (pris ? '✓' : '') + '</span>'
+        : '';
+      var actionClic = modeSelection
+        ? 'cocherDemande(event,\''+escAttr(d.id)+'\')'
+        : 'openDetail(\''+escAttr(d.id)+'\')';
+
+      html+='<div class="demand-row fade-in-item" data-demande="'+escAttr(d.id)+'" style="animation-delay:'+(i*0.04)+'s;'+urgentStyle
+        + (pris ? 'background:var(--vert-selection);' : '')
+        + '" onclick="'+actionClic+'">'+
+        caseCoche+
         '<span class="demand-icon">'+icon+'</span>'+
         '<div class="demand-info">'+
           '<div class="demand-type">'+escapeHtml(libellePrestation(d.prestation))+urgentBadge+badgeRecurrence+'</div>'+
@@ -7825,6 +7999,15 @@ async function loadDemandes(silent){
       '</div>';
     });
     c.innerHTML=html;
+
+    // Le bouton « Sélectionner » n'apparaît qu'à partir de trois demandes,
+    // et la barre d'action seulement si le mode est actif.
+    var btnS = document.getElementById('btn-selection');
+    if (btnS) {
+      btnS.style.display = (data && data.length >= 3) ? 'block' : 'none';
+      btnS.textContent = modeSelection ? 'Terminer' : 'Sélectionner';
+    }
+    majBarreSelection();
   }catch(e){console.error('loadDemandes',e)}
 }
 
