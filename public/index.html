@@ -15461,6 +15461,8 @@ function afficherQuantiteVitres(typeBien){
       '<div id="vitres-autre-note" style="font-size:11px;color:var(--gray);margin-top:4px"></div>'+
       '<div id="vitres-autres-liste" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>'+
     '</div>'+
+    // La surface estimée, pour que le client voie que sa saisie a compté.
+    '<div id="surface-estimee-vitres" style="display:none"></div>'+
     '<input type="hidden" id="f-quantite">'+
   '</div>';
   majChampAutreFenetre();
@@ -15540,6 +15542,34 @@ function compteurFenetreHtml(cle,titre,exemple){
     '<input type="number" id="f-vitres-'+cle+'" min="0" value="0" inputmode="numeric" style="width:64px;text-align:center;flex-shrink:0" oninput="calculerSurfaceVitresDepuisCompteur()">'+
   '</div>';
 }
+// ── DIRE AU CLIENT CE QU'ON A COMPRIS ───────────────────────────────────────
+// La surface totale n'était jamais montrée. L'intention était bonne — c'est
+// une estimation, pas une mesure, et l'afficher pourrait donner une fausse
+// impression de précision.
+//
+// Mais elle a un coût : impossible de vérifier que sa saisie a été prise en
+// compte. Un client qui ajoute une véranda de 18 m² et voit le prix inchangé
+// — parce que le plancher de 60 € s'applique — croit que rien n'a marché.
+//
+// On affiche donc la surface, AVEC sa réserve. « Environ » et « estimation »
+// disent ce qu'il faut : un ordre de grandeur, pas un métré.
+function afficherSurfaceEstimee(zoneId, total, unite) {
+  var el = document.getElementById(zoneId);
+  if (!el) return;
+  if (!total || total <= 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+  el.style.display = 'block';
+  el.innerHTML =
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;'
+    +   'gap:12px;background:var(--surface-alt);border-radius:12px;padding:12px 14px;'
+    +   'margin-top:10px">'
+    +   '<div><div style="font-size:13.5px;font-weight:700">Environ '
+    +     escapeHtml(String(total)) + ' ' + unite + '</div>'
+    +     '<div class="petit" style="color:var(--gray);margin-top:2px">'
+    +     'Estimation d\'après vos indications</div></div>'
+    + '</div>';
+}
+
 function calculerSurfaceVitresDepuisCompteur(){
   var total=0,nbVitresTotal=0;
   Object.keys(SURFACE_TYPES_FENETRES).forEach(function(cle){
@@ -15552,9 +15582,11 @@ function calculerSurfaceVitresDepuisCompteur(){
   total=Math.round(total*10)/10;
   var quantiteEl=document.getElementById('f-quantite');
   if(quantiteEl)quantiteEl.value=total>0?total:'';
+  afficherSurfaceEstimee('surface-estimee-tapis', total, 'm² de tapis');
   // Le nombre de vitres se déduit désormais automatiquement du comptage par type — plus besoin
   // de le redemander séparément au client, ça faisait doublon avec une information déjà saisie.
   window.nbVitresCalcule=nbVitresTotal>0?nbVitresTotal:null;
+  afficherSurfaceEstimee('surface-estimee-vitres', total, 'm² de surface vitrée');
   // La surface totale n'est volontairement PAS affichée au client — ce n'est qu'une estimation
   // interne (moyennes représentatives par type de fenêtre), pas une mesure certaine. Seul le prix
   // estimé (déjà présenté avec une fourchette min-max) doit apparaître, pour ne jamais donner une
@@ -15592,6 +15624,7 @@ function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><
     '</div>'+
     '<div id="tapis-perso-liste" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>'+
   '</div>'+
+  '<div id="surface-estimee-tapis" style="display:none"></div>'+
   '<input type="hidden" id="f-quantite">'+
   '</div>'+
   etatBlock()+descBlock('Ex: Taches, poils d\'animaux...')+dateTimeBlock(isLastInFlow())+sendBtn('tapis')}
