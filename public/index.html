@@ -8979,6 +8979,12 @@ function ouvrirNote(demandeId,societeId,proName){
     '<button class="modal-send-btn" onclick="envoyerNote(this)">✅ Envoyer mon avis</button>';
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
+  // ── LES ÉTOILES SONT DES ICÔNES ────────────────────────────────────────
+  // Le HTML pose des balises <i data-lucide="star"> — elles restent VIDES
+  // tant que la bibliothèque ne les a pas remplacées par du SVG.
+  //
+  // Le client voyait donc cinq espaces cliquables, sans rien dedans.
+  dessinerIcones();
 }
 var noteSelectionnee=0;
 var noteLabels={1:'😞 Très insatisfait',2:'😐 Insatisfait',3:'🙂 Correct',4:'😊 Satisfait',5:'🤩 Excellent !'};
@@ -12852,9 +12858,20 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
     if(mCr){
       var instantCr=new Date(+mCr[1], +mCr[2]-1, +mCr[3], +mCr[4], +mCr[5]).getTime();
       if(Date.now() - instantCr > 24*3600*1000){
+        // ── LE MÊME FAIT, DIT À CHACUN ──────────────────────────────────
+        // « remboursée AU CLIENT » s'adressait au prestataire. Le client
+        // lisait donc une phrase qui parlait de lui à la troisième personne.
+        //
+        // Le fait ne change pas ; la formulation suit le lecteur.
+        var estPro24 = (typeof userRole !== 'undefined')
+          && (userRole === 'pro' || userRole === 'entreprise');
         return '<div class="petit" style="margin-top:8px;color:var(--gray)">'
-          + 'Le créneau est passé depuis plus de 24 h. Cette prestation sera '
-          + 'remboursée au client.</div>';
+          + (estPro24
+              ? 'Le créneau est passé depuis plus de 24 h. Cette prestation sera '
+                + 'remboursée au client.'
+              : 'Le créneau est passé depuis plus de 24 h. Vous serez remboursé '
+                + 'automatiquement.')
+          + '</div>';
       }
     }
   }
@@ -16114,7 +16131,18 @@ async function sendDemand(type){
 // apparaît dans la page, sans avoir besoin d'appeler manuellement dessinerIcones() partout
 // où le contenu est régénéré. Protégé contre les boucles : l'observateur est mis en pause pendant
 // la conversion elle-même (qui modifie le DOM), et les appels rapprochés sont regroupés (debounce).
-if(window.lucide){
+// ── L'OBSERVATEUR NE DOIT PAS DÉPENDRE DE L'ORDRE DE CHARGEMENT ────────────
+// La condition `if (window.lucide)` était évaluée UNE FOIS, au démarrage. Si
+// la bibliothèque n'était pas encore arrivée — réseau lent, cache froid — elle
+// valait faux, et l'observateur n'était JAMAIS créé.
+//
+// Conséquence : aucune icône ajoutée après coup n'était dessinée. Les étoiles
+// de notation restaient invisibles, et sur une connexion lente, toutes les
+// icônes de la page disparaissaient.
+//
+// L'observateur se crée maintenant sans condition. `dessinerIcones` vérifie
+// déjà que la bibliothèque existe avant de l'appeler — il ne peut rien casser.
+{
   var lucideObserver=null;
   var lucideDebounce=null;
   function runLucideIcons(){
@@ -16128,6 +16156,12 @@ if(window.lucide){
     if(document.hidden)return;lucideDebounce=setTimeout(runLucideIcons,240);
   });
   runLucideIcons();
+
+  // Si Lucide arrive APRÈS ce bloc, rien ne l'aurait redessiné. Trois
+  // tentatives espacées couvrent les connexions lentes sans coûter quoi que
+  // ce soit quand tout va vite.
+  [400, 1200, 3000].forEach(function(ms){ setTimeout(runLucideIcons, ms); });
+  window.addEventListener('load', runLucideIcons);
 }
 
 // ── INIT ──
