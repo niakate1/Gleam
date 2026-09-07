@@ -15111,7 +15111,17 @@ async function updateEstimationMaintenant(){
       // taille. Le serveur exige pourtant une quantité pour les catégories à
       // l'unité — on lui envoie donc 1, ce qui est exact.
       var qEl=document.getElementById('f-quantite');
-      var quantite=qEl?parseInt(qEl.value,10):(currentFormType==='matelas'?1:0);
+      // ── UNE SURFACE N'EST PAS UN ENTIER ────────────────────────────────────
+      // `parseInt` tronquait : 0,3 m² devenait 0, et le code affichait
+      // « Indiquez une quantité » alors qu'elle était saisie.
+      //
+      // Pire, 4,8 m² devenait 4 — le prix était sous-évalué de 17 % sans
+      // que personne ne s'en aperçoive.
+      //
+      // Vitres, tapis, terrasse et toiture se comptent en m², avec des
+      // décimales. Seul le matelas se compte en entiers, et `parseFloat`
+      // le lit tout aussi bien.
+      var quantite=qEl?parseFloat(qEl.value):(currentFormType==='matelas'?1:0);
       if(!quantite||quantite<=0){
         box.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic">💡 Indiquez une quantité ci-dessus pour voir une estimation de prix</div>';
         return;
