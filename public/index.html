@@ -15451,11 +15451,24 @@ function afficherQuantiteVitres(typeBien){
     '</div>'+
     '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">'+
       '<label style="font-size:12.5px">Un autre type de fenêtre ? <span class="optional">(optionnel)</span></label>'+
-      '<div style="display:flex;gap:8px;margin-top:6px">'+
-        '<select id="f-vitres-autre-type" style="flex:1" onchange="majChampAutreFenetre()">'+
+      // `align-items:flex-end` aligne tout sur le bas : le champ porte
+      // désormais une étiquette au-dessus, les autres non.
+      '<div style="display:flex;gap:8px;margin-top:6px;align-items:flex-end">'+
+      '<select id="f-vitres-autre-type" style="flex:1;min-width:0" onchange="majChampAutreFenetre()">'+
           Object.keys(AUTRES_TYPES_FENETRES).map(function(cle){return '<option value="'+cle+'">'+AUTRES_TYPES_FENETRES[cle].label+'</option>'}).join('')+
         '</select>'+
-        '<input type="number" id="f-vitres-autre-qte" min="1" value="1" inputmode="numeric" style="width:56px;text-align:center;flex-shrink:0">'+
+        // ── DIRE CE QU'ON ATTEND, ET LAISSER LA PLACE ──────────────────────
+    // Le champ faisait 56 px pour un texte de repère de quatorze caractères :
+    // « Surface en m² » n'y tenait pas, et rien ne distinguait une quantité
+    // d'une surface.
+    //
+    // Une étiquette au-dessus le dit sans ambiguïté, et la largeur s'adapte.
+    '<div id="vitres-autre-champ" style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">'+
+      '<span id="vitres-autre-label" class="petit" style="color:var(--gray);'
+        + 'font-weight:700;line-height:1">Nombre</span>'+
+      '<input type="number" id="f-vitres-autre-qte" min="1" value="1" inputmode="numeric" '
+        + 'style="width:72px;text-align:center">'+
+    '</div>'+
         '<button type="button" class="btn" style="width:auto;padding:0 14px;flex-shrink:0" onclick="ajouterAutreFenetre()">Ajouter</button>'+
       '</div>'+
       '<div id="vitres-autre-note" style="font-size:11px;color:var(--gray);margin-top:4px"></div>'+
@@ -15493,14 +15506,23 @@ function majChampAutreFenetre(){
   var typeEl=document.getElementById('f-vitres-autre-type'),qteEl=document.getElementById('f-vitres-autre-qte'),noteEl=document.getElementById('vitres-autre-note');
   if(!typeEl||!qteEl)return;
   var info=AUTRES_TYPES_FENETRES[typeEl.value];
+  // L'étiquette dit ce qu'on attend. Le champ s'élargit pour une surface :
+  // « 18,5 » demande plus de place qu'un « 2 ».
+  var labelEl=document.getElementById('vitres-autre-label');
   if(info&&info.surfaceVariable){
-    qteEl.placeholder='Surface en m²';
+    if(labelEl)labelEl.textContent='Surface (m²)';
+    qteEl.style.width='96px';
+    qteEl.placeholder='ex : 18';
     qteEl.step='0.5';
+    qteEl.min='0.5';
     qteEl.value='';
     if(noteEl)noteEl.textContent='Cette installation varie trop d\'un modèle à l\'autre — indiquez directement sa surface réelle en m² (généralement connue).';
   }else{
+    if(labelEl)labelEl.textContent='Nombre';
+    qteEl.style.width='72px';
     qteEl.placeholder='';
     qteEl.step='1';
+    qteEl.min='1';
     qteEl.value=1;
     if(noteEl)noteEl.textContent='';
   }
