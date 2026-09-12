@@ -1866,6 +1866,15 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
 .toast-error   { background: #7F1D1D; }
 .toast-warning { background: #14262A; }
 
+/* ── UN MESSAGE NEUTRE N'EST PAS UN AVERTISSEMENT ──────────────────────────
+   « Bienvenue sur Gleam » tombait dans `warning`, le recours par défaut, et
+   s'affichait sur un fond presque noir. Un accueil qui ressemble à une alerte
+   commence mal.
+
+   Ce quatrième type reprend le vert de la marque. Il ne sert qu'aux messages
+   qui n'annoncent ni réussite, ni échec, ni danger. */
+.toast-neutre { background: var(--p); }
+
 
 /* ────────────────────────────────────────────────────────────────────────────
    22. PONT TEMPORAIRE — MODE SOMBRE
@@ -6408,9 +6417,17 @@ function carteExemple(e){
 }
 function toast(msg,dur=3000){
   const t=document.getElementById('toast');
-  var type='warning',icon='info';
+  // ── QUATRE TONS, PAS TROIS ──────────────────────────────────────────────
+  // `warning` servait de recours à tout ce qui n'était ni une réussite ni une
+  // erreur — « Bienvenue sur Gleam » compris. Un accueil sur fond noir.
+  //
+  // Le neutre devient le recours, aux couleurs de la marque. L'avertissement
+  // garde son fond sombre, mais ne s'applique plus qu'aux messages qui
+  // signalent vraiment quelque chose.
+  var type='neutre',icon='info';
   if(/^Erreur|❌/.test(msg)){type='error';icon='alert-circle'}
   else if(/✅|💾|📸|⭐|🗑️|📧|✨|🚫/.test(msg)){type='success';icon='check-circle'}
+  else if(/impossible|échec|attention|⚠️|expiré|refusé|ignoré/i.test(msg)){type='warning';icon='alert-triangle'}
   t.className='toast toast-'+type;
   // Le type du message a déjà déterminé une icône ci-dessus. Laisser en plus
   // l'emoji du texte affichait deux symboles côte à côte dans chaque
