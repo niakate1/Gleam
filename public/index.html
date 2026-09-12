@@ -8577,6 +8577,19 @@ async function refuserDevis(devisId,btn){
 // ── DETAIL DEMANDE ──
 var currentDetailDemande=null;
 async function openDetail(demandeId){
+  // ── L'ÉCRAN DE DÉTAIL EST CELUI DU CLIENT ──────────────────────────────
+  // `s-detail` n'a pas de barre de navigation : celle de l'écran précédent
+  // reste affichée. Un prestataire qui arrive ici par une notification voyait
+  // donc l'écran client sous sa propre barre — et en revenant, un mélange des
+  // deux interfaces.
+  //
+  // Le prestataire a son propre parcours : `s-pro-devis` puis le détail de la
+  // demande côté pro. On l'y renvoie plutôt que de lui montrer un écran qui
+  // ne lui est pas destiné.
+  if (typeof isPro === 'function' && isPro()) {
+    if (typeof goProTab === 'function') goProTab('pro-devis');
+    return;
+  }
   try{
     const r=await fetch(API+'/api/demandes/'+demandeId,{headers:authHeaders()});
     if(!r.ok){toast('Demande introuvable.');return}
