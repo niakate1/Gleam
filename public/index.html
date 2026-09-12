@@ -34,9 +34,37 @@
     to   { opacity: 1; transform: translateY(0); }
   }
   #splash-screen svg { animation: demarrage-monte .5s cubic-bezier(.16,1,.3,1) both; }
+
+/* La barre va et vient plutôt que d'avancer vers 100 % : nous ne savons pas
+   combien de temps le chargement prendra, et une barre qui atteint la fin
+   sans que rien ne se passe est pire que pas de barre du tout. */
+@keyframes barre-va-et-vient {
+  0%   { transform: translateX(-115%); }
+  100% { transform: translateX(240%); }
+}
+.barre-demarrage {
+  animation: barre-va-et-vient 1.15s cubic-bezier(.55,.1,.45,.9) infinite;
+}
+
+/* Une lueur lente derrière le logo. Elle occupe le regard pendant l'attente,
+   sans attirer l'attention sur elle. */
+@keyframes lueur-demarrage {
+  0%, 100% { opacity: .5;  transform: scale(1); }
+  50%      { opacity: .85; transform: scale(1.06); }
+}
+#splash-screen .goutte-demarrage {
+  animation: demarrage-monte .5s cubic-bezier(.16,1,.3,1) both,
+             lueur-demarrage 2.6s ease-in-out .5s infinite;
+}
   #splash-screen .gleam-effet { animation: demarrage-monte .5s cubic-bezier(.16,1,.3,1) .12s both; }
   @media (prefers-reduced-motion: reduce) {
-    #splash-screen svg, #splash-screen .gleam-effet { animation: none; }
+    /* La barre et la lueur suivent aussi ce réglage : quelqu'un qui demande
+     moins de mouvement ne veut pas d'une barre qui va et vient en continu.
+     La barre reste visible, simplement immobile — elle garde sa fonction
+     d'indicateur sans le mouvement. */
+  #splash-screen svg, #splash-screen .gleam-effet,
+  #splash-screen .goutte-demarrage, .barre-demarrage { animation: none; }
+  .barre-demarrage { width: 100%; opacity: .5; }
   }
   @media (prefers-color-scheme: dark) { body { background: #080F11; } }
 </style>
@@ -4402,8 +4430,63 @@ textarea { min-height: 92px; padding-top: 13px; }
       <path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="#0A4750"/>
     </svg>
     <div class="gleam-effet" style="font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:600;color:#fff;letter-spacing:-.02em">Gleam</div>
-  </div>
-</div>
+
+        <!-- ── UNE PROGRESSION, PAS UNE ATTENTE ─────────────────────────
+             Un écran immobile pendant deux secondes donne l'impression que
+             rien ne se passe. Cette barre avance en continu : elle ne mesure
+             rien, mais elle dit que l'application travaille.
+
+             Le mouvement est ce qui distingue « ça charge » de « c'est
+             planté » — et c'est précisément ce qui manquait. -->
+        <div style="width:132px;height:3px;border-radius:999px;background:rgba(255,255,255,.16);overflow:hidden;margin-top:6px">
+          <div class="barre-demarrage" style="width:42%;height:100%;border-radius:999px;background:rgba(255,255,255,.82)"></div>
+        </div>
+
+        <div style="font-size:12.5px;color:rgba(255,255,255,.55);letter-spacing:.04em;margin-top:2px">
+          Le nettoyage, sans mauvaise surprise
+        </div>
+      </div>
+    </div>
+
+<!-- ── LE FILET QUI NE DÉPEND DE RIEN ─────────────────────────────────────────
+     L'écran de démarrage était retiré par le script principal — huit cent
+     mille caractères plus bas. Une exception n'importe où avant cette ligne,
+     et l'écran restait affiché pour toujours.
+
+     C'est ce qui s'est produit avec l'`async` orphelin : l'application
+     paraissait figée sur le logo, sans message, sans recours.
+
+     Ce script-ci est court, isolé, et s'exécute AVANT tout le reste. Même si
+     tout le code qui suit échoue, l'écran partira. -->
+<script>
+(function () {
+  var DELAI_SECOURS = 6000;
+
+  function retirerDeForce() {
+    var e = document.getElementById('splash-screen');
+    if (!e) return;
+    e.style.opacity = '0';
+    e.style.visibility = 'hidden';
+    setTimeout(function () { if (e.parentNode) e.remove(); }, 500);
+  }
+
+  // Si le script principal fait son travail, il aura retiré l'écran bien
+  // avant. Ce délai ne se déclenche que lorsque quelque chose a échoué.
+  setTimeout(retirerDeForce, DELAI_SECOURS);
+
+  // Une erreur au chargement est le signal le plus fiable : inutile
+  // d'attendre six secondes si on sait déjà que ça ne marchera pas.
+  window.addEventListener('error', function () {
+    setTimeout(retirerDeForce, 1200);
+  }, true);
+
+  // Et si la page finit de charger sans que l'écran soit parti, c'est que le
+  // script principal n'a pas atteint sa ligne.
+  window.addEventListener('load', function () {
+    setTimeout(retirerDeForce, 2500);
+  });
+})();
+</script>
 <div class="toast" id="toast"></div>
 
 <!-- AUTH -->
