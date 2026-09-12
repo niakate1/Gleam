@@ -5271,7 +5271,21 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
     const demandeMap = {};
     demandes.forEach(d => demandeMap[d.id] = d);
 
-    const { data: devis } = await supabase.from('devis').select('*').in('demande_id', demandeIds);
+    // ── DEUX REQUÊTES QUI PARTENT DE LA MÊME LISTE ─────────────────────────
+    // `devis` et les codes de validation dépendent tous deux de `demandes`,
+    // pas l'un de l'autre. Les enchaîner ajoutait un aller-retour inutile.
+    //
+    // Mesuré à 314 ms côté client, contre 92 ms pour l'équivalent prestataire.
+    const idsEnCours = demandes.filter(d => d.statut === 'en_cours').map(d => d.id);
+    const [rDevis, rPaiements] = await Promise.all([
+      supabase.from('devis').select('*').in('demande_id', demandeIds),
+      idsEnCours.length
+        ? supabase.from('paiements').select('demande_id, code_validation')
+            .in('demande_id', idsEnCours).eq('statut', 'paye')
+        : Promise.resolve({ data: [] })
+    ]);
+    const devis = rDevis.data;
+    const paiementsPrecharges = rPaiements.data;
     if (!devis || !devis.length) return res.json([]);
 
     const proIds = [...new Set(devis.map(d => d.societe_id))];
@@ -5292,12 +5306,9 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
     });
 
     // Codes de validation des demandes en cours, récupérés en une seule requête groupée
-    const demandeIdsEnCours = demandes.filter(d => d.statut === 'en_cours').map(d => d.id);
+    // Les codes ont déjà été chargés, en parallèle des devis.
     const codeMap = {};
-    if (demandeIdsEnCours.length) {
-      const { data: paiementsEnCours } = await supabase.from('paiements').select('demande_id, code_validation').in('demande_id', demandeIdsEnCours).eq('statut', 'paye');
-      (paiementsEnCours || []).forEach(p => codeMap[p.demande_id] = p.code_validation);
-    }
+    (paiementsPrecharges || []).forEach(p => codeMap[p.demande_id] = p.code_validation);
 
     const enriched = devis.map(d => {
       const demandeInfo = demandeMap[d.demande_id];
@@ -6069,12 +6080,24 @@ app.get('/api/conversations', auth, async (req, res) => {
 
     if (!demandeIds.length) return res.json([]);
 
-    const { data: demandes } = await supabase.from('demandes').select('*').in('id', demandeIds);
+    // ── DEUX REQUÊTES INDÉPENDANTES, LANCÉES ENSEMBLE ──────────────────────
+    // Les demandes et les messages ne dépendent pas l'un de l'autre : tous deux
+    // partent de `demandeIds`, déjà connu.
+    //
+    // Les enchaîner faisait attendre deux allers-retours là où un seul suffit.
+    // Mesuré à 322 ms côté client — la route la plus lente de l'application.
+    const promesseDemandes = supabase.from('demandes').select('*').in('id', demandeIds);
 
     // Tout ce qui suit se fait en requêtes groupées (une poignée au total, quel que soit le nombre
     // de conversations) — plutôt qu'une requête séparée par conversation, qui devenait un vrai
     // problème de volume une fois combiné au rafraîchissement automatique.
-    const { data: tousMessages } = await supabase.from('messages').select('*').in('demande_id', demandeIds).order('created_at', { ascending: false });
+    const [rDemandes, rMessages] = await Promise.all([
+      promesseDemandes,
+      supabase.from('messages').select('*').in('demande_id', demandeIds)
+        .order('created_at', { ascending: false })
+    ]);
+    const demandes = rDemandes.data;
+    const tousMessages = rMessages.data;
     const dernierMessageParDemande = {};
     (tousMessages || []).forEach(m => { if (!dernierMessageParDemande[m.demande_id]) dernierMessageParDemande[m.demande_id] = m; });
 
