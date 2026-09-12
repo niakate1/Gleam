@@ -12876,8 +12876,9 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
         // lisait donc une phrase qui parlait de lui à la troisième personne.
         //
         // Le fait ne change pas ; la formulation suit le lecteur.
-        var estPro24 = (typeof userRole !== 'undefined')
-          && (userRole === 'pro' || userRole === 'entreprise');
+        // Même correction : `isPro()` lit le compte connecté, pas l'onglet
+        // d'inscription.
+        var estPro24 = (typeof isPro === 'function') && isPro();
         return '<div class="petit" style="margin-top:8px;color:var(--gray)">'
           + (estPro24
               ? 'Le créneau est passé depuis plus de 24 h. Cette prestation sera '
@@ -12915,8 +12916,10 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
     //
     // Le prestataire lisait donc un message écrit sur lui, qui lui suggérait
     // d'annuler son propre déplacement.
-    var estPrestataire = (typeof userRole !== 'undefined')
-      && (userRole === 'pro' || userRole === 'entreprise');
+    // `userRole` reflète le dernier onglet du formulaire d'INSCRIPTION, pas
+    // le compte connecté. `isPro()` lit `currentUser.type` — la seule source
+    // fiable une fois la session ouverte.
+    var estPrestataire = (typeof isPro === 'function') && isPro();
 
     if(douteuse && !confirmee && !estPrestataire){
       // On ne ferme pas, mais on prévient : reprogrammer alors que le
