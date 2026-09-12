@@ -9222,6 +9222,35 @@ function exempleDemandePro(){
   '</div>';
 }
 
+// ── UN ÉCHEC DE CHARGEMENT NE DOIT PAS EFFACER L'ÉCRAN ──────────────────────
+// Cinq écrans écrasaient leur contenu par un message d'erreur. Un utilisateur
+// qui laissait l'écran ouvert voyait ses données DISPARAÎTRE au premier
+// rafraîchissement raté — réseau faible, jeton expiré, serveur lent.
+//
+// Or ces données étaient valides : seule la mise à jour avait échoué.
+//
+// Et plusieurs messages proposaient « Tirez vers le bas », un geste qui
+// n'existe nulle part dans l'application. On offre un vrai bouton.
+function echecChargement(zoneId, relance, dejaAffiche) {
+  var zone = document.getElementById(zoneId);
+  if (!zone) return;
+
+  // Du contenu est à l'écran : on le garde et on signale discrètement.
+  if (dejaAffiche) {
+    if (typeof toast === 'function') {
+      toast('Mise à jour impossible — les données affichées datent de votre dernière connexion.', 5000);
+    }
+    return;
+  }
+
+  zone.innerHTML =
+      '<div class="empty-state"><span>📋</span>'
+    + '<p>Chargement impossible.</p>'
+    + '<button class="btn" style="width:auto;margin-top:12px;padding:10px 22px" '
+    +   'onclick="' + relance + '">Réessayer</button>'
+    + '</div>';
+}
+
 async function loadProDemandes(silent){
   var c0=document.getElementById('pro-demandes-list');
   if(c0&&!silent)c0.innerHTML=skeletonCards(3);
@@ -9285,7 +9314,36 @@ async function loadProDemandes(silent){
     if(silent&&!changed2)return;
     proDemandesCache=data;
     renderProDemandesCards();
-  }catch(e){document.getElementById('pro-demandes-list').innerHTML='<div class="empty-state"><span>📋</span><p>Erreur de chargement. Tirez vers le bas pour réessayer.</p></div>'}
+  }catch(e){
+    // ── UN ÉCHEC NE DOIT PAS EFFACER CE QUI EST DÉJÀ AFFICHÉ ─────────────
+    // Le catch écrasait la liste par un message d'erreur. Un prestataire qui
+    // laissait l'écran ouvert voyait ses demandes DISPARAÎTRE au premier
+    // rafraîchissement raté — réseau faible, jeton expiré, serveur lent.
+    //
+    // Or ces demandes étaient valides : seule la mise à jour a échoué.
+    //
+    // Et le message proposait « Tirez vers le bas », un geste qui n'existe
+    // nulle part dans l'application. On offre un vrai bouton.
+    var zone = document.getElementById('pro-demandes-list');
+    if (!zone) return;
+
+    // Des demandes sont déjà à l'écran : on les garde, et on signale
+    // discrètement que la mise à jour a échoué.
+    if (proDemandesCache && proDemandesCache.length) {
+      if (typeof toast === 'function') {
+        toast('Mise à jour impossible — les demandes affichées datent de votre dernière connexion.', 5000);
+      }
+      return;
+    }
+
+    // L'écran était vide : là, le message a sa place.
+    zone.innerHTML =
+        '<div class="empty-state"><span>📋</span>'
+      + '<p>Chargement impossible.</p>'
+      + '<button class="btn" style="width:auto;margin-top:12px;padding:10px 22px" '
+      +   'onclick="loadProDemandes()">Réessayer</button>'
+      + '</div>';
+  }
 }
 function renderProDemandesCards(){
   var c=document.getElementById('pro-demandes-list');
@@ -12839,7 +12897,11 @@ async function showMesAvis(){
         (a.commentaire?'<div style="font-size:13px;color:var(--text-secondary);line-height:1.4;padding-top:4px;border-top:1px solid var(--border)">"'+escapeHtml(a.commentaire)+'"</div>':'')+
         '</div>';
     }).join('');
-  }catch(e){var c2=document.getElementById('avis-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
+  }catch(e){
+    // Le contenu déjà affiché est conservé : voir echecChargement.
+    echecChargement('avis-list', 'showMesAvis()',
+      !!(document.getElementById('avis-list') && document.getElementById('avis-list').querySelector('div,article,section')));
+  }
 }
 async function showMesPaiements(){
   document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="credit-card" style="width:20px;height:20px;vertical-align:-4px"></i> Mes paiements</div><div class="modal-sub">Historique de vos transactions</div><div id="paiements-list">'+skeletonCards(3)+'</div>';
@@ -12891,7 +12953,11 @@ async function showMesPaiements(){
         '<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--p)">'+escapeHtml(p.montant_ttc)+'€</div>'+
         '<div style="font-size:11px;font-weight:700;color:'+couleur+'">'+libelle+'</div></div></div></div>';
     }).join('');
-  }catch(e){var c2=document.getElementById('paiements-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
+  }catch(e){
+    // Le contenu déjà affiché est conservé : voir echecChargement.
+    echecChargement('paiements-list', 'showMesPaiements()',
+      !!(document.getElementById('paiements-list') && document.getElementById('paiements-list').querySelector('div,article,section')));
+  }
 }
 async function configurerPaiementsPro(){
   toast('Redirection vers Stripe...');
@@ -13746,7 +13812,11 @@ async function showMesFavoris(){
         '<button class="btn-refuse" style="width:auto;padding:8px 10px" onclick="retirerFavori(\''+escAttr(p.id)+'\',this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>'+
       '</div>';
     }).join('');
-  }catch(e){var c2=document.getElementById('favoris-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
+  }catch(e){
+    // Le contenu déjà affiché est conservé : voir echecChargement.
+    echecChargement('favoris-list', 'showMesFavoris()',
+      !!(document.getElementById('favoris-list') && document.getElementById('favoris-list').querySelector('div,article,section')));
+  }
 }
 async function retirerFavori(proId,btn){
   if(btn)btn.disabled=true;
@@ -14289,7 +14359,11 @@ async function showMesGains(){
         '<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--p)">'+escapeHtml(p.montant_societe)+'€</div>'+
         '<div style="font-size:11px;font-weight:700;color:'+st[1]+'">'+st[0]+'</div></div></div></div>';
     }).join('');
-  }catch(e){var c2=document.getElementById('gains-list');if(c2)c2.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>'}
+  }catch(e){
+    // Le contenu déjà affiché est conservé : voir echecChargement.
+    echecChargement('gains-list', 'showMesGains()',
+      !!(document.getElementById('gains-list') && document.getElementById('gains-list').querySelector('div,article,section')));
+  }
 }
 function showHowItWorks(){
   var html='<div class="modal-title gleam-signature">✨ Comment marche Gleam ?</div>'+
