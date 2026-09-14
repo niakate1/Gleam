@@ -546,6 +546,28 @@ function echapper(s) {
 
 // Tout appel authentifié passe par ici : un 401 ramène systématiquement à
 // l'écran de connexion plutôt que d'afficher une page à moitié vide.
+// ── LIRE UN EN-TÊTE DE RÉPONSE ─────────────────────────────────────────────
+// `appel` ne renvoie que le corps. La pagination a besoin du total, qui voyage
+// dans un en-tête — sans quoi l'écran ne peut pas savoir combien de comptes
+// existent au-delà de la page affichée.
+//
+// On garde `appel` intacte : d'autres écrans en dépendent, et changer sa
+// valeur de retour les casserait tous.
+let dernierTotal = 0;
+
+async function appelAvecTotal(chemin, options) {
+  const r = await fetch(API + chemin, Object.assign({}, options, {
+    headers: Object.assign({ 'Content-Type': 'application/json',
+                             'Authorization': 'Bearer ' + jeton },
+                           (options && options.headers) || {})
+  }));
+  if (r.status === 401) { deconnecter('Session expirée, reconnectez-vous.'); throw new Error('401'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'Erreur ' + r.status);
+  dernierTotal = parseInt(r.headers.get('X-Total-Comptes') || '0', 10);
+  return d;
+}
+
 async function appel(chemin, options) {
   const r = await fetch(API + chemin, Object.assign({}, options, {
     headers: Object.assign({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jeton },
@@ -927,11 +949,35 @@ async function basculerSignalement(id, statut) {
 }
 
 // ── Comptes ─────────────────────────────────────────────────────────────────
+// La page affichée et la recherche en cours. Hors de la fonction : elles
+// doivent survivre entre deux appels.
+let pageComptes = 0;
+
+function pageComptesSuivante() {
+  pageComptes++;
+  chargerComptes(pageComptesRecherche);
+}
+function pageComptesPrecedente() {
+  if (pageComptes > 0) pageComptes--;
+  chargerComptes(pageComptesRecherche);
+}
+let pageComptesRecherche = '';
+
 async function chargerComptes(recherche) {
   const c = $('liste-comptes');
   c.innerHTML = '<div class="squelette"></div>'.repeat(3);
   try {
-    comptes = await appel('/api/admin/users' + (recherche ? '?q=' + encodeURIComponent(recherche) : ''));
+    // ── LA PAGE COURANTE ──────────────────────────────────────────────
+    // Une recherche repart toujours de la première page : chercher « Dupont »
+    // en étant page 4 ne montrerait rien, et on croirait qu'il n'existe pas.
+    if (recherche !== pageComptesRecherche) { pageComptes = 0; }
+    pageComptesRecherche = recherche;
+
+    const params = [];
+    if (recherche) params.push('q=' + encodeURIComponent(recherche));
+    if (pageComptes) params.push('page=' + pageComptes);
+    comptes = await appelAvecTotal('/api/admin/users'
+      + (params.length ? '?' + params.join('&') : ''));
     if (!comptes.length) {
       c.innerHTML = '<div class="vide"><div class="gros">Aucun compte trouvé</div>' +
         (recherche ? 'Essayez une autre recherche.' : '') + '</div>';
@@ -978,6 +1024,25 @@ async function chargerComptes(recherche) {
           : '') +
       '</div>';
     }).join('');
+
+    // ── LA NAVIGATION ENTRE PAGES ─────────────────────────────────────
+    // Sans elle, l'écran affichait cent comptes et laissait croire qu'il n'y
+    // en avait pas d'autres. Le total vient de l'en-tête X-Total-Comptes.
+    const debutAffiche = pageComptes * 100 + 1;
+    const finAffichee = pageComptes * 100 + comptes.length;
+    const resteApres = dernierTotal - finAffichee;
+
+    if (dernierTotal > 100) {
+      c.innerHTML += '<div style="display:flex;align-items:center;justify-content:space-between;'
+        + 'gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">'
+        + '<button class="action secondaire" ' + (pageComptes === 0 ? 'disabled' : '')
+        +   ' onclick="pageComptesPrecedente()">← Précédents</button>'
+        + '<span class="petit">' + debutAffiche + '–' + finAffichee
+        +   ' sur ' + dernierTotal + '</span>'
+        + '<button class="action secondaire" ' + (resteApres <= 0 ? 'disabled' : '')
+        +   ' onclick="pageComptesSuivante()">Suivants →</button>'
+        + '</div>';
+    }
   } catch (e) {
     if (e.message !== '401') c.innerHTML =
       '<div class="vide"><div class="gros">Chargement impossible</div>' + echapper(e.message) + '</div>';
@@ -1091,7 +1156,16 @@ async function chargerDiagnostic() {
 // à un comptable ou à un prestataire spécialisé de produire le fichier XML
 // normalisé, que cette page ne génère pas.
 
-let anneeDeclaration = new Date().getFullYear() - 1;
+// ── L'ANNÉE PAR DÉFAUT SUIT VOS DONNÉES ─────────────────────────────────────
+// L'écran ouvrait sur l'année PRÉCÉDENTE, ce qui se défend : une déclaration
+// fiscale porte sur l'exercice écoulé.
+//
+// Mais tant qu'il n'y a pas d'historique, cela affiche un tableau vide — et
+// l'en-tête disait « 2026 » pendant que le total disait « Total 2025 ».
+//
+// On ouvre donc sur l'année COURANTE. À partir de janvier prochain, l'écran
+// des années permettra de revenir sur 2026 pour la déclaration.
+let anneeDeclaration = new Date().getFullYear();
 
 // euros() est déjà déclarée plus haut dans ce fichier : on la réutilise plutôt
 // que d'en créer une seconde qui finirait par diverger.
