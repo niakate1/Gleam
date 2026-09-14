@@ -10260,13 +10260,30 @@ function renderProDevisCards(){
   var gagnes=data.filter(function(v){
     return v.statut==='accepte'&&v.demande&&v.demande.statut==='terminee';
   });
-  var montantGagne=gagnes.reduce(function(t,v){return t+(parseFloat(v.prix_ttc)||0)*(1-TAUX_COMMISSION)},0);
+  // ── CE CHIFFRE ÉTAIT UNE ESTIMATION, PAS UN GAIN ────────────────────────
+  // Il partait des DEVIS et appliquait 15 % de commission théorique :
+  //
+  //   prix_ttc × (1 − 0,15)
+  //
+  // L'accueil, lui, part des PAIEMENTS : le montant réellement transféré,
+  // corrigé par Stripe. Les deux écrans affichaient donc 748 € et 850 €.
+  //
+  // L'écart de 102 € était un remboursement partiel — une prestation payée
+  // 400 €, remboursée 280 €, dont le prestataire a gardé 102 €. Le calcul par
+  // devis ne pouvait pas le savoir : le devis, lui, vaut toujours 400 €.
+  //
+  // On retire donc ce montant. Deux chiffres différents pour la même chose
+  // font douter des deux — et celui-ci était le moins fiable.
+
   var euros = formaterEuros;   // une seule règle d'affichage, partout;
 
   var recap='<div class="recap-devis">'+
     '<div><div class="valeur attente">'+enAttente.length+'</div><div class="etiquette">En attente de réponse</div></div>'+
     '<div><div class="valeur attente">'+euros(montantEnJeu)+'</div><div class="etiquette">Montant en jeu</div></div>'+
-    '<div><div class="valeur gagne">'+euros(montantGagne)+'</div><div class="etiquette">Perçu, net de commission</div></div>'+
+    // Le nombre de prestations, pas un montant. Le montant vit sur l'accueil,
+  // où il est calculé depuis les paiements réels — une seule source, un seul
+  // chiffre.
+  '<div><div class="valeur gagne">'+gagnes.length+'</div><div class="etiquette">Prestation'+(gagnes.length>1?'s':'')+' terminée'+(gagnes.length>1?'s':'')+'</div></div>'+
   '</div>';
 
   if(!filtered.length){c.innerHTML=recap+chips+emptyStateHtml({title:'Rien dans cette catégorie',sub:'Changez de filtre pour retrouver vos autres devis.',ctaLabel:'',ctaAction:''});return}
