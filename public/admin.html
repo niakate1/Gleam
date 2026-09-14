@@ -1247,15 +1247,10 @@ function exporterDeclaration(d) {
     p.declarable ? 'oui' : 'NON'
   ]));
 
-  const csv = '\ufeff' + lignes.map((l) =>
-    l.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
-
-  const lien = document.createElement('a');
-  lien.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  lien.download = 'gleam-declaration-' + d.annee + '.csv';
-  lien.click();
-  URL.revokeObjectURL(lien.href);
-  avis('Export téléchargé.');
+  // L'export DAC7 passe par la même fonction que les autres : elle seule
+    // ajoute le lien au document et diffère la libération de l'adresse — sans
+    // quoi Safari ne télécharge rien.
+    telechargerCsv(lignes, 'gleam-declaration-' + d.annee + '.csv');
 }
 
 
@@ -1364,15 +1359,33 @@ async function chargerFactures() {
     : '<p class="petit">Aucune facture émise en ' + d.annee + '.</p>';
 }
 
+// ── DEUX DÉFAUTS QUI EMPÊCHAIENT LE TÉLÉCHARGEMENT SUR SAFARI ───────────────
+// UN — le lien n'était jamais ajouté à la page. `lien.click()` sur un élément
+// détaché fonctionne sur Chrome ; Safari l'ignore purement et simplement.
+//
+// DEUX — `revokeObjectURL` était appelé juste après le clic. Le téléchargement
+// n'avait pas eu le temps de commencer que l'adresse était déjà invalide.
+//
+// Résultat : le clic ne faisait rien, ou ouvrait une page vide.
 function telechargerCsv(lignes, nom) {
-  // BOM et point-virgule : ce qu'attend Excel en configuration française.
   const csv = '\ufeff' + lignes.map((l) =>
     l.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const lien = document.createElement('a');
-  lien.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  lien.href = url;
   lien.download = nom;
+  lien.style.display = 'none';
+
+  // Le lien doit exister dans le document pour que Safari le suive.
+  document.body.appendChild(lien);
   lien.click();
-  URL.revokeObjectURL(lien.href);
+  document.body.removeChild(lien);
+
+  // On laisse le navigateur démarrer le téléchargement avant de libérer
+  // l'adresse. Une seconde suffit largement, et l'attente ne coûte rien.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
   avis('Export téléchargé.');
 }
 
