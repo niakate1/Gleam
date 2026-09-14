@@ -2571,8 +2571,17 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--aqua); display: block; flex-shrink: 0;
 }
-.entete-pro-dispo.indispo { background: var(--surface-alt); color: var(--gray); }
-.entete-pro-dispo.indispo i { background: var(--border-fort); }
+/* ── INDISPONIBLE SE VOIT EN ROUGE, PAS EN GRIS ─────────────────────────────
+   Le gris dit « éteint », « inactif », « pas encore chargé ». Il ne dit pas
+   « je ne reçois plus de demandes ».
+   
+   C'est pourtant une décision que le prestataire prend volontairement, et
+   qu'il doit pouvoir vérifier d'un coup d'œil — un pro qui se croit
+   disponible alors qu'il ne l'est pas perd des demandes sans le savoir.
+   
+   Le rouge clair reste discret : c'est un état, pas une alerte. */
+.entete-pro-dispo.indispo { background: var(--red-clair); color: var(--red); }
+.entete-pro-dispo.indispo i { background: var(--red); }
 .entete-pro-dispo:active { transform: scale(.97); }
 
 .entete-pro-chiffres { display: flex; gap: 8px; margin-top: 12px; }
@@ -10256,7 +10265,20 @@ function renderProDevisCards(){
       var enAttente=data.filter(function(v){
         return v.statut==='envoye' && proDevisMainTabOf(v)==='encours';
       });
-  var montantEnJeu=enAttente.reduce(function(t,v){return t+(parseFloat(v.prix_ttc)||0)},0);
+  // ── CE QUE LE PRESTATAIRE TOUCHERAIT, PAS CE QUE LE CLIENT PAIERAIT ─────
+  // Le total additionnait les `prix_ttc` bruts. Sur 680 € de devis en attente,
+  // le prestataire lisait 680 € — alors qu'il en recevrait 578 après la
+  // commission de 15 %.
+  //
+  // C'est un chiffre qu'il ne touchera jamais. Et il sert précisément à
+  // décider s'il faut envoyer d'autres devis cette semaine : autant qu'il
+  // repose sur le vrai montant.
+  //
+  // L'approximation est assumée ici : ce sont des devis EN ATTENTE, rien n'est
+  // encore encaissé. Le libellé le dit — « si tout est accepté ».
+  var montantEnJeu=enAttente.reduce(function(t,v){
+    return t+(parseFloat(v.prix_ttc)||0)*(1-TAUX_COMMISSION);
+  },0);
   var gagnes=data.filter(function(v){
     return v.statut==='accepte'&&v.demande&&v.demande.statut==='terminee';
   });
@@ -10279,7 +10301,9 @@ function renderProDevisCards(){
 
   var recap='<div class="recap-devis">'+
     '<div><div class="valeur attente">'+enAttente.length+'</div><div class="etiquette">En attente de réponse</div></div>'+
-    '<div><div class="valeur attente">'+euros(montantEnJeu)+'</div><div class="etiquette">Montant en jeu</div></div>'+
+    // « Montant en jeu » ne disait ni de quoi il s'agit, ni s'il est net.
+  '<div><div class="valeur attente">'+euros(montantEnJeu)+'</div>'
+    + '<div class="etiquette">Pour vous, si tout est accepté</div></div>'+
     // Le nombre de prestations, pas un montant. Le montant vit sur l'accueil,
   // où il est calculé depuis les paiements réels — une seule source, un seul
   // chiffre.
