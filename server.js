@@ -4728,6 +4728,11 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
 
   if (pourcentage === 0) {
     await supabase.from('paiements').update({ statut: 'rembourse_partiel', montant_rembourse: 0 }).eq('id', paiement.id);
+
+    // Pas d'avoir ici : le client annule à moins de deux heures, rien ne lui
+    // est rendu. La facture reste due en totalité — il n'y a rien à annuler.
+    //
+    // Un avoir de 0 € encombrerait la séquence sans rien signifier.;
     return { rembourse: false, fraisRetenus: true, montantRetenu: paiement.montant_ttc };
   }
 
@@ -4773,6 +4778,10 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
       montant_rembourse: montantEffectivementRembourse,
       montant_societe: montantProCorrige
     }).eq('id', paiement.id);
+
+    // Un remboursement produit un avoir : la facture d'origine reste dans la
+    // séquence, et l'avoir dit ce qui a été annulé.
+    await attribuerNumeroAvoir(paiement.id, montantEffectivementRembourse);
 
     // Si ce paiement était le tout premier du client (celui qui avait déclenché sa récompense de
     // parrainage) et qu'il est intégralement remboursé, la récompense doit être reprise si elle
@@ -8078,6 +8087,50 @@ async function attribuerNumeroCommission(paiementId) {
   }
 }
 
+// ── UN REMBOURSEMENT DOIT PRODUIRE UN AVOIR ─────────────────────────────────
+// L'article 242 nonies A du CGI impose une numérotation CONTINUE. Une facture
+// annulée ne peut pas disparaître de la séquence : elle laisse un trou que
+// l'administration considère comme une facture manquante.
+//
+// Vos numéros actuels en portent la trace : 0006, 0007, et 0010 à 0014 sont
+// absents — ce sont les remboursements.
+//
+// L'avoir a sa PROPRE série — AV-2026-0001 — pour que les deux séquences
+// restent continues chacune de son côté. Mélanger factures et avoirs dans une
+// seule série rendrait les deux illisibles.
+async function attribuerNumeroAvoir(paiementId, montantRembourse) {
+  try {
+    const { data: existant } = await supabase.from('paiements')
+      .select('numero_avoir').eq('id', paiementId).single();
+    // Un second remboursement partiel sur la même prestation ne doit pas
+    // créer un second avoir : on complète le montant du premier.
+    if (existant && existant.numero_avoir) {
+      await supabase.from('paiements')
+        .update({ avoir_montant: montantRembourse }).eq('id', paiementId);
+      return existant.numero_avoir;
+    }
+
+    const { data: numero, error } = await supabase
+      .rpc('attribuer_numero_avoir', { p_annee: new Date().getFullYear() });
+    if (error || !numero) {
+      console.error('Numérotation d\'avoir impossible :', error && error.message);
+      return null;
+    }
+
+    await supabase.from('paiements').update({
+      numero_avoir: numero,
+      avoir_montant: montantRembourse,
+      avoir_le: new Date().toISOString()
+    }).eq('id', paiementId);
+
+    console.log('📄 Avoir ' + numero + ' — ' + montantRembourse + ' € — paiement ' + paiementId);
+    return numero;
+  } catch (e) {
+    console.error('Numérotation d\'avoir :', e.message);
+    return null;
+  }
+}
+
 async function attribuerNumeroFacture(paiementId) {
   try {
     const { data: existant } = await supabase.from('paiements')
@@ -8137,7 +8190,7 @@ app.get('/api/admin/mes-revenus', adminAuth, async (req, res) => {
     const { data: paiements } = await supabase.from('paiements')
       // `montant_ttc` et `montant_rembourse` : partReelle() a besoin des deux
       // pour calculer le prorata restant après un remboursement.
-      .select('montant, montant_ttc, commission, montant_societe, montant_rembourse, statut, created_at, numero_facture')
+      .select('montant_ttc, montant_ttc, commission, montant_societe, montant_rembourse, statut, created_at, numero_facture')
       .in('statut', ['paye', 'libere'])
       .gte('created_at', annee + '-01-01T00:00:00.000Z')
       .lt('created_at', (annee + 1) + '-01-01T00:00:00.000Z')
@@ -8201,7 +8254,12 @@ app.get('/api/admin/factures', adminAuth, async (req, res) => {
     const { data: paiements } = await supabase.from('paiements')
       .select(// `montant_rembourse` est nécessaire pour savoir ce qui reste remboursable :
       // sans lui, l'écran proposerait de rendre une somme déjà rendue.
-      'id, demande_id, numero_facture, montant, commission, montant_societe, statut, created_at, client_id, societe_id, montant_rembourse')
+      // ── LA COLONNE S'APPELLE `montant_ttc`, PAS `montant` ─────────────
+        // Supabase rejette la requête ENTIÈRE quand une colonne est inconnue.
+        // L'écran des factures restait donc vide, sans message d'erreur : le
+        // serveur renvoyait une liste nulle, que le client affichait comme un
+        // « aucune facture ».
+        'id, demande_id, numero_facture, montant_ttc, commission, montant_societe, statut, created_at, client_id, societe_id, montant_rembourse')
       .in('statut', ['paye', 'libere'])
       .gte('created_at', annee + '-01-01T00:00:00.000Z')
       .lt('created_at', (annee + 1) + '-01-01T00:00:00.000Z')
@@ -8230,7 +8288,9 @@ app.get('/api/admin/factures', adminAuth, async (req, res) => {
       demande_id: p.demande_id,
       statut: p.statut,
       montant_rembourse: parseFloat(p.montant_rembourse) || 0,
-      montant: parseFloat(p.montant) || 0,
+      // L'écran affiche ce champ sous le nom `montant` : on le garde, mais
+        // il vient désormais de la bonne colonne.
+        montant: parseFloat(p.montant_ttc) || 0,
       commission: parseFloat(p.commission) || 0,
       net: parseFloat(p.montant_societe) || 0
     }));
@@ -8273,7 +8333,7 @@ app.get('/api/admin/declaration-annuelle', adminAuth, async (req, res) => {
     const { data: paiements } = await supabase.from('paiements')
       // `montant_ttc` et `montant_rembourse` : sans eux, une prestation
       // remboursée serait déclarée à l'administration pour son montant entier.
-      .select('id, demande_id, societe_id, montant, montant_ttc, montant_societe, commission, montant_rembourse, statut, created_at')
+      .select('id, demande_id, societe_id, montant_ttc, montant_ttc, montant_societe, commission, montant_rembourse, statut, created_at')
       .in('statut', ['paye', 'libere'])
       .gte('created_at', debut).lt('created_at', fin)
       .limit(20000);
@@ -9396,6 +9456,10 @@ app.post('/api/admin/paiements/:id/rembourser', adminAuth, async (req, res) => {
       statut: nouveauTotal * 100 >= totalCentimes ? 'rembourse' : 'rembourse_partiel',
       montant_rembourse: nouveauTotal
     }).eq('id', paiement.id);
+
+    // Un remboursement produit un avoir : la facture d'origine reste dans la
+    // séquence, et l'avoir dit ce qui a été annulé.
+    await attribuerNumeroAvoir(paiement.id, nouveauTotal);
 
     // La trace : dans six mois, il faudra savoir pourquoi.
     await supabase.from('signalements').insert({
