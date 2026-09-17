@@ -34,7 +34,7 @@
 // aux utilisateurs déjà venus.
 //
 // La date suffit : une par jour de déploiement.
-const VERSION = 'gleam-sw-2026-09-04-lucide';
+const VERSION = 'gleam-sw-2026-09-17-litiges';
 
 // L'installation est désormais gérée plus bas, avec le précache de la
 // coquille : deux gestionnaires `install` s'exécuteraient tous les deux, et le
