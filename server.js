@@ -3292,7 +3292,12 @@ async function traiterEcheancesPaiement() {
 async function cloturerPrestationsSansArrivee() {
   try {
     const { data: candidates } = await supabase.from('demandes')
-      .select('id, client_id, prestation, creneau, contestation_le, reponse_pro_le, rappel_oubli_envoye_le, code_saisi_par_pro, photos_avant, photos_apres, distance_gps_arrivee, montant_rembourse')
+      // `montant_rembourse` n'est pas une colonne de `demandes` — il vit sur
+      // `paiements`. Supabase rejette la requête ENTIÈRE dès qu'une colonne
+      // nommée n'existe pas : `candidates` revenait vide, la fonction rendait
+      // 0, et ce filet de sécurité n'a jamais rien attrapé. Sans une ligne
+      // d'erreur nulle part, puisque « aucun candidat » est un cas normal.
+      .select('id, client_id, prestation, creneau, contestation_le, reponse_pro_le, rappel_oubli_envoye_le, code_saisi_par_pro, photos_avant, photos_apres, distance_gps_arrivee')
       .eq('statut', 'en_cours')
       .is('prestation_demarree_le', null)
       .is('contestation_le', null)
@@ -4903,6 +4908,32 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
 
     // Si la prestation était déjà payée (en cours), applique le barème de frais avant d'annuler
     const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id, heuresRestantes) : { rembourse: false };
+
+    // ── UNE ANNULATION NE DOIT PAS EFFACER UN LITIGE EN COURS ─────────────
+    // `rembourserPaiementSiPaye` peut SUSPENDRE le remboursement : le
+    // prestataire conteste, ou il a des preuves de sa venue. L'argent reste
+    // alors bloqué, en attente d'arbitrage — c'est voulu.
+    //
+    // Mais l'annulation se poursuivait quand même. La demande passait en
+    // `annulee_client`, et le client lisait « Prestation annulée » sans un mot
+    // sur son argent. Le motif, écrit précisément pour ce cas, n'était jamais
+    // transmis.
+    //
+    // Trois paiements sont restés ainsi depuis le 25 août : 110 € gelés, sur
+    // des demandes étiquetées « annulée par le client » — donc sorties de
+    // l'écran d'arbitrage, où personne ne pouvait plus les trancher.
+    //
+    // On refuse donc l'annulation tant que le litige n'est pas tranché. La
+    // demande garde son état, l'arbitrage reste possible, et le client sait
+    // pourquoi.
+    if (remboursement && remboursement.suspendu) {
+      return res.status(409).json({
+        error: remboursement.motif
+            || 'Votre paiement est en cours d\'examen : il ne sera versé à personne '
+             + 'tant que nous n\'avons pas tranché. La prestation ne peut pas être '
+             + 'annulée d\'ici là.'
+      });
+    }
 
     await supabase.from('demandes').update({ statut: 'annulee_client' }).eq('id', demande.id);
     if (devisAccepte) await supabase.from('devis').update({ statut: 'annule_client' }).eq('id', devisAccepte.id);
