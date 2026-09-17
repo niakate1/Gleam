@@ -1862,6 +1862,20 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
   transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Le champ qu'on vient de remonter à l'écran. Il bat deux fois puis
+   redevient normal : assez pour être trouvé, pas assez pour rester une
+   alarme. La couleur vient des variables du thème, donc elle suit le mode
+   sombre comme le reste. */
+.champ-manquant {
+  border-radius: var(--r-md);
+  animation: signalerChamp 1.2s ease-out 2;
+}
+@keyframes signalerChamp {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+  30%      { box-shadow: 0 0 0 3px var(--red-clair); background: var(--red-clair); }
+}
+.champ-manquant > label { color: var(--red); }
 .toast-success { background: #075E4A; }
 .toast-error   { background: #7F1D1D; }
 .toast-warning { background: #14262A; }
@@ -15284,8 +15298,19 @@ document.addEventListener('click',function(e){
   }
 });
 function quantiteBlock(label,placeholder){
+  // ── UNE SURFACE N'EST PAS UN ENTIER, ET LE CLAVIER DOIT LE SAVOIR ───────
+  // `inputmode="numeric"` ouvre sur iPhone un pavé de CHIFFRES SEULS : ni
+  // virgule, ni point. Une terrasse de 12,5 m² était donc intypable — et le
+  // champ est obligatoire, donc l'envoi restait bloqué.
+  //
+  // Pire avec `min="1"` : une vitre de 0,3 m² était refusée par le navigateur
+  // lui-même. Le reste du code lit déjà `parseFloat` et accepte les décimales
+  // (c'est la correction du 4 septembre) — seul le clavier ne suivait pas.
+  //
+  // `decimal` affiche la virgule. `min="0.1"` laisse passer les petites
+  // surfaces, tout en refusant toujours zéro.
   return '<div class="field-group"><label>'+label+'</label>'+
-    '<input type="number" inputmode="numeric" min="1" id="f-quantite" placeholder="'+placeholder+'" oninput="updateEstimation()"></div>';
+    '<input type="number" inputmode="decimal" min="0.1" step="any" id="f-quantite" placeholder="'+placeholder+'" oninput="updateEstimation()"></div>';
 }
 
 var currentFormType=null;
@@ -16180,7 +16205,33 @@ function getGroupLabel(group){
 // Vérifie que tous les champs nécessaires pour obtenir un devis précis sont bien remplis
 // (chaque groupe de choix affiché, ainsi que la quantité/surface exacte le cas échéant),
 // avant d'autoriser à passer à l'étape suivante ou à envoyer la demande.
+// ── LE CHAMP QUI MANQUE, ET OÙ IL SE TROUVE ─────────────────────────────
+// La validation disait « Merci de renseigner : Surface » et s'arrêtait là. Le
+// bouton d'envoi est en bas du formulaire, le champ manquant souvent tout en
+// haut : le client lisait un message sur un champ qu'il ne voyait pas, et
+// concluait que le bouton ne marchait pas.
+//
+// C'est exactement ce qui est arrivé sur terrasse, toiture et piscine — les
+// trois formulaires où un champ obligatoire se trouve loin au-dessus du
+// bouton. Aucune de ces demandes n'est jamais partie : le serveur n'a reçu
+// aucun appel, il n'y avait rien à déboguer côté serveur.
+//
+// On retient donc l'élément fautif pour pouvoir l'amener sous les yeux.
+var champManquant=null;
+function montrerChampManquant(){
+  if(!champManquant)return;
+  var cible=(champManquant.closest&&champManquant.closest('.field-group'))||champManquant;
+  try{ cible.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){ try{cible.scrollIntoView();}catch(e2){} }
+  cible.classList.add('champ-manquant');
+  // Le focus ouvre directement le clavier sur un champ de saisie ; sur un
+  // groupe de boutons il n'y a rien à ouvrir, le surlignage suffit.
+  if(champManquant.tagName==='INPUT'||champManquant.tagName==='TEXTAREA'){
+    try{ champManquant.focus({preventScroll:true}); }catch(e){}
+  }
+  setTimeout(function(){ cible.classList.remove('champ-manquant'); },2400);
+}
 function validateCurrentForm(type){
+  champManquant=null;
   var groups=[];
   // 'favori-cible' est volontairement optionnel (choisir un prestataire préféré n'est jamais
   // obligatoire pour envoyer une demande) — comme 'etat', qui a toujours une valeur par défaut.
@@ -16191,6 +16242,7 @@ function validateCurrentForm(type){
   });
   for(var i=0;i<groups.length;i++){
     if(!document.querySelector('[data-group="'+groups[i]+'"].sel')){
+      champManquant=document.querySelector('[data-group="'+groups[i]+'"]');
       return 'Merci de renseigner : '+getGroupLabel(groups[i]);
     }
   }
@@ -16201,6 +16253,7 @@ function validateCurrentForm(type){
       var qEl=document.getElementById('f-quantite');
       var q=qEl?parseFloat(qEl.value):NaN;
     if(!qEl||!qEl.value.trim()||isNaN(q)||q<=0){
+      champManquant=qEl;
       var qLabel=qEl&&qEl.closest('.field-group')&&qEl.closest('.field-group').querySelector('label');
       return 'Merci d\'indiquer '+(qLabel?qLabel.textContent.trim().toLowerCase():'la quantité exacte')+' pour continuer.';
     }
@@ -16242,7 +16295,9 @@ function afficherConfirmationEnvoi(reponse){
 
 async function sendDemand(type){
   var validationError=validateCurrentForm(type);
-  if(validationError){toast('❌ '+validationError);return}
+  // Le message ne suffit pas : il faut amener le champ sous les yeux. Sans
+  // cela, le bouton paraît simplement mort.
+  if(validationError){toast('❌ '+validationError);montrerChampManquant();return}
   var desc=document.getElementById('f-desc')&&document.getElementById('f-desc').value.trim()||'';
   var details={};
   var groupesMultiSelect2=['voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
