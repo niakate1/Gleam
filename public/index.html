@@ -180,11 +180,19 @@
      pétrole sont deux bleu-verts sombres, indistinguables côte à côte.
      Un état « validé » qui ressemble à la couleur principale ne signale
      plus rien. */
-  --aqua:           #2E9E5B;
+  /* ── CONTRASTE (audit du 28/09) ────────────────────────────────────────
+     Le gris, le vert et l'ambre d'origine plafonnaient entre 3,0 et 4,0 sur
+     fond blanc : sous le seuil de lisibilité (4,5) pour les petits textes —
+     prix conseillés, notes, sous-titres, badges « Configuré », « En attente ».
+     Assombris juste assez pour passer 4,5 partout, sans changer la teinte. */
+  --aqua:           #237A46;
   --aqua-clair:     #E4F5EA;
-  --mint:           #2E9E5B;   /* alias conservé : utilisé tel quel dans le JS */
+  --mint:           #237A46;   /* alias conservé : utilisé tel quel dans le JS */
   --gold:           #D9930C;
   --gold-clair:     #FDF4E3;
+  /* L'or reste la couleur des étoiles ; pour les NOTES et les montants écrits
+     en or, un or plus sombre, lisible (4,9 sur blanc au lieu de 2,6). */
+  --gold-texte:     #946200;
 
   /* Neutres — légèrement refroidis pour s'accorder à l'indigo plutôt que gris pur */
   --bg:             #F4F7F7;
@@ -197,14 +205,14 @@
   --border-fort:    #BECCCC;
   --text:           #14132B;
   --text-secondary: #44585C;
-  --gray:           #6E8285;
+  --gray:           #56696C;
 
   /* Sémantiques */
-  --green:          #0E9F6E;
+  --green:          #0A7A54;
   --green-clair:    #E3F7EF;
   --red:            #DC2626;
   --red-clair:      #FDEDED;
-  --amber:          #B4740A;
+  --amber:          #8F5C06;
   --amber-clair:    #FDF4E3;
 
   /* Élévation — une échelle courte et cohérente, jamais des ombres ad hoc */
@@ -267,6 +275,7 @@
     --mint:           #56C97F;
     --gold:           #F5C542;
     --gold-clair:     #3A2C0C;
+    --gold-texte:     #F5C542;
 
     /* Ces neutres étaient restés violacés. C'est le thème sombre AUTOMATIQUE :
        il s'applique quand le téléphone est en mode sombre, sans que
@@ -280,7 +289,7 @@
     --border-fort:    #365055;
     --text:           #E9EFF0;
     --text-secondary: #B6C6C8;
-    --gray:           #7E9296;
+    --gray:           #96A9AC;
 
     --green:          #34D399;
     --green-clair:    #10352A;
@@ -298,16 +307,24 @@
   }
 }
 
+/* Mode sombre : le turquoise de marque s'éclaircit (#4FB3B8) pour rester
+   lisible SUR le fond sombre — mais le texte blanc posé DESSUS tombait alors à
+   2,5 de contraste. Les boutons pleins passent au texte bleu nuit (7,4). */
+html[data-theme="dark"] :is(.btn, .btn-devis, .modal-send-btn, .btn-principal-devis, .filter-chip.active, .chat-send-btn, .chat-bubble.mine, .btn-accept, #svc-count) { color: #062E34; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.btn, .btn-devis, .modal-send-btn, .btn-principal-devis, .filter-chip.active, .chat-send-btn, .chat-bubble.mine, .btn-accept, #svc-count) { color: #062E34; }
+}
+
 /* Choix explicite de l'utilisateur — prévaut toujours sur la préférence système. */
 html[data-theme="dark"] {
   --p:#4FB3B8; --p2:#7ECBCE; --light:#0F2E33;
   --aqua:#2FD8BE; --aqua-clair:#12352F; --mint:#2FD8BE;
-  --gold:#F5C542; --gold-clair:#3A2C0C;
+  --gold:#F5C542; --gold-clair:#3A2C0C; --gold-texte:#F5C542;
   /* Les neutres étaient teintés de violet — reste de l'ancienne marque. Un
      thème sombre violacé sous une marque pétrole donne deux applications. */
   --bg:#080F11; --surface:#111C1F; --surface-alt:#18272B;
   --border:#25383D; --border-fort:#365055;
-  --text:#E9EFF0; --text-secondary:#B6C6C8; --gray:#7E9296;
+  --text:#E9EFF0; --text-secondary:#B6C6C8; --gray:#96A9AC;
   --green:#34D399; --green-clair:#10352A;
   --red:#F87171; --red-clair:#3B1A1A;
   --amber:#FBBF4C; --amber-clair:#3A2C0C;
@@ -1056,7 +1073,11 @@ select {
      Les marges automatiques centrent exactement pareil, mais ne débordent
      JAMAIS du conteneur. C'est toute la différence entre les deux. */
   display: flex; align-items: flex-start; justify-content: center;
-  padding: calc(var(--gap-5) + var(--pad-haut)) var(--gap-4) var(--gap-5);
+  /* 64 px en haut : la flèche de retour (38 px, posée à 14 px) doit rester
+     AU-DESSUS de la carte. Sur l'inscription, plus haute que l'écran, la
+     carte remontait sous la flèche — une flèche blanche sur une carte blanche,
+     invisible. */
+  padding: calc(64px + var(--pad-haut)) var(--gap-4) var(--gap-5);
   position: relative; overflow: hidden;
   background:
     radial-gradient(ellipse 420px 340px at 92% -6%, rgba(245,197,66,.32), transparent 66%),
@@ -1186,9 +1207,9 @@ select {
 }
 
 .svc-card[data-svc="voiture"]  { background:#E3F1F2; color:#0E5A63; }
-.svc-card[data-svc="canape"]   { background:#FDF1E7; color:#B45F27; }
+.svc-card[data-svc="canape"]   { background:#FDF1E7; color:#9A4F1F; }
 .svc-card[data-svc="matelas"]  { background:#E4EEF5; color:#1B5E86; }
-.svc-card[data-svc="terrasse"] { background:#FEF6E4; color:#B4740A; }
+.svc-card[data-svc="terrasse"] { background:#FEF6E4; color:#8F5C06; }
 .svc-card[data-svc="piscine"]  { background:#E2F8F5; color:#00796B; }
 .svc-card[data-svc="toiture"]  { background:#FBEFE2; color:#9A4C0B; }
 .svc-card[data-svc="vitres"]   { background:#E8F1FE; color:#1D4ED8; }
@@ -1421,7 +1442,7 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
 .stat-label { font-size: 11.5px; font-weight: 600; color: var(--gray); margin-top: 6px; }
 .stat-card-p    { background: var(--light);      border-color: transparent; }
 .stat-card-gold { background: var(--gold-clair); border-color: transparent; }
-.stat-card-gold .stat-num { color: var(--gold); }
+.stat-card-gold .stat-num { color:var(--gold-texte); }
 
 .dispo-toggle {
   display: flex; align-items: center; justify-content: space-between;
@@ -1736,6 +1757,9 @@ html[data-theme="dark"] .svc-card[data-svc="tapis"]    { background:rgba(122,58,
   transition: transform var(--dur-fast) var(--ease-spring);
 }
 .avatar-upload-btn:active { transform: scale(.85); }
+/* Le bouton ne mesure que 20 à 28 px : sa zone d'appui déborde de 12 px tout
+   autour, pour atteindre la taille d'un doigt sans grossir la pastille. */
+.avatar-upload-btn::before { content: ''; position: absolute; inset: -12px; border-radius: 50%; }
 .avatar-upload-btn i { width: 14px; height: 14px; }
 
 .mini-avatar {
@@ -2051,7 +2075,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   padding: 2px 8px;
   background: var(--light); color: var(--p);
   border-radius: var(--r-pill);
-  font-size: 10.5px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   text-transform: none; letter-spacing: 0;
   vertical-align: 1px;
 }
@@ -2254,7 +2278,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
 .cases-tailles { display: flex; gap: 7px; }
 .case-taille { flex: 1; min-width: 0; }
 .case-taille span {
-  display: block; font-size: 10.5px; font-weight: 700; color: var(--gray);
+  display: block; font-size: 11px; font-weight: 700; color: var(--gray);
   text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px;
 }
 .case-taille input {
@@ -2376,7 +2400,7 @@ html[data-theme="dark"] [style*="#B45309"] { color: var(--amber) !important; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .eva-reperes span {
-  display: block; font-size: 10px; font-weight: 700; color: var(--gray);
+  display: block; font-size: 11px; font-weight: 700; color: var(--gray);
   text-transform: uppercase; letter-spacing: .03em; margin-top: 2px;
   line-height: 1.3;
 }
@@ -2444,7 +2468,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   text-transform: capitalize;
 }
 .entete-client-chiffre span {
-  display: block; font-size: 9.5px; font-weight: 800; color: var(--gray);
+  display: block; font-size: 11px; font-weight: 800; color: var(--gray);
   text-transform: uppercase; letter-spacing: .04em; margin-top: 1px;
 }
 #s-home .home-hero-card { margin-top: var(--gap-4); }
@@ -2471,6 +2495,9 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 
 /* Le contenu du bandeau se décale pour ne pas passer sous la flèche. */
 #s-guest-pro .home-hero-top { padding-left: 44px; }
+/* Le sous-titre de cet écran tient sur deux lignes : la carte, qui remonte de
+   36 px sur le bandeau, venait mordre la seconde. */
+#s-guest-pro .home-hero { padding-bottom: 54px; }
 
 /* ────────────────────────────────────────────────────────────────────────────
    52. EN-TÊTE DE COMPTE — LES DEUX PROFILS
@@ -2611,7 +2638,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .entete-pro-chiffre span {
-  display: block; font-size: 9.5px; font-weight: 800; color: var(--gray);
+  display: block; font-size: 11px; font-weight: 800; color: var(--gray);
   text-transform: uppercase; letter-spacing: .04em; margin-top: 1px;
 }
 
@@ -2873,13 +2900,29 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   display: flex; flex-direction: column; justify-content: center;
 }
 #s-guest-profil .bloc-invite { width: 100%; }
+.avantages-invite { list-style: none; margin: 0 0 var(--gap-5); padding: 0; display: grid; gap: 10px; }
+.avantages-invite li {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 12px 14px; font-size: 14px; font-weight: 600; color: var(--text);
+}
+.avantages-invite li span {
+  flex: none; width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--light); color: var(--p);
+}
+.avantages-invite li svg, .avantages-invite li i { width: 18px; height: 18px; }
 
 /* Le taux reste parfaitement lisible, mais cesse d'être le plus gros chiffre
    de l'écran. Un prestataire doit pouvoir le trouver sans qu'on le lui jette
    au visage. */
 .chiffre-sobre {
-  font-size: 26px !important;
+  font-size: 21px !important;
   color: var(--text-secondary) !important;
+  /* « 15 % » se coupait en deux lignes dans sa colonne de 52 px : le « % »
+     tombait seul dessous. Une espace insécable ne suffit pas (le chiffre est
+     dans un span) : on interdit la coupure. */
+  white-space: nowrap;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -2937,7 +2980,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   background: var(--surface-alt); color: var(--gray);
   border-radius: var(--r-pill);
   padding: 2px 10px;
-  font-size: 10.5px; font-weight: 800;
+  font-size: 11px; font-weight: 800;
   text-transform: uppercase; letter-spacing: .05em;
 }
 
@@ -3100,7 +3143,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
    « 15 km autour de vous ». Un seul mot ne dirait rien de ce qui est réglé. */
 .libelle-acces {
   display: block;
-  font-size: 10.5px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .05em;
   color: var(--gray);
   /* Jamais sur deux lignes : la tuile perdrait sa hauteur régulière. */
@@ -3301,7 +3344,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   font-size: 15px; font-weight: 700; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.carte-devis-recu .note-pro { font-size: 12px; font-weight: 700; color: var(--gold); margin-top: 2px; }
+.carte-devis-recu .note-pro { font-size: 12px; font-weight: 700; color:var(--gold-texte); margin-top: 2px; }
 
 /* Repères de comparaison : ils ne s'affichent que si plusieurs devis
    coexistent pour la même demande. */
@@ -3619,7 +3662,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 .carte-tarif .ico i { width: 17px; height: 17px; }
 .carte-tarif .nom { flex: 1; font-size: 14.5px; font-weight: 700; }
 .carte-tarif .marque {
-  font-size: 10.5px; font-weight: 800;
+  font-size: 11px; font-weight: 800;
   text-transform: uppercase; letter-spacing: .05em;
   padding: 3px 9px; border-radius: var(--r-pill);
 }
@@ -3945,7 +3988,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
 }
 .recap-devis .valeur.attente { color: var(--amber); }
 .recap-devis .valeur.gagne { color: var(--green); }
-.recap-devis .etiquette { font-size: 10.5px; font-weight: 600; color: var(--gray); margin-top: 4px; line-height: 1.3; }
+.recap-devis .etiquette { font-size: 11px; font-weight: 600; color: var(--gray); margin-top: 4px; line-height: 1.3; }
 
 /* ────────────────────────────────────────────────────────────────────────────
    29. DÉCOUVERTE PRESTATAIRE, SANS COMPTE
@@ -4123,7 +4166,10 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   margin-top: var(--gap-3);
 }
 .bord-pro.trois { grid-template-columns: repeat(3, 1fr); }
-.bord-pro.trois .valeur { font-size: 17px; }
+.bord-pro.trois .valeur { font-size: 17px; white-space: nowrap; }
+/* « 1 284,50 € » passait sur deux lignes dans une case de 100 px : le symbole
+   euro tombait seul en dessous. Sur une ligne, quitte à réduire un peu. */
+.bord-pro.trois .valeur { font-size: clamp(14px, 4.2vw, 17px); letter-spacing: -.2px; }
 .bord-pro.trois > div { padding: 12px 8px; text-align: center; }
 .bord-pro > div {
   background: var(--surface);
@@ -4159,7 +4205,7 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   font-variant-numeric: tabular-nums;
 }
 .reputation span {
-  display: block; font-size: 10px; font-weight: 700;
+  display: block; font-size: 11px; font-weight: 700;
   color: var(--gray); text-transform: uppercase; letter-spacing: .03em;
   margin-top: 3px; line-height: 1.3; }
 .bord-pro .valeur {
@@ -4368,7 +4414,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 .register-section-titre {
   margin: 26px 0 14px;
   padding-bottom: 8px;
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: .1em;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
@@ -4434,6 +4480,21 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 @media (min-width: 700px) {
   .screen.active { max-width: 560px; margin: 0 auto; box-shadow: var(--shadow-lg); }
+}
+/* Sur ordinateur, la colonne de 560 px flottait sur un aplat gris : l'écran
+   paraissait vide et inachevé. Deux lueurs de marque, très douces, habillent
+   le fond, et un liseré détache la colonne. */
+@media (min-width: 900px) {
+  html, body {
+    background:
+      radial-gradient(900px 620px at 8% -4%, color-mix(in srgb, var(--p) 16%, transparent), transparent 62%),
+      radial-gradient(820px 620px at 96% 104%, color-mix(in srgb, var(--aqua) 12%, transparent), transparent 62%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+  .screen.active { box-shadow: 0 0 0 1px var(--border), var(--shadow-xl); }
+}
+@media (min-width: 700px) {
   .services-grid { gap: var(--gap-3); }
   .modal { border-radius: var(--r-lg); margin-bottom: var(--gap-5); }
   .modal-overlay.open { align-items: center; }
@@ -4739,7 +4800,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       <div id="form-login">
         <div class="champ-icone"><label>Email</label><i data-lucide="mail"></i><input type="email" id="le" placeholder="votre@email.com" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
         <div class="champ-icone"><label>Mot de passe</label><i data-lucide="key-round"></i><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password"><button type="button" class="bascule-mdp" aria-label="Afficher ou masquer le mot de passe" onclick="basculerVisibiliteMdp('lp',this)"><i data-lucide="eye"></i></button></div>
-        <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600" onclick="forgotPassword()">Mot de passe oublié ?</button></div>
+        <div style="text-align:right;margin-top:6px"><button style="background:none;border:none;color:var(--p);font-size:13px;cursor:pointer;font-weight:600;min-height:40px;padding:8px 2px" onclick="forgotPassword()">Mot de passe oublié ?</button></div>
         <button class="btn" id="login-btn" onclick="doLogin()">Se connecter</button>
         <div class="err" id="lerr"></div>
       </div>
@@ -4928,7 +4989,7 @@ textarea { min-height: 92px; padding-top: 13px; }
       </div>
       <div style="text-align:center;padding:4px">
         <div style="width:36px;height:36px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-weight:800;font-size:14px">3</div>
-        <div style="font-size:11px;color:var(--text-secondary);font-weight:600;line-height:1.3">Payez après la prestation</div>
+        <div style="font-size:11px;color:var(--text-secondary);font-weight:600;line-height:1.3">Réglez en ligne, en sécurité</div>
       </div>
     </div>
   </div>
@@ -4987,7 +5048,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 
       <div id="recent-demands"><div class="etat-vide-amorce">
       <div class="eva-titre">Votre première demande</div>
-      <p class="eva-texte">Décrivez ce qu'il faut nettoyer. Des professionnels vérifiés de votre zone vous répondent avec un prix ferme — vous ne payez qu'après la prestation.</p>
+      <p class="eva-texte">Décrivez ce qu'il faut nettoyer. Des professionnels vérifiés de votre zone vous répondent avec un prix ferme — vous ne payez qu'une fois le devis accepté.</p>
       <div class="eva-reperes">
         <div><b>0 €</b><span>à l'avance</span></div>
         <div><b>Gratuit</b><span>recevoir des devis</span></div>
@@ -5124,6 +5185,15 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
   <div class="home-content">
     <div class="bloc-invite" style="text-align:left">
+      <!-- Ce qu'un compte apporte, en quatre lignes. Sans cela, l'écran ne
+           proposait que deux boutons au milieu d'un grand vide : on demandait
+           de s'inscrire sans dire pourquoi. -->
+      <ul class="avantages-invite">
+        <li><span><i data-lucide="clipboard-list"></i></span>Suivez vos demandes pas à pas</li>
+        <li><span><i data-lucide="file-text"></i></span>Comparez les devis : prix, avis, expérience</li>
+        <li><span><i data-lucide="message-circle"></i></span>Échangez avec votre prestataire</li>
+        <li><span><i data-lucide="shield-check"></i></span>Des prestataires vérifiés et assurés</li>
+      </ul>
       <button class="btn" onclick="afficherEcranAuth('register')">Créer un compte</button>
       <button class="btn-lien" onclick="afficherEcranAuth('login')">J'ai déjà un compte</button>
     </div>
@@ -5270,7 +5340,7 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div id="reputation-pro"></div>
     <div class="upload-progress" id="photo-upload-progress-pro" style="text-align:center"></div>
     <div class="profile-menu">
-      <div class="profile-item" id="item-confirmer-email-pro" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
+      <div class="profile-item" id="item-confirmer-email-pro" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon"><i data-lucide="mail-check" style="width:20px;height:20px;color:var(--gold-texte)"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow">›</span></div>
     </div>
 
     <!-- Sections, comme sur le profil client. Onze entrées en liste continue
@@ -5372,10 +5442,10 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- DEVIS CLIENT -->
 <div class="screen" id="s-devis">
-  <div class="page-header"><h1>Mes Devis</h1></div>
+  <div class="page-header"><h1>Mes devis</h1></div>
   <div class="tab-pills">
     <button class="tab-pill active" id="devis-tab-encours" onclick="setDevisMainTab('encours')">En cours</button>
-    <button class="tab-pill" id="devis-tab-termines" onclick="setDevisMainTab('termines')">Terminés<span id="badge-note-attente" style="display:none;margin-left:6px;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:10px;vertical-align:2px"></span></button>
+    <button class="tab-pill" id="devis-tab-termines" onclick="setDevisMainTab('termines')">Terminés<span id="badge-note-attente" style="display:none;margin-left:6px;background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:10px;vertical-align:2px"></span></button>
   </div>
   <div class="devis-list" id="devis-list"></div>
   <div class="bottom-nav">
@@ -5429,7 +5499,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 
     <div class="profile-section-titre">Compte</div>
     <div class="profile-menu">
-      <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon" style="background:rgba(245,185,66,.15);color:var(--gold)"><i data-lucide="mail-check" style="width:18px;height:18px"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
+      <div class="profile-item" id="item-confirmer-email-client" style="display:none" onclick="ouvrirConfirmerEmail()"><span class="pi-icon" style="background:rgba(245,185,66,.15);color:var(--gold-texte)"><i data-lucide="mail-check" style="width:18px;height:18px"></i></span><span class="pi-text">Confirmer mon email</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" id="item-facturation" style="display:none" onclick="ouvrirFacturation()"><span class="pi-icon"><i data-lucide="receipt" style="width:18px;height:18px"></i></span><span class="pi-text">Informations de facturation</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
       <div class="profile-item" onclick="showMesPaiements()"><span class="pi-icon"><i data-lucide="credit-card" style="width:18px;height:18px"></i></span><span class="pi-text">Paiements</span><span class="pi-arrow"><i data-lucide="chevron-right" style="width:17px;height:17px"></i></span></div>
     </div>
@@ -5502,7 +5572,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 
     <div style="flex:1;overflow-y:auto;padding-bottom:8px">
       <div class="modal-title" style="margin-bottom:2px">Confirmer et payer</div>
-      <div class="modal-sub" style="margin-bottom:18px">Vous ne serez débité qu'après la prestation</div>
+      <div class="modal-sub" style="margin-bottom:18px">Paiement sécurisé par carte ou Apple Pay</div>
 
       <!-- Le prestataire, sa photo et sa note. On paie quelqu'un, pas un
            formulaire — et le voir rassure au moment de sortir sa carte. -->
@@ -5530,7 +5600,7 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div style="flex-shrink:0;padding:14px 0 18px;background:var(--surface);border-top:1px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;color:var(--gray);margin-bottom:10px">
         <i data-lucide="shield-check" style="width:14px;height:14px;color:var(--mint)"></i>
-        Paiement chiffré — l'argent n'est versé qu'à la fin
+        Paiement chiffré et sécurisé
       </div>
       <button class="modal-send-btn" id="payment-btn" onclick="confirmPayment()" style="margin:0">Payer</button>
       <button onclick="closePayment()" style="width:100%;padding:12px;background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;margin-top:6px">Annuler</button>
@@ -7150,6 +7220,12 @@ function enterApp(){
     if(itemFact)itemFact.style.display=(currentUser&&currentUser.type==='entreprise')?'':'none';
     renderProfileAvatar('profile-avatar-inner',currentUser&&currentUser.photo,'👤');
     renderNoteGlobale('profile-note',currentUser&&currentUser.note_moyenne);
+    // ── L'EN-TÊTE DU CLIENT N'ÉTAIT JAMAIS REMPLI ─────────────────────────
+    // majEnteteClientChiffres() n'était appelée que dans la branche PRO — où
+    // elle s'arrête aussitôt, puisqu'elle ne concerne que les clients. Chez
+    // le client, l'avatar gardait son tiret « — » au lieu des initiales, et
+    // les trois chiffres de l'en-tête restaient vides.
+    majEnteteClientChiffres();
     // La grille de l'accueil doit reprendre la sélection faite avant connexion,
     // sur l'écran de découverte : sans cela les deux grilles repartaient divergentes.
     majAffichageSelectionPrestations();
@@ -7587,7 +7663,7 @@ function afficherDetailsVitresPro(p){
   if(Array.isArray(d['vitres_estime'])&&d['vitres_estime'].length){
     lignes+='<div style="margin-bottom:4px"><strong>🪟 Fenêtres (estimation du client) :</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['vitres_estime'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul>'+
-      '<div style="font-size:10.5px;color:var(--gray);font-style:italic">Comptage approximatif, pas une mesure exacte — à confirmer sur place.</div></div>';
+      '<div style="font-size:11px;color:var(--gray);font-style:italic">Comptage approximatif, pas une mesure exacte — à confirmer sur place.</div></div>';
   }
   if(Array.isArray(d['vitres_indique_client'])&&d['vitres_indique_client'].length){
     lignes+='<div style="margin-bottom:4px"><strong>📏 Indiqué par le client (surface exacte) :</strong>'+
@@ -7640,7 +7716,7 @@ function afficherDetailsTapisPro(p){
   if(!d['tapis_par_matiere']&&Array.isArray(d['tapis_estime'])&&d['tapis_estime'].length){
     lignes+='<div style="margin-bottom:4px"><strong>📐 Tapis (estimation du client) :</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['tapis_estime'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul>'+
-      '<div style="font-size:10.5px;color:var(--gray);font-style:italic">Taille approximative, pas une mesure exacte — à confirmer sur place.</div></div>';
+      '<div style="font-size:11px;color:var(--gray);font-style:italic">Taille approximative, pas une mesure exacte — à confirmer sur place.</div></div>';
   }
   if(Array.isArray(d['tapis_indique_client'])&&d['tapis_indique_client'].length){
     lignes+='<div style="margin-bottom:4px"><strong>📏 Indiqué par le client (surface exacte) :</strong>'+
@@ -7687,11 +7763,11 @@ function tryParseNotes(notes){
           : '';
         return '<div style="'+separateur+'margin-bottom:8px">'+
           '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'+
-            '<span style="background:var(--light);color:var(--p);font-size:10.5px;font-weight:800;'+
+            '<span style="background:var(--light);color:var(--p);font-size:11px;font-weight:800;'+
               'min-width:18px;height:18px;border-radius:9px;display:inline-flex;'+
               'align-items:center;justify-content:center">'+(indicePresta+1)+'</span>'+
             '<strong style="text-transform:capitalize;font-size:13.5px;color:var(--p)">'+
-              ICONS_get(p.type)+' '+escapeHtml(p.type)+'</strong>'+
+              ICONS_get(p.type)+' '+escapeHtml(libellePrestation(p.type))+'</strong>'+
           '</div>'+
           (p.description?'<div style="font-size:12px;margin-top:2px">'+escapeHtml(p.description)+'</div>':'')+
           corps+'</div>';
@@ -7780,7 +7856,7 @@ function renderNoteGlobale(elId,noteMoyenne){
   // Blanc translucide sur blanc : la pastille était dessinée pour l'ancien
   // bandeau violet, et l'en-tête de compte est devenu blanc. La note était
   // illisible — contraste mesuré à 1:1.
-  el.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px;background:var(--light);padding:5px 14px;border-radius:20px;font-weight:800;font-size:15px;color:var(--p)"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold)"></i> '+noteTxt+' <span style="font-weight:600;font-size:12px;color:var(--text-secondary)">/ 5</span></span>';
+  el.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px;background:var(--light);padding:5px 14px;border-radius:20px;font-weight:800;font-size:15px;color:var(--p)"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold-texte)"></i> '+noteTxt+' <span style="font-weight:600;font-size:12px;color:var(--text-secondary)">/ 5</span></span>';
   el.style.display='block';
   if(window.lucide)dessinerIcones();
 }
@@ -8059,7 +8135,7 @@ async function loadDemandes(silent){
       var st=libelleStatutDemande(d);
       var icon=ICONS_get((d.prestation||'').split(' + ')[0]);
       var urgentStyle=d.statut==='en_cours'?'border-color:var(--green);background:var(--green-clair);':'';
-      var urgentBadge=d.statut==='en_cours'?'<span style="font-size:10px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px">ACTION REQUISE</span>':'';
+      var urgentBadge=d.statut==='en_cours'?'<span style="font-size:11px;background:var(--green);color:#fff;padding:2px 8px;border-radius:10px">ACTION REQUISE</span>':'';
       // La carte affichait la date de CRÉATION de la demande. Une prestation
       // programmée pour le 31 janvier 2027 s'affichait donc « 03/08/2026 » — la
       // date à laquelle elle avait été créée. C'est le créneau qui compte pour
@@ -8071,7 +8147,7 @@ async function loadDemandes(silent){
       // apparaissait comme un doublon inexplicable à côté de la prestation
       // terminée qui l'avait engendrée.
       var badgeRecurrence=(d.recurrence&&d.recurrence_active)
-        ? '<span style="font-size:10px;background:var(--light);color:var(--p);padding:2px 8px;border-radius:10px;white-space:nowrap">🔁 '+libelleRecurrence(d.recurrence)+'</span>'
+        ? '<span style="font-size:11px;background:var(--light);color:var(--p);padding:2px 8px;border-radius:10px;white-space:nowrap">🔁 '+libelleRecurrence(d.recurrence)+'</span>'
         : '';
       // ── EN MODE SÉLECTION, LA LIGNE SE COCHE AU LIEU DE S'OUVRIR ──────
       // Deux comportements pour le même clic seraient déroutants. On remplace
@@ -8169,7 +8245,7 @@ async function renderActiveRequestBanner(data){
           banner.innerHTML='<div class="fade-in-item" style="background:var(--surface);border:1.5px solid var(--gold);border-radius:14px;padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="'+actionNote+'">'+
             '<span style="font-size:26px;flex-shrink:0">⭐</span>'+
             '<div style="flex:1;min-width:0">'+
-              '<div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.03em">Votre avis compte</div>'+
+              '<div style="font-size:11px;font-weight:700;color:var(--gold-texte);text-transform:uppercase;letter-spacing:.03em">Votre avis compte</div>'+
               '<div style="font-weight:700;font-size:14px">Notez '+escapeHtml(aNoter.pro_nom||'votre prestataire')+' pour '+escapeHtml(libellePrestation(aNoter.prestation))+'</div>'+
             '</div>'+
             '<i data-lucide="chevron-right" style="width:20px;height:20px;color:var(--gray);flex-shrink:0"></i>'+
@@ -8406,7 +8482,7 @@ function renderDevisClientCards(){
   //
   // La base garantit l'échelle : CHECK (note >= 1 AND note <= 5).
   var noteDevis=noteAffichable(v.pro&&v.pro.note_moyenne);
-  var proNote=noteDevis?'<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold);vertical-align:-2px"></i> '+escapeHtml(noteDevis)+' / 5':'';
+  var proNote=noteDevis?'<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold-texte);vertical-align:-2px"></i> '+escapeHtml(noteDevis)+' / 5':'';
 
       // ── LE PALIER DU PRESTATAIRE ────────────────────────────────────────
       // Un client ne sait pas quoi faire d'un « 87 % de ponctualité ». Il sait
@@ -8505,7 +8581,7 @@ function renderDevisClientCards(){
           // On PROPOSE, on n'ajoute pas d'office : un favori qu'on n'a pas
           // choisi n'en est pas un, et la liste deviendrait un historique.
           (estFavori(safeSocieteId)
-            ? '<div style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;padding:9px;font-size:13px;font-weight:600;color:var(--amber)"><i data-lucide="star" style="width:14px;height:14px;fill:var(--gold);color:var(--gold)"></i> Dans vos favoris</div>'
+            ? '<div style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;padding:9px;font-size:13px;font-weight:600;color:var(--amber)"><i data-lucide="star" style="width:14px;height:14px;fill:var(--gold);color:var(--gold-texte)"></i> Dans vos favoris</div>'
             : (favoriRefuse(safeSocieteId)
               ? ''
               : '<div class="proposition-favori">'
@@ -8637,7 +8713,7 @@ function renderDevisClientCards(){
         // même nature. Sur la ligne du nom, « Accepté — Paiement requis »
         // recouvrait purement et simplement le prestataire.
         ((badge||reperes)?'<div class="ligne-etiquettes">'+badge+reperes+'</div>':'')+
-        '<div class="prestation-devis">'+ICONS_get(v.prestation)+' '+escapeHtml(v.prestation)+'</div>'+
+        '<div class="prestation-devis">'+ICONS_get(v.prestation)+' '+escapeHtml(libellePrestation(v.prestation))+'</div>'+
         '<div class="montant-devis">'+escapeHtml(v.prix_ttc)+' \u20ac'+
           '<span class="mention-ttc">TTC, tout compris</span></div>'+
         (v.description?'<div class="mot-du-pro">'+escapeHtml(v.description)+'</div>':'')+
@@ -8852,7 +8928,7 @@ function renderDetail(d){
         (p.description?'<div class="detail-presta-info">'+escapeHtml(p.description)+'</div>':'')+
         '</div></div>';
     }).join(''):
-    '<div class="detail-presta"><span class="detail-presta-icon">'+ICONS_get(d.prestation)+'</span><div class="detail-presta-name">'+escapeHtml(d.prestation)+'</div></div>')+
+    '<div class="detail-presta"><span class="detail-presta-icon">'+ICONS_get(d.prestation)+'</span><div class="detail-presta-name">'+escapeHtml(libellePrestation(d.prestation))+'</div></div>')+
   '</div>';
   if(hasPhotos)html+='<div class="detail-card"><label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>';
   html+='<div class="detail-card">'+
@@ -9099,7 +9175,7 @@ function prefillModifyForm(p){
 var noteDemandeId=null,noteSocieteId=null;
 function ouvrirNote(demandeId,societeId,proName){
   noteDemandeId=demandeId;noteSocieteId=societeId;
-  var starIcon='<i data-lucide="star" style="width:36px;height:36px;fill:var(--gold);color:var(--gold)"></i>';
+  var starIcon='<i data-lucide="star" style="width:36px;height:36px;fill:var(--gold);color:var(--gold-texte)"></i>';
   var html='<div class="modal-title gleam-signature">⭐ Noter '+escapeHtml(proName)+'</div>'+
     '<div class="modal-sub">Comment s\'est passée votre prestation ?</div>'+
     '<div id="star-rating" style="display:flex;gap:12px;justify-content:center;margin:20px 0">'+
@@ -9444,7 +9520,7 @@ function renderProDemandesCards(){
   });
   var chips='<div class="filter-chips"><button class="filter-chip'+(proDemandesFilterActive==='tous'?' active':'')+'" onclick="setProDemandesFilter(\'tous\')">Toutes</button>'+
     categories.map(function(cat){
-      return '<button class="filter-chip'+(proDemandesFilterActive===cat?' active':'')+'" onclick="setProDemandesFilter(\''+escAttr(cat)+'\')">'+escapeHtml(cat)+'</button>';
+      return '<button class="filter-chip'+(proDemandesFilterActive===cat?' active':'')+'" onclick="setProDemandesFilter(\''+escAttr(cat)+'\')">'+escapeHtml(libellePrestation(cat))+'</button>';
     }).join('')+'</div>';
 
   var filtered=proDemandesFilterActive==='tous'?data:data.filter(function(d){return(d.prestation||'').indexOf(proDemandesFilterActive)>=0});
@@ -10481,7 +10557,7 @@ function renderProDevisCards(){
       var photosClient=getPhotosFromNotes(v.demande&&v.demande.notes);
       html+='<div class="devis-card fade-in-item" style="animation-delay:'+(vi*0.04)+'s">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
-          '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+ICONS_get(v.demande&&v.demande.prestation)+' '+escapeHtml(v.demande&&v.demande.prestation||'')+'</div>'+badge+
+          '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+ICONS_get(v.demande&&v.demande.prestation)+' '+escapeHtml(libellePrestation(v.demande&&v.demande.prestation))+'</div>'+badge+
         '</div>'+
         '<div style="font-size:12px;color:var(--gray)">📍 '+escapeHtml(v.demande&&v.demande.adresse||'')+'</div>'+
         (v.demande&&v.demande.creneau?'<div style="font-size:12px;color:var(--gray);margin-top:2px">📅 '+formatCreneau(v.demande.creneau)+'</div>':'')+
@@ -11930,7 +12006,7 @@ function goToChat(demandeId,otherName){
   }
   var subEl=document.getElementById('chat-subtitle');
   if(subEl){
-    if(info.note){subEl.style.display='block';subEl.innerHTML='<i data-lucide="star" style="width:11px;height:11px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(info.note)+' / 5';if(window.lucide)dessinerIcones()}
+    if(info.note){subEl.style.display='block';subEl.innerHTML='<i data-lucide="star" style="width:11px;height:11px;fill:var(--gold);color:var(--gold-texte);vertical-align:-1px"></i> '+escapeHtml(info.note)+' / 5';if(window.lucide)dessinerIcones()}
     else{subEl.style.display='none';subEl.textContent=''}
   }
   document.getElementById('chat-messages').innerHTML='';
@@ -12151,7 +12227,7 @@ async function loadChatMessages(){
         var heure=d?d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'';
         html+='<div style="display:flex;flex-direction:column;'+(mine?'align-items:flex-end':'align-items:flex-start')+'">'+
           '<div class="chat-bubble '+(mine?'mine':'theirs')+'">'+escapeHtml(m.contenu)+'</div>'+
-          (heure?'<span style="font-size:10px;color:var(--gray);margin:2px 6px 0">'+heure+'</span>':'')+
+          (heure?'<span style="font-size:11px;color:var(--gray);margin:2px 6px 0">'+heure+'</span>':'')+
         '</div>';
       });
     }
@@ -12187,7 +12263,7 @@ async function sendChatMsg(){
     var div=document.createElement('div');
     div.id=tempId;
     div.style.cssText='display:flex;flex-direction:column;align-items:flex-end';
-    div.innerHTML='<div class="chat-bubble mine" style="opacity:.6">'+escapeHtml(msg)+'</div><span style="font-size:10px;color:var(--gray);margin:2px 6px 0">'+heureLocale+'</span>';
+    div.innerHTML='<div class="chat-bubble mine" style="opacity:.6">'+escapeHtml(msg)+'</div><span style="font-size:11px;color:var(--gray);margin:2px 6px 0">'+heureLocale+'</span>';
     c.appendChild(div);
     c.scrollTop=c.scrollHeight;
   }
@@ -12669,7 +12745,7 @@ function majAffichageSelectionPrestations(){
           + 'border-top:1px solid rgba(0,0,0,.06)';
         c.appendChild(barre);
       }
-      var styleBouton = 'width:20px;height:20px;flex:0 0 20px;border-radius:50%;'
+      var styleBouton = 'width:26px;height:26px;flex:0 0 26px;border-radius:50%;'
         + 'border:1px solid var(--border);background:#fff;font-size:14px;line-height:1;'
         + 'padding:0;cursor:pointer;color:var(--text);font-family:inherit';
       barre.innerHTML =
@@ -12933,7 +13009,7 @@ function comingSoon(label){
 }
 async function showMesAvis(){
   var sousTitre=isPro()?'Ce que vos clients disent de vous':'Ce que vos prestataires disent de vous';
-  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes avis</div><div class="modal-sub">'+sousTitre+'</div><div id="avis-summary"></div><div id="avis-list">'+skeletonCards(3)+'</div>';
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold-texte)"></i> Mes avis</div><div class="modal-sub">'+sousTitre+'</div><div id="avis-summary"></div><div id="avis-list">'+skeletonCards(3)+'</div>';
   document.getElementById('modal-overlay').classList.add('open');
   try{
     const r=await fetch(API+'/api/evaluations/mes-avis',{headers:authHeaders()});
@@ -12945,9 +13021,9 @@ async function showMesAvis(){
     var sumEl=document.getElementById('avis-summary');
     if(sumEl)sumEl.innerHTML='<div style="display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,var(--light),var(--surface));border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:16px">'+
       '<div style="font-size:30px;font-weight:800;color:var(--p)">'+moyenne.toFixed(2).replace('.',',')+'</div>'+
-      '<div style="flex:1"><div style="color:var(--gold);font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold)"></i> sur 5</div>'+
+      '<div style="flex:1"><div style="color:var(--gold-texte);font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px"><i data-lucide="star" style="width:15px;height:15px;fill:var(--gold);color:var(--gold-texte)"></i> sur 5</div>'+
       '<div style="font-size:12px;color:var(--gray)">basée sur '+d.length+' avis</div></div></div>';
-    var starIcon='<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold)"></i>';
+    var starIcon='<i data-lucide="star" style="width:13px;height:13px;fill:var(--gold);color:var(--gold-texte)"></i>';
     var whoLabel=isPro()?' (client)':' (prestataire)';
     c.innerHTML=d.map(function(a,i){
       var stars='';
@@ -12961,11 +13037,11 @@ async function showMesAvis(){
             '<div style="font-size:11px;color:var(--gray)">'+new Date(a.created_at).toLocaleDateString('fr-FR')+'</div>'+
           '</div>'+
           '<div style="text-align:right;flex-shrink:0">'+
-            '<div style="font-weight:800;color:var(--gold);font-size:15px">'+a.note.toFixed(1)+'<span style="font-size:11px;font-weight:600">/5</span></div>'+
+            '<div style="font-weight:800;color:var(--gold-texte);font-size:15px">'+a.note.toFixed(1)+'<span style="font-size:11px;font-weight:600">/5</span></div>'+
             '<div>'+stars+'</div>'+
           '</div>'+
         '</div>'+
-        (a.prestation?'<div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface-alt);color:var(--text-secondary);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;text-transform:capitalize;margin-bottom:8px">'+ICONS_get(a.prestation)+' '+escapeHtml(a.prestation)+'</div>':'')+
+        (a.prestation?'<div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface-alt);color:var(--text-secondary);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;text-transform:capitalize;margin-bottom:8px">'+ICONS_get(a.prestation)+' '+escapeHtml(libellePrestation(a.prestation))+'</div>':'')+
         (a.commentaire?'<div style="font-size:13px;color:var(--text-secondary);line-height:1.4;padding-top:4px;border-top:1px solid var(--border)">"'+escapeHtml(a.commentaire)+'"</div>':'')+
         '</div>';
     }).join('');
@@ -12992,7 +13068,7 @@ async function showMesPaiements(){
       // « Confirmé » ne disait pas non plus ce qui s'était passé : le
       // prestataire a été payé.
       var statutLabels={
-        paye:['Payé — versé au prestataire après la prestation','var(--gold)'],
+        paye:['Payé','var(--gold-texte)'],
         libere:['Terminé — prestataire payé','var(--mint)'],
         bloque:['Bloqué','var(--red)'],
         rembourse:['Remboursé intégralement','var(--gray)']
@@ -13012,7 +13088,7 @@ async function showMesPaiements(){
         couleur='var(--amber)';
       }else if(p.statut==='rembourse_partiel'){
         var montantRemb=parseFloat(p.montant_rembourse||0);
-        libelle=montantRemb>0?('Remboursé partiellement ('+montantRemb+'€ sur '+p.montant_ttc+'€)'):'Aucun remboursement (annulation à moins de 2h)';
+        libelle=montantRemb>0?('Remboursé partiellement ('+formaterEuros(montantRemb)+' sur '+formaterEuros(p.montant_ttc)+')'):'Aucun remboursement (annulation à moins de 2h)';
         couleur=montantRemb>0?'var(--gold)':'var(--red)';
       }else{
         var st=statutLabels[p.statut]||['',''];
@@ -13020,9 +13096,9 @@ async function showMesPaiements(){
       }
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
-        '<div><div style="font-weight:700;text-transform:capitalize">'+escapeHtml(p.demande&&p.demande.prestation||'Prestation')+'</div>'+
+        '<div><div style="font-weight:700;text-transform:capitalize">'+escapeHtml(libellePrestation(p.demande&&p.demande.prestation)||'Prestation')+'</div>'+
         '<div style="font-size:12px;color:var(--gray)">'+new Date(p.created_at).toLocaleDateString('fr-FR')+'</div></div>'+
-        '<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--p)">'+escapeHtml(p.montant_ttc)+'€</div>'+
+        '<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--p)">'+escapeHtml(formaterEuros(p.montant_ttc))+'</div>'+
         '<div style="font-size:11px;font-weight:700;color:'+couleur+'">'+libelle+'</div></div></div></div>';
     }).join('');
   }catch(e){
@@ -13047,7 +13123,7 @@ async function checkConnectStatut(){
     const r=await fetchGroupe(API+'/api/paiements/connect/statut',{headers:authHeaders()});
     const d=await safeJson(r);
     if(d.statut==='pret')badge.innerHTML='<span style="color:var(--mint);font-size:11px;font-weight:700">✓ Prêt</span>';
-    else if(d.statut==='en_cours')badge.innerHTML='<span style="color:var(--gold);font-size:11px;font-weight:700">En cours</span>';
+    else if(d.statut==='en_cours')badge.innerHTML='<span style="color:var(--gold-texte);font-size:11px;font-weight:700">En cours</span>';
     else badge.textContent='›';
   }catch(e){}
 }
@@ -13164,7 +13240,7 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
   }
   if(creneauPropose){
     if(creneauProposePar===currentUser.id){
-      return '<div style="margin-top:8px;font-size:12px;color:var(--gold);background:var(--amber-clair);border-radius:8px;padding:8px 10px">⏳ Nouveau créneau proposé ('+formatCreneau(creneauPropose)+'), en attente de confirmation.</div>';
+      return '<div style="margin-top:8px;font-size:12px;color:var(--gold-texte);background:var(--amber-clair);border-radius:8px;padding:8px 10px">⏳ Nouveau créneau proposé ('+formatCreneau(creneauPropose)+'), en attente de confirmation.</div>';
     }
     return '<div style="margin-top:8px;background:var(--amber-clair);border:1px solid var(--border);border-radius:8px;padding:10px">'+
       '<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:6px">📅 Nouveau créneau proposé : '+formatCreneau(creneauPropose)+'</div>'+
@@ -13776,7 +13852,7 @@ async function enregistrerZoneIntervention(){
   }catch(e){if(errEl){errEl.textContent=friendlyNetworkError(e);errEl.classList.add('show')}}
 }
 function ouvrirConfirmerEmail(){
-  var html='<div class="modal-title"><i data-lucide="mail-check" style="width:20px;height:20px;vertical-align:-4px;color:var(--gold)"></i> Confirmer mon email</div>'+
+  var html='<div class="modal-title"><i data-lucide="mail-check" style="width:20px;height:20px;vertical-align:-4px;color:var(--gold-texte)"></i> Confirmer mon email</div>'+
     '<div class="modal-sub">Un code à 6 chiffres vous a été envoyé à '+escapeHtml((currentUser&&currentUser.email)||'')+'</div>'+
     '<input type="text" id="code-verif-email" placeholder="Ex: 123456" inputmode="numeric" maxlength="6" style="text-align:center;font-size:20px;letter-spacing:4px;font-weight:700">'+
     '<button class="btn-accept" style="width:100%;margin-top:12px" onclick="validerCodeVerifEmail()">Confirmer</button>'+
@@ -13864,7 +13940,7 @@ function partagerParrainage(code){
   }
 }
 async function showMesFavoris(){
-  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold)"></i> Mes favoris</div><div class="modal-sub">Vos prestataires préférés, à recontacter en un clic</div><div id="favoris-list">'+skeletonCards(2)+'</div>';
+  document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="star" style="width:20px;height:20px;vertical-align:-4px;fill:var(--gold);color:var(--gold-texte)"></i> Mes favoris</div><div class="modal-sub">Vos prestataires préférés, à recontacter en un clic</div><div id="favoris-list">'+skeletonCards(2)+'</div>';
   document.getElementById('modal-overlay').classList.add('open');
   try{
     const r=await fetch(API+'/api/favoris',{headers:authHeaders()});
@@ -13875,13 +13951,13 @@ async function showMesFavoris(){
     c.innerHTML=d.map(function(p,i){
       var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
       var noteP=noteAffichable(p.note_moyenne);
-  var note=noteP?'<i data-lucide="star" style="width:12px;height:12px;fill:var(--gold);color:var(--gold);vertical-align:-1px"></i> '+escapeHtml(noteP)+' / 5':'';
+  var note=noteP?'<i data-lucide="star" style="width:12px;height:12px;fill:var(--gold);color:var(--gold-texte);vertical-align:-1px"></i> '+escapeHtml(noteP)+' / 5':'';
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s;display:flex;align-items:center;gap:12px">'+
         miniAvatarHtml(p.photo,nom)+
         '<div style="flex:1;min-width:0"><div style="font-weight:700">'+escapeHtml(nom)+'</div>'+
-        (note?'<div style="font-size:12px;color:var(--gold);font-weight:700">'+note+'</div>':'')+
+        (note?'<div style="font-size:12px;color:var(--gold-texte);font-weight:700">'+note+'</div>':'')+
         (p.disponible===false?'<div style="font-size:11px;color:var(--gray)">Actuellement indisponible</div>':'')+'</div>'+
-        '<button class="btn-refuse" style="width:auto;padding:8px 10px" onclick="retirerFavori(\''+escAttr(p.id)+'\',this)"><i data-lucide="x" style="width:14px;height:14px"></i></button>'+
+        '<button class="btn-refuse" aria-label="Retirer des favoris" title="Retirer des favoris" style="width:38px;height:38px;flex:0 0 38px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center" onclick="retirerFavori(\''+escAttr(p.id)+'\',this)"><i data-lucide="x" style="width:16px;height:16px"></i></button>'+
       '</div>';
     }).join('');
   }catch(e){
@@ -14382,8 +14458,8 @@ async function showMesGains(){
       // qui mérite qu'on s'y arrête.
       if(sum) sum.style.gridTemplateColumns = 'repeat(2, 1fr)';
 
-      if(sum)sum.innerHTML='<div class="stat-card stat-card-p"><div class="stat-num">'+d.total_libere+'€</div><div class="stat-label">Reçu</div></div>'+
-      '<div class="stat-card stat-card-gold"><div class="stat-num">'+d.total_en_attente+'€</div><div class="stat-label">En attente</div></div>'
+      if(sum)sum.innerHTML='<div class="stat-card stat-card-p"><div class="stat-num" style="white-space:nowrap;font-size:clamp(20px,6.4vw,28px)">'+formaterEuros(d.total_libere)+'</div><div class="stat-label">Reçu</div></div>'+
+      '<div class="stat-card stat-card-gold"><div class="stat-num" style="white-space:nowrap;font-size:clamp(20px,6.4vw,28px)">'+formaterEuros(d.total_en_attente)+'</div><div class="stat-label">En attente</div></div>'
         // ── L'ARGENT GELÉ A SA PROPRE CASE ──────────────────────────────
         // Il était compté dans « En attente ». Le prestataire voyait 93,50 € à
         // venir alors que la totalité était bloquée par deux contestations.
@@ -14398,7 +14474,7 @@ async function showMesGains(){
               + 'border-color:var(--amber);display:flex;align-items:center;'
               + 'justify-content:space-between;text-align:left;gap:12px">'
               + '<div><div class="stat-num" style="color:var(--amber);font-size:20px">'
-              +   d.total_en_litige+'€</div>'
+              +   formaterEuros(d.total_en_litige)+'</div>'
               + '<div class="stat-label">En litige</div></div>'
               + '<div style="font-size:11px;color:var(--amber);line-height:1.4;max-width:60%">'
               + 'Gleam examine ces prestations. Ce montant ne vous sera versé '
@@ -14411,7 +14487,7 @@ async function showMesGains(){
       // d'un clic du client. Sur une prestation CONTESTÉE, c'est faux : un
       // arbitrage est en cours et le paiement est gelé.
       var statutLabels={
-        paye:['En attente de validation','var(--gold)'],
+        paye:['En attente de validation','var(--gold-texte)'],
         libere:['Reçu','var(--mint)'],
         bloque:['Bloqué','var(--red)'],
         rembourse_partiel:['Reçu (annulation tardive du client)','var(--mint)']
@@ -14426,9 +14502,9 @@ async function showMesGains(){
           : (statutLabels[p.statut]||['','']);
       return '<div class="devis-card fade-in-item" style="animation-delay:'+(i*0.04)+'s">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
-        '<div><div style="font-weight:700;text-transform:capitalize">'+escapeHtml(p.demande&&p.demande.prestation||'Prestation')+'</div>'+
+        '<div><div style="font-weight:700;text-transform:capitalize">'+escapeHtml(libellePrestation(p.demande&&p.demande.prestation)||'Prestation')+'</div>'+
         '<div style="font-size:12px;color:var(--gray)">'+new Date(p.created_at).toLocaleDateString('fr-FR')+'</div></div>'+
-        '<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--p)">'+escapeHtml(p.montant_societe)+'€</div>'+
+        '<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:var(--p)">'+escapeHtml(formaterEuros(p.montant_societe))+'</div>'+
         '<div style="font-size:11px;font-weight:700;color:'+st[1]+'">'+st[0]+'</div></div></div></div>';
     }).join('');
   }catch(e){
@@ -14444,7 +14520,7 @@ function showHowItWorks(){
       '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">1</div><div><strong>Décrivez votre besoin</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Choisissez une ou plusieurs prestations, précisez l\'état, la taille, vos disponibilités.</div></div></div>'+
       '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">2</div><div><strong>Recevez des devis</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Des prestataires vérifiés et assurés (RC Pro) vous envoient un prix adapté à votre demande précise.</div></div></div>'+
       '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">3</div><div><strong>Choisissez et discutez</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Comparez, échangez directement par messagerie avec le prestataire avant de valider.</div></div></div>'+
-      '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">4</div><div><strong>Payez en toute sécurité</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Votre paiement est débité seulement après la prestation, jamais avant.</div></div></div>'+
+      '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">4</div><div><strong>Payez en toute sécurité</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Vous réglez en ligne en acceptant le devis. À la fin, vous donnez votre code au prestataire pour confirmer que tout est fait.</div></div></div>'+
     '</div>'+
     '<div class="divider"></div>'+
     '<div style="background:var(--surface-alt);border-radius:10px;padding:14px;font-size:13px;color:var(--text-secondary);line-height:1.5">'+
@@ -14681,7 +14757,7 @@ function assistantEtapeSuivante(){
   if(!assistantEtapes.length)return;
   var etapeActuelle=assistantEtapes[assistantIndexActuel];
   var erreur=validerEtapeAssistant(etapeActuelle);
-  if(erreur){toast('❌ '+erreur);return}
+  if(erreur){toast('❌ '+erreur);montrerChampManquant();return}
   var cible=prochaineEtapeUtile(assistantIndexActuel, 1);
   if(cible<0)return;
   etapeActuelle.style.display='none';
@@ -14704,6 +14780,11 @@ function assistantEtapePrecedente(){
 // (etat, favori-cible, récurrence, options par catégorie...) restent exemptés, comme pour la
 // validation finale complète du formulaire.
 function validerEtapeAssistant(etape){
+  // Même règle que pour l'envoi : on retient le champ fautif. C'est ICI que ça
+  // compte le plus — le formulaire est découpé en questions, et le bouton
+  // « Suivant » est juste sous le champ. Quand il refuse sans rien montrer,
+  // l'écran paraît figé et on croit l'application bloquée.
+  champManquant=null;
   var groupesOptionnels=['etat','favori-cible','recurrence','voit-options','canape-options','matelas-options','terrasse-options','vitres-options'];
   var groupes=[];
   etape.querySelectorAll('[data-group]').forEach(function(el){
@@ -14712,6 +14793,7 @@ function validerEtapeAssistant(etape){
   });
   for(var i=0;i<groupes.length;i++){
     if(!etape.querySelector('[data-group="'+groupes[i]+'"].sel')){
+      champManquant=etape.querySelector('[data-group="'+groupes[i]+'"]');
       return 'Merci de renseigner : '+getGroupLabel(groupes[i]);
     }
   }
@@ -14719,14 +14801,15 @@ function validerEtapeAssistant(etape){
   if(qEl){
     var q=parseFloat(qEl.value);
     if(!qEl.value.trim()||isNaN(q)||q<=0){
+      champManquant=qEl;
       var qLabel=qEl.closest('.field-group')&&qEl.closest('.field-group').querySelector('label');
       return 'Merci d\'indiquer '+(qLabel?qLabel.textContent.trim().toLowerCase():'la quantité exacte')+' pour continuer.';
     }
   }
   var addrEl=etape.querySelector('#f-addr');
-  if(addrEl&&!addrEl.value.trim())return 'Merci de renseigner l\'adresse d\'intervention.';
+  if(addrEl&&!addrEl.value.trim()){champManquant=addrEl;return 'Merci de renseigner l\'adresse d\'intervention.'}
   var villeEl=etape.querySelector('#f-ville');
-  if(villeEl&&!villeEl.value.trim())return 'Merci de renseigner la ville.';
+  if(villeEl&&!villeEl.value.trim()){champManquant=villeEl;return 'Merci de renseigner la ville.'}
   // Vérification de la date/heure directement dans le navigateur du client — comme le navigateur
   // tourne déjà dans le fuseau horaire réel de l'utilisateur, cette vérification est fiable par
   // nature, sans le risque de décalage serveur/client que corrigeait le serveur. Une double
@@ -15130,7 +15213,7 @@ function sendBtn(type){
     html+='<button type="button" onclick="goToPreviousStep(\''+type+'\')" style="width:100%;padding:12px;background:none;border:2px solid var(--border);color:var(--text-secondary);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px">← Étape précédente</button>';
   }
   if(!multiFlow.active||isLast){
-    html+='<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin:10px 0;font-size:11.5px;color:var(--gray)"><i data-lucide="lock" style="width:13px;height:13px"></i> Paiement sécurisé, débité seulement après la prestation</div>';
+    html+='<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin:10px 0;font-size:11.5px;color:var(--gray)"><i data-lucide="lock" style="width:13px;height:13px"></i> Paiement sécurisé</div>';
   }
   // Le compteur vit sur la carte de sélection, où le client règle la quantité
   // AVANT de répondre aux questions. Un second bouton d'ajout ici ferait
@@ -15415,7 +15498,7 @@ async function updateEstimationMaintenant(){
       return;
     }
     box.innerHTML='<div class="fade-in-item" style="background:linear-gradient(135deg,var(--light),var(--surface));border:1px solid var(--border);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden">'+
-      '<div style="font-size:11px;color:var(--text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:5px"><i data-lucide="sparkles" style="width:13px;height:13px;color:var(--gold)"></i> Prix estimé</div>'+
+      '<div style="font-size:11px;color:var(--text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:5px"><i data-lucide="sparkles" style="width:13px;height:13px;color:var(--gold-texte)"></i> Prix estimé</div>'+
       '<div style="font-size:28px;font-weight:800;color:var(--p);margin:4px 0 2px">'+(d.prix_moyen||d.prix_min)+'€'+
         '<span style="font-size:13px;font-weight:600;color:var(--gray);margin-left:6px">('+d.prix_min+'€ – '+d.prix_max+'€)</span>'+
       '</div>'+
