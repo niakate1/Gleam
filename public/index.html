@@ -4499,6 +4499,170 @@ textarea { min-height: 92px; padding-top: 13px; }
   .modal { border-radius: var(--r-lg); margin-bottom: var(--gap-5); }
   .modal-overlay.open { align-items: center; }
 }
+/* ════════════════════════════════════════════════════════════════════════════
+   99. COUCHE PREMIUM — 28 septembre 2026
+   Une seule couche, posée par-dessus le reste : on la lit d'un trait, et on la
+   retire d'un bloc si besoin. Elle ne change aucun comportement — seulement
+   la matière : profondeur, lumière, rythme, mouvement.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --degrade-marque: linear-gradient(135deg, #12707A 0%, #0E5A63 48%, #0A4750 100%);
+  --degrade-entete: radial-gradient(130% 120% at 100% 0%, rgba(127,217,208,.20), transparent 55%),
+                    linear-gradient(172deg, #062E34 0%, #0A4750 58%, #0E5A63 100%);
+  --ombre-carte:  0 1px 2px rgba(6,46,52,.04), 0 8px 24px -8px rgba(6,46,52,.10);
+  --ombre-carte-appui: 0 1px 2px rgba(6,46,52,.05), 0 14px 32px -10px rgba(6,46,52,.16);
+  --ombre-bouton: inset 0 1px 0 rgba(255,255,255,.16), 0 10px 22px -10px rgba(10,71,80,.75);
+  --liseré:       color-mix(in srgb, var(--border) 80%, transparent);
+  --r-carte:      18px;
+}
+html[data-theme="dark"] {
+  --degrade-marque: linear-gradient(135deg, #74CDD1 0%, #4FB3B8 55%, #3C9DA2 100%);
+  --degrade-entete: radial-gradient(130% 120% at 100% 0%, rgba(79,179,184,.16), transparent 55%),
+                    linear-gradient(172deg, #041A1E 0%, #0A2A30 60%, #0E3A41 100%);
+  --ombre-carte: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px -12px rgba(0,0,0,.6);
+  --ombre-bouton: inset 0 1px 0 rgba(255,255,255,.25), 0 10px 24px -12px rgba(79,179,184,.55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --degrade-marque: linear-gradient(135deg, #74CDD1 0%, #4FB3B8 55%, #3C9DA2 100%);
+    --degrade-entete: radial-gradient(130% 120% at 100% 0%, rgba(79,179,184,.16), transparent 55%),
+                      linear-gradient(172deg, #041A1E 0%, #0A2A30 60%, #0E3A41 100%);
+    --ombre-carte: 0 1px 2px rgba(0,0,0,.35), 0 10px 26px -12px rgba(0,0,0,.6);
+    --ombre-bouton: inset 0 1px 0 rgba(255,255,255,.25), 0 10px 24px -12px rgba(79,179,184,.55);
+  }
+}
+
+/* ── Typographie : chiffres alignés, titres plus serrés ─────────────────── */
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+.valeur, .stat-num, .entete-client-chiffre b, .entete-pro-chiffre b, .recap-devis .valeur,
+[id^="prix-"], .prix, .montant { font-variant-numeric: tabular-nums; }
+.page-header h1, .modal-title, .entete-interne-titre { letter-spacing: -.02em; }
+.section-title, .profile-section-titre { letter-spacing: .09em; }
+
+/* ── Les écrans entrent, ils n'apparaissent pas ─────────────────────────── */
+@keyframes premium-entree { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* Seulement le CONTENU : les éléments masqués par une translation (la barre
+   « Demande écartée — Annuler », par exemple) ne doivent pas être animés, sinon
+   l'animation les ramène à l'écran. */
+.screen.active > :is(.home-hero-card, .home-content, .pro-content, .page-header, .tab-pills, .devis-list, .profile-content, .success-screen, #client-conv-list, #pro-conv-list) {
+  animation: premium-entree .32s var(--ease-out) both;
+}
+@media (prefers-reduced-motion: reduce) { .screen.active > * { animation: none !important; } }
+
+/* ── En-têtes d'accueil : la marque, en profondeur ──────────────────────── */
+.entete-client, .entete-pro {
+  background: var(--degrade-entete);
+  border-bottom: none;
+  border-radius: 0 0 24px 24px;
+  box-shadow: 0 14px 30px -18px rgba(6,46,52,.65);
+  padding-bottom: 16px;
+}
+.entete-client-qui strong, .entete-pro-qui strong { color: #fff; font-size: 16px; }
+.entete-client-qui span,   .entete-pro-qui span   { color: rgba(255,255,255,.74); }
+.entete-client-avatar, .entete-pro-avatar {
+  background: rgba(255,255,255,.14); color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.28);
+}
+.entete-client-chiffre, .entete-pro-chiffre {
+  background: rgba(255,255,255,.09);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), inset 0 1px 0 rgba(255,255,255,.10);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border-radius: 14px;
+}
+.entete-client-chiffre b, .entete-pro-chiffre b { color: #fff; }
+.entete-client-chiffre span, .entete-pro-chiffre span { color: rgba(255,255,255,.72); }
+/* La tuile qui appelle une décision ressort en blanc, comme une carte posée. */
+.entete-client-chiffre.a-decider { background: #fff; box-shadow: 0 8px 18px -10px rgba(0,0,0,.5); }
+.entete-client-chiffre.a-decider b { color: var(--p); }
+.entete-client-chiffre.a-decider span { color: #56696C; }
+html[data-theme="dark"] .entete-client-chiffre.a-decider { background: #4FB3B8; }
+html[data-theme="dark"] .entete-client-chiffre.a-decider b, html[data-theme="dark"] .entete-client-chiffre.a-decider span { color: #062E34; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .entete-client-chiffre.a-decider { background: #4FB3B8; }
+  :root:not([data-theme="light"]) .entete-client-chiffre.a-decider b, :root:not([data-theme="light"]) .entete-client-chiffre.a-decider span { color: #062E34; }
+}
+
+/* ── Boutons : un dégradé discret, une lumière en haut, un appui franc ──── */
+.btn, .modal-send-btn, .btn-principal-devis, .btn-devis, .btn-accept {
+  background-image: var(--degrade-marque);
+  box-shadow: var(--ombre-bouton);
+  border-radius: 14px;
+  letter-spacing: .01em;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), filter var(--dur-fast) var(--ease-out);
+}
+.btn:active, .modal-send-btn:active, .btn-principal-devis:active, .btn-devis:active, .btn-accept:active {
+  transform: scale(.982); filter: brightness(.96);
+}
+/* Un bouton à fond explicite (rouge, gris, ambre, transparent) garde son fond. */
+.btn[style*="background"], .btn-accept[style*="background"] { background-image: none; }
+.btn[style*="box-shadow:none"], .btn[style*="background:none"] { box-shadow: none; }
+:is(.btn, .modal-send-btn, .btn-principal-devis, .btn-devis, .btn-accept):focus-visible {
+  outline: none; box-shadow: var(--ombre-bouton), 0 0 0 3px color-mix(in srgb, var(--p) 35%, transparent);
+}
+.chat-send-btn { background-image: var(--degrade-marque); box-shadow: var(--ombre-bouton); }
+.chat-send-btn svg { width: 18px; height: 18px; }
+
+/* ── Cartes : liseré fin, ombre en deux couches, angles plus doux ───────── */
+.carte-premium, .devis-card, .demande-card, .detail-card, .demand-row, .conv-row, .home-hero-card, .profile-menu, .recap-devis, .bord-pro {
+  border-color: var(--liseré);
+  border-radius: var(--r-carte);
+  box-shadow: var(--ombre-carte);
+}
+.profile-menu { overflow: hidden; }
+
+/* ── Tuiles de prestations : une lumière posée dessus ───────────────────── */
+.svc-card {
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75), inset 0 0 0 1px rgba(6,46,52,.04), 0 1px 2px rgba(6,46,52,.05);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+.svc-card:active { transform: scale(.96); }
+@media (hover: hover) { .svc-card:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 10px 22px -12px rgba(6,46,52,.35); } }
+html[data-theme="dark"] .svc-card { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.05); }
+
+/* ── Barre du bas : l'onglet actif dans une pastille ────────────────────── */
+.bnav-item.active::before { display: none; }
+.bnav-item svg { padding: 4px 16px; border-radius: 999px; box-sizing: content-box; transition: background var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-spring); }
+.bnav-item.active svg { background: color-mix(in srgb, var(--p) 14%, transparent); transform: translateY(-1px); }
+.bnav-item { gap: 2px; padding-top: 7px; }
+
+/* ── Filtres et onglets ─────────────────────────────────────────────────── */
+.filter-chip { border-color: var(--liseré); box-shadow: 0 1px 2px rgba(6,46,52,.04); }
+.filter-chip.active { background-image: var(--degrade-marque); border-color: transparent; box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+.tab-pill.active { box-shadow: 0 1px 2px rgba(6,46,52,.06), 0 6px 14px -8px rgba(6,46,52,.25); }
+
+/* ── Champs : plus d'air, un focus lumineux ─────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea {
+  border-radius: 14px; min-height: 48px; border-color: var(--liseré);
+  background-color: var(--surface);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--p);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--p) 16%, transparent);
+}
+
+/* ── Fenêtres : feuille plus ronde, fond plus flou ──────────────────────── */
+.modal { border-radius: 28px 28px 0 0; }
+@media (min-width: 700px) { .modal { border-radius: 28px; } }
+.modal-overlay { background: rgba(4,28,32,.48); -webkit-backdrop-filter: blur(8px) saturate(120%); backdrop-filter: blur(8px) saturate(120%); }
+
+/* ── Profil : les rangées respirent ─────────────────────────────────────── */
+.profile-item { padding-top: 15px; padding-bottom: 15px; }
+.pi-icon { border-radius: 12px !important; }
+.avatar-initiales { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 20px; color: var(--p); letter-spacing: .02em; }
+
+/* ── Détails d'une demande côté prestataire : libellé / valeur ─────────── */
+.ligne-detail { display: grid; grid-template-columns: 112px 1fr; gap: 8px; align-items: baseline; padding: 3px 0; }
+.ligne-detail > strong { font-weight: 600; color: var(--gray); font-size: 12px; }
+
+/* ── Icônes dans le texte (anciens emojis) ──────────────────────────────── */
+.ico-txt, svg.ico-txt { width: 1.05em; height: 1.05em; vertical-align: -.16em; margin-right: .1em; flex-shrink: 0; }
+.empty-state > span svg { width: 30px; height: 30px; color: var(--p); }
+.locked-banner > span svg { width: 20px; height: 20px; }
+.opt-btn > span svg { width: 22px; height: 22px; display: block; margin: 0 auto; color: var(--p); }
+.dc-info > span svg { width: 15px; height: 15px; color: var(--gray); vertical-align: -2px; }
+.success-icon svg { width: 38px; height: 38px; color: var(--p); }
+
 </style>
 </head>
 <body>
@@ -4593,7 +4757,7 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="home-hero-top"><span class="logo-sm"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam</span>
       <button class="user-badge" style="border:none;cursor:pointer" onclick="afficherEcranAuth('login')">Se connecter</button>
     </div>
-    <h2>Bonjour 👋</h2>
+    <h2>Bonjour</h2>
     <p>Créez un compte quand vous serez prêt à réserver.</p>
     <!-- L'aiguillage vers l'autre public tient ici, et nulle part ailleurs.
          Placé en bas de page, un professionnel devait défiler l'intégralité
@@ -5273,7 +5437,7 @@ textarea { min-height: 92px; padding-top: 13px; }
   </div>
   <div class="pro-content" style="padding-top:0">
     <div class="section-title">Demandes clients — les plus proches d'abord</div>
-    <div id="pro-demandes-list"><div class="empty-state"><span>📋</span><p>Chargement...</p></div></div>
+    <div id="pro-demandes-list"><div class="empty-state"><span><i data-lucide="clipboard-list"></i></span><p>Chargement...</p></div></div>
   </div>
   <div class="barre-ecartement" id="barre-ecartement"></div>
   <div style="display:none">
@@ -5320,11 +5484,11 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- PRO PROFILE -->
 <div class="screen" id="s-pro-profile">
-  <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil Pro</span></div>
+  <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon profil pro</span></div>
   <div class="profile-content">
     <div class="entete-compte">
       <div class="avatar-wrap" id="pro-profile-avatar">
-        <div class="avatar" id="pro-profile-avatar-inner">🏢</div>
+        <div class="avatar" id="pro-profile-avatar-inner"></div>
         <button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-pro').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button>
         <input type="file" id="photo-input-profile-pro" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'pro')">
       </div>
@@ -5435,7 +5599,7 @@ textarea { min-height: 92px; padding-top: 13px; }
     <div class="chat-messages" id="chat-messages"></div>
     <div class="chat-input-bar">
       <input type="text" id="chat-input" placeholder="Écrivez votre message..." onkeypress="if(event.key==='Enter')sendChatMsg()">
-      <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMsg()" aria-label="Envoyer le message">➤</button>
+      <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMsg()" aria-label="Envoyer le message"><i data-lucide="send-horizontal"></i></button>
     </div>
   </div>
 </div>
@@ -5458,14 +5622,14 @@ textarea { min-height: 92px; padding-top: 13px; }
 
 <!-- PROFIL CLIENT -->
 <div class="screen" id="s-profile">
-  <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon Profil</span></div>
+  <div class="navbar"><span class="logo-sm"><i data-lucide="user" style="width:20px;height:20px;vertical-align:-4px"></i> Mon profil</span></div>
   <div class="profile-content">
     <!-- En-tête de compte. L'avatar ne disparaît pas : il rétrécit et se range à
          gauche, à côté du nom. C'est la disposition d'un en-tête de compte, pas
          d'une page de profil de réseau social — et elle rend 106 px au contenu. -->
     <div class="entete-compte">
       <div class="avatar-wrap" id="profile-avatar">
-        <div class="avatar" id="profile-avatar-inner">👤</div>
+        <div class="avatar" id="profile-avatar-inner"></div>
         <button class="avatar-upload-btn" onclick="document.getElementById('photo-input-profile-client').click()" aria-label="Changer la photo de profil"><i data-lucide="camera"></i></button>
         <input type="file" id="photo-input-profile-client" accept="image/*" style="display:none" onchange="handleProfilePhoto(this,'client')">
       </div>
@@ -5535,7 +5699,7 @@ textarea { min-height: 92px; padding-top: 13px; }
 <div class="screen" id="s-success">
   <div class="navbar"><span class="logo-sm"><svg class="marque-goutte" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C58 26 65 37 68 44 C70 49 71 53 71 57 C71 69 62 78 50 78 C38 78 29 69 29 57 C29 53 30 49 32 44 C35 37 42 26 50 12 Z" fill="currentColor"/><path d="M50 44 C51 53 52 56 55 58 C52 60 51 63 50 72 C49 63 48 60 45 58 C48 56 49 53 50 44 Z" fill="var(--fond-goutte, #0A4750)"/></svg> Gleam</span></div>
   <div class="success-screen">
-    <div class="success-icon gleam-signature">✨</div>
+    <div class="success-icon gleam-signature"><i data-lucide="sparkles"></i></div>
     <h2>Demande envoyée</h2>
     <p id="success-message">Votre demande a été transmise aux prestataires Gleam.</p>
     <button class="btn" onclick="goTab('home')" style="max-width:300px">Retour à l'accueil</button>
@@ -7177,7 +7341,7 @@ function enterApp(){
   viderMemoireRequetes();
   const name=(currentUser&&(currentUser.firstName||currentUser.prenom||currentUser.email))||'';
   if(isPro()){
-    document.getElementById('pro-greeting').textContent='Bonjour '+name+' 👋';
+    document.getElementById('pro-greeting').textContent='Bonjour '+name;
     document.getElementById('pro-name-badge').textContent=name;
     document.getElementById('pro-profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
     document.getElementById('pro-profile-email').textContent=(currentUser&&currentUser.email)||'';
@@ -7200,14 +7364,14 @@ function enterApp(){
     chargerTableauDeBordPro();
     verifierConfigurationPro();
   }else{
-    document.getElementById('greeting-name').textContent='Bonjour '+name+' 👋';
+    document.getElementById('greeting-name').textContent='Bonjour '+name;
     document.getElementById('user-name-badge').textContent=name;
     document.getElementById('profile-name').textContent=((currentUser&&(currentUser.firstName||currentUser.prenom))||'')+' '+((currentUser&&(currentUser.lastName||currentUser.nom))||'');
     document.getElementById('profile-email').textContent=(currentUser&&currentUser.email)||'';
     var badgeType=document.getElementById('profile-type-badge');
     if(badgeType){
       var t=currentUser&&currentUser.type;
-      var labels={client:'',entreprise:'🏢 Compte Entreprise'};
+      var labels={client:'',entreprise:'<i data-lucide="building-2" class="ico-txt"></i> Compte Entreprise'};
       if(t&&labels[t]){badgeType.style.display='inline-block';badgeType.innerHTML='<span style="background:var(--light);color:var(--p);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">'+labels[t]+'</span>'}
       else badgeType.style.display='none';
     }
@@ -7399,6 +7563,12 @@ function iconHtml(name,size){
   return '<i data-lucide="'+(name||'sparkles')+'" style="width:'+size+'px;height:'+size+'px;vertical-align:-4px;display:inline-block"></i>';
 }
 function ICONS_get(key){return iconHtml(ICON_NAMES[key])}
+// Les options du formulaire client portent un emoji (« 📐Angle », « 🛋️ Droit »).
+// Stockées telles quelles, elles réapparaissaient côté prestataire, collées au
+// texte. On les retire à l'affichage : le libellé suffit.
+function sansEmoji(v){
+  return String(v==null?'':v).replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{FE0F}\u{200D}]/gu,'').replace(/\s{2,}/g,' ').trim();
+}
 // Icônes vectorielles plutôt qu'emojis : un emoji se dessine différemment sur
 // iOS, Android et Windows, et ne prend jamais la couleur du statut. Ces icônes
 // héritent de la teinte de leur classe (s-attente, s-acceptee…).
@@ -7541,13 +7711,13 @@ function formatDetails(details,type){
       var unit=UNIT_CATEGORIES_LABELS[type]||'';
       texte=escapeHtml(val+(unit?' '+unit:''));
     }else if(Array.isArray(val)){
-      texte=val.map(function(v){return escapeHtml(v)}).join(', ');
+      texte=val.map(function(v){return escapeHtml(sansEmoji(v))}).join(', ');
     }else{
-      texte=escapeHtml(val);
+      texte=escapeHtml(sansEmoji(val));
     }
     // Une ligne par champ, avec son nom : on lit en diagonale sans deviner.
-    return '<div style="margin-bottom:2px">'+
-      (libelle?'<strong>'+escapeHtml(libelle)+' :</strong> ':'')+texte+'</div>';
+    return '<div class="ligne-detail">'+
+      (libelle?'<strong>'+escapeHtml(libelle)+'</strong> ':'')+'<span>'+texte+'</span></div>';
   }).join('');
 }
 // Traduit les valeurs techniques des options en un libellé clair et lisible pour le pro.
@@ -7566,16 +7736,16 @@ var GUIDE_PRO_NETTOYAGE_VOITURE={
 function afficherDetailsVoiturePro(p){
   var d=p.details||{};
   var lignes='';
-  if(d['net-type'])lignes+='<div style="margin-bottom:3px"><strong>🧼 Type de nettoyage :</strong> '+escapeHtml(d['net-type'])+'</div>';
+  if(d['net-type'])lignes+='<div class="ligne-detail"><strong>Type de nettoyage</strong> '+escapeHtml(sansEmoji(d['net-type']))+'</div>';
   var vehiculeParts=[];
   if(d['veh'])vehiculeParts.push(d['veh']);
   if(d['seats'])vehiculeParts.push(d['seats']);
-  if(vehiculeParts.length)lignes+='<div style="margin-bottom:3px"><strong>🚗 Véhicule :</strong> '+escapeHtml(vehiculeParts.join(', '))+'</div>';
-  if(d['emplacement'])lignes+='<div style="margin-bottom:3px"><strong>📍 Emplacement :</strong> '+escapeHtml(d['emplacement'])+'</div>';
+  if(vehiculeParts.length)lignes+='<div class="ligne-detail"><strong>Véhicule</strong> '+escapeHtml(vehiculeParts.join(', '))+'</div>';
+  if(d['emplacement'])lignes+='<div class="ligne-detail"><strong>Emplacement</strong> '+escapeHtml(sansEmoji(d['emplacement']))+'</div>';
   if(Array.isArray(d['voit-options'])&&d['voit-options'].length){
-    lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['voit-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
+    lignes+='<div class="ligne-detail"><strong>À prévoir</strong> '+d['voit-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
   }
-  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  if(d['etat'])lignes+='<div class="ligne-detail"><strong>État général</strong> '+escapeHtml(sansEmoji(d['etat']))+'</div>';
 
   var guideHtml='';
   // Retrouve quel palier (intérieur/extérieur/complet) a été choisi, pour afficher le bon guide
@@ -7587,7 +7757,7 @@ function afficherDetailsVoiturePro(p){
       etapes.push('Shampouinage en profondeur des sièges et tapis (option choisie par le client)');
     }
     guideHtml='<div style="background:var(--light);border-radius:8px;padding:10px;margin-top:6px">'+
-      '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">📋 Étapes à suivre</div>'+
+      '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">'+iconHtml('list-checks',14)+' Étapes à suivre</div>'+
       '<ol style="margin:0;padding-left:18px;font-size:11.5px;color:var(--text-secondary);line-height:1.6">'+
       etapes.map(function(e){return '<li>'+escapeHtml(e)+'</li>'}).join('')+
       '</ol></div>';
@@ -7600,13 +7770,13 @@ var GUIDE_PRO_CANAPE_BASE=['Aspirer en profondeur (assises, dossiers, recoins)',
 function afficherDetailsCanapePro(p){
   var d=p.details||{};
   var lignes='';
-  if(d['can-type'])lignes+='<div style="margin-bottom:3px"><strong>🛋️ Forme :</strong> '+escapeHtml(d['can-type'])+'</div>';
-  if(d['can-pl'])lignes+='<div style="margin-bottom:3px"><strong>🔢 Places :</strong> '+escapeHtml(d['can-pl'])+'</div>';
-  if(d['can-mat'])lignes+='<div style="margin-bottom:3px"><strong>🧵 Matière :</strong> '+escapeHtml(d['can-mat'])+'</div>';
+  if(d['can-type'])lignes+='<div class="ligne-detail"><strong>Forme</strong> '+escapeHtml(sansEmoji(d['can-type']))+'</div>';
+  if(d['can-pl'])lignes+='<div class="ligne-detail"><strong>Places</strong> '+escapeHtml(sansEmoji(d['can-pl']))+'</div>';
+  if(d['can-mat'])lignes+='<div class="ligne-detail"><strong>Matière</strong> '+escapeHtml(sansEmoji(d['can-mat']))+'</div>';
   if(Array.isArray(d['canape-options'])&&d['canape-options'].length){
-    lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['canape-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
+    lignes+='<div class="ligne-detail"><strong>À prévoir</strong> '+d['canape-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
   }
-  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  if(d['etat'])lignes+='<div class="ligne-detail"><strong>État général</strong> '+escapeHtml(sansEmoji(d['etat']))+'</div>';
   var etapes=GUIDE_PRO_CANAPE_BASE.slice();
   if(Array.isArray(d['canape-options'])){
     if(d['canape-options'].some(function(o){return o.indexOf('Coussins')>=0}))etapes.push('Traiter aussi les coussins amovibles (option choisie par le client)');
@@ -7615,7 +7785,7 @@ function afficherDetailsCanapePro(p){
     if(d['canape-options'].some(function(o){return o.indexOf('odorisation')>=0}))etapes.push('Appliquer un traitement désodorisant');
   }
   var guideHtml='<div style="background:var(--light);border-radius:8px;padding:10px;margin-top:6px">'+
-    '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">📋 Étapes à suivre</div>'+
+    '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">'+iconHtml('list-checks',14)+' Étapes à suivre</div>'+
     '<ol style="margin:0;padding-left:18px;font-size:11.5px;color:var(--text-secondary);line-height:1.6">'+
     etapes.map(function(e){return '<li>'+escapeHtml(e)+'</li>'}).join('')+
     '</ol></div>';
@@ -7627,12 +7797,12 @@ var GUIDE_PRO_MATELAS_BASE=['Aspirer en profondeur (recto)','Nettoyer à la vape
 function afficherDetailsMatelasPro(p){
   var d=p.details||{};
   var lignes='';
-  if(d['mat-t'])lignes+='<div style="margin-bottom:3px"><strong>📏 Taille :</strong> '+escapeHtml(d['mat-t'])+'</div>';
-  if(d['quantite'])lignes+='<div style="margin-bottom:3px"><strong>🔢 Quantité :</strong> '+escapeHtml(d['quantite'])+'</div>';
+  if(d['mat-t'])lignes+='<div class="ligne-detail"><strong>Taille</strong> '+escapeHtml(sansEmoji(d['mat-t']))+'</div>';
+  if(d['quantite'])lignes+='<div class="ligne-detail"><strong>Quantité</strong> '+escapeHtml(sansEmoji(d['quantite']))+'</div>';
   if(Array.isArray(d['matelas-options'])&&d['matelas-options'].length){
-    lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['matelas-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
+    lignes+='<div class="ligne-detail"><strong>À prévoir</strong> '+d['matelas-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
   }
-  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  if(d['etat'])lignes+='<div class="ligne-detail"><strong>État général</strong> '+escapeHtml(sansEmoji(d['etat']))+'</div>';
   var etapes=GUIDE_PRO_MATELAS_BASE.slice();
   if(Array.isArray(d['matelas-options'])){
     // L'étape « traitement anti-punaises » disparaît avec l'option : demander à
@@ -7642,7 +7812,7 @@ function afficherDetailsMatelasPro(p){
     if(d['matelas-options'].some(function(o){return o.indexOf('ancienne')>=0}))etapes.push('Prétraitement renforcé sur la tache signalée');
   }
   var guideHtml='<div style="background:var(--light);border-radius:8px;padding:10px;margin-top:6px">'+
-    '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">📋 Étapes à suivre</div>'+
+    '<div style="font-weight:700;color:var(--p);font-size:11.5px;margin-bottom:4px">'+iconHtml('list-checks',14)+' Étapes à suivre</div>'+
     '<ol style="margin:0;padding-left:18px;font-size:11.5px;color:var(--text-secondary);line-height:1.6">'+
     etapes.map(function(e){return '<li>'+escapeHtml(e)+'</li>'}).join('')+
     '</ol></div>';
@@ -7655,24 +7825,24 @@ function afficherDetailsMatelasPro(p){
 function afficherDetailsVitresPro(p){
   var d=p.details||{};
   var lignes='';
-  if(d['vitr-b'])lignes+='<div style="margin-bottom:3px"><strong>🏠 Type de bien :</strong> '+escapeHtml(d['vitr-b'])+'</div>';
+  if(d['vitr-b'])lignes+='<div class="ligne-detail"><strong>Type de bien</strong> '+escapeHtml(sansEmoji(d['vitr-b']))+'</div>';
   if(d['quantite']&&!(Array.isArray(d['vitres_estime'])&&d['vitres_estime'].length)&&!(Array.isArray(d['vitres_indique_client'])&&d['vitres_indique_client'].length)){
     // Cas Commerce/Bureaux : uniquement une surface directe, sans comptage détaillé par ailleurs.
-    lignes+='<div style="margin-bottom:3px"><strong>📐 Surface indiquée par le client :</strong> '+escapeHtml(d['quantite'])+' m²</div>';
+    lignes+='<div class="ligne-detail"><strong>Surface indiquée par le client</strong> '+escapeHtml(sansEmoji(d['quantite']))+' m²</div>';
   }
   if(Array.isArray(d['vitres_estime'])&&d['vitres_estime'].length){
-    lignes+='<div style="margin-bottom:4px"><strong>🪟 Fenêtres (estimation du client) :</strong>'+
+    lignes+='<div class="ligne-detail"><strong>Fenêtres (estimation du client)</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['vitres_estime'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul>'+
       '<div style="font-size:11px;color:var(--gray);font-style:italic">Comptage approximatif, pas une mesure exacte — à confirmer sur place.</div></div>';
   }
   if(Array.isArray(d['vitres_indique_client'])&&d['vitres_indique_client'].length){
-    lignes+='<div style="margin-bottom:4px"><strong>📏 Indiqué par le client (surface exacte) :</strong>'+
+    lignes+='<div class="ligne-detail"><strong>Indiqué par le client (surface exacte)</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['vitres_indique_client'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul></div>';
   }
   if(Array.isArray(d['vitres-options'])&&d['vitres-options'].length){
-    lignes+='<div style="margin-bottom:3px"><strong>⚠️ À prévoir :</strong> '+d['vitres-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
+    lignes+='<div class="ligne-detail"><strong>À prévoir</strong> '+d['vitres-options'].map(function(o){return escapeHtml(o)}).join(', ')+'</div>';
   }
-  if(d['etat'])lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+  if(d['etat'])lignes+='<div class="ligne-detail"><strong>État général</strong> '+escapeHtml(sansEmoji(d['etat']))+'</div>';
   return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>';
 }
 // Affichage tapis côté pro — même principe : une ligne par élément, avec sa quantité explicite.
@@ -7693,14 +7863,14 @@ function afficherDetailsTapisPro(p){
   // Or c'est exactement ce qui détermine son devis : la laine et le synthétique
   // ne se nettoient ni avec le même produit, ni dans le même temps.
   if(d['tapis_par_matiere']){
-    lignes+='<div style="margin-bottom:5px"><strong>🧶 Détail par matière :</strong>'+
+    lignes+='<div class="ligne-detail"><strong>Détail par matière</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+
       String(d['tapis_par_matiere']).split(' \u00b7 ').map(function(v){
         return '<li>'+escapeHtml(v)+'</li>';
       }).join('')+'</ul></div>';
   }else if(d['tapis-mat']){
     // Une seule matière : la phrase détaillée n'existe pas, on affiche le nom.
-    lignes+='<div style="margin-bottom:3px"><strong>🧶 Matière :</strong> '+escapeHtml(d['tapis-mat'])+'</div>';
+    lignes+='<div class="ligne-detail"><strong>Matière</strong> '+escapeHtml(sansEmoji(d['tapis-mat']))+'</div>';
   }
   // L'estimation globale ne fait que TOTALISER le détail par matière :
   //
@@ -7714,12 +7884,12 @@ function afficherDetailsTapisPro(p){
   // On ne l'affiche que si le détail par matière est absent : dans ce cas seul,
   // il porte une information que rien d'autre ne donne.
   if(!d['tapis_par_matiere']&&Array.isArray(d['tapis_estime'])&&d['tapis_estime'].length){
-    lignes+='<div style="margin-bottom:4px"><strong>📐 Tapis (estimation du client) :</strong>'+
+    lignes+='<div class="ligne-detail"><strong>Tapis (estimation du client)</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['tapis_estime'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul>'+
       '<div style="font-size:11px;color:var(--gray);font-style:italic">Taille approximative, pas une mesure exacte — à confirmer sur place.</div></div>';
   }
   if(Array.isArray(d['tapis_indique_client'])&&d['tapis_indique_client'].length){
-    lignes+='<div style="margin-bottom:4px"><strong>📏 Indiqué par le client (surface exacte) :</strong>'+
+    lignes+='<div class="ligne-detail"><strong>Indiqué par le client (surface exacte)</strong>'+
       '<ul style="margin:4px 0 2px;padding-left:18px">'+d['tapis_indique_client'].map(function(v){return '<li>'+escapeHtml(v)+'</li>'}).join('')+'</ul></div>';
   }
   // Même raison pour l'état : chaque ligne du détail par matière se termine
@@ -7727,7 +7897,7 @@ function afficherDetailsTapisPro(p){
   // qui contredit parfois le détail, quand les matières sont dans des états
   // différents.
   if(d['etat']&&!d['tapis_par_matiere'])
-    lignes+='<div style="margin-bottom:3px"><strong>🧽 État général :</strong> '+escapeHtml(d['etat'])+'</div>';
+    lignes+='<div class="ligne-detail"><strong>État général</strong> '+escapeHtml(sansEmoji(d['etat']))+'</div>';
   return '<div style="font-size:12px;line-height:1.5">'+lignes+'</div>';
 }
 function tryParseNotes(notes){
@@ -7843,7 +8013,13 @@ function renderProfileAvatar(innerId,photo,fallbackEmoji){
   var el=document.getElementById(innerId);
   if(!el)return;
   if(photo){el.innerHTML='<img class="avatar-photo" src="'+photo+'" alt="">'}
-  else{el.textContent=fallbackEmoji}
+  else{
+    // Les initiales plutôt qu'un emoji (👤, 🏢) : même principe que l'en-tête
+    // d'accueil, et un rendu identique sur tous les téléphones.
+    var u=currentUser||{};
+    var ini=((u.prenom||u.firstName||'').trim().charAt(0)+(u.nom||u.lastName||'').trim().charAt(0)).toUpperCase();
+    el.innerHTML='<span class="avatar-initiales">'+escapeHtml(ini||'?')+'</span>';
+  }
 }
 
 // Affiche la note globale (ex: "4,93") en évidence sur l'en-tête du profil, avec l'étoile signature.
@@ -8147,7 +8323,7 @@ async function loadDemandes(silent){
       // apparaissait comme un doublon inexplicable à côté de la prestation
       // terminée qui l'avait engendrée.
       var badgeRecurrence=(d.recurrence&&d.recurrence_active)
-        ? '<span style="font-size:11px;background:var(--light);color:var(--p);padding:2px 8px;border-radius:10px;white-space:nowrap">🔁 '+libelleRecurrence(d.recurrence)+'</span>'
+        ? '<span style="font-size:11px;background:var(--light);color:var(--p);padding:2px 8px;border-radius:10px;white-space:nowrap"><i data-lucide="repeat" class="ico-txt"></i> '+libelleRecurrence(d.recurrence)+'</span>'
         : '';
       // ── EN MODE SÉLECTION, LA LIGNE SE COCHE AU LIEU DE S'OUVRIR ──────
       // Deux comportements pour le même clic seraient déroutants. On remplace
@@ -8243,7 +8419,7 @@ async function renderActiveRequestBanner(data){
             ? "ouvrirNote('"+escAttr(aNoter.id)+"','"+escAttr(aNoter.societe_id)+"','"+escAttr(aNoter.pro_nom||'votre prestataire')+"')"
             : "goTab('devis')";   // repli : mieux vaut une liste qu'un clic mort
           banner.innerHTML='<div class="fade-in-item" style="background:var(--surface);border:1.5px solid var(--gold);border-radius:14px;padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="'+actionNote+'">'+
-            '<span style="font-size:26px;flex-shrink:0">⭐</span>'+
+            '<span style="font-size:26px;flex-shrink:0"><i data-lucide="star"></i></span>'+
             '<div style="flex:1;min-width:0">'+
               '<div style="font-size:11px;font-weight:700;color:var(--gold-texte);text-transform:uppercase;letter-spacing:.03em">Votre avis compte</div>'+
               '<div style="font-weight:700;font-size:14px">Notez '+escapeHtml(aNoter.pro_nom||'votre prestataire')+' pour '+escapeHtml(libellePrestation(aNoter.prestation))+'</div>'+
@@ -8445,7 +8621,7 @@ function renderDevisClientCards(){
     return;
   }
   var filtered=parOnglet.filter(function(v){return devisClientMatchesFilter(v,devisClientFilterActive)});
-  if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span>🔍</span><p>Aucun devis dans cette catégorie.</p></div>';return}
+  if(!filtered.length){c.innerHTML=chips+'<div class="empty-state"><span><i data-lucide="search"></i></span><p>Aucun devis dans cette catégorie.</p></div>';return}
 
   // Repères de comparaison, calculés une seule fois. Uniquement lorsqu'une même
   // demande a reçu plusieurs devis encore en attente : sur un devis unique, dire
@@ -8525,7 +8701,7 @@ function renderDevisClientCards(){
         var creneauHtml=v.creneau?'<div style="display:flex;align-items:center;gap:6px;background:var(--surface-alt);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:13px;font-weight:700;color:var(--text)"><i data-lucide="calendar" style="width:15px;height:15px;color:var(--p);flex-shrink:0"></i> '+formatCreneau(v.creneau)+'</div>':'';
         var photosAvantHtml='';
         if(v.photos_avant&&v.photos_avant.length){
-          photosAvantHtml='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">📸 Photos avant intervention</div>'+
+          photosAvantHtml='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px"><i data-lucide="camera" class="ico-txt"></i> Photos avant intervention</div>'+
             '<div style="display:flex;gap:6px;overflow-x:auto">'+v.photos_avant.map(function(ph){return '<img src="'+ph+'" style="width:70px;height:70px;border-radius:8px;object-fit:cover;flex-shrink:0" onclick="ouvrirPhotoPleinEcran(this.src)">'}).join('')+'</div></div>';
         // Même correction que côté prestataire : le champ porte le suffixe « _le »,
       // et il est sur la DEMANDE, pas sur le devis. Sans cela, le client ne voyait
@@ -8534,7 +8710,7 @@ function renderDevisClientCards(){
           photosAvantHtml='<div style="font-size:12px;color:var(--mint);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Le prestataire est arrivé</div>';
         }
         actions=creneauHtml+photosAvantHtml+'<div style="margin-top:0">'+
-          '<button class="btn-accept" style="width:100%;margin-bottom:8px" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')">💬 Discuter</button>'+
+          '<button class="btn-accept" style="width:100%;margin-bottom:8px" onclick="goToChat(\''+safeDemandeId+'\',\''+safeProName+'\')"><i data-lucide="message-circle" class="ico-txt"></i> Discuter</button>'+
           (v.code_validation?(
             '<div style="background:var(--surface);border:2px dashed var(--green);border-radius:12px;padding:14px;text-align:center">'+
               '<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">Votre code de fin de prestation</div>'+
@@ -8562,7 +8738,7 @@ function renderDevisClientCards(){
           photosHtml+='</div>';
         }
         actions=photosHtml+'<button class="btn-accept" style="background:var(--p);width:100%;margin-top:10px" onclick="showFacture(\''+safeDemandeId+'\')"><i data-lucide="file-text" style="width:14px;height:14px;vertical-align:-2px"></i> Voir ma facture</button>'+
-          '<button class="btn-accept" style="background:none;border:1.5px solid var(--p);color:var(--p);width:100%;margin-top:8px" onclick="ouvrirRelancerRecurrence(\''+safeDemandeId+'\',\''+safeProName+'\')">🔁 Refaire régulièrement</button>'+
+          '<button class="btn-accept" style="background:none;border:1.5px solid var(--p);color:var(--p);width:100%;margin-top:8px" onclick="ouvrirRelancerRecurrence(\''+safeDemandeId+'\',\''+safeProName+'\')"><i data-lucide="repeat" class="ico-txt"></i> Refaire régulièrement</button>'+
           // ── LE BOUTON DISPARAÎT S'IL EST DÉJÀ FAVORI ────────────────────
           // Le proposer à quelqu'un qui l'a déjà ajouté — après cinq
           // prestations — donne le sentiment que rien n'est enregistré. Le
@@ -8594,7 +8770,7 @@ function renderDevisClientCards(){
           actions+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
         }else{
           actions+='<div style="margin-top:8px">'+
-            '<button class="btn-accept" style="background:var(--gray)" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeSocieteId+'\',\''+safeProName+'\')">⭐ Noter le prestataire</button>'+
+            '<button class="btn-accept" style="background:var(--gray)" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeSocieteId+'\',\''+safeProName+'\')"><i data-lucide="star" class="ico-txt"></i> Noter le prestataire</button>'+
           '</div>';
         }
         // Ranger la prestation depuis la carte elle-même. Le bouton existait déjà,
@@ -8836,12 +9012,12 @@ function renderDetail(d){
       if(m){var dc=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);tardive=((dc-new Date())/36e5)<24}
     }
     if(canCancel){
-      html+='<div class="locked-banner"><span>🔒</span><div>Cette demande a été acceptée'+
+      html+='<div class="locked-banner"><span><i data-lucide="lock"></i></span><div>Cette demande a été acceptée'+
         (d.statut==='en_cours'?' et est en cours':'')+'. '+
         (tardive?'Une annulation reste possible, mais le prestataire sera prévenu qu\'elle est tardive (moins de 24h avant le créneau).':'Vous pouvez encore l\'annuler gratuitement (plus de 24h avant le créneau).')+
         '</div></div>';
     }else if(d.statut==='annulee_client'){
-      html+='<div class="locked-banner"><span>🚫</span><div>Vous avez annulé cette prestation. Le prestataire a été prévenu.</div></div>';
+      html+='<div class="locked-banner"><span><i data-lucide="ban"></i></span><div>Vous avez annulé cette prestation. Le prestataire a été prévenu.</div></div>';
 
     // ── CHAQUE ÉTAT A SON PROPRE MESSAGE ────────────────────────────────
     // Un `else` unique disait « Cette demande est terminée » pour TOUT ce qui
@@ -8854,17 +9030,17 @@ function renderDetail(d){
     //
     // On nomme chaque état plutôt que de tout ranger dans le même repli.
     }else if(d.statut==='terminee'){
-      html+='<div class="locked-banner"><span>✅</span><div>Cette prestation est terminée. Elle ne peut plus être modifiée ni annulée.</div></div>';
+      html+='<div class="locked-banner"><span><i data-lucide="circle-check"></i></span><div>Cette prestation est terminée. Elle ne peut plus être modifiée ni annulée.</div></div>';
 
     }else if(d.statut==='expiree'){
-      html+='<div class="locked-banner"><span>📅</span><div>Le créneau est passé sans qu\'un devis ait été retenu. Vous pouvez refaire une demande à une autre date.</div></div>';
+      html+='<div class="locked-banner"><span><i data-lucide="calendar"></i></span><div>Le créneau est passé sans qu\'un devis ait été retenu. Vous pouvez refaire une demande à une autre date.</div></div>';
 
     // ── PENDANT UN ARBITRAGE, PERSONNE N'ATTEND POUR RIEN ───────────────
     // Le client avait répondu « personne n'est venu » et ne voyait plus rien
     // se passer. Il ignorait qu'une décision était en cours, et combien de
     // temps elle prendrait.
     }else if(d.contestation_le){
-      html+='<div class="locked-banner"><span>⚖️</span><div>'
+      html+='<div class="locked-banner"><span><i data-lucide="scale"></i></span><div>'
         + '<strong>Gleam examine cette prestation.</strong><br>'
         + 'Vous avez signalé que le prestataire n\'était pas venu. '
         + (d.reponse_pro_le
@@ -8881,7 +9057,7 @@ function renderDetail(d){
       // que tout se passe bien.
       var arriveeDouteuse=(d.arrivee_qualite==='eloignee'||d.arrivee_qualite==='non_verifiee')
                           && d.arrivee_confirmee_client!==true;
-      html+='<div class="locked-banner"><span>🔧</span><div>'
+      html+='<div class="locked-banner"><span><i data-lucide="wrench"></i></span><div>'
         + (arriveeDouteuse
             ? 'Le prestataire a déclaré son arrivée. Confirmez sa venue ci-dessous — '
               + 'tant que vous n\'avez pas répondu, vous pouvez encore reprogrammer.'
@@ -8906,10 +9082,10 @@ function renderDetail(d){
           + 'remboursé intégralement — sans avoir à le demander.<br><br>'
           + 'S\'il est venu malgré tout, remettez-lui simplement votre code de '
           + 'validation.</div></div>'
-        : '<div class="locked-banner"><span>💳</span><div>Cette prestation est payée. Le prestataire déclarera son arrivée le jour venu.</div></div>';
+        : '<div class="locked-banner"><span><i data-lucide="credit-card"></i></span><div>Cette prestation est payée. Le prestataire déclarera son arrivée le jour venu.</div></div>';
 
     }else{
-      html+='<div class="locked-banner"><span>🔒</span><div>Cette demande ne peut plus être modifiée.</div></div>';
+      html+='<div class="locked-banner"><span><i data-lucide="lock"></i></span><div>Cette demande ne peut plus être modifiée.</div></div>';
     }
   }
   html+='<div class="detail-card">'+
@@ -8930,22 +9106,22 @@ function renderDetail(d){
     }).join(''):
     '<div class="detail-presta"><span class="detail-presta-icon">'+ICONS_get(d.prestation)+'</span><div class="detail-presta-name">'+escapeHtml(libellePrestation(d.prestation))+'</div></div>')+
   '</div>';
-  if(hasPhotos)html+='<div class="detail-card"><label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:block">📸 Photos</label><div class="photo-previews" id="photos-detail"></div></div>';
+  if(hasPhotos)html+='<div class="detail-card"><label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:block"><i data-lucide="camera" class="ico-txt"></i> Photos</label><div class="photo-previews" id="photos-detail"></div></div>';
   html+='<div class="detail-card">'+
-    '<div class="field-group" style="margin-bottom:10px"><label>📍 Adresse</label><div style="font-size:14px">'+escapeHtml(d.adresse)+'</div></div>'+
-    (d.creneau?'<div class="field-group" style="margin-bottom:0"><label>📅 Créneau</label><div style="font-size:14px">'+formatCreneau(d.creneau)+'</div></div>':'')+
+    '<div class="field-group" style="margin-bottom:10px"><label><i data-lucide="map-pin" class="ico-txt"></i> Adresse</label><div style="font-size:14px">'+escapeHtml(d.adresse)+'</div></div>'+
+    (d.creneau?'<div class="field-group" style="margin-bottom:0"><label><i data-lucide="calendar" class="ico-txt"></i> Créneau</label><div style="font-size:14px">'+formatCreneau(d.creneau)+'</div></div>':'')+
   '</div>';
   if(!locked)html+='<div class="detail-actions">'+
-    '<button class="btn-modify" onclick="openModifyDemande()">✏️ Modifier</button>'+
-    '<button class="btn-delete" onclick="deleteDemande()">🗑️ Supprimer</button>'+
+    '<button class="btn-modify" onclick="openModifyDemande()"><i data-lucide="pencil" class="ico-txt"></i> Modifier</button>'+
+    '<button class="btn-delete" onclick="deleteDemande()"><i data-lucide="trash-2" class="ico-txt"></i> Supprimer</button>'+
   '</div>';
   // Le libellé change quand l'arrivée est contestée : le client vient de dire
   // que personne n'est venu, et il doit savoir qu'il sera remboursé
   // intégralement — sinon il n'osera pas cliquer.
   if(canCancel)html+='<button class="btn-delete" style="width:100%;margin-top:10px" onclick="annulerDemandeAcceptee()">'
     + ((arriveeContestee || absenceConstatee)
-        ? '🚫 Annuler et être remboursé intégralement'
-        : '🚫 Annuler cette prestation')
+        ? '<i data-lucide="ban" class="ico-txt"></i> Annuler et être remboursé intégralement'
+        : '<i data-lucide="ban" class="ico-txt"></i> Annuler cette prestation')
     + '</button>';
   // ouvrirGererRecurrence() existait, la route serveur aussi — mais aucun bouton
   // n'y menait nulle part dans l'application. Un client ayant programmé « tous
@@ -8965,7 +9141,7 @@ function renderDetail(d){
      && d.arrivee_confirmee_client === null){
     html+='<div class="detail-card" style="border-color:var(--gold)">'+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
-        '<span style="font-size:22px">📍</span>'+
+        '<span style="font-size:22px"><i data-lucide="map-pin"></i></span>'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-weight:700;font-size:14px">Le prestataire est-il bien venu ?</div>'+
           '<div style="font-size:12.5px;color:var(--gray)">'+
@@ -9004,7 +9180,7 @@ function renderDetail(d){
     var echeance = tempsAvantOuverture(d.exclusivite_jusqu_a);
     html+='<div class="detail-card" style="border-color:var(--gold)">'+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
-        '<span style="font-size:22px">🔒</span>'+
+        '<span style="font-size:22px"><i data-lucide="lock"></i></span>'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-weight:700;font-size:14px">Réservée à '+escapeHtml(d.pro_prefere_nom||'votre favori')+'</div>'+
           '<div style="font-size:12.5px;color:var(--gray)">'+escapeHtml(echeance||'ouverte à tous prochainement')+'</div>'+
@@ -9024,7 +9200,7 @@ function renderDetail(d){
   if(d.recurrence){
     html+='<div class="detail-card" style="border-color:var(--p)">'+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
-        '<span style="font-size:22px">🔁</span>'+
+        '<span style="font-size:22px"><i data-lucide="repeat"></i></span>'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-weight:700;font-size:14px">Prestation récurrente</div>'+
           '<div style="font-size:12.5px;color:var(--gray)">Renouvelée '+libelleRecurrence(d.recurrence)+
@@ -9042,7 +9218,7 @@ function renderDetail(d){
   var isClosed=d.statut==='terminee'||d.statut==='annulee_client'||d.statut==='expiree';
   if(isClosed&&!d.archivee_client)html+='<button class="btn-modify" style="width:100%;margin-top:10px" onclick="archiverDemande()"><i data-lucide="archive" style="width:15px;height:15px;vertical-align:-3px"></i> Archiver (la ranger de ma liste)</button>';
   if(d.statut==='devis_recus'||d.statut==='acceptee'||d.statut==='en_cours')
-    html+='<button class="modal-send-btn" style="margin-top:14px" onclick="goTab(\'devis\')">📋 Voir les devis reçus</button>';
+    html+='<button class="modal-send-btn" style="margin-top:14px" onclick="goTab(\'devis\')"><i data-lucide="clipboard-list" class="ico-txt"></i> Voir les devis reçus</button>';
   c.innerHTML=html;
   if(hasPhotos)renderPhotoPreviews(getPhotosFromNotes(d.notes),'photos-detail');
 }
@@ -9154,7 +9330,7 @@ function prefillModifyForm(p){
     Object.entries(p.details).forEach(function(entry){
       var group=entry[0],value=entry[1];
       document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){
-        if(b.textContent.trim()===value)b.classList.add('sel');
+        if(sansEmoji(b.textContent)===sansEmoji(value))b.classList.add('sel');
       });
       if(group==='quantite'){var qEl=document.getElementById('f-quantite');if(qEl)qEl.value=value}
     });
@@ -9176,7 +9352,7 @@ var noteDemandeId=null,noteSocieteId=null;
 function ouvrirNote(demandeId,societeId,proName){
   noteDemandeId=demandeId;noteSocieteId=societeId;
   var starIcon='<i data-lucide="star" style="width:36px;height:36px;fill:var(--gold);color:var(--gold-texte)"></i>';
-  var html='<div class="modal-title gleam-signature">⭐ Noter '+escapeHtml(proName)+'</div>'+
+  var html='<div class="modal-title gleam-signature"><i data-lucide="star" class="ico-txt"></i> Noter '+escapeHtml(proName)+'</div>'+
     '<div class="modal-sub">Comment s\'est passée votre prestation ?</div>'+
     '<div id="star-rating" style="display:flex;gap:12px;justify-content:center;margin:20px 0">'+
     '<span class="star" data-note="1" onclick="selectNote(1)" style="cursor:pointer;opacity:0.3">'+starIcon+'</span>'+
@@ -9188,7 +9364,7 @@ function ouvrirNote(demandeId,societeId,proName){
     '<div id="note-label" style="text-align:center;font-weight:700;font-size:16px;margin-bottom:16px;color:var(--gray)">Sélectionnez une note</div>'+
     '<div class="field-group"><label>Commentaire <span class="optional">(optionnel)</span></label>'+
     '<textarea id="note-comment" rows="3" placeholder="Décrivez votre expérience..." style="resize:none"></textarea></div>'+
-    '<button class="modal-send-btn" onclick="envoyerNote(this)">✅ Envoyer mon avis</button>';
+    '<button class="modal-send-btn" onclick="envoyerNote(this)"><i data-lucide="circle-check" class="ico-txt"></i> Envoyer mon avis</button>';
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
   // ── LES ÉTOILES SONT DES ICÔNES ────────────────────────────────────────
@@ -9199,7 +9375,7 @@ function ouvrirNote(demandeId,societeId,proName){
   dessinerIcones();
 }
 var noteSelectionnee=0;
-var noteLabels={1:'😞 Très insatisfait',2:'😐 Insatisfait',3:'🙂 Correct',4:'😊 Satisfait',5:'🤩 Excellent !'};
+var noteLabels={1:'Très insatisfait',2:'Insatisfait',3:'Correct',4:'Satisfait',5:'Excellent !'};
 function selectNote(n){
   noteSelectionnee=n;
   document.querySelectorAll('.star').forEach(function(s,i){s.style.opacity=i<n?'1':'0.3'});
@@ -9360,7 +9536,7 @@ function echecChargement(zoneId, relance, dejaAffiche) {
   }
 
   zone.innerHTML =
-      '<div class="empty-state"><span>📋</span>'
+      '<div class="empty-state"><span><i data-lucide="clipboard-list"></i></span>'
     + '<p>Chargement impossible.</p>'
     + '<button class="btn" style="width:auto;margin-top:12px;padding:10px 22px" '
     +   'onclick="' + relance + '">Réessayer</button>'
@@ -9454,7 +9630,7 @@ async function loadProDemandes(silent){
 
     // L'écran était vide : là, le message a sa place.
     zone.innerHTML =
-        '<div class="empty-state"><span>📋</span>'
+        '<div class="empty-state"><span><i data-lucide="clipboard-list"></i></span>'
       + '<p>Chargement impossible.</p>'
       + '<button class="btn" style="width:auto;margin-top:12px;padding:10px 22px" '
       +   'onclick="loadProDemandes()">Réessayer</button>'
@@ -9556,13 +9732,13 @@ function renderProDemandesCards(){
       // La récurrence ne s'affiche que si CE pro précis est le favori ciblé — sinon, la prochaine
       // occurrence sera de nouveau ouverte à tous les pros, rien ne lui garantit de la récupérer.
       // L'annoncer dans ce cas créerait une fausse attente de business répété, sans rien assurer.
-      (d.recurrence&&d.pro_prefere_id===currentUser.id?'<div style="background:var(--light);color:var(--p);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;display:inline-block;margin-bottom:6px">🔁 Prestation récurrente qui vous est adressée en priorité</div>':'')+
-      '<div class="dc-info"><span>📍</span>'+escapeHtml(d.adresse)+(typeof d.distance_km==='number'?' <strong style="color:var(--p)">— à '+d.distance_km+' km</strong>':'')+'</div>'+
-      (d.creneau?'<div class="dc-info"><span>📅</span>'+formatCreneau(d.creneau)+'</div>':'')+
+      (d.recurrence&&d.pro_prefere_id===currentUser.id?'<div style="background:var(--light);color:var(--p);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;display:inline-block;margin-bottom:6px"><i data-lucide="repeat" class="ico-txt"></i> Prestation récurrente qui vous est adressée en priorité</div>':'')+
+      '<div class="dc-info"><span><i data-lucide="map-pin"></i></span>'+escapeHtml(d.adresse)+(typeof d.distance_km==='number'?' <strong style="color:var(--p)">— à '+d.distance_km+' km</strong>':'')+'</div>'+
+      (d.creneau?'<div class="dc-info"><span><i data-lucide="calendar"></i></span>'+formatCreneau(d.creneau)+'</div>':'')+
       (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
       (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
       '<div class="actions-demande">'+
-        '<button class="btn-devis" id="ouvrir-devis-'+safeId+'" onclick="basculerFormulaireDevis(\''+safeId+'\',\''+escAttr(d.prestation)+'\')">💰 Proposer un prix</button>'+
+        '<button class="btn-devis" id="ouvrir-devis-'+safeId+'" onclick="basculerFormulaireDevis(\''+safeId+'\',\''+escAttr(d.prestation)+'\')"><i data-lucide="hand-coins" class="ico-txt"></i> Proposer un prix</button>'+
         // Secondaire, discret, sans confirmation : écarter est anodin et
         // réversible. Demander « êtes-vous sûr ? » sur ce geste serait pénible.
         '<button class="btn-ecarter" onclick="ecarterDemande(\''+safeId+'\')" '+
@@ -9581,9 +9757,9 @@ function renderProDemandesCards(){
         (nbPrestations>1
           ? '<div class="rappel-devis-global">Votre prix couvre <strong>l\'ensemble de la demande</strong> — les '+nbPrestations+' prestations. Si vous ne pouvez pas tout réaliser, ne répondez pas.</div>'
           : '')+
-        '<label>💰 Votre prix (€ TTC)</label>'+
+        '<label><i data-lucide="hand-coins" class="ico-txt"></i> Votre prix (€ TTC)</label>'+
         '<input type="number" inputmode="decimal" id="prix-'+safeId+'" placeholder="Ex: 150" min="1">'+
-        '<label>📝 Message pour le client</label>'+
+        '<label><i data-lucide="pencil-line" class="ico-txt"></i> Message pour le client</label>'+
         '<textarea id="msg-'+safeId+'" rows="2" placeholder="Décrivez votre offre..." style="resize:none"></textarea>'+
         '<button class="btn-devis" id="btn-devis-'+safeId+'" onclick="envoyerDevis(\''+safeId+'\')">Envoyer mon devis</button>'+
       '</div></div>';
@@ -10281,7 +10457,7 @@ async function loadProDevis(silent){
     const r=await fetchGroupe(API+'/api/devis/mes-devis',{headers:authHeaders()});
     const c=document.getElementById('pro-devis-list');
     if(r.status===401)return;   // l'intercepteur global prévient puis déconnecte
-    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun devis envoyé.</p></div>';return}
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span><i data-lucide="hand-coins"></i></span><p>Aucun devis envoyé.</p></div>';return}
     const data=await safeJson(r);
     document.getElementById('stat-devis').textContent=data.length||0;
     if(!data||!data.length){proDevisCache={data:[],notesDonnees:[]};renderProDevisCards();return}
@@ -10417,7 +10593,7 @@ function renderProDevisCards(){
           extra+='<div style="margin-top:8px;font-size:12px;color:var(--mint);font-weight:700;display:flex;align-items:center;gap:5px"><i data-lucide="check-circle" style="width:14px;height:14px"></i> Avis déjà envoyé</div>';
         }else{
           extra+='<div style="margin-top:8px">'+
-            '<button class="btn-accept" style="background:var(--gray)" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeClientId+'\',\'le client\')">⭐ Noter le client</button>'+
+            '<button class="btn-accept" style="background:var(--gray)" onclick="ouvrirNote(\''+safeDemandeId+'\',\''+safeClientId+'\',\'le client\')"><i data-lucide="star" class="ico-txt"></i> Noter le client</button>'+
           '</div>';
         }
       }else if(v.statut==='accepte'&&demandeStatut==='en_cours'){
@@ -10485,20 +10661,20 @@ function renderProDevisCards(){
         }
 
         extra='<div style="margin-top:10px">'+creneauHtmlPro+blocReclamation+blocContestation+
-          '<button class="btn-accept" style="width:100%;margin-top:10px;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')">💬 Discuter</button>';
+          '<button class="btn-accept" style="width:100%;margin-top:10px;margin-bottom:10px" onclick="goToChat(\''+safeDemandeId+'\',\'Client\')"><i data-lucide="message-circle" class="ico-txt"></i> Discuter</button>';
         if(!demandeeDemarree){
           // Étape 1 : le pro vient d'arriver — photo de l'état initial avant de commencer
           extra+='<div style="background:var(--surface-alt);border-radius:10px;padding:12px">'+
-            '<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">📸 Photo avant de commencer <span class="optional">(optionnel, rassure le client)</span></label>'+
-            '<div class="photo-zone" style="margin-top:6px;margin-bottom:8px" onclick="document.getElementById(\'photo-avant-input-'+safeDemandeId+'\').click()"><span style="font-size:22px">📷</span><p style="font-size:12px">Ajouter des photos</p></div>'+
+            '<label style="font-size:12px;font-weight:700;color:var(--text-secondary)"><i data-lucide="camera" class="ico-txt"></i> Photo avant de commencer <span class="optional">(optionnel, rassure le client)</span></label>'+
+            '<div class="photo-zone" style="margin-top:6px;margin-bottom:8px" onclick="document.getElementById(\'photo-avant-input-'+safeDemandeId+'\').click()"><span style="font-size:22px"><i data-lucide="camera"></i></span><p style="font-size:12px">Ajouter des photos</p></div>'+
             '<input type="file" id="photo-avant-input-'+safeDemandeId+'" accept="image/*" multiple style="display:none" onchange="handlePhotosAvant(this,\''+safeDemandeId+'\')">'+
             '<div class="photo-previews" id="photos-avant-previews-'+safeDemandeId+'"></div>'+
             '<button class="btn-accept" style="width:100%" onclick="demarrerPrestation(\''+safeDemandeId+'\',this)"><i data-lucide="play" style="width:14px;height:14px;vertical-align:-2px"></i> Confirmer mon arrivée et démarrer</button>'+
           '</div>'+blocReprogrammation;
         }else{
           // Étape 2 : le travail est en cours — photo après + code de fin
-          extra+='<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">📸 Photos du travail réalisé <span class="optional">(optionnel, rassure le client)</span></label>'+
-            '<div class="photo-zone" style="margin-top:6px;margin-bottom:10px" onclick="document.getElementById(\'photo-apres-input-'+safeDemandeId+'\').click()"><span style="font-size:22px">📷</span><p style="font-size:12px">Ajouter des photos</p></div>'+
+          extra+='<label style="font-size:12px;font-weight:700;color:var(--text-secondary)"><i data-lucide="camera" class="ico-txt"></i> Photos du travail réalisé <span class="optional">(optionnel, rassure le client)</span></label>'+
+            '<div class="photo-zone" style="margin-top:6px;margin-bottom:10px" onclick="document.getElementById(\'photo-apres-input-'+safeDemandeId+'\').click()"><span style="font-size:22px"><i data-lucide="camera"></i></span><p style="font-size:12px">Ajouter des photos</p></div>'+
             '<input type="file" id="photo-apres-input-'+safeDemandeId+'" accept="image/*" multiple style="display:none" onchange="handlePhotosApres(this,\''+safeDemandeId+'\')">'+
             '<div class="photo-previews" id="photos-apres-previews-'+safeDemandeId+'"></div>'+
             '<label style="font-size:12px;font-weight:700;color:var(--text-secondary)">Code donné par le client, à la fin de la prestation</label>'+
@@ -10529,7 +10705,7 @@ function renderProDevisCards(){
         + 'Vous serez prévenu dès son paiement, et pourrez alors échanger avec lui.'+
           '</div>'+
           '<div style="display:flex;gap:8px;margin-top:10px">'+
-          '<button class="btn-refuse" onclick="annulerProDevis(\''+safeVId+'\',this)">🚫 Annuler</button>'+
+          '<button class="btn-refuse" onclick="annulerProDevis(\''+safeVId+'\',this)"><i data-lucide="ban" class="ico-txt"></i> Annuler</button>'+
         '</div>';
       }else if(v.statut==='expire_sans_paiement'){badge='<span class="devis-badge badge-refused"><i data-lucide="clock" style="width:12px;height:12px;vertical-align:-2px"></i> Expiré faute de paiement</span>'}
       else if(v.statut==='annule_client'){badge='<span class="devis-badge badge-refused"><i data-lucide="ban" style="width:12px;height:12px;vertical-align:-2px"></i> Annulé par le client</span>'}
@@ -10559,8 +10735,8 @@ function renderProDevisCards(){
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
           '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+ICONS_get(v.demande&&v.demande.prestation)+' '+escapeHtml(libellePrestation(v.demande&&v.demande.prestation))+'</div>'+badge+
         '</div>'+
-        '<div style="font-size:12px;color:var(--gray)">📍 '+escapeHtml(v.demande&&v.demande.adresse||'')+'</div>'+
-        (v.demande&&v.demande.creneau?'<div style="font-size:12px;color:var(--gray);margin-top:2px">📅 '+formatCreneau(v.demande.creneau)+'</div>':'')+
+        '<div style="font-size:12px;color:var(--gray)"><i data-lucide="map-pin" class="ico-txt"></i> '+escapeHtml(v.demande&&v.demande.adresse||'')+'</div>'+
+        (v.demande&&v.demande.creneau?'<div style="font-size:12px;color:var(--gray);margin-top:2px"><i data-lucide="calendar" class="ico-txt"></i> '+formatCreneau(v.demande.creneau)+'</div>':'')+
         (detailsClient?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+detailsClient+'</div>':'')+
         (photosClient.length?'<div class="photo-previews" style="margin-top:8px" id="photos-mesdevis-'+safeVId+'"></div>':'')+
         '<div style="font-size:24px;font-weight:800;color:var(--p);margin:8px 0">'+escapeHtml(v.prix_ttc)+' €</div>'+
@@ -11362,7 +11538,7 @@ function basculerFormulaireDevis(id,prestation){
   if(!form)return;
   var etaitOuvert=form.style.display!=='none';
   form.style.display=etaitOuvert?'none':'block';
-  if(btn)btn.textContent=etaitOuvert?'💰 Proposer un prix':'Fermer';
+  if(btn){btn.innerHTML=etaitOuvert?'<i data-lucide="hand-coins" class="ico-txt"></i> Proposer un prix':'Fermer';if(window.lucide)dessinerIcones();}
   if(!etaitOuvert){
     // ── LA DEMANDE EXISTE-T-ELLE ENCORE ? ───────────────────────────────
     // Le prestataire s'apprête à saisir un prix et à rédiger un message. Autant
@@ -11439,17 +11615,17 @@ async function envoyerDevis(demandeId){
 
 // ── TARIFICATION (Vague 2) ──
 const TARIF_CATEGORIES=[
-  {key:'voiture',label:'🚗 Voiture',// Le haut de gamme est ajouté ici aussi : le prestataire doit pouvoir en
+  {key:'voiture',label:'Voiture',// Le haut de gamme est ajouté ici aussi : le prestataire doit pouvoir en
     // fixer le prix, sinon il recevrait des demandes qu'il ne sait pas tarifer.
     tiers:['citadine','berline','suv_4x4','monospace','utilitaire','haut_de_gamme'],
     tierLabels:{citadine:'Citadine',berline:'Berline',suv_4x4:'SUV / 4x4',monospace:'Monospace',utilitaire:'Utilitaire / Van',haut_de_gamme:'Haut de gamme'},
     tierPlaceholders:{citadine:85,berline:105,suv_4x4:128,monospace:132,utilitaire:153,haut_de_gamme:190},
     note:'Prix pour un nettoyage intérieur + extérieur complet, état propre. Le type de nettoyage (intérieur seul/extérieur seul) ajuste ensuite automatiquement.'},
-  {key:'canape',label:'🛋️ Canapé',tiers:['A','B','C','D'],
+  {key:'canape',label:'Canapé',tiers:['A','B','C','D'],
     tierLabels:{A:'2 places',B:'3 places',C:'4 places',D:'5+ places / angle'},
     tierPlaceholders:{A:65,B:80,C:95,D:115},
     note:'Prix pour un canapé en tissu, état propre. Cuir/velours ajustent ensuite automatiquement le prix.'},
-  {key:'matelas',label:'🛏️ Matelas',unite:true,uniteLabel:'matelas',tiers:['A','B','C','D','E'],
+  {key:'matelas',label:'Matelas',unite:true,uniteLabel:'matelas',tiers:['A','B','C','D','E'],
     tierLabels:{A:'90x190 cm',B:'140x190 cm',C:'160x200 cm',D:'180x200 cm',E:'200x200 cm (Empereur)'},
     // Aligné sur PRESTATION_CONFIG.matelas du serveur, qui pilote l'estimation
     // affichée au client. La divergence précédente conseillait au prestataire
@@ -11457,20 +11633,20 @@ const TARIF_CATEGORIES=[
     // que la plateforme jugeait juste, en croyant suivre son conseil.
     tierPlaceholders:{A:60,B:78,C:90,D:105,E:125},
     note:'Prix par matelas, état propre. Le nombre de matelas est fourni par le client.'},
-  {key:'terrasse',label:'☀️ Terrasse',unite:true,uniteLabel:'m²',tiers:null,placeholder:4,
+  {key:'terrasse',label:'Terrasse',unite:true,uniteLabel:'m²',tiers:null,placeholder:4,
     note:'Prix par m², pour une terrasse en carrelage, état propre. Bois/béton/pierre ajustent ensuite automatiquement le prix. Le client indique la surface exacte.'},
-  {key:'piscine',label:'💧 Piscine',tiers:['entretien','complet','eau_verte'],
+  {key:'piscine',label:'Piscine',tiers:['entretien','complet','eau_verte'],
     tierLabels:{entretien:'Entretien simple',complet:'Nettoyage complet',eau_verte:'Eau verte / remise en état'},
     tierPlaceholders:{entretien:65,complet:190,eau_verte:600},
     note:'Prix pour un bassin de taille moyenne, état propre. La surface exacte ajuste ensuite automatiquement le prix.'},
-  {key:'toiture',label:'🏠 Toiture',unite:true,uniteLabel:'m²',tiers:null,placeholder:20,
+  {key:'toiture',label:'Toiture',unite:true,uniteLabel:'m²',tiers:null,placeholder:20,
     note:'Prix par m², pour une toiture en tuiles, démoussage + hydrofuge, état propre. Ardoises/fibrociment/zinc ajustent ensuite automatiquement le prix. Le client indique la surface exacte.'},
-  {key:'vitres',label:'🪟 Vitres',unite:true,uniteLabel:'m²',tiers:['maison','appartement','commerce','bureaux'],
+  {key:'vitres',label:'Vitres',unite:true,uniteLabel:'m²',tiers:['maison','appartement','commerce','bureaux'],
     tierLabels:{maison:'Maison',appartement:'Appartement',commerce:'Commerce',bureaux:'Bureaux'},
     // Aligné sur le serveur : commerce 5 €/m², bureaux 6,5 €/m².
     tierPlaceholders:{maison:4,appartement:4,commerce:5,bureaux:6.5},
     note:'Prix par m² de surface vitrée, état propre. Le client indique la surface exacte.'},
-  {key:'tapis',label:'🧶 Tapis',unite:true,uniteLabel:'m²',tiers:null,placeholder:16,
+  {key:'tapis',label:'Tapis',unite:true,uniteLabel:'m²',tiers:null,placeholder:16,
     note:'Prix par m², pour un tapis synthétique, état propre. Coton/jute-sisal/berbère/laine/soie ajustent ensuite automatiquement le prix (la soie coûte nettement plus cher à nettoyer). Le client indique la surface exacte.'},
   // « Autre » a été retiré des tarifs prestataire.
   //
@@ -11900,7 +12076,7 @@ async function loadConversationsClient(silent){
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('client-conv-list');
-    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span><i data-lucide="message-circle"></i></span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await safeJson(r);
     updateNavBadge(hasAnyUnreadVisible(data));
     var changed4=hasDataChanged('convClient',data);
@@ -11914,7 +12090,7 @@ async function loadConversationsPro(silent){
   try{
     const r=await fetch(API+'/api/conversations',{headers:authHeaders()});
     const c=document.getElementById('pro-conv-list');
-    if(!r.ok){c.innerHTML='<div class="empty-state"><span>💬</span><p>Aucun message pour l\u2019instant.</p></div>';return}
+    if(!r.ok){c.innerHTML='<div class="empty-state"><span><i data-lucide="message-circle"></i></span><p>Aucun message pour l\u2019instant.</p></div>';return}
     const data=await safeJson(r);
     updateNavBadge(hasAnyUnreadVisible(data));
     var changed5=hasDataChanged('convPro',data);
@@ -11975,7 +12151,7 @@ function renderConvList(container,data,role){
           '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
           '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
           '<div class="conv-preview">Prestation terminée — consulter l\'historique</div></div>'+
-          '<div class="conv-time">🏁</div></div>';
+          '<div class="conv-time"><i data-lucide="flag" style="width:14px;height:14px"></i></div></div>';
       });
     }
   }
@@ -12042,7 +12218,7 @@ function goToChat(demandeId,otherName){
     .then(function(d){
       var bar=document.querySelector('.chat-input-bar');
       if(d&&d.statut==='terminee'){
-        if(bar)bar.innerHTML='<div style="text-align:center;padding:12px;color:var(--gray);font-size:13px;width:100%">🏁 Cette prestation est terminée. La messagerie est fermée.</div>';
+        if(bar)bar.innerHTML='<div style="text-align:center;padding:12px;color:var(--gray);font-size:13px;width:100%"><i data-lucide="flag" class="ico-txt"></i> Cette prestation est terminée. La messagerie est fermée.</div>';
       }
     }).catch(function(){});
 }
@@ -12176,7 +12352,7 @@ async function loadChatMessages(){
     hasDataChanged('chat-'+currentChatDemandeId,data);
     var atBottom=c.scrollTop+c.clientHeight>=c.scrollHeight-20;
     var html='';
-    if(!data||!data.length){html='<div class="empty-state" style="padding:30px"><span>💬</span><p>Démarrez la conversation !</p></div>'}
+    if(!data||!data.length){html='<div class="empty-state" style="padding:30px"><span><i data-lucide="message-circle"></i></span><p>Démarrez la conversation !</p></div>'}
     else{
       var lastDay='';
       data.forEach(function(m){
@@ -12202,9 +12378,9 @@ async function loadChatMessages(){
             var jeSuisLePro = currentUser && (currentUser.type === 'pro'
                                            || currentUser.type === 'societe');
             texteSysteme = jeSuisLePro
-              ? '💳 Paiement confirmé — la prestation est réservée. Le montant '
+              ? 'Paiement confirmé — la prestation est réservée. Le montant '
                 + 'est conservé par Gleam et vous sera versé après validation.'
-              : '💳 Paiement confirmé — la prestation est réservée. Le montant '
+              : 'Paiement confirmé — la prestation est réservée. Le montant '
                 + 'est conservé par Gleam jusqu\'à la fin de la prestation.';
           }
 
@@ -12459,7 +12635,7 @@ async function openPayment(devisId,montant,devis){
         recap.insertAdjacentHTML('beforeend',
           '<div style="margin-top:10px;padding:8px 10px;background:var(--green-clair);'
           + 'border-radius:8px;font-size:12.5px;color:var(--green);font-weight:600">'
-          + '🎁 Réduction de parrainage appliquée</div>');
+          + '<i data-lucide="gift" class="ico-txt"></i> Réduction de parrainage appliquée</div>');
       }
       // Le bouton doit dire le montant RÉELLEMENT débité.
       var btnP=document.getElementById('payment-btn');
@@ -13016,7 +13192,7 @@ async function showMesAvis(){
     const d=await safeJson(r);
     var c=document.getElementById('avis-list');
     if(!c)return;
-    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>⭐</span><p>Aucun avis reçu pour l\u2019instant.<br>Terminez une prestation pour recevoir vos premiers avis !</p></div>';return}
+    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span><i data-lucide="star"></i></span><p>Aucun avis reçu pour l\u2019instant.<br>Terminez une prestation pour recevoir vos premiers avis !</p></div>';return}
     var moyenne=d.reduce(function(a,b){return a+b.note},0)/d.length;
     var sumEl=document.getElementById('avis-summary');
     if(sumEl)sumEl.innerHTML='<div style="display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,var(--light),var(--surface));border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:16px">'+
@@ -13059,7 +13235,7 @@ async function showMesPaiements(){
     const d=await safeJson(r);
     var c=document.getElementById('paiements-list');
     if(!c)return;
-    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>💳</span><p>Aucun paiement pour l\u2019instant.</p></div>';return}
+    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span><i data-lucide="credit-card"></i></span><p>Aucun paiement pour l\u2019instant.</p></div>';return}
     // ── DIRE QUI ATTEND QUOI ────────────────────────────────────────────
       // « En attente de confirmation » ne disait pas de QUI. Le client pouvait
       // croire qu'il devait agir, alors que l'argent attend simplement la fin
@@ -13243,20 +13419,20 @@ function creneauBlockHtml(demandeId,creneauActuel,creneauPropose,creneauProposeP
       return '<div style="margin-top:8px;font-size:12px;color:var(--gold-texte);background:var(--amber-clair);border-radius:8px;padding:8px 10px">⏳ Nouveau créneau proposé ('+formatCreneau(creneauPropose)+'), en attente de confirmation.</div>';
     }
     return '<div style="margin-top:8px;background:var(--amber-clair);border:1px solid var(--border);border-radius:8px;padding:10px">'+
-      '<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:6px">📅 Nouveau créneau proposé : '+formatCreneau(creneauPropose)+'</div>'+
+      '<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:6px"><i data-lucide="calendar" class="ico-txt"></i> Nouveau créneau proposé : '+formatCreneau(creneauPropose)+'</div>'+
       '<div style="display:flex;gap:8px">'+
-        '<button class="btn-accept" style="padding:8px" onclick="repondreCreneau(\''+safeId+'\',true,this)">✅ Accepter</button>'+
-        '<button class="btn-refuse" style="padding:8px" onclick="repondreCreneau(\''+safeId+'\',false,this)">❌ Refuser</button>'+
+        '<button class="btn-accept" style="padding:8px" onclick="repondreCreneau(\''+safeId+'\',true,this)"><i data-lucide="circle-check" class="ico-txt"></i> Accepter</button>'+
+        '<button class="btn-refuse" style="padding:8px" onclick="repondreCreneau(\''+safeId+'\',false,this)"><i data-lucide="x" class="ico-txt"></i> Refuser</button>'+
       '</div></div>';
   }
   return boutonReprogrammer(safeId);
 }
 function ouvrirGererRecurrence(demandeId,active){
-  var html='<div class="modal-title">🔁 Prestation récurrente</div><div class="modal-sub">Gérez la répétition automatique de cette demande</div>'+
+  var html='<div class="modal-title"><i data-lucide="repeat" class="ico-txt"></i> Prestation récurrente</div><div class="modal-sub">Gérez la répétition automatique de cette demande</div>'+
     (active
       ?'<button class="btn" style="width:100%" onclick="actionRecurrence(\''+escAttr(demandeId)+'\',\'pause\')">⏸️ Mettre en pause</button>'
       :'<button class="btn-accept" style="width:100%" onclick="actionRecurrence(\''+escAttr(demandeId)+'\',\'reprendre\')">▶️ Reprendre la récurrence</button>')+
-    '<button class="btn" style="width:100%;margin-top:10px;color:var(--red);border-color:var(--red)" onclick="actionRecurrence(\''+escAttr(demandeId)+'\',\'arreter\')">⛔ Arrêter définitivement</button>';
+    '<button class="btn" style="width:100%;margin-top:10px;color:var(--red);border-color:var(--red)" onclick="actionRecurrence(\''+escAttr(demandeId)+'\',\'arreter\')"><i data-lucide="octagon-x" class="ico-txt"></i> Arrêter définitivement</button>';
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -13274,7 +13450,7 @@ async function actionRecurrence(demandeId,action){
 // le plus naturel pour en parler au client, juste après qu'il ait apprécié la prestation, plutôt
 // que d'exiger d'y penser dès la création initiale.
 function ouvrirRelancerRecurrence(demandeId,nomPro){
-  var html='<div class="modal-title">🔁 Refaire cette prestation régulièrement ?</div>'+
+  var html='<div class="modal-title"><i data-lucide="repeat" class="ico-txt"></i> Refaire cette prestation régulièrement ?</div>'+
     '<div class="modal-sub">Choisissez le rythme souhaité</div>'+
     '<div class="options-grid" style="margin-bottom:10px">'+
     '<button class="opt-btn" data-group="relance-freq" data-jours="7" onclick="choisirFreqRelance(this)">Chaque semaine</button>'+
@@ -13947,7 +14123,7 @@ async function showMesFavoris(){
     const d=await safeJson(r);
     var c=document.getElementById('favoris-list');
     if(!c)return;
-    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span>⭐</span><p>Aucun favori pour l\u2019instant.<br>Ajoutez un prestataire depuis une prestation terminée !</p></div>';return}
+    if(!r.ok||!d||!d.length){c.innerHTML='<div class="empty-state"><span><i data-lucide="star"></i></span><p>Aucun favori pour l\u2019instant.<br>Ajoutez un prestataire depuis une prestation terminée !</p></div>';return}
     c.innerHTML=d.map(function(p,i){
       var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
       var noteP=noteAffichable(p.note_moyenne);
@@ -14442,7 +14618,7 @@ async function showMesGains(){
     const r=await fetch(API+'/api/paiements/mes-gains',{headers:authHeaders()});
     const d=await safeJson(r);
     var sum=document.getElementById('gains-summary'),c=document.getElementById('gains-list');
-    if(!r.ok){if(c)c.innerHTML='<div class="empty-state"><span>⚠️</span><p>Erreur de chargement.</p></div>';return}
+    if(!r.ok){if(c)c.innerHTML='<div class="empty-state"><span><i data-lucide="alert-triangle"></i></span><p>Erreur de chargement.</p></div>';return}
     // ── LA GRILLE SUIT LE NOMBRE DE CARTES ──────────────────────────────
       // Elle était figée à deux colonnes. La troisième carte — « En litige »,
       // ajoutée aujourd'hui — passait seule à la ligne sur une demi-largeur.
@@ -14481,7 +14657,7 @@ async function showMesGains(){
               + 'que si la décision vous est favorable.</div>'
               + '</div>'
             : '');
-    if(!d.paiements||!d.paiements.length){if(c)c.innerHTML='<div class="empty-state"><span>💰</span><p>Aucun gain pour l\u2019instant.</p></div>';return}
+    if(!d.paiements||!d.paiements.length){if(c)c.innerHTML='<div class="empty-state"><span><i data-lucide="hand-coins"></i></span><p>Aucun gain pour l\u2019instant.</p></div>';return}
     // ── DIRE CE QUE LE PRESTATAIRE ATTEND VRAIMENT ────────────────────────
       // « En attente de confirmation client » laissait croire qu'il suffisait
       // d'un clic du client. Sur une prestation CONTESTÉE, c'est faux : un
@@ -14514,7 +14690,7 @@ async function showMesGains(){
   }
 }
 function showHowItWorks(){
-  var html='<div class="modal-title gleam-signature">✨ Comment marche Gleam ?</div>'+
+  var html='<div class="modal-title gleam-signature"><i data-lucide="sparkles" class="ico-txt"></i> Comment marche Gleam ?</div>'+
     '<div class="modal-sub">Simple, transparent, sans surprise.</div>'+
     '<div style="display:flex;flex-direction:column;gap:16px;margin:20px 0">'+
       '<div style="display:flex;gap:12px;align-items:flex-start"><div style="width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">1</div><div><strong>Décrivez votre besoin</strong><div style="font-size:13px;color:var(--gray);margin-top:2px">Choisissez une ou plusieurs prestations, précisez l\'état, la taille, vos disponibilités.</div></div></div>'+
@@ -14942,7 +15118,7 @@ async function chargerFavoriCible(type){
     const favoris=await safeJson(r);
     var compatibles=(favoris||[]).filter(function(p){return Array.isArray(p.prestations_proposees)&&p.prestations_proposees.indexOf(type)>=0});
     if(!compatibles.length){box.innerHTML='';return}
-    box.innerHTML='<div class="field-group"><label>⭐ Adresser en priorité à un favori <span class="optional">(optionnel)</span></label>'+
+    box.innerHTML='<div class="field-group"><label><i data-lucide="star" class="ico-txt"></i> Adresser en priorité à un favori <span class="optional">(optionnel)</span></label>'+
       '<div class="options-grid">'+
       compatibles.map(function(p){
         var nom=((p.prenom||'')+' '+(p.nom||'')).trim();
@@ -15070,7 +15246,7 @@ function afficherBlocRecurrence(){
   var messageExplicatif=proPrefereChoisi
     ?'La prochaine demande sera adressée en priorité à ce prestataire favori.'
     :'La prochaine demande restera ouverte à tous les prestataires disponibles, comme celle-ci.';
-  box.innerHTML='<div class="field-group"><label>🔁 Répéter cette demande <span class="optional">(optionnel)</span></label>'+
+  box.innerHTML='<div class="field-group"><label><i data-lucide="repeat" class="ico-txt"></i> Répéter cette demande <span class="optional">(optionnel)</span></label>'+
     '<div style="font-size:11.5px;color:var(--gray);margin-bottom:8px">Le bon rythme dépend de la prestation — un ménage classique peut se faire chaque semaine, une voiture ou des vitres plutôt tous les 2-3 mois. À vous de choisir.</div>'+
     '<div class="options-grid">'+
     '<button class="opt-btn" data-group="recurrence" data-jours="7" onclick="choisirRecurrence(this)">Chaque semaine</button>'+
@@ -15198,7 +15374,7 @@ function dateTimeBlock(isLast){
     blocDateHeure(today)+
     blocAdresseEtSuite();
 }
-function descBlock(ph){return'<div class="field-group"><label>📝 Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
+function descBlock(ph){return'<div class="field-group"><label><i data-lucide="pencil-line" class="ico-txt"></i> Description <span class="optional">(optionnel)</span></label><textarea id="f-desc" rows="3" placeholder="'+ph+'" style="resize:none"></textarea></div>'}
 function sendBtn(type){
   var isLast=isLastInFlow();
   // Sans compte, à la dernière étape : deux boutons vers connexion/inscription plutôt que
@@ -15283,7 +15459,7 @@ function goToPreviousStep(currentType){
 function etatBlock(){
   // `id` sur le groupe : le formulaire tapis doit pouvoir le retirer du
   // parcours quand la grille par matière pose déjà la question.
-  return '<div class="field-group" id="etape-etat-global"><label>🧽 État actuel</label><div class="options-grid">'+
+  return '<div class="field-group" id="etape-etat-global"><label><i data-lucide="gauge" class="ico-txt"></i> État actuel</label><div class="options-grid">'+
     '<button class="opt-btn sel" data-group="etat" data-etat-val="propre" onclick="selOpt(this)"><i data-lucide="sparkles" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Propre</button>'+
     '<button class="opt-btn" data-group="etat" data-etat-val="moyen" onclick="selOpt(this)"><i data-lucide="meh" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Moyennement sale</button>'+
     '<button class="opt-btn" data-group="etat" data-etat-val="sale" onclick="selOpt(this)"><i data-lucide="frown" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Sale</button>'+
@@ -15433,7 +15609,7 @@ async function updateEstimationMaintenant(){
   // On dit donc la vérité — les prestataires chiffreront sur la description.
   if(currentFormType==='autre'){
     box.innerHTML='<div style="font-size:12.5px;color:var(--gray);line-height:1.5">'
-      + '💬 <strong>Pas d\'estimation pour cette demande.</strong><br>'
+      + '<i data-lucide="message-circle" class="ico-txt"></i> <strong>Pas d\'estimation pour cette demande.</strong><br>'
       + 'Décrivez précisément votre besoin — nombre d\'articles, matière, '
       + 'dimensions — et les prestataires vous proposeront leur prix.</div>';
     return;
@@ -15462,7 +15638,7 @@ async function updateEstimationMaintenant(){
       // le lit tout aussi bien.
       var quantite=qEl?parseFloat(qEl.value):(currentFormType==='matelas'?1:0);
       if(!quantite||quantite<=0){
-        box.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic">💡 Indiquez une quantité ci-dessus pour voir une estimation de prix</div>';
+        box.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic"><i data-lucide="lightbulb" class="ico-txt"></i> Indiquez une quantité ci-dessus pour voir une estimation de prix</div>';
         return;
       }
       url+='&quantite='+encodeURIComponent(quantite);
@@ -15494,7 +15670,7 @@ async function updateEstimationMaintenant(){
       return;
     }
     if(d.prix_min===null||d.prix_min===undefined){
-      box.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic">💡 '+(d.message||'Complétez les informations ci-dessus pour voir une estimation de prix')+'</div>';
+      box.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic"><i data-lucide="lightbulb" class="ico-txt"></i> '+(d.message||'Complétez les informations ci-dessus pour voir une estimation de prix')+'</div>';
       return;
     }
     box.innerHTML='<div class="fade-in-item" style="background:linear-gradient(135deg,var(--light),var(--surface));border:1px solid var(--border);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden">'+
@@ -15520,7 +15696,7 @@ async function updateEstimationMaintenant(){
     // Une requête volontairement annulée n'est pas une erreur : l'afficher ferait
     // clignoter un message rouge à chaque clic un peu rapide.
     if(e&&e.name==='AbortError')return;
-    box.innerHTML='<div style="font-size:12px;color:var(--red)">⚠️ Estimation indisponible ('+friendlyNetworkError(e)+')</div>';
+    box.innerHTML='<div style="font-size:12px;color:var(--red)"><i data-lucide="alert-triangle" class="ico-txt"></i> Estimation indisponible ('+friendlyNetworkError(e)+')</div>';
   }
 }
 
@@ -15596,37 +15772,37 @@ function afficherDetailNettoyage(type){
   var noteShamp=document.getElementById('note-shampouinage');
   if(noteShamp)noteShamp.style.display=pertinent?'':'none';
 }
-function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
+function voitureForm(){return'<div class="modal-title"><i data-lucide="car" class="ico-txt"></i> Nettoyage voiture</div><div class="modal-sub">Choisissez le type de nettoyage</div>'+
   '<div class="field-group"><label>Type de nettoyage</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this);afficherDetailNettoyage(\'interieur\')"><span>💺</span>Intérieur</button>'+
-  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this);afficherDetailNettoyage(\'exterieur\')"><span>🚗</span>Extérieur</button>'+
-  '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this);afficherDetailNettoyage(\'complet\')"><span>✨</span>Intérieur + Extérieur</button></div>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="interieur" onclick="selOpt(this);afficherDetailNettoyage(\'interieur\')"><span><i data-lucide="armchair"></i></span>Intérieur</button>'+
+  '<button class="opt-btn" data-group="net-type" data-coef-key="portee" data-coef-val="exterieur" onclick="selOpt(this);afficherDetailNettoyage(\'exterieur\')"><span><i data-lucide="car"></i></span>Extérieur</button>'+
+  '<button class="opt-btn full" data-group="net-type" data-coef-key="portee" data-coef-val="complet" onclick="selOpt(this);afficherDetailNettoyage(\'complet\')"><span><i data-lucide="sparkles"></i></span>Intérieur + Extérieur</button></div>'+
   '<div id="detail-nettoyage-box"></div></div>'+
   '<div class="field-group" id="etape-options-voiture"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
-  '<button class="opt-btn full" id="opt-shampouinage" style="display:none" data-group="voit-options" data-option-val="shampouinage" onclick="toggleOption(this)"><span>🧴</span>Shampouinage en profondeur des sièges et tapis</button>'+
+  '<button class="opt-btn full" id="opt-shampouinage" style="display:none" data-group="voit-options" data-option-val="shampouinage" onclick="toggleOption(this)"><span><i data-lucide="spray-can"></i></span>Shampouinage en profondeur des sièges et tapis</button>'+
   '<div id="note-shampouinage" class="note-option" style="display:none">'+
     '<strong>Nettoyage de surface</strong> — inclus : aspiration et essuyage au produit adapté.<br>'+
     '<strong>Shampouinage</strong> — en option : la mousse est injectée dans la fibre puis réaspirée, '+
     'avec les taches et les odeurs incrustées. Utile sur un siège taché, pas sur un siège simplement poussiéreux.'+
   '</div>'+
-  '<button class="opt-btn" id="opt-poils" data-group="voit-options" data-option-val="poils_animaux" onclick="toggleOption(this)"><span>🐾</span>Poils d\'animaux</button>'+
-  '<button class="opt-btn" id="opt-encrasse" data-group="voit-options" data-option-val="tres_sale" onclick="toggleOption(this)"><span>🤢</span>Habitacle très sale / encrassé</button>'+
-  '<button class="opt-btn" id="opt-rangement" data-group="voit-options" data-option-val="rangement" onclick="toggleOption(this)"><span>🧳</span>Rangement d\'effets personnels</button>'+
-  '<button class="opt-btn" id="opt-odeur" data-group="voit-options" data-option-val="anti_odeur" onclick="toggleOption(this)"><span>💨</span>Traitement anti-odeur</button></div></div>'+
+  '<button class="opt-btn" id="opt-poils" data-group="voit-options" data-option-val="poils_animaux" onclick="toggleOption(this)"><span><i data-lucide="paw-print"></i></span>Poils d\'animaux</button>'+
+  '<button class="opt-btn" id="opt-encrasse" data-group="voit-options" data-option-val="tres_sale" onclick="toggleOption(this)"><span><i data-lucide="triangle-alert"></i></span>Habitacle très sale / encrassé</button>'+
+  '<button class="opt-btn" id="opt-rangement" data-group="voit-options" data-option-val="rangement" onclick="toggleOption(this)"><span><i data-lucide="briefcase"></i></span>Rangement d\'effets personnels</button>'+
+  '<button class="opt-btn" id="opt-odeur" data-group="voit-options" data-option-val="anti_odeur" onclick="toggleOption(this)"><span><i data-lucide="wind"></i></span>Traitement anti-odeur</button></div></div>'+
   '<div class="field-group"><label>Type de véhicule</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span>🚗</span>Citadine</button>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="citadine" onclick="selOpt(this)"><span><i data-lucide="car"></i></span>Citadine</button>'+
   // Sans ce bouton, le palier berline existerait dans la grille du prestataire
   // sans qu'aucun client puisse jamais le déclencher.
-  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="berline" onclick="selOpt(this)"><span>🚘</span>Berline</button>'+
-  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span>🚙</span>SUV/4x4</button>'+
-  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="monospace" onclick="selOpt(this)"><span>🚐</span>Monospace</button>'+
-  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span>🚚</span>Utilitaire</button>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="berline" onclick="selOpt(this)"><span><i data-lucide="car-front"></i></span>Berline</button>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="suv_4x4" onclick="selOpt(this)"><span><i data-lucide="car"></i></span>SUV/4x4</button>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="monospace" onclick="selOpt(this)"><span><i data-lucide="bus"></i></span>Monospace</button>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="utilitaire" onclick="selOpt(this)"><span><i data-lucide="truck"></i></span>Utilitaire</button>'+
   // ── LE HAUT DE GAMME EST UN MÉTIER À PART ──────────────────────────────
   // Cuir pleine fleur, plastiques fragiles, jantes qui ne supportent pas les
   // produits courants. Sans ce choix, une sportive ou une berline de luxe
   // devait être classée en « berline » — et le prestataire travaillait deux
   // heures de plus au même prix, ou refusait la demande.
-  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="haut_de_gamme" onclick="selOpt(this)"><span>✨</span>Haut de gamme</button></div></div>'+
+  '<button class="opt-btn" data-group="veh" data-coef-key="taille" data-coef-val="haut_de_gamme" onclick="selOpt(this)"><span><i data-lucide="sparkles"></i></span>Haut de gamme</button></div></div>'+
   '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="B" onclick="selOpt(this)">5 places</button>'+
@@ -15634,27 +15810,27 @@ function voitureForm(){return'<div class="modal-title">🚗 Nettoyage voiture</d
   '<button class="opt-btn" data-group="seats" data-coef-key="places" data-coef-val="D" onclick="selOpt(this)">9+ places</button></div></div>'+
   '<div class="field-group"><label>Emplacement du véhicule</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🅿️</span>Parking souterrain</button>'+
-  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🛣️</span>Rue / voie publique</button>'+
-  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>☀️</span>Parking extérieur ouvert</button>'+
-  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span>🏠</span>Garage privé</button></div></div>'+
+  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span><i data-lucide="route"></i></span>Rue / voie publique</button>'+
+  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span><i data-lucide="sun"></i></span>Parking extérieur ouvert</button>'+
+  '<button class="opt-btn" data-group="emplacement" onclick="selOpt(this)"><span><i data-lucide="home"></i></span>Garage privé</button></div></div>'+
   etatBlock()+descBlock('Ex: Sièges tachés, odeur...')+dateTimeBlock(isLastInFlow())+sendBtn('voiture')}
 
 // Détail de ce qu'inclut une prestation canapé de base, et options facturées à part chez la
 // plupart des professionnels du secteur — recherche de marché à l'appui.
 var DETAIL_CANAPE_BASE='Aspiration approfondie • Nettoyage vapeur ou injection-extraction • Détachage courant';
-function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
+function canapeForm(){return'<div class="modal-title"><i data-lucide="sofa" class="ico-txt"></i> Nettoyage canapé</div><div class="modal-sub">Type de canapé</div>'+
   '<div class="field-group"><label>Type</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span>➖</span>Droit</button>'+
-  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="angle" onclick="selOpt(this)"><span>📐</span>Angle</button>'+
-  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="u_panoramique" onclick="selOpt(this)"><span>🧲</span>En U / Panoramique</button>'+
-  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="canape_lit" onclick="selOpt(this)"><span>🛌</span>Canapé lit</button>'+
-  '<button class="opt-btn full" data-group="can-type" data-coef-key="forme" data-coef-val="chauffeuses" onclick="selOpt(this)"><span>🪑</span>Chauffeuses</button></div>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="droit" onclick="selOpt(this)"><span><i data-lucide="minus"></i></span>Droit</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="angle" onclick="selOpt(this)"><span><i data-lucide="triangle-right"></i></span>Angle</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="u_panoramique" onclick="selOpt(this)"><span><i data-lucide="magnet"></i></span>En U / Panoramique</button>'+
+  '<button class="opt-btn" data-group="can-type" data-coef-key="forme" data-coef-val="canape_lit" onclick="selOpt(this)"><span><i data-lucide="bed"></i></span>Canapé lit</button>'+
+  '<button class="opt-btn full" data-group="can-type" data-coef-key="forme" data-coef-val="chauffeuses" onclick="selOpt(this)"><span><i data-lucide="armchair"></i></span>Chauffeuses</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_CANAPE_BASE+'</div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="canape-options" data-option-val="coussins" onclick="toggleOption(this)"><span>🛋️</span>Coussins à traiter</button>'+
-  '<button class="opt-btn" data-group="canape-options" data-option-val="anti_acariens" onclick="toggleOption(this)"><span>🦠</span>Anti-acariens</button>'+
-  '<button class="opt-btn" data-group="canape-options" data-option-val="taches_tenaces" onclick="toggleOption(this)"><span>🔴</span>Taches tenaces (encre, vin...)</button>'+
-  '<button class="opt-btn" data-group="canape-options" data-option-val="desodorisation" onclick="toggleOption(this)"><span>💨</span>Désodorisation</button></div></div>'+
+  '<button class="opt-btn" data-group="canape-options" data-option-val="coussins" onclick="toggleOption(this)"><span><i data-lucide="sofa"></i></span>Coussins à traiter</button>'+
+  '<button class="opt-btn" data-group="canape-options" data-option-val="anti_acariens" onclick="toggleOption(this)"><span><i data-lucide="bug"></i></span>Anti-acariens</button>'+
+  '<button class="opt-btn" data-group="canape-options" data-option-val="taches_tenaces" onclick="toggleOption(this)"><span><i data-lucide="circle-dot"></i></span>Taches tenaces (encre, vin...)</button>'+
+  '<button class="opt-btn" data-group="canape-options" data-option-val="desodorisation" onclick="toggleOption(this)"><span><i data-lucide="wind"></i></span>Désodorisation</button></div></div>'+
   '<div class="field-group"><label>Nombre de places</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">2 places</button>'+
   '<button class="opt-btn" data-group="can-pl" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">3 places</button>'+
@@ -15668,7 +15844,7 @@ function canapeForm(){return'<div class="modal-title">🛋️ Nettoyage canapé<
   etatBlock()+descBlock('Ex: Taches de café...')+dateTimeBlock(isLastInFlow())+sendBtn('canape')}
 
 var DETAIL_MATELAS_BASE='Aspiration en profondeur • Nettoyage vapeur ou injection-extraction • <strong>Recto ET verso systématiquement traités</strong> • Traitement anti-acariens standard';
-function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
+function matelasForm(){return'<div class="modal-title"><i data-lucide="bed-double" class="ico-txt"></i> Nettoyage matelas</div><div class="modal-sub">Dimensions</div>'+
   '<div class="field-group"><label>Taille</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">90x190 cm</button>'+
   '<button class="opt-btn" data-group="mat-t" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">140x190 cm</button>'+
@@ -15691,8 +15867,8 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
   // facture 10 à 16 € le m² et porte sur le LOGEMENT, pas sur le matelas.
   // Aucun coefficient sur une prestation à 60-125 € ne pouvait le représenter.
 
-  '<button class="opt-btn" data-group="matelas-options" data-option-val="sommier" onclick="toggleOption(this)"><span>🪵</span>Sommier / tête de lit à traiter</button>'+
-  '<button class="opt-btn full" data-group="matelas-options" data-option-val="tache_ancienne" onclick="toggleOption(this)"><span>🔴</span>Tache ancienne / tenace (urine, sang...)</button></div></div>'+
+  '<button class="opt-btn" data-group="matelas-options" data-option-val="sommier" onclick="toggleOption(this)"><span><i data-lucide="layers"></i></span>Sommier / tête de lit à traiter</button>'+
+  '<button class="opt-btn full" data-group="matelas-options" data-option-val="tache_ancienne" onclick="toggleOption(this)"><span><i data-lucide="circle-dot"></i></span>Tache ancienne / tenace (urine, sang...)</button></div></div>'+
   // ── LE NOMBRE SE RÈGLE SUR LA CARTE ────────────────────────────────────
   // Ce champ demandait « combien de matelas ? » alors que le compteur de la
   // carte pose déjà la question — et il la posait MOINS BIEN.
@@ -15707,7 +15883,7 @@ function matelasForm(){return'<div class="modal-title">🛏️ Nettoyage matelas
   etatBlock()+descBlock('Ex: Taches, acariens...')+dateTimeBlock(isLastInFlow())+sendBtn('matelas')}
 
 var DETAIL_TERRASSE_BASE='Balayage et dégagement • Nettoyage haute pression ou brossage adapté au revêtement • Démoussage • Rinçage';
-function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
+function terrasseForm(){return'<div class="modal-title"><i data-lucide="sun" class="ico-txt"></i> Nettoyage terrasse</div><div class="modal-sub">Surface et sol</div>'+
   quantiteBlock('Surface exacte (en m²)','Ex: 34')+
   '<div class="field-group"><label>Type de sol</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="carrelage" onclick="selOpt(this)"><i data-lucide="grid-3x3" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Carrelage</button>'+
@@ -15716,19 +15892,19 @@ function terrasseForm(){return'<div class="modal-title">☀️ Nettoyage terrass
   '<button class="opt-btn" data-group="ter-sol" data-coef-key="matiere" data-coef-val="pierre_naturelle" onclick="selOpt(this)"><i data-lucide="mountain" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Pierre naturelle</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_TERRASSE_BASE+'</div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
-  '<button class="opt-btn full" data-group="terrasse-options" data-option-val="traitement_protecteur" onclick="toggleOption(this)"><span>🛡️</span>Traitement protecteur (dégriseur/saturateur)</button></div></div>'+
+  '<button class="opt-btn full" data-group="terrasse-options" data-option-val="traitement_protecteur" onclick="toggleOption(this)"><span><i data-lucide="shield"></i></span>Traitement protecteur (dégriseur/saturateur)</button></div></div>'+
   etatBlock()+descBlock('Ex: Mousse verte...')+dateTimeBlock(isLastInFlow())+sendBtn('terrasse')}
 
-function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</div><div class="modal-sub">Quel type d\'intervention souhaitez-vous ?</div>'+
+function piscineForm(){return'<div class="modal-title"><i data-lucide="droplets" class="ico-txt"></i> Nettoyage piscine</div><div class="modal-sub">Quel type d\'intervention souhaitez-vous ?</div>'+
   '<div class="field-group"><label>Type d\'intervention</label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.piscine+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="entretien" onclick="selOpt(this)">Entretien simple<br><span style="font-weight:400;font-size:11px">(pH, skimmer, contrôle)</span></button>'+
   '<button class="opt-btn" data-group="pisc-int" data-coef-key="intervention" data-coef-val="complet" onclick="selOpt(this)">Nettoyage complet<br><span style="font-weight:400;font-size:11px">(parois, fond, filtre)</span></button>'+
   '<button class="opt-btn full" data-group="pisc-int" data-coef-key="intervention" data-coef-val="eau_verte" onclick="selOpt(this)">Eau verte / remise en état</button></div></div>'+
   '<div class="field-group"><label>Type de bassin</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="enterree" onclick="selOpt(this)"><span>🏊</span>Enterrée</button>'+
-  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="hors_sol" onclick="selOpt(this)"><span>🪣</span>Hors-sol</button>'+
-  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="semi_enterree" onclick="selOpt(this)"><span>🌗</span>Semi-enterrée</button>'+
-  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="spa_jacuzzi" onclick="selOpt(this)"><span>🛁</span>Spa/Jacuzzi</button></div></div>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="enterree" onclick="selOpt(this)"><span><i data-lucide="waves"></i></span>Enterrée</button>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="hors_sol" onclick="selOpt(this)"><span><i data-lucide="paint-bucket"></i></span>Hors-sol</button>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="semi_enterree" onclick="selOpt(this)"><span><i data-lucide="contrast"></i></span>Semi-enterrée</button>'+
+  '<button class="opt-btn" data-group="pisc-t" data-coef-key="type_bassin" data-coef-val="spa_jacuzzi" onclick="selOpt(this)"><span><i data-lucide="bath"></i></span>Spa/Jacuzzi</button></div></div>'+
   '<div class="field-group"><label>Surface</label><div class="options-grid">'+
   '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="A" onclick="selOpt(this)">Moins de 25 m²</button>'+
   '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="B" onclick="selOpt(this)">25 à 50 m²</button>'+
@@ -15736,7 +15912,7 @@ function piscineForm(){return'<div class="modal-title">💧 Nettoyage piscine</d
   '<button class="opt-btn" data-group="pisc-s" data-coef-key="taille" data-coef-val="D" onclick="selOpt(this)">Plus de 80 m²</button></div></div>'+
   etatBlock()+descBlock('Ex: Eau verte...')+dateTimeBlock(isLastInFlow())+sendBtn('piscine')}
 
-function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
+function toitureForm(){return'<div class="modal-title"><i data-lucide="home" class="ico-txt"></i> Nettoyage toiture</div><div class="modal-sub">Démoussage et traitement</div>'+
   '<div class="field-group"><label>Type de toiture</label>'+'<div class="inclus-prestation"><strong>\u2713 Ce qui est inclus</strong><span>'+DETAIL_PRESTATIONS.toiture+'</span></div>'+'<div class="options-grid">'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="tuiles" onclick="selOpt(this)"><i data-lucide="home" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Tuiles</button>'+
   '<button class="opt-btn" data-group="toit-t" data-coef-key="matiere" data-coef-val="ardoises" onclick="selOpt(this)"><i data-lucide="layers" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"></i>Ardoises</button>'+
@@ -15746,15 +15922,15 @@ function toitureForm(){return'<div class="modal-title">🏠 Nettoyage toiture</d
   etatBlock()+descBlock('Ex: Mousse importante...')+dateTimeBlock(isLastInFlow())+sendBtn('toiture')}
 
 var DETAIL_VITRES_BASE='Nettoyage des vitres, cadres et rebords • Produit anti-traces • Rez-de-chaussée et étages standards accessibles';
-function vitresForm(){return'<div class="modal-title">🪟 Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
+function vitresForm(){return'<div class="modal-title"><i data-lucide="app-window" class="ico-txt"></i> Nettoyage vitres</div><div class="modal-sub">Type de bien</div>'+
   '<div class="field-group"><label>Type de bien</label><div class="options-grid">'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this);afficherQuantiteVitres(\'maison\')"><span>🏠</span>Maison</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this);afficherQuantiteVitres(\'appartement\')"><span>🏘️</span>Appartement</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this);afficherQuantiteVitres(\'commerce\')"><span>🏪</span>Commerce</button>'+
-  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this);afficherQuantiteVitres(\'bureaux\')"><span>🏢</span>Bureaux</button></div>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="maison" onclick="selOpt(this);afficherQuantiteVitres(\'maison\')"><span><i data-lucide="home"></i></span>Maison</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="appartement" onclick="selOpt(this);afficherQuantiteVitres(\'appartement\')"><span><i data-lucide="building"></i></span>Appartement</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="commerce" onclick="selOpt(this);afficherQuantiteVitres(\'commerce\')"><span><i data-lucide="store"></i></span>Commerce</button>'+
+  '<button class="opt-btn" data-group="vitr-b" data-coef-key="type_bien" data-coef-val="bureaux" onclick="selOpt(this);afficherQuantiteVitres(\'bureaux\')"><span><i data-lucide="building-2"></i></span>Bureaux</button></div>'+
   '<div style="background:var(--surface-alt);border-radius:10px;padding:12px;margin-top:10px;font-size:12.5px;color:var(--text-secondary);line-height:1.6"><strong style="color:var(--text)">✓ Ce qui est inclus :</strong><br>'+DETAIL_VITRES_BASE+'</div></div>'+
   '<div class="field-group"><label>Options supplémentaires <span class="optional">(optionnel, informe le prestataire)</span></label><div class="options-grid">'+
-  '<button class="opt-btn full" data-group="vitres-options" data-option-val="acces_difficile" onclick="toggleOption(this)"><span>🪜</span>Accès difficile / hauteur (nacelle, perche télescopique)</button></div></div>'+
+  '<button class="opt-btn full" data-group="vitres-options" data-option-val="acces_difficile" onclick="toggleOption(this)"><span><i data-lucide="arrow-up-from-line"></i></span>Accès difficile / hauteur (nacelle, perche télescopique)</button></div></div>'+
   '<div id="vitres-quantite-box"></div>'+
   etatBlock()+descBlock('Ex: Velux, double vitrage...')+dateTimeBlock(isLastInFlow())+sendBtn('vitres')}
 
@@ -15966,7 +16142,7 @@ function calculerSurfaceVitresDepuisCompteur(){
 }
 
 var DETAIL_TAPIS_BASE='Dépoussiérage en profondeur • Shampoing ou nettoyage à sec adapté à la matière • Détachage courant • Désodorisation légère';
-function tapisForm(){return'<div class="modal-title">🧶 Nettoyage tapis</div><div class="modal-sub">Matière et surface</div>'+
+function tapisForm(){return'<div class="modal-title"><i data-lucide="square" class="ico-txt"></i> Nettoyage tapis</div><div class="modal-sub">Matière et surface</div>'+
   '<div class="field-group"><label>Matière des tapis <span class="etiquette-multi">plusieurs choix possibles</span></label><div class="options-grid">'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="synthetique" onclick="selMatiere(this)">Synthétique</button>'+
   '<button class="opt-btn" data-group="tapis-mat" data-coef-key="matiere" data-multi="1" data-coef-val="coton" onclick="selMatiere(this)">Coton</button>'+
@@ -16045,7 +16221,7 @@ function calculerSurfaceTapisDepuisCompteur(){
   updateEstimation();
 }
 
-function autreForm(){return'<div class="modal-title">➕ Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
+function autreForm(){return'<div class="modal-title"><i data-lucide="plus-circle" class="ico-txt"></i> Autre prestation</div><div class="modal-sub">Décrivez votre besoin</div>'+
   // ── DES EXEMPLES QUI CORRESPONDENT AUX VRAIES DEMANDES ──────────────────
   // « Bateau, jacuzzi » suggérait des cas rares et décourageait ceux qui ont
   // un besoin banal — six chaises, de la moquette, des rideaux.
