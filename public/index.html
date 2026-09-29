@@ -2468,9 +2468,14 @@ input[type="checkbox"], input[type="radio"], .toggle-switch {
   text-transform: capitalize;
 }
 .entete-client-chiffre span {
-  display: block; font-size: 11px; font-weight: 800; color: var(--gray);
-  text-transform: uppercase; letter-spacing: .04em; margin-top: 1px;
+  display: block; font-size: 11px; font-weight: 700; color: var(--gray);
+  line-height: 1.2; margin-top: 2px;
 }
+button.entete-client-chiffre {
+  border: none; font-family: inherit; text-align: left; cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+button.entete-client-chiffre:active { transform: scale(.96); }
 #s-home .home-hero-card { margin-top: var(--gap-4); }
 
 /* La flèche de retour de l'écran de découverte prestataire. Flottante sur le
@@ -8265,6 +8270,13 @@ async function agirSurSelection(action) {
 
 async function loadDemandes(silent){
   var c0=document.getElementById('recent-demands');
+  // ── LES CHIFFRES DE L'EN-TÊTE SUIVENT LA LISTE ─────────────────────────
+  // Ils n'étaient calculés qu'une fois, à la connexion. Une demande envoyée,
+  // un devis reçu : l'en-tête affichait toujours « 0 ». Chaque rechargement de
+  // l'accueil (retour sur l'onglet, sondage d'une minute, retour au premier
+  // plan) les recalcule désormais — sans requête de plus : fetchGroupe
+  // partage la lecture de /api/demandes avec la liste.
+  if(typeof majEnteteClientChiffres==='function')majEnteteClientChiffres();
 
   // Le bouton « Sélectionner » n'a de sens qu'avec plusieurs demandes.
   // En dessous de trois, en ranger une par une va plus vite.
@@ -10092,7 +10104,7 @@ async function majEnteteClientChiffres(){
   var salut=document.getElementById('greeting-name');
   if(salut)salut.textContent=(currentUser.prenom||'Bonjour');
 
-  var enCours=0, devisAExaminer=0, prochaine=null;
+  var enCours=0, devisAExaminer=0, prochaine=null, prochaineId=null;
   try{
     const r=await fetchGroupe(API+'/api/demandes',{headers:authHeaders()});
     const d=await safeJson(r);
@@ -10102,7 +10114,7 @@ async function majEnteteClientChiffres(){
       if(['en_attente','acceptee','en_cours'].indexOf(dem.statut)>=0){
         enCours++;
         if(['acceptee','en_cours'].indexOf(dem.statut)>=0 && dem.creneau){
-          if(!prochaine || String(dem.creneau) < String(prochaine)) prochaine=dem.creneau;
+          if(!prochaine || String(dem.creneau) < String(prochaine)){ prochaine=dem.creneau; prochaineId=dem.id; }
         }
       }
     });
@@ -10136,10 +10148,26 @@ async function majEnteteClientChiffres(){
     }
   }
 
+  // ── TROIS QUESTIONS, TROIS RÉPONSES, TROIS RACCOURCIS ──────────────────
+  // « DEMANDE », « DEVIS REÇUS », « PROCHAINE » : trois mots qu'on ne savait
+  // pas lire. Les libellés disent maintenant ce qu'ils comptent, et chaque
+  // tuile mène à ce qu'elle résume.
+  var allerProchaine = prochaineId ? "openDetail('"+escAttr(prochaineId)+"')" : "goTab('devis')";
   boite.innerHTML=
-    '<div class="entete-client-chiffre"><b>'+enCours+'</b><span>'+(enCours>1?'demandes':'demande')+'</span></div>'+
-    '<div class="entete-client-chiffre'+(devisAExaminer?' a-decider':'')+'"><b>'+devisAExaminer+'</b><span>'+(devisAExaminer>1?'devis reçus':'devis reçu')+'</span></div>'+
-    '<div class="entete-client-chiffre"><b>'+libelleProchaine+'</b><span>prochaine</span></div>';
+    '<button type="button" class="entete-client-chiffre" onclick="allerMesDemandes()" aria-label="Voir mes demandes en cours">'
+      +'<b>'+enCours+'</b><span>'+(enCours>1?'demandes en cours':'demande en cours')+'</span></button>'+
+    '<button type="button" class="entete-client-chiffre'+(devisAExaminer?' a-decider':'')+'" onclick="goTab(\'devis\')" aria-label="Voir les devis à comparer">'
+      +'<b>'+devisAExaminer+'</b><span>'+(devisAExaminer>1?'devis à comparer':'devis à comparer')+'</span></button>'+
+    '<button type="button" class="entete-client-chiffre" onclick="'+allerProchaine+'" aria-label="Prochaine intervention">'
+      +'<b>'+libelleProchaine+'</b><span>prochain passage</span></button>';
+}
+// Le compteur « demandes en cours » mène à la liste, sur l'accueil.
+function allerMesDemandes(){
+  if(!document.getElementById('s-home').classList.contains('active'))goTab('home');
+  setTimeout(function(){
+    var liste=document.getElementById('recent-demands');
+    if(liste)liste.scrollIntoView({behavior:'smooth',block:'start'});
+  },120);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
