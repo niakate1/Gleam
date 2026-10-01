@@ -93,6 +93,32 @@ function lienAvecCompte(url, compteId) {
   return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(compteId);
 }
 
+function echapperHtml(v) {
+  return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// Échappe récursivement toutes les chaînes d'un objet de données de courriel.
+function echapperDonnees(v) {
+  if (typeof v === 'string') return echapperHtml(v);
+  if (Array.isArray(v)) return v.map(echapperDonnees);
+  if (v && typeof v === 'object' && !(v instanceof Date)) {
+    const r = {};
+    for (const k of Object.keys(v)) r[k] = echapperDonnees(v[k]);
+    return r;
+  }
+  return v;
+}
+function nettoyerObjet(v) {
+  if (typeof v === 'string') return v.replace(/[\r\n]+/g, ' ').slice(0, 150);
+  if (Array.isArray(v)) return v.map(nettoyerObjet);
+  if (v && typeof v === 'object' && !(v instanceof Date)) {
+    const r = {};
+    for (const k of Object.keys(v)) r[k] = nettoyerObjet(v[k]);
+    return r;
+  }
+  return v;
+}
+
 function wrapTemplate({ title, body, ctaLabel, ctaUrl, compteId }) {
   ctaUrl = lienAvecCompte(ctaUrl, compteId);
   return `
@@ -468,7 +494,14 @@ async function sendEmail(type, to, data = {}) {
   // Là encore, cela ne doit pas remonter jusqu'à l'appelant.
   let subject, html;
   try {
-    ({ subject, html } = builder(data));
+    // ── SÉCURITÉ : AUCUNE DONNÉE D'UTILISATEUR N'EST DU HTML ────────────────
+    // Prénoms, messages et libellés étaient insérés tels quels dans le corps
+    // du courriel. Un « prénom » contenant un lien piégé produisait un courriel
+    // d'hameçonnage envoyé depuis l'adresse officielle de Gleam. Le corps est
+    // désormais construit à partir de valeurs échappées ; l'objet (texte brut)
+    // garde les valeurs d'origine, débarrassées des retours à la ligne.
+    subject = String(builder(nettoyerObjet(data)).subject || '').replace(/[\r\n]+/g, ' ').slice(0, 200);
+    html = builder(echapperDonnees(data)).html;
   } catch (err) {
     console.error(`[email] Gabarit "${type}" en échec — courriel non envoyé :`, err.message);
     return;
