@@ -1220,7 +1220,7 @@ async function ouvrirDemande(id) {
     const a = [];
     if (['paye', 'libere', 'rembourse_partiel', 'bloque'].includes(p.statut)) a.push('rembourser');
     if (p.statut === 'bloque') a.push('debloquer');
-    if (p.statut === 'paye' && dm.statut === 'terminee' && !dm.contestation_le) a.push('verser');
+    if (p.statut === 'paye' && !dm.contestation_le && (dm.statut === 'terminee' || (dm.statut === 'en_cours' && dm.code_saisi_par_pro))) a.push('verser');
     return a;
   };
   d.paiements.forEach((p) => { p.restant_remboursable = Math.round((Number(p.montant_ttc) - Number(p.montant_rembourse || 0)) * 100) / 100; p.pro = d.devis.filter((v) => v.societe_id === p.societe_id).map((v) => nomDe(v.pro))[0]; });
