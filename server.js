@@ -1957,10 +1957,16 @@ app.post('/api/push/subscribe', auth, async (req, res) => {
     // seconde route et une seconde table à tenir synchronisées.
     if (plateforme === 'ios' || plateforme === 'android') {
       if (!jeton_natif) return res.status(400).json({ error: 'Jeton d\'appareil manquant.' });
-      await supabase.from('push_subscriptions').upsert({
+      // L'erreur est lue : l'enregistrement échouait en silence (contrainte
+      // partielle incompatible avec onConflict, corrigée en base le 1er octobre).
+      const { error: erreurAppareil } = await supabase.from('push_subscriptions').upsert({
         user_id: req.user.id, plateforme, jeton_natif,
         endpoint: null, keys_p256dh: null, keys_auth: null
       }, { onConflict: 'jeton_natif' });
+      if (erreurAppareil) {
+        console.error('Enregistrement appareil échoué :', erreurAppareil.message);
+        return res.status(500).json({ error: 'Les notifications n\'ont pas pu être activées. Réessayez.' });
+      }
       console.log('🔔 Appareil ' + plateforme + ' enregistré pour ' + req.user.id);
       return res.json({ message: 'Notifications activées.' });
     }
@@ -2071,7 +2077,7 @@ app.post('/api/auth/verifier-email', auth, limiteParCompte, async (req, res) => 
 // Renvoie un nouveau code si l'ancien a expiré ou n'a jamais été reçu
 app.post('/api/auth/renvoyer-code-verification', auth, limiteParCompte, async (req, res) => {
   try {
-    const { data: moi } = await supabase.from('users').select('email, prenom, email_verifie').eq('id', req.user.id).single();
+    const { data: moi } = await supabase.from('users').select('id, email, prenom, email_verifie').eq('id', req.user.id).single();
     if (!moi) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
     if (moi.email_verifie) return res.json({ message: 'Votre email est déjà confirmé.' });
 
@@ -2714,7 +2720,7 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
 
     await supabase.from('demandes').update({ recurrence_prochaine_creee: true }).eq('id', demandeId);
 
-    const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
+    const { data: client } = await supabase.from('users').select('id, email, prenom').eq('id', demande.client_id).single();
     if (client) {
       sendEmail('prochaine_prestation_recurrente', client.email, {
         compteId: client.id,
@@ -2771,15 +2777,31 @@ async function prosConcernesParDemande(demande, options) {
   // que 2 prestataires. Le bloc d'origine, lui, filtrait bien sur type='pro'.
   const { data: pros } = await supabase
     .from('users')
-    .select('id, email, prenom, type, prestations_proposees, latitude, longitude, rayon_intervention_km, compte_supprime')
+    .select('id, email, prenom, type, prestations_proposees, latitude, longitude, rayon_intervention_km, compte_supprime, suspendu, stripe_account_id')
     .in('type', ['pro', 'societe', 'professionnel'])
     .eq('disponible', true);
   if (!pros || !pros.length) return [];
+
+  // ── SEULS LES PRESTATAIRES EN RÈGLE SONT PRÉVENUS ───────────────────────
+  // Ils recevaient « nouvelle demande » alors que l'application ne leur en
+  // montre aucune tant que leur dossier n'est pas validé. Même règle que
+  // prestataireEnRegle, sans l'appel Stripe (trop lent pour 25 comptes) :
+  // compte non suspendu, paiements créés, pièces obligatoires validées.
+  const piecesRequises = [];
+  documentsObligatoires().forEach((t) => (TYPES_DOCUMENTS[t].faces || ['unique']).forEach((f) => piecesRequises.push(t + '|' + f)));
+  const candidatsIds = pros.filter((p) => !p.suspendu && p.stripe_account_id).map((p) => p.id);
+  const { data: docsValides } = candidatsIds.length
+    ? await supabase.from('documents_pro').select('pro_id, type, face').eq('statut', 'valide').in('pro_id', candidatsIds)
+    : { data: [] };
+  const valideesPar = {};
+  (docsValides || []).forEach((d) => { (valideesPar[d.pro_id] = valideesPar[d.pro_id] || new Set()).add(d.type + '|' + (d.face || 'unique')); });
+  const enRegle = new Set(candidatsIds.filter((id) => piecesRequises.every((k) => valideesPar[id] && valideesPar[id].has(k))));
 
   const typesDemandes = extractPrestationTypes(demande);
 
   let retenus = pros.filter((pro) => {
     if (pro.compte_supprime) return false;
+    if (!enRegle.has(pro.id)) return false;
     if (!pro.email) return false;
     // Second garde-fou, volontairement redondant avec le filtre SQL ci-dessus :
     // ce sont des emails envoyés à des personnes réelles, une erreur ne se
@@ -2858,18 +2880,21 @@ async function notifierProsPourDemande(demande, gabarit, options) {
     const relance = gabarit === 'demande_sans_devis_pro';
     const ville = (demande.adresse || '').split(',').pop().trim() || demande.adresse;
 
+    let courrielsEnvoyes = 0;
     for (const pro of pros) {
-      if (envoisCePassage >= PLAFOND_ENVOIS_PAR_PASSAGE) {
-        console.warn('⏸️  Plafond d\'envois atteint pour ce passage — le reste attendra le prochain.');
-        break;
-      }
-      envoisCePassage++;
-      sendEmail(gabarit, pro.email, {
+      // ── LE PLAFOND NE CONCERNE QUE LES COURRIELS ──────────────────────────
+      // Il protège le quota SendGrid. Il coupait aussi la notification push —
+      // gratuite — si bien qu'au-delà de 40 courriels par quart d'heure, une
+      // nouvelle demande ne prévenait plus personne, en silence.
+      const courrielPossible = envoisCePassage < PLAFOND_ENVOIS_PAR_PASSAGE;
+      if (courrielPossible) { envoisCePassage++; courrielsEnvoyes++; }
+      if (courrielPossible) sendEmail(gabarit, pro.email, {
         prenom: pro.prenom,
         prestation: demande.prestation,
         ville,
         distance: pro.distance_km,
-        creneau: demande.creneau
+        creneau: demande.creneau,
+        compteId: pro.id
       }).catch((e) => console.error('Email ' + gabarit + ':', e.message));
 
       envoyerNotificationPush(pro.id, {
@@ -2882,6 +2907,9 @@ async function notifierProsPourDemande(demande, gabarit, options) {
       }).catch(() => {});
     }
 
+    if (courrielsEnvoyes < pros.length) {
+      console.warn('⏸️  Plafond de courriels atteint : ' + (pros.length - courrielsEnvoyes) + ' prestataire(s) prévenu(s) par notification seulement.');
+    }
     console.log('📨 ' + pros.length + ' prestataire(s) notifié(s)' + (aElargi ? ' [zone élargie]' : '') +
       ' — ' + gabarit + ' — demande ' + demande.id);
     // Un objet plutôt qu'un nombre : l'appelant a besoin de savoir non seulement
@@ -3619,23 +3647,28 @@ async function cloturerPrestationsSansArrivee() {
       // nommée n'existe pas : `candidates` revenait vide, la fonction rendait
       // 0, et ce filet de sécurité n'a jamais rien attrapé. Sans une ligne
       // d'erreur nulle part, puisque « aucun candidat » est un cas normal.
-      .select('id, client_id, prestation, creneau, contestation_le, reponse_pro_le, rappel_oubli_envoye_le, code_saisi_par_pro, photos_avant, photos_apres, distance_gps_arrivee')
+      .select('id, client_id, prestation, creneau, contestation_le, reponse_pro_le, rappel_oubli_envoye_le, code_saisi_par_pro, photos_avant, photos_apres, distance_gps_arrivee, arrivee_confirmee_client')
       .eq('statut', 'en_cours')
       .is('prestation_demarree_le', null)
-      .is('contestation_le', null)
+      // CORRECTIF (test complet du 1er octobre) : on filtrait aussi sur
+      // « contestation_le vide ». Or c'est CETTE fonction qui pose ce marqueur
+      // à +6 h : passé l'avertissement, la demande sortait de la liste et le
+      // remboursement à +24 h n'arrivait jamais. L'argent restait bloqué.
+      .is('reponse_pro_le', null)
       .limit(30);
 
     if (!candidates || !candidates.length) return 0;
 
     let traitees = 0;
     for (const d of candidates) {
+      // Une contestation du CLIENT suit son propre circuit (traiterContestationsEchues).
+      if (d.arrivee_confirmee_client === false) continue;
       const instant = instantDuCreneau(d.creneau);
       if (!instant) continue;
 
       const heures = (Date.now() - instant) / 3600000;
 
-      const { data: paiement } = await supabase.from('paiements')
-        .select('*').eq('demande_id', d.id).maybeSingle();
+      const paiement = await paiementPrincipal(d.id, '*');
       if (!paiement || paiement.statut !== 'paye') continue;
 
       // Le code saisi prouve la présence même sans déclaration : la clôture
@@ -3683,11 +3716,15 @@ async function cloturerPrestationsSansArrivee() {
       // arbitrer, elle ne se règle plus automatiquement.
       if (d.reponse_pro_le) continue;
 
-      const resultat = await rembourserPaiementSiPaye(d.id, 999);
+      // L'avertissement a posé le marqueur de contestation : sans `arbitrage`,
+      // le remboursement se suspendrait lui-même. Le prestataire a eu 18 h.
+      const resultat = await rembourserPaiementSiPaye(d.id, 999, { arbitrage: true });
       if (!resultat || !resultat.rembourse) continue;
 
       await supabase.from('demandes')
         .update({ statut: 'annulee_client', contestation_le: null }).eq('id', d.id);
+      await supabase.from('signalements').update({ statut: 'traite' })
+        .eq('demande_id', d.id).eq('statut', 'nouveau');
 
       if (paiement.societe_id) {
         try {
@@ -3803,8 +3840,9 @@ async function traiterContestationsEchues() {
 
     let rembourses = 0;
     for (const d of echues) {
-      const { data: paiement } = await supabase.from('paiements')
-        .select('*').eq('demande_id', d.id).maybeSingle();
+      // Plusieurs lignes possibles (tentative abandonnée, nouveau paiement) :
+      // `.maybeSingle()` échouait et le dossier était ignoré.
+      const paiement = await paiementPrincipal(d.id, '*');
 
       // Un paiement déjà réglé n'a plus rien à trancher.
       if (!paiement || ['rembourse', 'rembourse_partiel', 'libere'].includes(paiement.statut)) {
@@ -4927,6 +4965,13 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
     if (!demande.creneau_propose) return res.status(400).json({ error: 'Aucune proposition de créneau en attente.' });
     if (demande.creneau_propose_par === req.user.id) return res.status(403).json({ error: 'Vous ne pouvez pas répondre à votre propre proposition.' });
 
+    // SÉCURITÉ : l'appartenance est vérifiée AVANT toute écriture (un compte
+    // quelconque pouvait effacer la proposition de report d'autrui).
+    const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
+    const estClient = demande.client_id === req.user.id;
+    const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
+    if (!estClient && !estPro) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
+
     // ── LE MÊME GARDE-FOU, SUR L'AUTRE CHEMIN ───────────────────────────
     // Bloquer la PROPOSITION ne suffit pas : une proposition faite la veille,
     // encore en attente, pouvait être acceptée après l'arrivée du prestataire.
@@ -4947,11 +4992,6 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
                'signalez-le depuis la conversation et nous interviendrons.'
       });
     }
-
-    const { data: devisAccepte } = await supabase.from('devis').select('societe_id').eq('demande_id', demande.id).eq('statut', 'accepte').maybeSingle();
-    const estClient = demande.client_id === req.user.id;
-    const estPro = devisAccepte && devisAccepte.societe_id === req.user.id;
-    if (!estClient && !estPro) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
     if (accepter) {
       await supabase.from('demandes').update({ creneau: demande.creneau_propose, creneau_propose: null, creneau_propose_par: null }).eq('id', req.params.id);
@@ -5309,12 +5349,31 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
       });
     }
 
+    // Remboursement refusé par Stripe : l'argent est toujours chez Gleam. On
+    // n'annule PAS — sinon la demande serait « annulée » avec un paiement
+    // encore encaissé, que plus aucun écran ne traiterait.
+    if (remboursement && remboursement.erreur) {
+      return res.status(502).json({ error: 'Le remboursement n\'a pas pu être effectué pour l\'instant : votre prestation n\'est pas annulée. Réessayez dans quelques minutes, ou contactez le support.' });
+    }
+
+    // Accepté mais pas encore payé : l'intention de paiement ouverte est
+    // annulée, pour qu'elle ne puisse plus aboutir sur une demande annulée.
+    if (demande.statut === 'acceptee') {
+      const { data: ouvertes } = await supabase.from('paiements')
+        .select('stripe_payment_intent_id').eq('demande_id', demande.id).eq('statut', 'en_attente');
+      for (const o of (ouvertes || [])) {
+        if (!o.stripe_payment_intent_id) continue;
+        const annulee = await stripe.paymentIntents.cancel(o.stripe_payment_intent_id).then(() => true, () => false);
+        if (annulee) await supabase.from('paiements').delete().eq('stripe_payment_intent_id', o.stripe_payment_intent_id).eq('statut', 'en_attente');
+      }
+    }
+
     await supabase.from('demandes').update({ statut: 'annulee_client' }).eq('id', demande.id);
     if (devisAccepte) await supabase.from('devis').update({ statut: 'annule_client' }).eq('id', devisAccepte.id);
 
     // 📧 Notifie immédiatement le prestataire concerné
     if (devisAccepte) {
-      const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', devisAccepte.societe_id).single();
+      const { data: pro } = await supabase.from('users').select('id, email, prenom').eq('id', devisAccepte.societe_id).single();
       if (pro) {
         sendEmail('annulation_client', pro.email, {
           compteId: pro.id,
@@ -5641,7 +5700,7 @@ app.post('/api/devis', auth, async (req, res) => {
     await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', demande_id);
 
     // 📧 Email 2/8 : nouveau devis reçu → client
-    const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
+    const { data: client } = await supabase.from('users').select('id, email, prenom').eq('id', demande.client_id).single();
     if (client) {
       sendEmail('nouveau_devis', client.email, {
         compteId: client.id,
@@ -5983,7 +6042,7 @@ app.post('/api/devis/:id/refuser', auth, async (req, res) => {
 
     // 📧 Email "devis refusé" désactivé pour l'instant (peu actionnable, peut être mal vécu par les pros).
     // Pour le réactiver, décommentez le bloc ci-dessous :
-    // const { data: proRefuse } = await supabase.from('users').select('email, prenom').eq('id', devis.societe_id).single();
+    // const { data: proRefuse } = await supabase.from('users').select('id, email, prenom').eq('id', devis.societe_id).single();
     // if (proRefuse) {
     //   sendEmail('devis_refuse', proRefuse.email, { compteId: proRefuse.id, prenom: proRefuse.prenom, prestation: demande.prestation });
     // }
@@ -6046,6 +6105,13 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     // de remettre la demande en circulation pour d'autres pros
     const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id) : { rembourse: false };
 
+    // Le client DOIT être remboursé avant que la demande ne reparte vers
+    // d'autres prestataires : sinon elle serait rouverte avec un paiement
+    // encore encaissé, et le client paierait deux fois.
+    if (demande.statut === 'en_cours' && !(remboursement && remboursement.rembourse)) {
+      return res.status(502).json({ error: 'Le remboursement du client n\'a pas pu être effectué : l\'annulation n\'est pas enregistrée. Réessayez dans quelques minutes, ou contactez le support.' });
+    }
+
     // Système de sanction progressive : chaque annulation d'un devis déjà accepté fait baisser le
     // taux de fiabilité du pro de 20 points (déjà utilisé ailleurs pour le classement des devis).
     // En dessous de 40% (après 3 annulations), le compte est suspendu automatiquement — il faudra
@@ -6074,7 +6140,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     await supabase.from('demandes').update({ statut: nouveauStatut }).eq('id', devis.demande_id);
 
     // 📧 Email 7/8 : annulation pro → client
-    const { data: client } = await supabase.from('users').select('email, prenom').eq('id', demande.client_id).single();
+    const { data: client } = await supabase.from('users').select('id, email, prenom').eq('id', demande.client_id).single();
     if (client) {
       sendEmail('annulation_pro', client.email, {
         compteId: client.id,
@@ -6523,7 +6589,7 @@ app.post('/api/messages', auth, async (req, res) => {
     }
 
     if (destinataireId) {
-      const { data: destinataire } = await supabase.from('users').select('email, prenom').eq('id', destinataireId).single();
+      const { data: destinataire } = await supabase.from('users').select('id, email, prenom').eq('id', destinataireId).single();
       if (destinataire) {
         sendEmail('nouveau_message', destinataire.email, {
           compteId: destinataire.id,
@@ -7247,7 +7313,7 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
     }
 
     // 📧 Email 5/8 : paiement confirmé → pro
-    const { data: pro } = await supabase.from('users').select('email, prenom').eq('id', paiement.societe_id).single();
+    const { data: pro } = await supabase.from('users').select('id, email, prenom').eq('id', paiement.societe_id).single();
     const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
     if (pro) {
       sendEmail('paiement_confirme', pro.email, {
@@ -7330,7 +7396,7 @@ async function verserAuPrestataire(paiementId) {
 }
 
 async function finaliserPrestation(paiement) {
-  const { data: pro } = await supabase.from('users').select('email, prenom, stripe_account_id').eq('id', paiement.societe_id).single();
+  const { data: pro } = await supabase.from('users').select('id, email, prenom, stripe_account_id').eq('id', paiement.societe_id).single();
   if (!pro || !pro.stripe_account_id) {
     // Une trace, sinon ce paiement n'apparaît nulle part à surveiller.
     await supabase.from('paiements').update({
@@ -7395,7 +7461,7 @@ async function finaliserPrestation(paiement) {
   creerProchaineOccurrenceRecurrente(paiement.demande_id).catch(e => console.error('Récurrence non créée:', e.message));
 
   const { data: demandeInfo } = await supabase.from('demandes').select('prestation').eq('id', paiement.demande_id).single();
-  const { data: client } = await supabase.from('users').select('email, prenom').eq('id', paiement.client_id).single();
+  const { data: client } = await supabase.from('users').select('id, email, prenom').eq('id', paiement.client_id).single();
   if (client) {
     sendEmail('prestation_confirmee', client.email, {
       compteId: client.id,
@@ -7568,6 +7634,18 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
     //
     // Le code reste SAISISSABLE : c'est une preuve de présence, et elle est
     // enregistrée plus bas. Mais elle ne déclenche plus le paiement.
+    // SÉCURITÉ : cinq essais par paiement, compté AVANT tout — y compris
+    // pendant un litige, où la saisie était évaluée sans plafond.
+    // (ancien commentaire :) Le code libère l'argent : sans
+    // plafond, le prestataire pouvait le deviner sans le client.
+    if (!(await consommerTentative('paiements', paiement.id, 'code_tentatives', 5))) {
+      return res.status(429).json({
+        error: 'Trop de codes erronés : la saisie est bloquée par sécurité. Sans signalement du client, '
+             + 'votre paiement est libéré automatiquement 48 h après la prestation. En cas de souci, '
+             + 'contactez le support Gleam.'
+      });
+    }
+
     const { data: demandeLitige } = await supabase.from('demandes')
       .select('contestation_le').eq('id', paiement.demande_id).maybeSingle();
 
@@ -7584,15 +7662,6 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
       });
     }
 
-    // SÉCURITÉ : cinq essais par paiement. Le code libère l'argent : sans
-    // plafond, le prestataire pouvait le deviner sans le client.
-    if (!(await consommerTentative('paiements', paiement.id, 'code_tentatives', 5))) {
-      return res.status(429).json({
-        error: 'Trop de codes erronés : la saisie est bloquée par sécurité. Sans signalement du client, '
-             + 'votre paiement est libéré automatiquement 48 h après la prestation. En cas de souci, '
-             + 'contactez le support Gleam.'
-      });
-    }
     if (String(code).trim() !== paiement.code_validation) return res.status(400).json({ error: 'Code incorrect. Vérifiez le code donné par le client.' });
 
     // ── SAISIR LE BON CODE PROUVE LA PRÉSENCE ──────────────────────────────
@@ -7846,7 +7915,7 @@ app.get('/api/demandes/:id/facture', auth, async (req, res) => {
 
     const { data: client } = await supabase.from('users').select('prenom, nom, email, type, raison_sociale, siret, tva_intracom, adresse_facturation').eq('id', demande.client_id).single();
     const { data: pro } = await supabase.from('users').select('prenom, nom, email, siret').eq('id', devisAccepte.societe_id).single();
-    const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demande.id).maybeSingle();
+    const paiement = await paiementPrincipal(demande.id, '*');
 
     // ── LE NUMÉRO EST ATTRIBUÉ ICI SI ON NE L'A PAS ENCORE ──────────────
     // Il l'est normalement à l'encaissement. Mais si cette attribution a
@@ -8062,8 +8131,7 @@ app.post('/api/demandes/:id/reclamer-remboursement', auth, async (req, res) => {
       return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
     }
 
-    const { data: paiement } = await supabase.from('paiements')
-      .select('statut, montant_ttc, created_at').eq('demande_id', demande.id).maybeSingle();
+    const paiement = await paiementPrincipal(demande.id, 'statut, montant_ttc, created_at');
     if (!paiement || !['rembourse', 'rembourse_partiel'].includes(paiement.statut)) {
       return res.status(409).json({
         error: 'Cette prestation n\'a pas été remboursée — il n\'y a rien à réclamer.'
@@ -8882,7 +8950,7 @@ app.get('/api/admin/mes-revenus', adminAuth, async (req, res) => {
       // Encaissé, commission et reversé étaient additionnés bruts. Une
       // prestation remboursée de moitié gonflait donc votre chiffre d'affaires
       // et votre commission — et fausserait une déclaration fiscale.
-      mois[m].encaisse += partReelle(p, 'montant');
+      mois[m].encaisse += partReelle(p, 'montant_ttc');
       mois[m].commission += partReelle(p, 'commission');
       mois[m].reverse += partReelle(p, 'montant_societe');
       mois[m].nb += 1;
@@ -8939,7 +9007,10 @@ app.get('/api/admin/factures', adminAuth, async (req, res) => {
         // serveur renvoyait une liste nulle, que le client affichait comme un
         // « aucune facture ».
         'id, demande_id, numero_facture, montant_ttc, commission, montant_societe, statut, created_at, client_id, societe_id, montant_rembourse')
-      .in('statut', ['paye', 'libere'])
+      // CORRECTIF : toutes les factures NUMÉROTÉES, quel que soit le statut.
+      // Une facture remboursée reste dans la séquence (un avoir l'annule) :
+      // ne lire que « payé » et « versé » faisait apparaître des trous.
+      .or('numero_facture.not.is.null,statut.in.(paye,libere)')
       .gte('created_at', annee + '-01-01T00:00:00.000Z')
       .lt('created_at', (annee + 1) + '-01-01T00:00:00.000Z')
       .order('created_at', { ascending: true })
@@ -9051,7 +9122,7 @@ app.get('/api/admin/declaration-annuelle', adminAuth, async (req, res) => {
       // C'est le point le plus sensible : ce tableau part à l'administration.
       // Déclarer un revenu qui a été rendu au client, c'est payer des
       // cotisations sur de l'argent qu'on n'a jamais gardé.
-      const brut = partReelle(p, 'montant');
+      const brut = partReelle(p, 'montant_ttc');
       const commission = partReelle(p, 'commission');
       const net = partReelle(p, 'montant_societe') || (brut - commission);
       const trimestre = 'T' + (Math.floor(new Date(p.created_at).getMonth() / 3) + 1);
@@ -10670,7 +10741,7 @@ app.get('/api/admin/paiements', adminAuth, async (req, res) => {
     const idsDemandes = [...new Set(liste.map(p => p.demande_id).filter(Boolean))];
     const [usersRes, demandesRes] = await Promise.all([
       idsUsers.length ? supabase.from('users').select('id, prenom, nom, email').in('id', idsUsers) : { data: [] },
-      idsDemandes.length ? supabase.from('demandes').select('id, prestation, statut, contestation_le, creneau').in('id', idsDemandes) : { data: [] }
+      idsDemandes.length ? supabase.from('demandes').select('id, prestation, statut, contestation_le, creneau, code_saisi_par_pro').in('id', idsDemandes) : { data: [] }
     ]);
     const u = Object.fromEntries((usersRes.data || []).map(x => [x.id, x]));
     const dm = Object.fromEntries((demandesRes.data || []).map(x => [x.id, x]));
@@ -10684,7 +10755,8 @@ app.get('/api/admin/paiements', adminAuth, async (req, res) => {
         const actions = [];
         if (['paye', 'libere', 'rembourse_partiel', 'bloque'].includes(p.statut)) actions.push('rembourser');
         if (p.statut === 'bloque') actions.push('debloquer');
-        if (p.statut === 'paye' && demande && demande.statut === 'terminee' && !demande.contestation_le) actions.push('verser');
+        if (p.statut === 'paye' && demande && !demande.contestation_le
+            && (demande.statut === 'terminee' || (demande.statut === 'en_cours' && demande.code_saisi_par_pro))) actions.push('verser');
         return {
           ...p,
           client: nomDe(u[p.client_id]), pro: nomDe(u[p.societe_id]),
@@ -10762,8 +10834,11 @@ app.post('/api/admin/paiements/:id/verser', adminAuth, async (req, res) => {
     const { data: p } = await supabase.from('paiements').select('id, demande_id, client_id, societe_id, statut').eq('id', req.params.id).maybeSingle();
     if (!p) return res.status(404).json({ error: 'Ce paiement n\'existe pas.' });
     if (p.statut !== 'paye') return res.status(409).json({ error: 'Seul un paiement « payé » peut être versé.' });
-    const { data: d } = await supabase.from('demandes').select('statut, contestation_le').eq('id', p.demande_id).maybeSingle();
-    if (!d || d.statut !== 'terminee') return res.status(409).json({ error: 'La prestation n\'est pas terminée : le versement se fait au code de fin ou à la clôture automatique.' });
+    const { data: d } = await supabase.from('demandes').select('statut, contestation_le, code_saisi_par_pro').eq('id', p.demande_id).maybeSingle();
+    // Terminée, OU code de fin saisi (le versement a échoué juste après) :
+    // dans les deux cas la prestation a eu lieu.
+    const realisee = d && (d.statut === 'terminee' || (d.statut === 'en_cours' && d.code_saisi_par_pro));
+    if (!realisee) return res.status(409).json({ error: 'La prestation n\'est pas terminée : le versement se fait au code de fin ou à la clôture automatique.' });
     if (d.contestation_le) return res.status(409).json({ error: 'Un litige est en cours : tranchez-le depuis l\'écran Litiges.' });
     const { data: ouverts } = await supabase.from('signalements').select('id').eq('demande_id', p.demande_id).eq('statut', 'nouveau').limit(1);
     if (ouverts && ouverts.length) return res.status(409).json({ error: 'Un signalement est ouvert sur cette prestation : traitez-le d\'abord.' });
@@ -10964,6 +11039,9 @@ function estPublic(url) {
 app.use((req, res, suivant) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return suivant();
   if (req.path === '/' || estPublic(req.path)) return suivant();
+  // Les chemins d'API inconnus doivent répondre 404 en JSON (plus bas), pas
+  // renvoyer la page de l'application.
+  if (req.path.startsWith('/api/') || req.path.startsWith('/webhooks/')) return suivant();
 
   // Un fichier non public ne doit pas répondre « 404 » : cela confirmerait son
   // existence. On rend l'application, comme pour toute adresse inconnue.
