@@ -168,11 +168,30 @@
     # Aucune page ne demande la caméra ni le micro. La géolocalisation reste
     # autorisée : elle sert à la zone d'intervention des prestataires et à la
     # confirmation d'arrivée.
-    Permissions-Policy = "camera=(), microphone=(), payment=(), geolocation=(self)"
+    # `payment` : autorisé pour le site et le formulaire Stripe — sans lui,
+    # Apple Pay et Google Pay ne peuvent pas s'afficher dans le paiement.
+    Permissions-Policy = "camera=(), microphone=(), payment=(self \"https://js.stripe.com\"), geolocation=(self)"
 
     # Impose HTTPS pendant un an. À n'activer qu'une fois le certificat en
     # place et le domaine stabilisé — ce que Netlify fait automatiquement.
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+    # ── SÉCURITÉ : LA POLITIQUE DE CONTENU (CSP) S'APPLIQUE ENFIN AU VRAI SITE ──
+    # Elle n'existait que sur le serveur Railway (Helmet) — or gleam-app.fr est
+    # servi par Netlify : le site réel n'avait AUCUNE CSP. Celle-ci n'autorise
+    # que les domaines effectivement utilisés : Stripe (paiement), unpkg
+    # (icônes, carte), Google Fonts, l'API Gleam, le géocodage de l'IGN.
+    # Vérifiée sur les 61 écrans de l'application : aucune violation.
+    #
+    # 'unsafe-inline' reste nécessaire tant que l'application utilise des
+    # onclick="…" (plusieurs centaines). La CSP bloque néanmoins tout script
+    # chargé depuis un domaine étranger, et l'envoi de données par fetch vers
+    # un domaine non listé.
+    #
+    # SI QUELQUE CHOSE CASSE (carte vide, paiement qui ne s'affiche pas) :
+    # la console du navigateur nomme le domaine refusé — l'ajouter ci-dessous.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.js.stripe.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://gleam-production-9b95.up.railway.app https://data.geopf.fr https://api-adresse.data.gouv.fr https://api.stripe.com https://*.stripe.com; frame-src 'self' https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://m.stripe.network; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self'; manifest-src 'self'"
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
