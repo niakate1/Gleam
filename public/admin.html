@@ -538,10 +538,19 @@ function dateCourte(iso) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
     + ' à ' + new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
+// SÉCURITÉ : échappe aussi les guillemets — l'ancienne version (textContent →
+// innerHTML) les laissait passer, ce qui rendait les attributs (href="tel:…",
+// onclick="…") exploitables avec un nom ou un téléphone piégé.
+function echapperJs(s) {
+  // Chaîne JavaScript placée dans un attribut HTML : JS d'abord, HTML ensuite.
+  const js = String(s === null || s === undefined ? '' : s)
+    .replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/[\r\n\u2028\u2029]/g, ' ');
+  return echapper(js);
+}
 function echapper(s) {
-  const d = document.createElement('div');
-  d.textContent = s === null || s === undefined ? '' : String(s);
-  return d.innerHTML;
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Tout appel authentifié passe par ici : un 401 ramène systématiquement à
@@ -995,11 +1004,11 @@ async function chargerComptes(recherche) {
             '<div class="petit">' + echapper(u.email) + '</div>' +
             // Cliquable : sur un ordinateur cela ouvre le logiciel de téléphonie,
             // sur un téléphone cela appelle.
-            (u.telephone ? '<a class="lien-tel" href="tel:' + echapper(u.telephone) + '">' +
+            (u.telephone ? '<a class="lien-tel" href="tel:' + echapper(String(u.telephone).replace(/[^0-9+]/g, '')) + '">' +
               echapper(u.telephone) + '</a>' : '') +
           '</div>' +
           '<span class="badge ' + (u.compte_supprime ? 'neutre' : suspendu ? 'suspendu' : 'neutre') + '">' +
-            (u.compte_supprime ? 'Supprimé' : suspendu ? 'Suspendu' : (libelleType[u.type] || u.type)) + '</span>' +
+            (u.compte_supprime ? 'Supprimé' : suspendu ? 'Suspendu' : echapper(libelleType[u.type] || u.type)) + '</span>' +
         '</div>' +
         // L'état du SIRET était vérifié mais nulle part visible. Un compte
         // introuvable au répertoire, ou partageant son numéro, doit se repérer
@@ -1190,7 +1199,7 @@ async function chargerDeclaration() {
 
   let d;
   try { d = await appel('/api/admin/declaration-annuelle?annee=' + anneeDeclaration); }
-  catch (e) { $('liste-declaration').innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+  catch (e) { $('liste-declaration').innerHTML = '<p class="petit">Chargement impossible : ' + echapper(e.message) + '</p>'; return; }
 
   const t = d.totaux;
   $('totaux-declaration').innerHTML = '<div class="totaux-declaration">' +
@@ -1369,7 +1378,14 @@ async function chargerFactures() {
 // Résultat : le clic ne faisait rien, ou ouvrait une page vide.
 function telechargerCsv(lignes, nom) {
   const csv = '\ufeff' + lignes.map((l) =>
-    l.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+    l.map((c) => {
+      // SÉCURITÉ : une cellule commençant par = + - @ est une FORMULE pour
+      // Excel. Un nom comme =HYPERLINK(…) devenait un lien piégé dans le
+      // tableur du comptable. On la neutralise (les nombres restent intacts).
+      let v = String(c === null || c === undefined ? '' : c);
+      if (/^[=+\-@\t\r]/.test(v) && !/^[-+]?\d+([.,]\d+)?$/.test(v)) v = "'" + v;
+      return '"' + v.replace(/"/g, '""') + '"';
+    }).join(';')).join('\r\n');
 
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const lien = document.createElement('a');
@@ -1435,18 +1451,18 @@ function blocControle(pro) {
   let lignes = [];
 
   if (pro.siret_statut === 'verifie') {
-    lignes.push('<strong>SIRET vérifié</strong> — ' + (d.nom || pro.siret) +
+    lignes.push('<strong>SIRET vérifié</strong> — ' + echapper(d.nom || pro.siret) +
       (d.etat_etablissement === 'A' ? ', établissement actif' : '') +
-      (d.activite_libelle ? '<div class="ligne">' + d.activite_libelle +
-        (d.activite_code ? ' (' + d.activite_code + ')' : '') + '</div>' : ''));
+      (d.activite_libelle ? '<div class="ligne">' + echapper(d.activite_libelle) +
+        (d.activite_code ? ' (' + echapper(d.activite_code) + ')' : '') + '</div>' : ''));
   } else if (pro.siret_statut === 'ferme') {
-    lignes.push('<strong>Établissement fermé</strong> au répertoire — ' + (d.nom || pro.siret));
+    lignes.push('<strong>Établissement fermé</strong> au répertoire — ' + echapper(d.nom || pro.siret));
   } else if (pro.siret_statut === 'introuvable') {
     lignes.push('<strong>SIRET introuvable</strong> au répertoire officiel');
   } else if (!pro.siret) {
     lignes.push('<strong>Aucun SIRET renseigné</strong>');
   } else {
-    lignes.push('SIRET non vérifié — ' + pro.siret);
+    lignes.push('SIRET non vérifié — ' + echapper(pro.siret));
   }
 
   if (pro.siret_doublon)
@@ -1472,12 +1488,12 @@ function carteDocument(doc) {
     const decidable = doc.statut === 'en_attente';
     return '<div class="dossier" id="dossier-' + doc.id + '">' +
       '<div class="entete">' +
-        '<div><div class="qui">' + (pro.prenom || '') + ' ' + (pro.nom || '') + '</div>' +
-          '<div class="quoi">' + doc.type_libelle + '</div>' +
-          '<div class="petit">' + (pro.email || '') + '</div>' +
+        '<div><div class="qui">' + echapper(pro.prenom || '') + ' ' + echapper(pro.nom || '') + '</div>' +
+          '<div class="quoi">' + echapper(doc.type_libelle) + '</div>' +
+          '<div class="petit">' + echapper(pro.email || '') + '</div>' +
           // Un appel de trente secondes règle ce que trois refus n'ont pas réglé.
-          (pro.telephone ? '<a class="lien-tel" href="tel:' + pro.telephone + '">' +
-            pro.telephone + '</a>' : '') + '</div>' +
+          (pro.telephone ? '<a class="lien-tel" href="tel:' + echapper(String(pro.telephone).replace(/[^0-9+]/g, '')) + '">' +
+            echapper(pro.telephone) + '</a>' : '') + '</div>' +
         '<div style="text-align:right"><div class="quand">' + ilYA(doc.created_at) + '</div>' +
           (decidable ? '' : '<div style="margin-top:6px"><span class="etiquette ' + doc.statut + '">' +
             (doc.statut === 'valide' ? 'Validé' : doc.statut === 'refuse' ? 'Refusé' : 'Expiré') + '</span></div>') +
@@ -1556,7 +1572,7 @@ async function chargerDossiers() {
 
   let d;
   try { d = await appel('/api/admin/dossiers?filtre=' + (filtreDossiers || 'a_traiter')); }
-  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + echapper(e.message) + '</p>'; return; }
 
   const pastille = $('compteur-documents');
   if (pastille) pastille.textContent = d.compteurs.a_traiter ? String(d.compteurs.a_traiter) : '';
@@ -1620,8 +1636,8 @@ async function chargerDossiers() {
       '<div class="vignettes" id="vignettes-' + p.pro_id + '"></div>' +
       '<div class="actions-dossier">' +
         (p.complet && p.nb_en_attente
-          ? '<button class="action" onclick="validerDossier(\'' + p.pro_id + '\',\'' +
-              echapper(nom) + '\',' + p.nb_en_attente + ')">Tout valider (' + p.nb_en_attente + ')</button>'
+          ? '<button class="action" onclick="validerDossier(\'' + echapperJs(p.pro_id) + '\',\'' +
+              echapperJs(nom) + '\',' + Number(p.nb_en_attente) + ')">Tout valider (' + p.nb_en_attente + ')</button>'
           : '') +
         '<button class="action secondaire" onclick="ouvrirDossier(\'' + p.pro_id + '\')">' +
           'Voir les ' + p.documents + ' pièce(s)</button>' +
@@ -1704,7 +1720,7 @@ async function chargerDocuments() {
     const proId = filtreDocuments.slice(4);
     let dd;
     try { dd = await appel('/api/admin/documents?pro_id=' + proId); }
-    catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+    catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + echapper(e.message) + '</p>'; return; }
     motifsRefus = dd.motifs_refus || {};
     c.innerHTML = '<button class="action secondaire" style="margin-bottom:12px" ' +
         'onclick="filtreDocuments=\'en_attente\';chargerDossiers()">← Retour aux dossiers</button>' +
@@ -1727,7 +1743,7 @@ async function chargerDocuments() {
 
   let d;
   try { d = await appel('/api/admin/documents?statut=' + filtreDocuments); }
-  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + e.message + '</p>'; return; }
+  catch (e) { c.innerHTML = '<p class="petit">Chargement impossible : ' + echapper(e.message) + '</p>'; return; }
   motifsRefus = d.motifs_refus || {};
 
   const pastille = $('compteur-documents');
@@ -1849,9 +1865,9 @@ async function chargerExpirations() {
     const pro = doc.pro || {};
     const urgent = doc.jours_restants <= 15;
     return '<div class="dossier"><div class="entete" style="border:none;margin:0;padding:0">' +
-      '<div><div class="qui">' + (pro.prenom || '') + ' ' + (pro.nom || '') + '</div>' +
-        '<div class="quoi">' + doc.type_libelle + '</div>' +
-        '<div class="petit">' + (pro.email || '') + '</div></div>' +
+      '<div><div class="qui">' + echapper(pro.prenom || '') + ' ' + echapper(pro.nom || '') + '</div>' +
+        '<div class="quoi">' + echapper(doc.type_libelle) + '</div>' +
+        '<div class="petit">' + echapper(pro.email || '') + '</div></div>' +
       '<div style="text-align:right"><span class="etiquette ' + (urgent ? 'urgent' : 'attente') + '">' +
         (doc.jours_restants < 0 ? 'Expiré' : 'Dans ' + doc.jours_restants + ' jour' + (doc.jours_restants > 1 ? 's' : '')) +
       '</span><div class="petit" style="margin-top:5px">' + dateFr(doc.date_expiration) + '</div></div>' +
