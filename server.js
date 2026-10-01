@@ -156,6 +156,9 @@ async function envoyerNotificationPush(userId, { titre, corps, url }) {
     if (!abonnements || !abonnements.length) return;
     const payload = JSON.stringify({ title: titre, body: corps, url: url || '/' });
     await Promise.all(abonnements.map(async (a) => {
+      // Abonnement natif (pas d'endpoint web) ou adresse hors des services de
+      // notification (enregistrée avant le contrôle) : on n'y envoie rien.
+      if (!a.endpoint || !pushEndpointAutorise(a.endpoint)) return;
       try {
         await webpush.sendNotification({ endpoint: a.endpoint, keys: { p256dh: a.keys_p256dh, auth: a.keys_auth } }, payload);
       } catch (e) {
@@ -320,19 +323,19 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       // Stripe pour le paiement ; unpkg pour les icônes Lucide.
-      scriptSrc: ["'self'", "'unsafe-inline'", 'https://js.stripe.com', 'https://unpkg.com'],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://js.stripe.com', 'https://*.js.stripe.com', 'https://unpkg.com'],
       // Les 710 styles en ligne imposent unsafe-inline. Les polices Google
       // servent une feuille de style depuis googleapis.
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://unpkg.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
       // `data:` et `blob:` : les photos sont prévisualisées avant envoi.
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
       // L'API, l'adresse gouvernementale, Stripe.
       connectSrc: ["'self'", 'https://gleam-production-9b95.up.railway.app',
                    'https://gleam-app.fr', 'https://api-adresse.data.gouv.fr',
-                   'https://data.geopf.fr', 'https://api.stripe.com'],
+                   'https://data.geopf.fr', 'https://api.stripe.com', 'https://*.stripe.com'],
       // Le formulaire de carte Stripe s'affiche dans un cadre.
-      frameSrc: ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'],
+      frameSrc: ["'self'", 'https://js.stripe.com', 'https://*.js.stripe.com', 'https://hooks.stripe.com', 'https://m.stripe.network'],
       // Personne ne doit pouvoir encadrer Gleam dans son propre site.
       frameAncestors: ["'none'"],
       objectSrc: ["'none'"],
@@ -363,8 +366,11 @@ const corsOptions = {
     // serveur-à-serveur) — seules les requêtes d'un navigateur avec une origine non reconnue sont refusées.
     if (!origin) return callback(null, true);
     try {
-      const hote = new URL(origin).hostname.toLowerCase().replace(/^www\./, '');
-      if (hotesAutorises.includes(hote)) return callback(null, true);
+      const u = new URL(origin);
+      const hote = u.hostname.toLowerCase().replace(/^www\./, '');
+      // SÉCURITÉ : HTTPS obligatoire — la version http:// d'un domaine autorisé
+      // pouvait faire des appels authentifiés (réseau Wi-Fi piégé).
+      if (u.protocol === 'https:' && hotesAutorises.includes(hote)) return callback(null, true);
     } catch (e) { /* origine malformée, refusée ci-dessous */ }
     console.error('CORS refusé pour origine:', origin, '— autorisées:', hotesAutorises);
     return callback(new Error('Origine non autorisée par CORS.'));
@@ -420,6 +426,47 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
       console.error('Erreur webhook Stripe (finalisation paiement):', e);
     }
   }
+
+  // ── SÉCURITÉ : LES OPPOSITIONS ET REMBOURSEMENTS FAITS HORS DE GLEAM ──────
+  // Seul `payment_intent.succeeded` était traité. Après une opposition
+  // bancaire (chargeback), le paiement restait « payé » : le code de fin ou la
+  // clôture automatique versait quand même au prestataire, et Gleam perdait
+  // deux fois la somme. Le paiement est désormais BLOQUÉ : plus aucun
+  // versement automatique, l'administrateur tranche.
+  //
+  // À activer côté Stripe : Développeurs → Webhooks → ajouter les événements
+  // `charge.dispute.created` et `charge.refunded` à ce point de terminaison.
+  try {
+    if (event.type === 'charge.dispute.created') {
+      const litige = event.data.object;
+      const pi = typeof litige.payment_intent === 'string' ? litige.payment_intent
+               : (litige.payment_intent && litige.payment_intent.id);
+      if (pi) {
+        const { data: bloques } = await supabase.from('paiements')
+          .update({ statut: 'bloque' })
+          .eq('stripe_payment_intent_id', pi)
+          .in('statut', ['paye', 'liberation_en_cours'])
+          .select('id');
+        console.error('⚠️  OPPOSITION BANCAIRE sur le paiement ' + pi + ' (' + (litige.reason || 'motif inconnu')
+          + ', ' + (litige.amount / 100) + ' €) — '
+          + (bloques && bloques.length ? 'paiement bloqué.' : 'déjà versé ou remboursé : à examiner.'));
+      }
+    } else if (event.type === 'charge.refunded') {
+      const charge = event.data.object;
+      const pi = typeof charge.payment_intent === 'string' ? charge.payment_intent
+               : (charge.payment_intent && charge.payment_intent.id);
+      if (pi && charge.amount_refunded >= charge.amount) {
+        // Remboursement total fait depuis le tableau de bord Stripe : plus
+        // rien ne doit être versé au prestataire.
+        await supabase.from('paiements')
+          .update({ statut: 'rembourse', montant_rembourse: charge.amount / 100, montant_societe: 0 })
+          .eq('stripe_payment_intent_id', pi)
+          .in('statut', ['paye', 'bloque']);
+      }
+    }
+  } catch (e) {
+    console.error('Erreur webhook Stripe (' + event.type + '):', e);
+  }
   res.json({ received: true });
 });
 
@@ -442,7 +489,8 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 900, standardHeaders: true, legacyHeaders: false });
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 900, standardHeaders: true, legacyHeaders: false,
+  keyGenerator: (req) => cleAdresse(req) });
 // Les routes publiques n'exigent pas de compte — un visiteur doit pouvoir
 // estimer un prix, et l'inscription doit pouvoir vérifier un SIRET. Sans
 // limite, elles servent de relais gratuit : on interroge l'annuaire de l'État
@@ -454,7 +502,55 @@ const publicLimiter = rateLimit({
   message: { error: 'Trop de requêtes. Patientez une minute.' }
 });
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+// ── SÉCURITÉ : UNE ADRESSE IPv6 N'EST PAS UNE PERSONNE ────────────────────
+// Un abonné IPv6 dispose d'un bloc /64 entier — des milliards d'adresses. Une
+// limite « par adresse » ne l'arrêtait pas : il en changeait à chaque essai.
+// On regroupe donc par /64 (IPv4 inchangé).
+function cleAdresse(req) {
+  const ip = String(req.ip || '').replace(/^::ffff:/, '');
+  if (ip.indexOf(':') === -1) return ip;
+  const blocs = ip.split('::')[0].split(':');
+  return blocs.slice(0, 4).join(':') + '::/64';
+}
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
+  keyGenerator: cleAdresse });
+// Par ADRESSE EMAIL visée, quel que soit l'appareil : c'est ce qui borne le
+// nombre total d'essais sur un compte, même depuis mille adresses IP.
+const limiteParEmail = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 6, standardHeaders: true, legacyHeaders: false,
+  keyGenerator: (req) => 'oubli:' + String((req.body && req.body.email) || '').toLowerCase().trim(),
+  message: { error: 'Trop de demandes pour ce compte. Réessayez dans une heure.' }
+});
+// Saisie du code : par compte ET par réseau — un tiers ne peut pas bloquer la
+// personne légitime, et le compteur en base plafonne déjà les essais par code.
+const limiteSaisieCode = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false,
+  keyGenerator: (req) => 'code:' + String((req.body && req.body.email) || '').toLowerCase().trim() + '|' + cleAdresse(req),
+  message: { error: 'Trop d\'essais. Réessayez dans une heure.' }
+});
+// Par COMPTE connecté (routes avec `auth`, qui doit passer avant).
+const limiteParCompte = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false,
+  keyGenerator: (req) => 'compte:' + ((req.user && req.user.id) || cleAdresse(req)),
+  message: { error: 'Trop d\'essais. Réessayez dans une heure.' }
+});
+
+// Compteur de tentatives ATOMIQUE en base (fonction gleam_tentative) : il
+// n'incrémente que sous le plafond, en une seule écriture — des requêtes
+// parallèles ne peuvent plus toutes lire « 0 essai ». Renvoie false quand le
+// plafond est atteint. En cas de panne de la base, on laisse passer (et on le
+// note) plutôt que de bloquer tout le monde.
+async function consommerTentative(table, id, colonne, max) {
+  try {
+    const { data, error } = await supabase.rpc('gleam_tentative',
+      { p_table: table, p_id: id, p_colonne: colonne, p_max: max });
+    if (error) { console.error('Compteur de tentatives indisponible :', error.message); return true; }
+    return data === true;
+  } catch (e) {
+    console.error('Compteur de tentatives indisponible :', e.message);
+    return true;
+  }
+}
 app.use('/api/', globalLimiter);
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -552,18 +648,64 @@ const auth = async (req, res, next) => {
   const token = lireCookie(req, COOKIE_JETON)
     || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
   if (!token) return res.status(401).json({ error: 'Votre session a expiré ou n\'est plus valide. Reconnectez-vous pour continuer.' });
+  let charge;
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
+    charge = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch (e) {
     // Diagnostic précis, jamais le jeton ni la clé secrète eux-mêmes : seulement le type d'erreur
     // JWT réel (expiré, signature invalide, malformé) — pour savoir avec certitude la prochaine
     // fois, plutôt que de deviner entre un jeton simplement expiré (normal après 7 jours) et un
     // vrai problème de configuration (clé JWT_SECRET incohérente entre deux déploiements).
     console.warn('⚠️ Jeton rejeté — type d\'erreur JWT : ' + e.name + ' (' + e.message + ')');
-    res.status(401).json({ error: 'Token invalide' });
+    return res.status(401).json({ error: 'Token invalide' });
   }
+
+  // ── SÉCURITÉ : UN JETON PEUT ÊTRE RÉVOQUÉ ────────────────────────────────
+  // Un jeton restait valable 7 jours quoi qu'il arrive : après un changement
+  // de mot de passe (compte volé), ou même après la suppression du compte.
+  // On compare désormais sa date d'émission à `jetons_valides_apres`, et on
+  // refuse les comptes supprimés. Lecture mise en cache 60 s par compte.
+  const etat = await etatRevocation(charge.id);
+  if (etat) {
+    if (etat.supprime) {
+      return res.status(401).json({ error: 'Ce compte a été supprimé.' });
+    }
+    if (etat.validesApres && charge.iat && charge.iat < Math.floor(etat.validesApres / 1000)) {
+      return res.status(401).json({ error: 'Votre session a expiré ou n\'est plus valide. Reconnectez-vous pour continuer.' });
+    }
+  }
+  req.user = charge;
+  next();
 };
+
+const CACHE_REVOCATION = new Map();
+async function etatRevocation(userId) {
+  if (!userId) return null;
+  const enCache = CACHE_REVOCATION.get(userId);
+  if (enCache && enCache.expire > Date.now()) return enCache.etat;
+  try {
+    const { data, error } = await supabase.from('users')
+      .select('compte_supprime, jetons_valides_apres').eq('id', userId).maybeSingle();
+    if (error) { console.error('Révocation — lecture impossible :', error.message); return null; }
+    const etat = data ? {
+      supprime: !!data.compte_supprime,
+      validesApres: data.jetons_valides_apres ? new Date(data.jetons_valides_apres).getTime() : 0
+    } : null;
+    if (CACHE_REVOCATION.size > 20000) CACHE_REVOCATION.clear();
+    CACHE_REVOCATION.set(userId, { etat, expire: Date.now() + 60 * 1000 });
+    return etat;
+  } catch (e) {
+    console.error('Révocation — lecture impossible :', e.message);
+    return null;
+  }
+}
+// Invalide immédiatement toutes les sessions ouvertes d'un compte.
+async function revoquerSessions(userId) {
+  CACHE_REVOCATION.delete(userId);
+  await supabase.from('users')
+    .update({ jetons_valides_apres: new Date().toISOString() })
+    .eq('id', userId);
+}
 
 // Authentification admin totalement séparée du système client/pro — pas de rôle "admin" dans la
 // table users (qui aurait demandé d'ouvrir à nouveau la contrainte de vérification sur le type),
@@ -673,7 +815,12 @@ function maintenantEnFrance() {
   return { annee: get('year'), mois: get('month'), jour: get('day'), heure: get('hour'), minute: get('minute') };
 }
 
-function validerCreneauFutur(date, time) {
+function validerCreneauFutur(date, time, obligatoire) {
+  // SÉCURITÉ : une heure en texte libre (« midi ») rendait le créneau
+  // illisible pour le serveur — et toute annulation devenait gratuite, la
+  // demande n'expirait jamais. On exige le format des listes de l'application.
+  if (time && !/^\d{1,2}[h:]\d{2}$/.test(String(time).trim())) return 'Heure invalide.';
+  if (obligatoire && (!date || !time)) return 'Choisissez une date et une heure.';
   if (!date) return null;
   const matchDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!matchDate) return 'Date invalide.';
@@ -1413,6 +1560,25 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
     if (!email || !password || !prenom || !nom)
       return res.status(400).json({ error: 'Tous les champs sont requis.' });
+    // ── SÉCURITÉ : DES NOMS QUI SONT DES NOMS ──────────────────────────────
+    // Le prénom et le nom étaient libres, sans limite. Ils sont affichés à
+    // l'autre partie, dans l'administration et dans les courriels : un « prénom »
+    // contenant du HTML ou du code devenait une arme (hameçonnage depuis
+    // l'adresse de Gleam, script exécuté chez le client ou l'administrateur).
+    const NOM_VALIDE = /^[\p{L}\p{M}][\p{L}\p{M}' .\-’]{0,49}$/u;
+    if (typeof prenom !== 'string' || !NOM_VALIDE.test(prenom.trim())
+        || typeof nom !== 'string' || !NOM_VALIDE.test(nom.trim()))
+      return res.status(400).json({ error: 'Prénom et nom : lettres, espaces, tirets et apostrophes uniquement (50 caractères maximum).' });
+    if (telephone && (typeof telephone !== 'string' || !/^\+?[0-9 ().\-]{6,20}$/.test(telephone.replace(/\s/g, ' ').trim())))
+      return res.status(400).json({ error: 'Numéro de téléphone invalide.' });
+    if (!['client', 'entreprise', 'pro'].includes(type))
+      return res.status(400).json({ error: 'Type de compte invalide.' });
+    if (typeof email !== 'string' || email.length > 254 || typeof password !== 'string' || password.length > 200)
+      return res.status(400).json({ error: 'Adresse email ou mot de passe invalide.' });
+    for (const champ of [raisonSociale, adresseFacturation, assuranceCompagnie, assurancePolice, tvaIntracom]) {
+      if (champ != null && (typeof champ !== 'string' || champ.length > 300 || /[<>]/.test(champ)))
+        return res.status(400).json({ error: 'Un des champs de votre entreprise contient des caractères non autorisés.' });
+    }
     if (password.length < 8)
       return res.status(400).json({ error: 'Mot de passe : 8 caractères minimum.' });
     if (!cguAcceptees)
@@ -1606,7 +1772,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 // paramètres — s'est révélé peu fiable à détecter côté navigateur). Un code à 6 chiffres, envoyé
 // par notre propre système d'email, saisi directement dans l'app : plus simple, plus prévisible,
 // et cohérent avec le code de validation de fin de prestation déjà utilisé ailleurs dans Gleam.
-app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
+app.post('/api/auth/forgot-password', authLimiter, limiteParEmail, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email requis.' });
@@ -1635,7 +1801,7 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
   }
 });
 
-app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+app.post('/api/auth/reset-password', authLimiter, limiteSaisieCode, async (req, res) => {
   try {
     const { email, code, new_password } = req.body;
     if (!email || !code || !new_password) return res.status(400).json({ error: 'Informations manquantes.' });
@@ -1661,28 +1827,41 @@ app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
       });
     }
 
+    // SÉCURITÉ : l'essai est COMPTÉ AVANT la comparaison, en une écriture
+    // atomique. Auparavant le compteur était lu puis écrit plus tard : vingt
+    // requêtes simultanées lisaient toutes « 0 » et étaient toutes évaluées.
+    if (user && user.reset_code) {
+      const essaiAutorise = await consommerTentative('users', user.id, 'reset_tentatives', 5);
+      if (!essaiAutorise) {
+        await supabase.from('users')
+          .update({ reset_code: null, reset_code_expire: null, reset_tentatives: 0 })
+          .eq('id', user.id);
+        return res.status(400).json({
+          error: 'Ce code ne correspond pas. Refaites une demande de « mot de passe oublié ».'
+        });
+      }
+    }
+
     // On compare des EMPREINTES : le code en clair ne se trouve nulle part en
     // base, et le serveur n'a jamais besoin de le connaître.
     const codeCorrect = user && user.reset_code
       && user.reset_code === empreinteCode(code);
 
-    if (user && user.reset_code && !codeCorrect) {
-      // Chaque échec compte. Sans await : un compteur qui échoue ne doit pas
-      // transformer un code faux en erreur serveur.
-      supabase.from('users')
-        .update({ reset_tentatives: (user.reset_tentatives || 0) + 1 })
-        .eq('id', user.id).then(() => {}, () => {});
-    }
-
     if (!codeCorrect)
-      return res.status(400).json({ error: 'Ce code ne correspond pas. Vérifiez les six chiffres auprès du client — ils figurent dans son application.' });
+      return res.status(400).json({ error: 'Ce code ne correspond pas. Vérifiez les six chiffres reçus par email.' });
     if (!user.reset_code_expire || new Date(user.reset_code_expire) < new Date())
       return res.status(400).json({ error: 'Ce code a expiré. Refaites une demande de "mot de passe oublié".' });
 
     const { error: erreurMaj } = await supabase.auth.admin.updateUserById(user.id, { password: new_password });
-    if (erreurMaj) return res.status(400).json({ error: erreurMaj.message });
+    if (erreurMaj) {
+      console.error('Réinitialisation — refus Supabase :', erreurMaj.message);
+      return res.status(400).json({ error: 'Ce mot de passe n\'a pas été accepté. Choisissez-en un autre, plus long ou moins courant.' });
+    }
 
     await supabase.from('users').update({ reset_code: null, reset_code_expire: null, reset_tentatives: 0 }).eq('id', user.id);
+    // Un nouveau mot de passe déconnecte toutes les sessions ouvertes — y
+    // compris celle de la personne qui aurait volé l'ancien.
+    await revoquerSessions(user.id);
 
     res.json({ message: 'Mot de passe mis à jour avec succès !' });
   } catch (e) {
@@ -1711,6 +1890,17 @@ app.get('/api/push/vapid-public-key', (req, res) => {
 
 // Enregistre un nouvel abonnement aux notifications (un par appareil/navigateur) — remplace
 // silencieusement un abonnement existant avec le même endpoint plutôt que d'en créer un doublon.
+function pushEndpointAutorise(endpoint) {
+  let u;
+  try { u = new URL(String(endpoint)); } catch (e) { return false; }
+  if (u.protocol !== 'https:' || u.port) return false;
+  const h = u.hostname.toLowerCase();
+  return h === 'fcm.googleapis.com' || h === 'android.googleapis.com'
+      || h === 'updates.push.services.mozilla.com'
+      || h === 'web.push.apple.com' || h.endsWith('.push.apple.com')
+      || h.endsWith('.notify.windows.com');
+}
+
 app.post('/api/push/subscribe', auth, async (req, res) => {
   try {
     const { endpoint, keys, plateforme, jeton_natif } = req.body;
@@ -1730,6 +1920,11 @@ app.post('/api/push/subscribe', auth, async (req, res) => {
     }
 
     if (!endpoint || !keys || !keys.p256dh || !keys.auth) return res.status(400).json({ error: 'Abonnement invalide.' });
+    // ── SÉCURITÉ : LE SERVEUR N'ÉCRIT QU'AUX SERVICES DE NOTIFICATION ───────
+    // L'adresse était libre : le serveur envoyait ensuite des requêtes à
+    // n'importe quelle URL fournie — y compris des adresses internes (SSRF).
+    if (!pushEndpointAutorise(endpoint) || String(keys.p256dh).length > 200 || String(keys.auth).length > 100)
+      return res.status(400).json({ error: 'Abonnement invalide.' });
     await supabase.from('push_subscriptions').upsert({
       user_id: req.user.id, plateforme: 'web', endpoint, keys_p256dh: keys.p256dh, keys_auth: keys.auth
     }, { onConflict: 'endpoint' });
@@ -1801,20 +1996,26 @@ app.post('/api/client/adresse-memorisee', auth, async (req, res) => {
 // Vérifie le code de confirmation d'email — n'importe qui de connecté peut confirmer son propre
 // compte, à tout moment (pas de blocage d'accès en attendant, conformément aux bonnes pratiques
 // actuelles : la vérification email se fait en tâche de fond, jamais en barrage à l'entrée).
-app.post('/api/auth/verifier-email', auth, async (req, res) => {
+app.post('/api/auth/verifier-email', auth, limiteParCompte, async (req, res) => {
   try {
-    const code = (req.body.code || '').trim();
-    if (!code) return res.status(400).json({ error: 'Saisissez le code de validation que le client vous a communiqué à la fin de la prestation.' });
+    const code = String(req.body.code || '').trim();
+    if (!code) return res.status(400).json({ error: 'Saisissez le code à six chiffres reçu par email.' });
 
     const { data: moi } = await supabase.from('users').select('email_verifie, email_verif_code, email_verif_expire').eq('id', req.user.id).single();
     if (!moi) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
     if (moi.email_verifie) return res.json({ message: 'Votre email est déjà confirmé.' });
+    // SÉCURITÉ : cinq essais par code. Sans plafond, un million de
+    // combinaisons se parcouraient en une journée avec quelques adresses IP —
+    // et la vérification d'email est ce qui autorise le paiement.
+    if (!(await consommerTentative('users', req.user.id, 'verif_tentatives', 5))) {
+      return res.status(429).json({ error: 'Trop d\'essais avec ce code. Demandez-en un nouveau.' });
+    }
     if (!moi.email_verif_code || moi.email_verif_code !== code)
-      return res.status(400).json({ error: 'Ce code ne correspond pas. Vérifiez les six chiffres auprès du client — ils figurent dans son application.' });
+      return res.status(400).json({ error: 'Ce code ne correspond pas. Vérifiez les six chiffres reçus par email.' });
     if (moi.email_verif_expire && new Date(moi.email_verif_expire) < new Date())
       return res.status(400).json({ error: 'Ce code a expiré, demandez-en un nouveau.' });
 
-    await supabase.from('users').update({ email_verifie: true, email_verif_code: null }).eq('id', req.user.id);
+    await supabase.from('users').update({ email_verifie: true, email_verif_code: null, verif_tentatives: 0 }).eq('id', req.user.id);
     res.json({ message: 'Email confirmé, merci !' });
   } catch (e) {
     erreurServeur(res, 'POST /api/auth/verifier-email', e);
@@ -1822,7 +2023,7 @@ app.post('/api/auth/verifier-email', auth, async (req, res) => {
 });
 
 // Renvoie un nouveau code si l'ancien a expiré ou n'a jamais été reçu
-app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
+app.post('/api/auth/renvoyer-code-verification', auth, limiteParCompte, async (req, res) => {
   try {
     const { data: moi } = await supabase.from('users').select('email, prenom, email_verifie').eq('id', req.user.id).single();
     if (!moi) return res.status(404).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
@@ -1830,7 +2031,7 @@ app.post('/api/auth/renvoyer-code-verification', auth, async (req, res) => {
 
     const nouveauCode = codeSecret6();
     const nouvelleExpiration = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    await supabase.from('users').update({ email_verif_code: nouveauCode, email_verif_expire: nouvelleExpiration }).eq('id', req.user.id);
+    await supabase.from('users').update({ email_verif_code: nouveauCode, email_verif_expire: nouvelleExpiration, verif_tentatives: 0 }).eq('id', req.user.id);
     sendEmail('verification_email', moi.email, { compteId: moi.id, prenom: moi.prenom, code: nouveauCode });
     res.json({ message: 'Un nouveau code vous a été envoyé par email.' });
   } catch (e) {
@@ -1870,6 +2071,22 @@ async function signerPhotosDeLot(personnes) {
   return personnes;
 }
 
+// ── SÉCURITÉ : UNE IMAGE EST VÉRIFIÉE DE BOUT EN BOUT ─────────────────────
+// Seul le DÉBUT de la chaîne était contrôlé. Une valeur comme
+// « data:image/png;base64,x⏎" onerror="… » passait le contrôle, n'était pas
+// reconnue au téléversement… et était enregistrée TELLE QUELLE, puis insérée
+// dans une balise <img> chez l'autre partie : du code exécuté dans son
+// navigateur. On exige désormais une chaîne base64 complète, sans rien après,
+// et un contenu qui commence réellement comme une image.
+const IMAGE_DATA_URL = /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
+function signatureImageValide(tampon) {
+  if (!tampon || tampon.length < 12) return false;
+  const jpeg = tampon[0] === 0xFF && tampon[1] === 0xD8 && tampon[2] === 0xFF;
+  const png  = tampon[0] === 0x89 && tampon[1] === 0x50 && tampon[2] === 0x4E && tampon[3] === 0x47;
+  const webp = tampon.toString('ascii', 0, 4) === 'RIFF' && tampon.toString('ascii', 8, 12) === 'WEBP';
+  return jpeg || png || webp;
+}
+
 // Reconnaît une ancienne valeur base64, pour continuer à la servir telle quelle.
 function estPhotoBase64(v) {
   return typeof v === 'string' && v.startsWith('data:image/');
@@ -1897,7 +2114,7 @@ async function lienPhotoProfil(valeur) {
 app.patch('/api/users/photo', auth, async (req, res) => {
   try {
     const { photo } = req.body;
-    const format = /^data:image\/(jpeg|jpg|png|webp);base64,/.exec(photo || '');
+    const format = IMAGE_DATA_URL.exec(photo || '');
     if (!photo || typeof photo !== 'string' || !format) {
       return res.status(400).json({ error: 'Format d\'image non supporté (JPEG, PNG ou WEBP uniquement).' });
     }
@@ -1909,7 +2126,7 @@ app.patch('/api/users/photo', auth, async (req, res) => {
 
     const extension = format[1] === 'jpg' ? 'jpeg' : format[1];
     const binaire = Buffer.from(photo.split(',')[1] || '', 'base64');
-    if (!binaire.length) return res.status(400).json({ error: 'Image illisible.' });
+    if (!binaire.length || !signatureImageValide(binaire)) return res.status(400).json({ error: 'Image illisible.' });
 
     // Le nom porte un horodatage : sans lui, le navigateur garderait l'ancienne
     // image en cache et le changement de photo paraîtrait sans effet.
@@ -2078,6 +2295,7 @@ app.post('/api/users/me/supprimer', auth, async (req, res) => {
 
     // Révoque l'accès de connexion (best-effort : n'empêche pas la suppression si ça échoue)
     try { await supabase.auth.admin.deleteUser(req.user.id); } catch (e) { console.error('Suppression auth:', e); }
+    CACHE_REVOCATION.delete(req.user.id);
 
     res.json({ message: 'Compte supprimé.' });
   } catch (e) {
@@ -2169,12 +2387,31 @@ function instantDuCreneau(texte) {
   return d ? d.getTime() : null;
 }
 
+// ── SÉCURITÉ : LE TYPE DE PRESTATION EST UNE CLÉ CONNUE ───────────────────
+// Le type était du texte libre, repris ensuite dans l'écran des prestataires.
+// Une valeur piégée devenait du code exécuté chez tous les pros du secteur.
+function prestationsInvalides(liste) {
+  if (!Array.isArray(liste)) return null;
+  if (liste.length > 20) return 'Trop de prestations dans une même demande.';
+  for (const p of liste) {
+    if (!p || typeof p !== 'object') return 'Prestation invalide.';
+    if (!Object.prototype.hasOwnProperty.call(PRESTATION_CONFIG, p.type || 'autre')) return 'Type de prestation inconnu.';
+    if (p.description != null && String(p.description).length > 2000) return 'Description trop longue (2 000 caractères maximum).';
+    if (p.details != null && JSON.stringify(p.details).length > 5000) return 'Détails de la prestation trop longs.';
+  }
+  return null;
+}
+
 app.post('/api/demandes', auth, async (req, res) => {
   try {
     const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id, latitude, longitude, recurrence } = req.body;
     if (!address) return res.status(400).json({ error: 'Indiquez l\'adresse où doit avoir lieu la prestation.' });
+    if (String(address).length > 300) return res.status(400).json({ error: 'Adresse trop longue.' });
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
+    const erreurPrestations = prestationsInvalides(prestations)
+      || (type && !Object.prototype.hasOwnProperty.call(PRESTATION_CONFIG, type) ? 'Type de prestation inconnu.' : null);
+    if (erreurPrestations) return res.status(400).json({ error: erreurPrestations });
     // La récurrence ne nécessite plus un favori précis : sans favori choisi, la prochaine
     // Le délai entre deux occurrences est maintenant un nombre de jours librement choisi par le
     // client (7, 14, 30, 90...), plutôt que 3 fréquences fixes qui ne convenaient pas à toutes
@@ -2204,7 +2441,7 @@ app.post('/api/demandes', auth, async (req, res) => {
         });
       }
       for (const p of photos) {
-        if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
+        if (typeof p !== 'string' || !IMAGE_DATA_URL.test(p)) {
           return res.status(400).json({ error: 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).' });
         }
         // ── UNE LIMITE EN OCTETS, PAS EN CARACTÈRES ────────────────────────
@@ -2773,6 +3010,15 @@ async function televerserDocument(base64, proId, type) {
   if (contenu.length > 8 * 1024 * 1024)
     return { erreur: 'Fichier trop lourd (8 Mo maximum).' };
 
+  // SÉCURITÉ : le type annoncé par le navigateur ne prouve rien. On vérifie
+  // que le contenu commence réellement comme le format annoncé.
+  const contenuConforme = typeMime === 'application/pdf'
+    ? contenu.toString('ascii', 0, 5) === '%PDF-'
+    : (typeMime === 'image/heic' || typeMime === 'image/heif')
+      ? contenu.toString('ascii', 4, 8) === 'ftyp'
+      : signatureImageValide(contenu);
+  if (!contenuConforme) return { erreur: 'Ce fichier ne semble pas être une photo ou un PDF valide.' };
+
   // Un dossier par prestataire, un sous-dossier par type : le dépôt reste
   // navigable à la main depuis Supabase si vous devez chercher quelque chose.
   const chemin = proId + '/' + type + '/' + crypto.randomUUID() + '.' + extensions[typeMime];
@@ -2799,8 +3045,11 @@ async function signerDocument(chemin) {
 
 async function televerserPhoto(base64, dossier) {
   try {
-    const m = /^data:(image\/(?:jpeg|jpg|png|webp));base64,(.+)$/.exec(base64 || '');
-    if (!m) return base64;
+    const m = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+\/]+={0,2})$/.exec(base64 || '');
+    // SÉCURITÉ : une valeur qui n'est pas une image valide n'est JAMAIS
+    // conservée telle quelle (c'était le cas auparavant).
+    if (!m) return null;
+    if (!signatureImageValide(Buffer.from(m[2].slice(0, 32), 'base64'))) return null;
 
     const typeMime = m[1] === 'image/jpg' ? 'image/jpeg' : m[1];
     const extension = typeMime === 'image/png' ? 'png' : typeMime === 'image/webp' ? 'webp' : 'jpg';
@@ -2824,7 +3073,11 @@ async function televerserPhotos(liste, dossier) {
   if (!Array.isArray(liste) || !liste.length) return [];
   const resultats = [];
   for (const photo of liste) {
-    resultats.push(estBase64(photo) ? await televerserPhoto(photo, dossier) : photo);
+    // Seuls deux cas sont acceptés : une image base64 valide (téléversée), ou
+    // un chemin du dépôt déjà existant. Toute autre valeur est écartée.
+    const r = estBase64(photo) ? await televerserPhoto(photo, dossier)
+            : (estCheminDepot(photo) && /^[\w\-\/.]+$/.test(photo) && photo.indexOf('..') === -1 ? photo : null);
+    if (r) resultats.push(r);
   }
   return resultats;
 }
@@ -3208,6 +3461,29 @@ async function traiterEcheancesPaiement() {
         continue;
       }
 
+      // Une intention encore ouverte chez Stripe : payée mais pas encore
+      // confirmée (webhook en retard) → on confirme ; en cours de traitement
+      // → on attend le prochain passage ; sinon on l'annule, pour qu'elle ne
+      // puisse plus aboutir sur un devis qui n'est plus réservé.
+      const { data: ouvertes } = await supabase.from('paiements')
+        .select('stripe_payment_intent_id').eq('devis_id', d.id).eq('statut', 'en_attente');
+      let attendre = false;
+      for (const o of (ouvertes || [])) {
+        if (!o.stripe_payment_intent_id) continue;
+        try {
+          const pi = await stripe.paymentIntents.retrieve(o.stripe_payment_intent_id);
+          if (pi.status === 'succeeded') { await finaliserConfirmationPaiement(pi.id); attendre = true; }
+          else if (pi.status === 'processing') attendre = true;
+          else {
+            if (pi.status !== 'canceled') await stripe.paymentIntents.cancel(pi.id).catch(() => {});
+            // Tentative morte : on retire sa ligne pour ne pas encombrer la suite.
+            await supabase.from('paiements').delete()
+              .eq('stripe_payment_intent_id', pi.id).eq('statut', 'en_attente');
+          }
+        } catch (e) { attendre = true; }
+      }
+      if (attendre) continue;
+
       await supabase.from('devis')
         .update({ statut: 'envoye', paiement_avant: null,
                   rappel_paiement_envoye_le: null })
@@ -3567,7 +3843,7 @@ async function reprendreVirementsEchoues() {
         .select('statut').eq('id', p.demande_id).maybeSingle();
       if (!demande || demande.statut !== 'terminee') continue;
 
-      const resultat = await finaliserPrestation(p.demande_id);
+      const resultat = await verserAuPrestataire(p.id);
       if (resultat && !resultat.erreur) {
         // Le virement a abouti : on efface la trace de l'échec, sinon le
         // paiement reviendrait à chaque passage.
@@ -4110,10 +4386,9 @@ app.get('/api/demandes/all', auth, async (req, res) => {
         || d.dans_zone);
     }
 
-    res.json(await signerPhotosDesDemandes(filtered));
+    res.json(await signerPhotosDesDemandes(filtered.map(masquerAdresseDemande)));
   } catch (e) {
-    console.error('Erreur /api/demandes/all:', e);
-    res.status(500).json({ error: 'Erreur serveur: ' + e.message });
+    erreurServeur(res, 'GET /api/demandes/all', e);
   }
 });
 
@@ -4345,12 +4620,44 @@ app.post('/api/pro/zone-intervention', auth, async (req, res) => {
   }
 });
 
+// ── CONFIDENTIALITÉ : L'ADRESSE EXACTE APRÈS LE PAIEMENT ──────────────────
+// Tout prestataire du secteur voyait l'adresse complète et la position exacte
+// du domicile de chaque client — avant même d'avoir envoyé un devis. On ne
+// montre désormais que la commune et une position arrondie (~1 km), assez pour
+// juger du trajet. L'adresse exacte apparaît une fois la prestation payée.
+function adresseApproximative(adresse) {
+  const texte = String(adresse || '').trim();
+  if (!texte) return texte;
+  const morceaux = texte.split(',').map(x => x.trim()).filter(Boolean);
+  if (morceaux.length > 1) return morceaux[morceaux.length - 1];
+  const cp = /\b\d{5}\s+.+$/.exec(texte);
+  return cp ? cp[0] : 'Adresse communiquée après le paiement';
+}
+function masquerAdresseDemande(d) {
+  if (!d) return d;
+  const r = { ...d, adresse: adresseApproximative(d.adresse), adresse_masquee: true };
+  if (typeof r.latitude === 'number') r.latitude = Math.round(r.latitude * 100) / 100;
+  if (typeof r.longitude === 'number') r.longitude = Math.round(r.longitude * 100) / 100;
+  return r;
+}
+const STATUTS_PAIEMENT_REGLE = ['paye', 'libere', 'liberation_en_cours', 'bloque', 'remboursement_en_cours'];
+
 app.get('/api/demandes/:id', auth, async (req, res) => {
   const { data } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
   if (!data) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
   if (data.client_id === req.user.id) return res.json((await signerPhotosDesDemandes([data]))[0]);
-  const { data: monDevis } = await supabase.from('devis').select('id').eq('demande_id', req.params.id).eq('societe_id', req.user.id).maybeSingle();
-  if (monDevis) return res.json((await signerPhotosDesDemandes([data]))[0]);
+  const { data: mesDevis } = await supabase.from('devis').select('id, statut').eq('demande_id', req.params.id).eq('societe_id', req.user.id);
+  if (mesDevis && mesDevis.length) {
+    let regle = false;
+    if (mesDevis.some(d => d.statut === 'accepte')) {
+      const { data: p } = await supabase.from('paiements').select('id')
+        .eq('demande_id', req.params.id).eq('societe_id', req.user.id)
+        .in('statut', STATUTS_PAIEMENT_REGLE).limit(1);
+      regle = !!(p && p.length);
+    }
+    const vue = regle ? data : masquerAdresseDemande(data);
+    return res.json((await signerPhotosDesDemandes([vue]))[0]);
+  }
   return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 });
 
@@ -4365,8 +4672,11 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
 
     const { prestations, address, date, time, flexibility } = req.body;
     if (!address) return res.status(400).json({ error: 'Indiquez l\'adresse où doit avoir lieu la prestation.' });
+    if (String(address).length > 300) return res.status(400).json({ error: 'Adresse trop longue.' });
     const erreurCreneau = validerCreneauFutur(date, time);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
+    const erreurPrestations = prestationsInvalides(prestations);
+    if (erreurPrestations) return res.status(400).json({ error: erreurPrestations });
 
     const creneau = date && time ? date + ' à ' + time : demande.creneau;
     const listePrestations = prestations && Array.isArray(prestations) && prestations.length ? prestations : null;
@@ -4480,7 +4790,7 @@ app.post('/api/demandes/:id/relancer-recurrente', auth, async (req, res) => {
 app.post('/api/demandes/:id/proposer-creneau', auth, async (req, res) => {
   try {
     const { date, time } = req.body;
-    const erreurCreneau = validerCreneauFutur(date, time);
+    const erreurCreneau = validerCreneauFutur(date, time, true);
     if (erreurCreneau) return res.status(400).json({ error: erreurCreneau });
 
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', req.params.id).single();
@@ -4632,7 +4942,10 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
 //     comme si la prestation avait eu lieu normalement)
 // Si `heuresRestantes` n'est pas fourni (annulation à l'initiative du PRO), remboursement toujours
 // intégral — ce n'est jamais au client de payer les frais d'une annulation qu'il n'a pas décidée.
-async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
+async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
+  // `options.arbitrage` : décision de l'administrateur après examen du litige.
+  // Elle tranche — la suspension « en attente d'arbitrage » ne s'applique plus.
+  const arbitrage = !!(options && options.arbitrage);
   const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demandeId).eq('statut', 'paye').maybeSingle();
   if (!paiement) return { rembourse: false };
 
@@ -4713,6 +5026,8 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
     remboursementSuspendu = preuves.length > 0 || aRepondu || fenetreOuverte;
   }
 
+  if (arbitrage) remboursementSuspendu = false;
+
   if (remboursementSuspendu) {
     return {
       rembourse: false,
@@ -4747,13 +5062,25 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
     // sa part complète tout en laissant le client remboursé, ce qui ferait dépasser le total
     // redistribué par rapport à ce qui a été réellement payé (exactement le bug identifié).
     // Il faut donc explicitement demander la reprise proportionnelle des deux côtés.
+    //
+    // ── SÉCURITÉ : LA REPRISE EST DEMANDÉE AUSSI POUR UN REMBOURSEMENT TOTAL ──
+    // Auparavant, `reverse_transfer` n'était passé que pour un remboursement
+    // partiel. Un remboursement à 100 % rendait donc tout au client… sur les
+    // fonds de Gleam, le prestataire gardant ses 85 %. Un pro et un faux client
+    // de connivence pouvaient payer, annuler, et recommencer.
     const paramsRemboursement = { payment_intent: paiement.stripe_payment_intent_id };
+    // Seulement pour un paiement réparti au pro (destination charge) : un
+    // paiement resté chez Gleam n'a ni transfert ni commission à reprendre.
+    if (paiement.transfert_automatique || paiement.stripe_transfer_id) {
+      paramsRemboursement.reverse_transfer = true;        // reprend (au prorata) la part du pro
+      paramsRemboursement.refund_application_fee = true;  // reprend (au prorata) la commission Gleam
+    }
     if (pourcentage < 1) {
       paramsRemboursement.amount = Math.round(paiement.montant_ttc * pourcentage * 100);
-      paramsRemboursement.reverse_transfer = true; // reprend au prorata sur la part du pro
-      paramsRemboursement.refund_application_fee = true; // reprend au prorata sur la commission Gleam
     }
-    await stripe.refunds.create(paramsRemboursement);
+    await stripe.refunds.create(paramsRemboursement, {
+      idempotencyKey: 'rembourser-' + paiement.id + '-' + Math.round(pourcentage * 100) + '-' + (paiement.montant_rembourse || 0)
+    });
     const montantEffectivementRembourse = Math.round(paiement.montant_ttc * pourcentage * 100) / 100;
 
     // Plutôt que de recalculer à la main ce que le pro garde réellement (la mécanique interne de
@@ -4761,8 +5088,9 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes) {
     // le montant brut transféré n'est pas ce qu'on pensait), on va lire directement chez Stripe le
     // vrai montant final, une fois la reprise effectuée. Ça élimine tout risque de mauvais calcul
     // de notre côté : on rapporte fidèlement ce que Stripe confirme, jamais une estimation.
-    let montantProCorrige = paiement.montant_societe;
-    if (pourcentage < 1 && paiement.stripe_transfer_id) {
+    // Remboursement total : la part du pro est intégralement reprise.
+    let montantProCorrige = pourcentage >= 1 ? 0 : paiement.montant_societe;
+    if (paiement.stripe_transfer_id) {
       try {
         const transfert = await stripe.transfers.retrieve(paiement.stripe_transfer_id);
         const montantTransfereNet = (transfert.amount - transfert.amount_reversed) / 100;
@@ -4992,9 +5320,29 @@ app.delete('/api/demandes/:id', auth, async (req, res) => {
     if (demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Cette demande est déjà annulée.' });
 
+    // ── SÉCURITÉ : ON NE DÉTRUIT JAMAIS UNE TRACE DE PAIEMENT ──────────────
+    // Une demande revenue « en attente » après un remboursement (ou une
+    // échéance dépassée) pouvait être supprimée — avec ses paiements, factures
+    // et avoirs numérotés. Des pièces comptables disparaissaient, et même un
+    // paiement encore détenu par Gleam.
+    const { data: paiementsDemande } = await supabase.from('paiements')
+      .select('id, statut, stripe_payment_intent_id').eq('demande_id', req.params.id);
+    const paiementsReels = (paiementsDemande || []).filter(p => p.statut !== 'en_attente');
+    if (paiementsReels.length) {
+      return res.status(409).json({
+        error: 'Cette demande a un historique de paiement : elle ne peut pas être supprimée. '
+             + 'Vous pouvez l\'archiver pour la retirer de votre liste.'
+      });
+    }
+    for (const p of (paiementsDemande || [])) {
+      if (p.stripe_payment_intent_id) {
+        await stripe.paymentIntents.cancel(p.stripe_payment_intent_id).catch(() => {});
+      }
+    }
+
     await supabase.from('devis').delete().eq('demande_id', req.params.id);
     await supabase.from('messages').delete().eq('demande_id', req.params.id);
-    await supabase.from('paiements').delete().eq('demande_id', req.params.id);
+    await supabase.from('paiements').delete().eq('demande_id', req.params.id).eq('statut', 'en_attente');
     await supabase.from('evaluations').delete().eq('demande_id', req.params.id);
     const { error } = await supabase.from('demandes').delete().eq('id', req.params.id);
     if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
@@ -5068,7 +5416,11 @@ async function prestataireEnRegle(proId) {
   const manques = [];
 
   const { data: pro } = await supabase.from('users')
-    .select('stripe_account_id').eq('id', proId).single();
+    .select('stripe_account_id, suspendu').eq('id', proId).single();
+
+  if (pro && pro.suspendu) {
+    manques.push('Votre compte est suspendu. Contactez le support Gleam pour le réactiver.');
+  }
 
   if (!pro || !pro.stripe_account_id) {
     manques.push('Configurez vos paiements depuis votre profil pour pouvoir être réglé.');
@@ -5209,6 +5561,20 @@ app.post('/api/devis', auth, async (req, res) => {
     if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
     if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Cette demande n\'est plus disponible.' });
+
+    // ── SÉCURITÉ : LES MÊMES RÈGLES QUE LA LISTE DES DEMANDES ──────────────
+    // La liste masquait ces demandes, mais la route d'envoi ne vérifiait
+    // rien : un compte pro pouvait chiffrer sa propre demande (gonfler ses
+    // prestations et ses badges), ou passer outre l'exclusivité du favori.
+    if (!auteur || !isProType(auteur.type))
+      return res.status(403).json({ error: 'Seuls les comptes prestataires peuvent envoyer un devis.' });
+    if (demande.client_id === req.user.id)
+      return res.status(403).json({ error: 'Vous ne pouvez pas répondre à votre propre demande.' });
+    if (demande.pro_prefere_id && demande.pro_prefere_id !== req.user.id
+        && !(demande.exclusivite_jusqu_a && new Date(demande.exclusivite_jusqu_a).getTime() <= Date.now()))
+      return res.status(403).json({ error: 'Cette demande est réservée pour l\'instant au prestataire choisi par le client.' });
+    if (description != null && String(description).length > 2000)
+      return res.status(400).json({ error: 'Message trop long (2 000 caractères maximum).' });
 
     // Ne bloque que si un devis encore ACTIF existe déjà pour ce pro sur cette demande — un devis
     // qu'il a lui-même annulé, ou que le client a refusé, ne doit jamais l'empêcher de renvoyer
@@ -5401,7 +5767,11 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
           .select('demande_id, statut').in('demande_id', demandeIds)
       : { data: [] };
     const paiementParDemande = {};
-    (paiementsDevis || []).forEach(p => { paiementParDemande[p.demande_id] = p.statut; });
+    (paiementsDevis || []).forEach(p => {
+      // Un paiement réglé l'emporte sur une tentative restée « en attente ».
+      const actuel = paiementParDemande[p.demande_id];
+      if (!actuel || actuel === 'en_attente') paiementParDemande[p.demande_id] = p.statut;
+    });
 
     const demandeMap = {};
     (demandes || []).forEach(d => demandeMap[d.id] = d);
@@ -5417,7 +5787,10 @@ app.get('/api/devis/mes-devis', auth, async (req, res) => {
         photos_apres: demandeInfo.photos_apres ? JSON.parse(demandeInfo.photos_apres) : [],
         prestation_demarree: Boolean(demandeInfo.prestation_demarree_le)
       } : null;
-      return { ...d, demande: demandeAvecPhotos, statut_paiement: statutPaiement };
+      // Adresse exacte seulement pour un devis accepté ET payé.
+      const adresseVisible = d.statut === 'accepte' && STATUTS_PAIEMENT_REGLE.includes(statutPaiement);
+      return { ...d, demande: adresseVisible ? demandeAvecPhotos : masquerAdresseDemande(demandeAvecPhotos),
+               statut_paiement: statutPaiement };
     });
     // Ici les photos sont portées par l'objet `demande` imbriqué dans chaque devis.
     await signerPhotosDesDemandes(enriched.map(d => d.demande).filter(Boolean));
@@ -5435,6 +5808,12 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
     if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
     if (demande.statut === 'acceptee') return res.status(400).json({ error: 'Une demande a déjà été acceptée pour cette prestation.' });
+
+    // SÉCURITÉ : seul un devis en attente de réponse peut être accepté. Un
+    // devis retiré par le prestataire, refusé ou expiré ne se « ressuscite » pas.
+    if (devis.statut !== 'envoye') {
+      return res.status(409).json({ error: 'Ce devis n\'est plus disponible. Il a peut-être été retiré par le prestataire.' });
+    }
 
     // La demande est réservée par écriture conditionnelle. Le contrôle ci-dessus
     // ne suffisait pas : entre lui et l'écriture, une seconde requête — double-tap
@@ -5473,9 +5852,15 @@ app.post('/api/devis/:id/accepter', auth, async (req, res) => {
       finEcheance = Math.max(instantCreneauDevis, Date.now() + 5 * 60 * 1000);
     }
     const echeance = new Date(finEcheance).toISOString();
-    await supabase.from('devis')
+    const { data: devisAcceptes } = await supabase.from('devis')
       .update({ statut: 'accepte', paiement_avant: echeance })
-      .eq('id', req.params.id);
+      .eq('id', req.params.id).eq('statut', 'envoye').select('id');
+    if (!devisAcceptes || !devisAcceptes.length) {
+      // Le prestataire l'a retiré entre-temps : la demande redevient ouverte.
+      await supabase.from('demandes').update({ statut: 'devis_recus' })
+        .eq('id', devis.demande_id).eq('statut', 'acceptee');
+      return res.status(409).json({ error: 'Ce devis n\'est plus disponible. Il a peut-être été retiré par le prestataire.' });
+    }
 
     // ── LES AUTRES DEVIS NE SONT PAS ENCORE REFUSÉS ───────────────────────
     // Ils l'étaient immédiatement. Si le client ne payait pas, il perdait
@@ -5507,7 +5892,48 @@ app.post('/api/devis/:id/refuser', auth, async (req, res) => {
     const { data: demande } = await supabase.from('demandes').select('*').eq('id', devis.demande_id).single();
     if (!demande || demande.client_id !== req.user.id) return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément. Il appartient peut-être à un autre compte — vérifiez que vous êtes connecté avec le bon.' });
 
-    await supabase.from('devis').update({ statut: 'refuse' }).eq('id', req.params.id);
+    // ── SÉCURITÉ : UN DEVIS PAYÉ NE SE REFUSE PAS ─────────────────────────
+    // Le refus ne regardait pas l'état du devis. Un client pouvait payer, puis
+    // « refuser » le devis : le prestataire perdait l'accès à la prestation
+    // (arrivée, messages, contestation) et le client se faisait ensuite
+    // rembourser en totalité, prestation faite. Après paiement, c'est
+    // l'annulation — avec ses règles — qui s'applique.
+    if (!['envoye', 'accepte'].includes(devis.statut)) {
+      return res.status(409).json({ error: 'Ce devis ne peut plus être refusé.' });
+    }
+    if (devis.statut === 'accepte') {
+      const { data: regle } = await supabase.from('paiements')
+        .select('id').eq('devis_id', devis.id)
+        .in('statut', ['paye', 'libere', 'liberation_en_cours', 'bloque', 'remboursement_en_cours'])
+        .limit(1);
+      if (regle && regle.length) {
+        return res.status(409).json({ error: 'Ce devis est déjà payé. Pour renoncer à la prestation, utilisez « Annuler la prestation ».' });
+      }
+    }
+
+    const { data: refuses } = await supabase.from('devis')
+      .update({ statut: 'refuse', paiement_avant: null })
+      .eq('id', req.params.id).eq('statut', devis.statut).select('id');
+    if (!refuses || !refuses.length) {
+      return res.status(409).json({ error: 'Ce devis vient de changer d\'état. Rechargez la page.' });
+    }
+    // Un devis accepté mais non payé : la demande redevient ouverte aux autres devis,
+    // et l'intention de paiement ouverte est annulée pour ne plus pouvoir aboutir.
+    if (devis.statut === 'accepte') {
+      await supabase.from('demandes').update({ statut: 'devis_recus' })
+        .eq('id', devis.demande_id).eq('statut', 'acceptee');
+      const { data: ouvertes } = await supabase.from('paiements')
+        .select('stripe_payment_intent_id').eq('devis_id', devis.id).eq('statut', 'en_attente');
+      for (const o of (ouvertes || [])) {
+        if (o.stripe_payment_intent_id) {
+          const annulee = await stripe.paymentIntents.cancel(o.stripe_payment_intent_id).then(() => true, () => false);
+          if (annulee) {
+            await supabase.from('paiements').delete()
+              .eq('stripe_payment_intent_id', o.stripe_payment_intent_id).eq('statut', 'en_attente');
+          }
+        }
+      }
+    }
 
     // 📧 Email "devis refusé" désactivé pour l'instant (peu actionnable, peut être mal vécu par les pros).
     // Pour le réactiver, décommentez le bloc ci-dessous :
@@ -5586,7 +6012,7 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     const suspendu = nouveauTaux <= 40;
 
     const misAJourPro = { taux_fiabilite: nouveauTaux, nombre_annulations_pro: nombreAnnulations };
-    if (suspendu) misAJourPro.disponible = false;
+    if (suspendu) { misAJourPro.disponible = false; misAJourPro.suspendu = true; }
     await supabase.from('users').update(misAJourPro).eq('id', req.user.id);
 
     if (suspendu && proActuel) {
@@ -5990,7 +6416,9 @@ function contientNumeroReconstitue(texte) {
 app.post('/api/messages', auth, async (req, res) => {
   try {
     const { demande_id, contenu } = req.body;
-    if (!demande_id || !contenu || !contenu.trim())
+    if (typeof contenu === 'string' && contenu.length > 4000)
+      return res.status(400).json({ error: 'Message trop long (4 000 caractères maximum).' });
+    if (!demande_id || !contenu || typeof contenu !== 'string' || !contenu.trim())
       return res.status(400).json({ error: 'Message vide.' });
 
     // Vérifie non seulement CE message, mais aussi les derniers messages envoyés par la même
@@ -6270,6 +6698,11 @@ app.patch('/api/entreprises/facturation', auth, async (req, res) => {
 
     if (!Object.keys(misAJour).length)
       return res.status(400).json({ error: 'Aucune modification à enregistrer : les champs sont identiques aux valeurs actuelles.' });
+    // SÉCURITÉ : mêmes règles qu'à l'inscription pour les champs d'entreprise.
+    for (const v of Object.values(misAJour)) {
+      if (typeof v === 'string' && (v.length > 300 || /[<>]/.test(v)))
+        return res.status(400).json({ error: 'Un des champs contient des caractères non autorisés (< ou >) ou est trop long.' });
+    }
 
     const { error } = await supabase.from('users').update(misAJour).eq('id', req.user.id);
     if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
@@ -6314,16 +6747,35 @@ app.post('/api/paiements/intent', auth, exigerEmailVerifie, async (req, res) => 
     //
     // L'ordre est le seul correctif : contrôler d'abord, lire ensuite.
     const { data: devisCible } = await supabase.from('devis')
-      .select('id, demande_id, prix_ttc, societe_id, statut')
+      .select('id, demande_id, prix_ttc, societe_id, statut, paiement_avant')
       .eq('id', devis_id).maybeSingle();
     if (!devisCible) return res.status(404).json({ error: 'Ce devis n\'existe plus.' });
 
     const { data: demandeCible } = await supabase.from('demandes')
-      .select('id, client_id').eq('id', devisCible.demande_id).maybeSingle();
+      .select('id, client_id, statut').eq('id', devisCible.demande_id).maybeSingle();
     if (!demandeCible) return res.status(404).json({ error: 'Cette demande n\'existe plus.' });
 
     if (demandeCible.client_id !== req.user.id) {
       return res.status(403).json({ error: 'Vous n\'avez pas accès à cet élément.' });
+    }
+
+    // ── SÉCURITÉ : ON NE PAIE QU'UN DEVIS ACCEPTÉ, DANS LE DÉLAI, UNE FOIS ──
+    // Rien ne vérifiait l'état du devis. On pouvait payer un devis encore
+    // « envoyé », déjà refusé, ou dont le délai de trente minutes était
+    // dépassé — et payer deux devis d'une même demande. Deux lignes « payé »
+    // sur une demande bloquaient ensuite remboursements et versements.
+    if (devisCible.statut !== 'accepte' || demandeCible.statut !== 'acceptee') {
+      return res.status(409).json({ error: 'Ce devis n\'est pas (ou plus) accepté. Acceptez-le avant de payer.' });
+    }
+    if (devisCible.paiement_avant && new Date(devisCible.paiement_avant).getTime() < Date.now()) {
+      return res.status(409).json({ error: 'Le délai de paiement de ce devis est dépassé. Acceptez-le de nouveau pour réserver.' });
+    }
+    const { data: dejaPayes } = await supabase.from('paiements')
+      .select('id').eq('demande_id', devisCible.demande_id)
+      .in('statut', ['paye', 'libere', 'liberation_en_cours', 'bloque', 'remboursement_en_cours'])
+      .limit(1);
+    if (dejaPayes && dejaPayes.length) {
+      return res.status(409).json({ error: 'Cette prestation est déjà réglée. Aucun nouveau paiement n\'est nécessaire.' });
     }
 
     // ── GARDE CONTRE LA DOUBLE INTENTION ────────────────────────────────
@@ -6335,11 +6787,14 @@ app.post('/api/paiements/intent', auth, exigerEmailVerifie, async (req, res) => 
     // la première tentative a échoué en silence — réseau coupé, application
     // fermée — doit pouvoir réessayer, pas se heurter à un « paiement déjà en
     // cours » qu'il ne comprendrait pas.
-    const { data: intentionEnCours } = await supabase.from('paiements')
+    // La plus récente : plusieurs tentatives successives peuvent exister.
+    const { data: intentionsEnCours } = await supabase.from('paiements')
       .select('id, stripe_payment_intent_id')
       .eq('devis_id', devis_id)
       .eq('statut', 'en_attente')
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const intentionEnCours = intentionsEnCours && intentionsEnCours[0];
 
     if (intentionEnCours && intentionEnCours.stripe_payment_intent_id) {
       try {
@@ -6347,6 +6802,16 @@ app.post('/api/paiements/intent', auth, exigerEmailVerifie, async (req, res) => 
         // Une intention encore ouverte se réutilise telle quelle. Si elle a
         // été annulée ou a échoué chez Stripe, on la laisse et on en crée une
         // neuve : la réutiliser mènerait à un paiement impossible à finaliser.
+        // Déjà payée chez Stripe mais pas encore confirmée chez nous (webhook
+        // en retard, application fermée) : en créer une autre débiterait le
+        // client deux fois. On le lui dit, la confirmation suit.
+        if (existante.status === 'succeeded') {
+          await finaliserConfirmationPaiement(existante.id).catch((e) => console.error('Finalisation différée :', e.message));
+          return res.status(409).json({
+            error: 'Votre paiement a bien été reçu. La confirmation arrive dans un instant.',
+            deja_paye: true
+          });
+        }
         if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(existante.status)) {
           console.log('↩️  Intention réutilisée pour le devis ' + devis_id + ' (' + existante.status + ')');
           return res.json({
@@ -6480,7 +6945,15 @@ app.post('/api/paiements/intent', auth, exigerEmailVerifie, async (req, res) => 
       paramsIntent.transfer_data = { destination: proPourPaiement.stripe_account_id };
     }
 
-    const intent = await stripe.paymentIntents.create(paramsIntent);
+    // Clé d'idempotence : deux appuis simultanés reçoivent la MÊME intention
+    // au lieu d'en créer deux (l'index unique sur l'identifiant Stripe
+    // empêche ensuite la seconde ligne).
+    // La clé change à chaque acceptation (échéance), et avec les paramètres :
+    // réutiliser une clé avec d'autres paramètres ferait échouer Stripe.
+    const cleIdempotence = ['intent', devis_id, devisCible.paiement_avant || 'sans-echeance', montant,
+      proConfigure ? proPourPaiement.stripe_account_id : 'plateforme',
+      intentionEnCours ? intentionEnCours.id : 'premiere'].join('-');
+    const intent = await stripe.paymentIntents.create(paramsIntent, { idempotencyKey: cleIdempotence });
 
     await supabase.from('paiements').insert({
       demande_id: devis.demande_id,
@@ -6531,13 +7004,52 @@ async function finaliserConfirmationPaiement(payment_intent_id) {
   const charge = intent.latest_charge;
   const stripeTransferId = charge && charge.transfer ? charge.transfer : null;
   const stripeApplicationFeeId = charge && charge.application_fee ? charge.application_fee : null;
-  await supabase.from('paiements').update({
+
+  // ── SÉCURITÉ : UNE SEULE CONFIRMATION ─────────────────────────────────
+  // La confirmation du navigateur et le webhook Stripe arrivent souvent en
+  // même temps. Les deux lisaient « en_attente » et écrivaient chacun un code
+  // de validation différent : le code affiché au client pouvait être écrasé,
+  // et le prestataire recevait « code incorrect ». Messages, courriels et
+  // parrainage partaient en double. L'écriture est désormais conditionnelle :
+  // seule la première passe.
+  const { data: gagnees } = await supabase.from('paiements').update({
     statut: 'paye',
     code_validation: codeValidation,
     stripe_transfer_id: stripeTransferId,
     stripe_application_fee_id: stripeApplicationFeeId
-  }).eq('stripe_payment_intent_id', payment_intent_id);
+  }).eq('stripe_payment_intent_id', payment_intent_id).eq('statut', 'en_attente').select('id');
+  if (!gagnees || !gagnees.length) return;
   const { data: paiement } = await supabase.from('paiements').select('*').eq('stripe_payment_intent_id', payment_intent_id).single();
+
+  // ── SÉCURITÉ : LE DEVIS DOIT TOUJOURS ÊTRE ACCEPTÉ ────────────────────
+  // Un paiement terminé après l'expiration du délai, ou après que le client a
+  // refusé le devis, ne doit pas réserver une prestation qui n'existe plus :
+  // on le rembourse aussitôt, intégralement.
+  if (paiement && paiement.devis_id) {
+    const { data: devisPaye } = await supabase.from('devis')
+      .select('statut').eq('id', paiement.devis_id).maybeSingle();
+    if (!devisPaye || devisPaye.statut !== 'accepte') {
+      try {
+        const aRepartir = !!(charge && charge.transfer);
+        await stripe.refunds.create(Object.assign({ payment_intent: payment_intent_id },
+          aRepartir ? { reverse_transfer: true, refund_application_fee: true } : {}),
+          { idempotencyKey: 'rembourser-orphelin-' + paiement.id });
+        await supabase.from('paiements').update({
+          statut: 'rembourse', montant_rembourse: paiement.montant_ttc, montant_societe: 0
+        }).eq('id', paiement.id);
+        envoyerNotificationPush(paiement.client_id, {
+          titre: 'Paiement remboursé',
+          corps: 'Ce devis n\'était plus réservé au moment du paiement. Vous êtes remboursé intégralement.',
+          url: '/#devis'
+        }).catch(() => {});
+      } catch (e) {
+        // Bloqué : aucun versement automatique, l'administrateur le voit.
+        await supabase.from('paiements').update({ statut: 'bloque' }).eq('id', paiement.id);
+        console.error('Remboursement d\'un paiement sans devis accepté ÉCHOUÉ — paiement bloqué, à traiter à la main :', paiement.id, e.message);
+      }
+      return;
+    }
+  }
 
   // Le numéro de facture est attribué au moment exact de l'encaissement : c'est
   // la date qui doit correspondre à la position dans la séquence. Sans await —
@@ -6731,6 +7243,28 @@ app.post('/api/paiements/confirmer', auth, async (req, res) => {
 // Finalise une prestation : déclenche le vrai virement Stripe vers le pro, met à jour les statuts,
 // et notifie les deux parties par email. Partagée entre la validation par code (le pro saisit le
 // code donné par le client) et toute finalisation manuelle éventuelle.
+// Réserve le paiement puis verse au prestataire. Utilisé par la reprise des
+// virements échoués et par l'arbitrage d'un litige — qui appelaient auparavant
+// `finaliserPrestation` avec un identifiant au lieu de la ligne, et échouaient.
+async function verserAuPrestataire(paiementId) {
+  const reserve = await reserverLigne('paiements', paiementId, ['paye'], 'liberation_en_cours');
+  if (!reserve) return { erreur: 'Ce paiement n\'est pas (ou plus) en attente de versement.' };
+  const { data: ligne } = await supabase.from('paiements').select('*').eq('id', paiementId).maybeSingle();
+  if (!ligne) return { erreur: 'Paiement introuvable.' };
+  let r;
+  try {
+    r = await finaliserPrestation(ligne);
+  } catch (e) {
+    r = { erreur: e.message || 'Versement impossible.' };
+  }
+  // Un échec (renvoyé OU levé) rend le paiement à « paye », d'où une
+  // nouvelle tentative peut repartir.
+  if (!r || r.erreur) {
+    await supabase.from('paiements').update({ statut: 'paye' }).eq('id', paiementId).eq('statut', 'liberation_en_cours');
+  }
+  return r;
+}
+
 async function finaliserPrestation(paiement) {
   const { data: pro } = await supabase.from('users').select('email, prenom, stripe_account_id').eq('id', paiement.societe_id).single();
   if (!pro || !pro.stripe_account_id) {
@@ -6812,7 +7346,7 @@ function validerPhotos(photos, max) {
   if (!photos || !Array.isArray(photos)) return null;
   if (photos.length > max) return `Maximum ${max} photos.`;
   for (const p of photos) {
-    if (typeof p !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(p)) {
+    if (typeof p !== 'string' || !IMAGE_DATA_URL.test(p)) {
       return 'Format de photo non supporté (JPEG, PNG ou WEBP uniquement).';
     }
     // Même correction qu'à la création d'une demande.
@@ -6978,6 +7512,15 @@ app.post('/api/paiements/valider-code', auth, async (req, res) => {
       });
     }
 
+    // SÉCURITÉ : cinq essais par paiement. Le code libère l'argent : sans
+    // plafond, le prestataire pouvait le deviner sans le client.
+    if (!(await consommerTentative('paiements', paiement.id, 'code_tentatives', 5))) {
+      return res.status(429).json({
+        error: 'Trop de codes erronés : la saisie est bloquée par sécurité. Sans signalement du client, '
+             + 'votre paiement est libéré automatiquement 48 h après la prestation. En cas de souci, '
+             + 'contactez le support Gleam.'
+      });
+    }
     if (String(code).trim() !== paiement.code_validation) return res.status(400).json({ error: 'Code incorrect. Vérifiez le code donné par le client.' });
 
     // ── SAISIR LE BON CODE PROUVE LA PRÉSENCE ──────────────────────────────
@@ -7580,6 +8123,20 @@ app.post('/api/demandes/:id/confirmer-arrivee', auth, async (req, res) => {
       return res.status(409).json({ error: 'Cette prestation n\'est plus en cours.' });
     }
 
+    // ── SÉCURITÉ : « PERSONNE N'EST VENU » N'A DE SENS QU'APRÈS L'HEURE ────
+    // Ce signalement était accepté à tout moment, même la veille. Il servait
+    // à contourner les frais d'annulation tardive : on déclarait l'absence une
+    // heure avant le créneau, puis on annulait « sans frais ».
+    if (!estVenu && !demande.prestation_demarree_le) {
+      const instant = instantDuCreneau(demande.creneau);
+      if (instant && Date.now() < instant + 60 * 60 * 1000) {
+        return res.status(409).json({
+          error: 'Vous pourrez signaler l\'absence du prestataire une heure après l\'heure prévue. '
+               + 'D\'ici là, écrivez-lui depuis la messagerie.'
+        });
+      }
+    }
+
     await supabase.from('demandes')
       .update({ arrivee_confirmee_client: estVenu })
       .eq('id', demande.id);
@@ -7752,6 +8309,8 @@ app.post('/api/signalements', auth, async (req, res) => {
   try {
     const { signale_id, demande_id, motif, description } = req.body;
     if (!motif) return res.status(400).json({ error: 'Motif requis.' });
+    if (String(motif).length > 200 || (description && String(description).length > 2000))
+      return res.status(400).json({ error: 'Signalement trop long (2 000 caractères maximum).' });
 
     // ── ON NE SIGNALE QUE SES PROPRES PRESTATIONS ─────────────────────────
     // La route acceptait n'importe quel `demande_id` et n'importe quel
@@ -7848,8 +8407,8 @@ app.post('/api/signalements', auth, async (req, res) => {
       sendEmail('nouveau_signalement', adminEmail, {
         reporterNom: reporter ? `${reporter.prenom} ${reporter.nom} (${reporter.email})` : req.user.id,
         signaleNom: signaleInfo ? `${signaleInfo.prenom} ${signaleInfo.nom} (${signaleInfo.email})` : 'Non spécifié (contact général)',
-        motif: motif,
-        description: description || 'Aucune description fournie.',
+        motif: String(motif || '').slice(0, 200),
+        description: description ? String(description).slice(0, 2000) : 'Aucune description fournie.',
         preuves: preuves,
         signalementId: signalement.id
       }).catch(e => console.error('Email nouveau_signalement:', e));
@@ -8022,8 +8581,20 @@ app.get('/api/societes', auth, async (req, res) => {
 });
 
 app.patch('/api/societes/disponibilite', auth, async (req, res) => {
-  await supabase.from('users').update({ disponible: Boolean(req.body.disponible) }).eq('id', req.user.id);
-  res.json({ message: 'Disponibilité mise à jour.' });
+  try {
+    // SÉCURITÉ : un compte suspendu (par Gleam ou après 3 annulations) ne se
+    // réactive pas lui-même — seule l'administration le peut.
+    if (req.body.disponible) {
+      const { data: moi } = await supabase.from('users').select('suspendu').eq('id', req.user.id).maybeSingle();
+      if (moi && moi.suspendu) {
+        return res.status(403).json({ error: 'Votre compte est suspendu. Contactez le support Gleam pour le réactiver.' });
+      }
+    }
+    await supabase.from('users').update({ disponible: Boolean(req.body.disponible) }).eq('id', req.user.id);
+    res.json({ message: 'Disponibilité mise à jour.' });
+  } catch (e) {
+    erreurServeur(res, 'PATCH /api/societes/disponibilite', e);
+  }
 });
 
 // Compléter ses justificatifs après l'inscription. Le SIRET est vérifié auprès
@@ -8051,6 +8622,11 @@ app.patch('/api/societes/justificatifs', auth, async (req, res) => {
 
     if (!Object.keys(misAJour).length)
       return res.status(400).json({ error: 'Aucune modification à enregistrer : les champs sont identiques aux valeurs actuelles.' });
+    // SÉCURITÉ : mêmes règles qu'à l'inscription pour les champs d'entreprise.
+    for (const v of Object.values(misAJour)) {
+      if (typeof v === 'string' && (v.length > 300 || /[<>]/.test(v)))
+        return res.status(400).json({ error: 'Un des champs contient des caractères non autorisés (< ou >) ou est trop long.' });
+    }
 
     const { error } = await supabase.from('users').update(misAJour).eq('id', req.user.id);
     if (error) return res.status(400).json({ error: traduireErreurSupabase(error.message) });
@@ -9465,14 +10041,14 @@ app.post('/api/admin/paiements/:id/rembourser', adminAuth, async (req, res) => {
     }
 
     try {
-      await stripe.refunds.create({
+      // Reprend au prorata sur la part du prestataire ET sur la commission.
+      // Sans cela, Gleam rembourserait seule un argent déjà versé. Uniquement
+      // pour un paiement réparti au pro : sinon il n'y a rien à reprendre.
+      await stripe.refunds.create(Object.assign({
         payment_intent: paiement.stripe_payment_intent_id,
-        amount: centimes,
-        // Reprend au prorata sur la part du prestataire ET sur la commission.
-        // Sans cela, Gleam rembourserait seule un argent déjà versé.
-        reverse_transfer: true,
-        refund_application_fee: true
-      });
+        amount: centimes
+      }, (paiement.transfert_automatique || paiement.stripe_transfer_id)
+        ? { reverse_transfer: true, refund_application_fee: true } : {}));
     } catch (err) {
       // Stripe a refusé : on rend au paiement son état d'avant.
       await supabase.from('paiements').update({ statut: statutAvant }).eq('id', paiement.id);
@@ -9689,7 +10265,10 @@ app.post('/api/admin/litiges/:demandeId/trancher', adminAuth, async (req, res) =
     let resultat;
     if (decision === 'payer_pro') {
       await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', demande.id);
-      resultat = await finaliserPrestation(demande.id);
+      // CORRECTIF : `finaliserPrestation` attend la LIGNE de paiement. On lui
+      // passait l'identifiant de la demande — le versement échouait toujours,
+      // alors que le prestataire était prévenu qu'il était payé.
+      resultat = await verserAuPrestataire(paiement.id);
 
       envoyerNotificationPush(paiement.societe_id, {
         titre: 'Litige tranché en votre faveur',
@@ -9703,7 +10282,7 @@ app.post('/api/admin/litiges/:demandeId/trancher', adminAuth, async (req, res) =
         url: '/#accueil'
       }).catch(() => {});
     } else {
-      resultat = await rembourserPaiementSiPaye(demande.id, 999);
+      resultat = await rembourserPaiementSiPaye(demande.id, 999, { arbitrage: true });
 
       envoyerNotificationPush(demande.client_id, {
         titre: 'Litige tranché en votre faveur',
@@ -9793,7 +10372,10 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
       .order('created_at', { ascending: false })
       .range(debut, debut + PAR_PAGE - 1);
 
-    if (recherche) requete = requete.or(`email.ilike.%${recherche}%,prenom.ilike.%${recherche}%,nom.ilike.%${recherche}%`);
+    // SÉCURITÉ : la saisie est insérée dans un filtre PostgREST. Virgules,
+    // parenthèses et jokers en changeaient la structure ; on les retire.
+    const rechercheSure = String(recherche || '').replace(/[,()%*\\"]/g, ' ').trim().slice(0, 100);
+    if (rechercheSure) requete = requete.or(`email.ilike.%${rechercheSure}%,prenom.ilike.%${rechercheSure}%,nom.ilike.%${rechercheSure}%`);
 
     const { data, count } = await requete;
 
@@ -9813,7 +10395,7 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
 app.patch('/api/admin/users/:id/disponibilite', adminAuth, async (req, res) => {
   try {
     const { disponible } = req.body;
-    await supabase.from('users').update({ disponible: !!disponible }).eq('id', req.params.id);
+    await supabase.from('users').update({ disponible: !!disponible, suspendu: !disponible }).eq('id', req.params.id);
     res.json({ message: disponible ? 'Compte réactivé.' : 'Compte suspendu.' });
   } catch (e) {
     erreurServeur(res, 'PATCH /api/admin/users/:id/disponibilite', e);
