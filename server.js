@@ -400,7 +400,10 @@ const corsOptions = {
   // pourrait garder une autorisation périmée pendant vingt-quatre heures.
   // Comme la liste ne bouge qu'au déploiement d'un nouveau domaine, cela ne
   // concerne personne en pratique.
-  maxAge: 86400
+  maxAge: 86400,
+  // La console d'administration lit le total des comptes dans cet en-tête :
+  // sans cette ligne, le navigateur le cache à une page d'une autre origine.
+  exposedHeaders: ['X-Total-Comptes', 'X-Page']
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
@@ -1540,6 +1543,43 @@ function compteVisible(compte) {
   return propre;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LES MOTS DE PASSE DÉJÀ DIVULGUÉS SONT REFUSÉS
+//
+// Même principe que l'option « leaked password protection » de Supabase, mais
+// appliqué par le serveur — donc valable quel que soit l'abonnement Supabase,
+// et aussi pour les comptes créés par l'API d'administration.
+//
+// Le mot de passe ne quitte JAMAIS le serveur : on envoie à Have I Been Pwned
+// les 5 premiers caractères de son empreinte SHA-1, et on cherche le reste
+// dans la liste reçue (k-anonymat). Service injoignable → on laisse passer.
+// ═══════════════════════════════════════════════════════════════════════════
+const MESSAGE_MDP_COMPROMIS = 'Ce mot de passe figure dans des fuites de données connues : '
+  + 'il serait facile à deviner. Choisissez-en un autre.';
+async function motDePasseCompromis(mdp) {
+  if (typeof mdp !== 'string' || !mdp) return false;
+  const minuteur = new AbortController();
+  const delai = setTimeout(() => minuteur.abort(), 2500);
+  try {
+    const sha1 = crypto.createHash('sha1').update(mdp, 'utf8').digest('hex').toUpperCase();
+    const r = await fetch('https://api.pwnedpasswords.com/range/' + sha1.slice(0, 5), {
+      headers: { 'Add-Padding': 'true', 'User-Agent': 'Gleam-securite' },
+      signal: minuteur.signal
+    });
+    if (!r.ok) return false;
+    const suffixe = sha1.slice(5);
+    const texte = await r.text();
+    return texte.split('\n').some((ligne) => {
+      const [hash, nombre] = ligne.trim().split(':');
+      return hash === suffixe && parseInt(nombre, 10) > 0;
+    });
+  } catch (e) {
+    return false;
+  } finally {
+    clearTimeout(delai);
+  }
+}
+
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
     const email = req.body.email;
@@ -1614,6 +1654,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       const { data: parrain } = await supabase.from('users').select('id').eq('code_parrainage', codeParrainageSaisi).maybeSingle();
       if (parrain) parrainId = parrain.id;
     }
+
+    if (await motDePasseCompromis(password))
+      return res.status(400).json({ error: MESSAGE_MDP_COMPROMIS });
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: email.toLowerCase().trim(),
@@ -1851,6 +1894,9 @@ app.post('/api/auth/reset-password', authLimiter, limiteSaisieCode, async (req, 
       return res.status(400).json({ error: 'Ce code ne correspond pas. Vérifiez les six chiffres reçus par email.' });
     if (!user.reset_code_expire || new Date(user.reset_code_expire) < new Date())
       return res.status(400).json({ error: 'Ce code a expiré. Refaites une demande de "mot de passe oublié".' });
+
+    if (await motDePasseCompromis(new_password))
+      return res.status(400).json({ error: MESSAGE_MDP_COMPROMIS });
 
     const { error: erreurMaj } = await supabase.auth.admin.updateUserById(user.id, { password: new_password });
     if (erreurMaj) {
@@ -6245,6 +6291,24 @@ async function indicateursPrestataires(proIds) {
 // Le prestataire voyait un tiers de ce qu'il avait réellement gardé.
 //
 // La règle : on ne proratise que ce qui n'a pas déjà été corrigé.
+// Le paiement qui compte pour une demande : le plus avancé, jamais une
+// tentative « en_attente » abandonnée. `.maybeSingle()` échouait dès qu'une
+// demande portait deux lignes — et le litige devenait invisible.
+const RANG_PAIEMENT = { libere: 9, liberation_en_cours: 8, bloque: 7, remboursement_en_cours: 6,
+  paye: 5, rembourse_partiel: 4, rembourse: 3, en_cours: 2, en_attente: 1 };
+async function paiementPrincipal(demandeId, colonnes) {
+  let cols = colonnes || '*';
+  if (cols !== '*') {
+    const liste = new Set(cols.split(',').map(c => c.trim()).filter(Boolean));
+    liste.add('statut'); liste.add('created_at');
+    cols = [...liste].join(', ');
+  }
+  const { data } = await supabase.from('paiements').select(cols)
+    .eq('demande_id', demandeId).order('created_at', { ascending: false }).limit(20);
+  if (!data || !data.length) return null;
+  return data.slice().sort((a, b) => (RANG_PAIEMENT[b.statut] || 0) - (RANG_PAIEMENT[a.statut] || 0))[0];
+}
+
 function partReelle(paiement, champ) {
   // `montant_societe` sur un remboursement partiel a déjà été recalculé à
   // partir des montants réels de Stripe. Le toucher à nouveau fausserait.
@@ -7268,6 +7332,12 @@ async function verserAuPrestataire(paiementId) {
 async function finaliserPrestation(paiement) {
   const { data: pro } = await supabase.from('users').select('email, prenom, stripe_account_id').eq('id', paiement.societe_id).single();
   if (!pro || !pro.stripe_account_id) {
+    // Une trace, sinon ce paiement n'apparaît nulle part à surveiller.
+    await supabase.from('paiements').update({
+      transfert_erreur: 'Paiements du prestataire non configurés',
+      transfert_tentative_le: new Date().toISOString(),
+      transfert_tentatives: (paiement.transfert_tentatives || 0) + 1
+    }).eq('id', paiement.id);
     return { erreur: 'Le prestataire n\'a pas encore configuré ses paiements. Le virement ne peut pas être effectué pour l\'instant — contactez le support Gleam.' };
   }
 
@@ -7276,12 +7346,14 @@ async function finaliserPrestation(paiement) {
   // toute façon (le solde de la plateforme ne contient jamais la part du pro dans ce cas).
   if (!paiement.transfert_automatique) {
     try {
+      // Clé d'idempotence par tentative : deux appels simultanés ne peuvent
+      // pas créer deux virements ; une nouvelle tentative après échec, si.
       await stripe.transfers.create({
         amount: Math.round(parseFloat(paiement.montant_societe) * 100),
         currency: 'eur',
         destination: pro.stripe_account_id,
         transfer_group: `demande_${paiement.demande_id}`
-      });
+      }, { idempotencyKey: 'versement-' + paiement.id + '-' + (paiement.transfert_tentatives || 0) });
     } catch (stripeErr) {
       console.error('Virement Stripe échoué:', stripeErr);
 
@@ -9145,7 +9217,8 @@ app.get('/api/admin/version', adminAuth, (req, res) => {
     routes_recentes: {
       dossiers: true,
       cloture_automatique: typeof cloturerPrestationsOubliees === 'function',
-      photos_stockage: typeof lienPhotoProfil === 'function'
+      photos_stockage: typeof lienPhotoProfil === 'function',
+      console_admin: typeof paiementPrincipal === 'function'
     }
   });
 });
@@ -9528,6 +9601,7 @@ app.patch('/api/admin/dossiers/:proId/valider', adminAuth, async (req, res) => {
       return res.status(400).json({ error: 'Aucun document en attente pour ce prestataire.' });
     }
 
+    const avant = await prestataireEnRegle(req.params.proId).catch(() => ({ enRegle: false }));
     const { error } = await supabase.from('documents_pro')
       .update({ statut: 'valide', motif_refus: null, verifie_le: new Date().toISOString() })
       .eq('pro_id', req.params.proId)
@@ -9539,11 +9613,22 @@ app.patch('/api/admin/dossiers/:proId/valider', adminAuth, async (req, res) => {
       const { data: pro } = await supabase.from('users')
         .select('id, prenom, email').eq('id', req.params.proId).maybeSingle();
       if (pro) {
-        envoyerNotificationPush(pro.id, {
-          titre: 'Vos documents sont validés',
-          corps: 'Votre dossier est complet. Vous pouvez recevoir des demandes.',
+        // On ne dit « complet » que s'il l'est vraiment (paiements configurés,
+        // toutes les pièces requises) — sinon le prestataire se croit débloqué.
+        const regle = await prestataireEnRegle(pro.id).catch(() => ({ enRegle: false }));
+        envoyerNotificationPush(pro.id, regle.enRegle ? {
+          titre: 'Votre dossier est validé',
+          corps: 'Vous pouvez maintenant recevoir des demandes et envoyer vos devis.',
+          url: '/#accueil'
+        } : {
+          titre: 'Documents validés',
+          corps: 'Vos documents sont validés. Il reste des étapes avant de recevoir des demandes : voir votre profil.',
           url: '/#profil'
         }).catch(() => {});
+        if (regle.enRegle && !avant.enRegle && pro.email) {
+          sendEmail('dossier_valide', pro.email, { compteId: pro.id, prenom: pro.prenom || '' })
+            .catch(e => console.error('Email dossier validé:', e.message));
+        }
       }
     } catch (e) { console.error('Notification validation dossier:', e.message); }
 
@@ -9612,6 +9697,11 @@ app.patch('/api/admin/documents/:id', adminAuth, async (req, res) => {
     if (decision === 'refuse' && !MOTIFS_REFUS[String(req.body.motif || '')])
       return res.status(400).json({ error: 'Un motif de refus est requis.' });
 
+    // L'état « en règle » AVANT la décision : le courriel « dossier validé »
+    // ne part qu'au passage d'incomplet à complet, pas à chaque renouvellement.
+    const { data: docAvant } = await supabase.from('documents_pro').select('pro_id').eq('id', req.params.id).maybeSingle();
+    const enRegleAvant = docAvant ? (await prestataireEnRegle(docAvant.pro_id).catch(() => ({ enRegle: false }))).enRegle : false;
+
     const misAJour = {
       statut: decision,
       verifie_par: 'admin',
@@ -9644,7 +9734,7 @@ app.patch('/api/admin/documents/:id', adminAuth, async (req, res) => {
     if (decision === 'valide' && data.pro_id) {
       try {
         const apres = await prestataireEnRegle(data.pro_id);
-        if (apres.enRegle) {
+        if (apres.enRegle && !enRegleAvant) {
           const pro = data.pro || {};
           if (pro.email) {
             sendEmail('dossier_valide', pro.email, {
@@ -9667,6 +9757,26 @@ app.patch('/api/admin/documents/:id', adminAuth, async (req, res) => {
     }
 
     const libelle = (TYPES_DOCUMENTS[data.type] || {}).libelle || data.type;
+
+    // ── UN REFUS EST ANNONCÉ AU PRESTATAIRE ─────────────────────────────────
+    // Il ne l'apprenait qu'en rouvrant son profil. Sans ce message, il attendait
+    // une validation qui ne viendrait jamais.
+    if (decision === 'refuse' && data.pro_id) {
+      const motifTexte = MOTIFS_REFUS[req.body.motif] || 'Document refusé';
+      envoyerNotificationPush(data.pro_id, {
+        titre: 'Un document est à renvoyer',
+        corps: libelle + ' : ' + motifTexte + '. Déposez-en un nouveau depuis votre profil.',
+        url: '/#profil'
+      }).catch(() => {});
+      const pro = data.pro || {};
+      if (pro.email) {
+        sendEmail('document_refuse', pro.email, {
+          compteId: data.pro_id, prenom: pro.prenom || '', document: libelle,
+          motif: motifTexte, commentaire: misAJour.commentaire || ''
+        }).catch(e => console.error('Email document refusé:', e.message));
+      }
+    }
+
     console.log((decision === 'valide' ? '✅' : '❌') + ' Document ' + decision + ' — ' + libelle +
       ' — ' + (data.pro && data.pro.email));
 
@@ -10004,6 +10114,11 @@ app.post('/api/admin/paiements/:id/rembourser', adminAuth, async (req, res) => {
     if (paiement.statut === 'rembourse') {
       return res.status(409).json({ error: 'Ce paiement a déjà été intégralement remboursé.' });
     }
+    // Seul un paiement réellement encaissé se rembourse : une tentative « en
+    // attente » n'a rien débité, une opération en cours doit d'abord aboutir.
+    if (!['paye', 'libere', 'rembourse_partiel', 'bloque'].includes(paiement.statut)) {
+      return res.status(409).json({ error: 'Ce paiement n\'est pas remboursable dans son état actuel (' + paiement.statut + ').' });
+    }
 
     // Ce qui reste remboursable : le total, moins ce qui l'a déjà été.
     const totalCentimes = Math.round(Number(paiement.montant_ttc) * 100);
@@ -10068,6 +10183,12 @@ app.post('/api/admin/paiements/:id/rembourser', adminAuth, async (req, res) => {
     // séquence, et l'avoir dit ce qui a été annulé.
     await attribuerNumeroAvoir(paiement.id, nouveauTotal);
 
+    // Remboursé en totalité : un litige éventuel n'a plus d'objet.
+    if (nouveauTotal * 100 >= totalCentimes) {
+      await supabase.from('demandes').update({ contestation_le: null, reponse_pro_le: null })
+        .eq('id', paiement.demande_id).not('contestation_le', 'is', null);
+    }
+
     // La trace : dans six mois, il faudra savoir pourquoi.
     await supabase.from('signalements').insert({
       demande_id: paiement.demande_id,
@@ -10107,12 +10228,13 @@ app.get('/api/admin/litiges', adminAuth, async (req, res) => {
 
     const litiges = [];
     for (const d of demandes) {
-      const { data: paiement } = await supabase.from('paiements')
-        .select(// `montant_rembourse` : une prestation partiellement remboursée doit
-        // afficher son montant RESTANT dans la carte de litige, pas son montant
-        // d'origine — sinon on arbitre sur une somme qui n'existe plus.
-        'id, montant_ttc, montant_societe, commission, statut, societe_id, client_id, montant_rembourse')
-        .eq('demande_id', d.id).maybeSingle();
+      // `montant_rembourse` : une prestation partiellement remboursée doit
+      // afficher son montant RESTANT dans la carte de litige, pas son montant
+      // d'origine — sinon on arbitre sur une somme qui n'existe plus.
+      // Une demande peut porter d'anciennes tentatives « en_attente » : on
+      // retient le paiement réellement encaissé.
+      const paiement = await paiementPrincipal(d.id,
+        'id, montant_ttc, montant_societe, commission, statut, societe_id, client_id, montant_rembourse, created_at');
 
       // ── UN DOSSIER RÉGLÉ PEUT ÊTRE ROUVERT ──────────────────────────────
       // J'écartais tous les paiements réglés. Or la réclamation du prestataire
@@ -10211,8 +10333,8 @@ app.get('/api/admin/litiges', adminAuth, async (req, res) => {
 app.post('/api/admin/litiges/:demandeId/trancher', adminAuth, async (req, res) => {
   try {
     const { decision, motif } = req.body || {};
-    if (!['payer_pro', 'rembourser'].includes(decision)) {
-      return res.status(400).json({ error: 'Décision inconnue : « payer_pro » ou « rembourser ».' });
+    if (!['payer_pro', 'rembourser', 'clore'].includes(decision)) {
+      return res.status(400).json({ error: 'Décision inconnue : « payer_pro », « rembourser » ou « clore ».' });
     }
     if (!motif || !String(motif).trim()) {
       return res.status(400).json({ error: 'Indiquez le motif de votre décision.' });
@@ -10225,51 +10347,74 @@ app.post('/api/admin/litiges/:demandeId/trancher', adminAuth, async (req, res) =
       return res.status(409).json({ error: 'Aucun litige en cours sur cette prestation.' });
     }
 
-    const { data: paiement } = await supabase.from('paiements')
-      .select('*').eq('demande_id', demande.id).maybeSingle();
+    const paiement = await paiementPrincipal(demande.id, '*');
     if (!paiement) return res.status(404).json({ error: 'Aucun paiement pour cette prestation.' });
+
+    // ── L'ÉTAT DU PAIEMENT DÉCIDE DES ISSUES POSSIBLES ─────────────────────
+    // On vérifie AVANT d'écrire quoi que ce soit : auparavant, la contestation
+    // était levée puis l'action échouait, et le litige disparaissait sans issue.
+    const regle = ['rembourse', 'rembourse_partiel', 'libere'].includes(paiement.statut);
+    if (decision === 'clore' && !regle) {
+      return res.status(409).json({ error: 'Le paiement est encore détenu par Gleam : choisissez de payer le prestataire ou de rembourser le client.' });
+    }
+    if (decision !== 'clore' && paiement.statut !== 'paye') {
+      const raisons = {
+        rembourse: 'Le client a déjà été remboursé : les fonds ne sont plus détenus par Gleam. Choisissez « Clore sans mouvement » et dédommagez le prestataire par un autre moyen si besoin.',
+        rembourse_partiel: 'Le client a déjà été remboursé en partie : les fonds ne sont plus détenus par Gleam. Choisissez « Clore sans mouvement ».',
+        libere: 'Le prestataire a déjà été payé. Choisissez « Clore sans mouvement », ou remboursez depuis l\'écran Paiements.',
+        bloque: 'Une opposition bancaire est en cours sur ce paiement : traitez-la d\'abord depuis l\'écran Paiements.'
+      };
+      return res.status(409).json({ error: raisons[paiement.statut] || ('Ce paiement est dans un état intermédiaire (' + paiement.statut + ') : réessayez dans un instant.') });
+    }
 
     // La trace, écrite AVANT l'action : si le virement échoue, la décision
     // reste consignée et vous savez où vous en êtes.
     await supabase.from('signalements').insert({
       demande_id: demande.id,
       reporter_id: demande.client_id,
-      motif: 'Arbitrage Gleam — ' + (decision === 'payer_pro' ? 'paiement au prestataire' : 'remboursement du client'),
+      motif: 'Arbitrage Gleam — ' + (decision === 'payer_pro' ? 'paiement au prestataire'
+           : decision === 'clore' ? 'dossier clos sans mouvement d\'argent' : 'remboursement du client'),
       description: String(motif).trim().slice(0, 1000),
       statut: 'traite'
     });
 
-    // La contestation est levée : le doute n'existe plus.
-    await supabase.from('demandes')
-      .update({ contestation_le: null, reponse_pro_le: null,
-                arrivee_confirmee_client: decision === 'payer_pro' })
-      .eq('id', demande.id);
+    // ── CLORE SANS MOUVEMENT D'ARGENT ────────────────────────────────────
+    // Pour une réclamation du prestataire après un remboursement déjà fait :
+    // les fonds ne sont plus chez Gleam. La décision est consignée, le dossier
+    // sort de la liste, rien n'est versé ni remboursé.
+    // Les signalements ouverts sur cette prestation sont refermés avec la
+    // décision : sinon ils bloqueraient tout versement ultérieur.
+    const fermerSignalements = () => supabase.from('signalements')
+      .update({ statut: 'traite' }).eq('demande_id', demande.id).eq('statut', 'nouveau');
 
-    // ── UN DOSSIER DÉJÀ REMBOURSÉ NE PEUT PLUS ÊTRE VERSÉ ─────────────────
-    // Sur une réclamation du prestataire, l'argent est déjà revenu au client.
-    // Appeler `finaliserPrestation` échouerait silencieusement — Stripe n'a
-    // plus rien à transférer.
-    //
-    // Le dire franchement vaut mieux qu'un bouton qui ne fait rien : la
-    // décision existe, mais elle se règle hors de la plateforme.
-    if (decision === 'payer_pro'
-        && ['rembourse', 'rembourse_partiel'].includes(paiement.statut)) {
-      return res.status(409).json({
-        error: 'Le client a déjà été remboursé : les fonds ne sont plus détenus '
-             + 'par Gleam et ne peuvent pas être versés au prestataire. '
-             + 'Si vous estimez la réclamation fondée, il faut le dédommager '
-             + 'par un autre moyen — et le noter ici en clôturant le dossier.'
-      });
+    if (decision === 'clore') {
+      await supabase.from('demandes')
+        .update({ contestation_le: null, reponse_pro_le: null })
+        .eq('id', demande.id);
+      await fermerSignalements();
+      return res.json({ message: 'Dossier clos. Aucun mouvement d\'argent.', resultat: { clos: true } });
     }
 
+    // ── L'ARGENT D'ABORD, LES MESSAGES ENSUITE ───────────────────────────────
+    // Les deux parties étaient prévenues (« le prestataire a été payé ») même
+    // quand le versement échouait. On n'annonce plus que ce qui a réellement eu
+    // lieu ; sinon l'écran d'administration dit quoi faire.
     let resultat;
     if (decision === 'payer_pro') {
-      await supabase.from('demandes').update({ statut: 'terminee' }).eq('id', demande.id);
-      // CORRECTIF : `finaliserPrestation` attend la LIGNE de paiement. On lui
-      // passait l'identifiant de la demande — le versement échouait toujours,
-      // alors que le prestataire était prévenu qu'il était payé.
       resultat = await verserAuPrestataire(paiement.id);
-
+      if (!resultat || resultat.erreur) {
+        return res.status(502).json({
+          error: 'Décision enregistrée, mais le versement n\'a pas pu partir : '
+               + ((resultat && resultat.erreur) || 'raison inconnue')
+               + '. Le litige reste ouvert : corrigez la cause puis tranchez de nouveau.',
+          decision_enregistree: true
+        });
+      }
+      // Versement fait (finaliserPrestation a passé la demande à « terminée »).
+      await supabase.from('demandes')
+        .update({ contestation_le: null, reponse_pro_le: null, arrivee_confirmee_client: true, statut: 'terminee' })
+        .eq('id', demande.id);
+      await fermerSignalements();
       envoyerNotificationPush(paiement.societe_id, {
         titre: 'Litige tranché en votre faveur',
         corps: 'Gleam a examiné la situation. Votre paiement est en route.',
@@ -10283,7 +10428,22 @@ app.post('/api/admin/litiges/:demandeId/trancher', adminAuth, async (req, res) =
       }).catch(() => {});
     } else {
       resultat = await rembourserPaiementSiPaye(demande.id, 999, { arbitrage: true });
-
+      if (!resultat || !resultat.rembourse) {
+        return res.status(502).json({
+          error: 'Décision enregistrée, mais le remboursement n\'a pas pu être effectué'
+               + (resultat && typeof resultat.erreur === 'string' ? ' : ' + resultat.erreur
+                  : resultat && resultat.suspendu ? ' : ' + resultat.motif : '')
+               + '. Le litige reste ouvert : réessayez, ou remboursez depuis l\'écran Paiements.',
+          decision_enregistree: true
+        });
+      }
+      // Remboursé : la prestation est close côté client — sans quoi la clôture
+      // automatique la passerait plus tard à « terminée » et annoncerait au
+      // client que le prestataire a été réglé.
+      await supabase.from('demandes')
+        .update({ contestation_le: null, reponse_pro_le: null, arrivee_confirmee_client: false, statut: 'annulee_client' })
+        .eq('id', demande.id);
+      await fermerSignalements();
       envoyerNotificationPush(demande.client_id, {
         titre: 'Litige tranché en votre faveur',
         corps: 'Vous êtes remboursé intégralement. Le remboursement paraîtra sous '
@@ -10344,6 +10504,315 @@ app.patch('/api/admin/signalements/:id', adminAuth, async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSOLE D'ADMINISTRATION — CE QUI ATTEND UNE DÉCISION
+//
+// Un seul appel, des comptages légers (`head: true`) : la console l'interroge
+// toutes les minutes pour tenir ses pastilles à jour.
+// ═══════════════════════════════════════════════════════════════════════════
+app.get('/api/admin/a-traiter', adminAuth, async (req, res) => {
+  try {
+    const compter = (requete) => requete.then(r => r.count || 0, () => 0);
+    const ilYaUneHeure = new Date(Date.now() - 3600 * 1000).toISOString();
+    const [litiges, documents, signalements, bloques, virementsEchoues, coinces, aPayer] = await Promise.all([
+      compter(supabase.from('demandes').select('id', { count: 'exact', head: true }).not('contestation_le', 'is', null)),
+      compter(supabase.from('documents_pro').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente')),
+      compter(supabase.from('signalements').select('id', { count: 'exact', head: true }).eq('statut', 'nouveau')),
+      compter(supabase.from('paiements').select('id', { count: 'exact', head: true }).eq('statut', 'bloque')),
+      compter(supabase.from('paiements').select('id', { count: 'exact', head: true }).eq('statut', 'paye').not('transfert_erreur', 'is', null)),
+      compter(supabase.from('paiements').select('id', { count: 'exact', head: true })
+        .in('statut', ['liberation_en_cours', 'remboursement_en_cours']).lt('created_at', ilYaUneHeure)),
+      compter(supabase.from('devis').select('id', { count: 'exact', head: true }).eq('statut', 'accepte').not('paiement_avant', 'is', null))
+    ]);
+    res.json({
+      litiges, documents, signalements,
+      paiements: bloques + virementsEchoues + coinces,
+      detail_paiements: { bloques, virements_echoues: virementsEchoues, operations_coincees: coinces },
+      devis_en_attente_de_paiement: aPayer
+    });
+  } catch (e) {
+    erreurServeur(res, 'GET /api/admin/a-traiter', e);
+  }
+});
+
+// ── LES DEMANDES ───────────────────────────────────────────────────────────
+// Toutes les demandes, filtrables, avec ce qu'il faut pour comprendre l'état
+// d'un dossier d'un coup d'œil : client, prestataire retenu, devis, paiement.
+const FILTRES_DEMANDES = {
+  actives:    ['en_attente', 'devis_recus', 'acceptee', 'en_cours'],
+  sans_devis: ['en_attente'],
+  devis_recus: ['devis_recus'],
+  acceptee:   ['acceptee'],
+  en_cours:   ['en_cours'],
+  terminee:   ['terminee'],
+  fermees:    ['annulee_client', 'expiree', 'refuse']
+};
+app.get('/api/admin/demandes', adminAuth, async (req, res) => {
+  try {
+    const PAR_PAGE = 50;
+    const page = Math.max(0, parseInt(req.query.page, 10) || 0);
+    const filtre = String(req.query.filtre || 'actives');
+    let requete = supabase.from('demandes')
+      .select('id, client_id, prestation, adresse, creneau, statut, numero_anonyme, created_at, contestation_le, pro_prefere_id, recurrence, prestation_demarree_le',
+              { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(page * PAR_PAGE, page * PAR_PAGE + PAR_PAGE - 1);
+    if (filtre === 'litige') requete = requete.not('contestation_le', 'is', null);
+    else if (FILTRES_DEMANDES[filtre]) requete = requete.in('statut', FILTRES_DEMANDES[filtre]);
+    const q = String(req.query.q || '').replace(/[,()%*\\"]/g, ' ').trim().slice(0, 100);
+    if (q) requete = requete.or(`adresse.ilike.%${q}%,prestation.ilike.%${q}%,numero_anonyme.ilike.%${q}%`);
+
+    const { data: demandes, count, error } = await requete;
+    if (error) return res.status(500).json({ error: 'Lecture impossible : ' + error.message });
+    const liste = demandes || [];
+    const ids = liste.map(d => d.id);
+    const [devisRes, paiementsRes] = ids.length ? await Promise.all([
+      supabase.from('devis').select('id, demande_id, societe_id, statut, prix_ttc').in('demande_id', ids),
+      supabase.from('paiements').select('id, demande_id, statut, montant_ttc, montant_rembourse, created_at').in('demande_id', ids)
+    ]) : [{ data: [] }, { data: [] }];
+    const devis = devisRes.data || [], paiements = paiementsRes.data || [];
+    const idsUsers = [...new Set(liste.map(d => d.client_id).concat(devis.filter(v => v.statut === 'accepte').map(v => v.societe_id)).filter(Boolean))];
+    const { data: users } = idsUsers.length
+      ? await supabase.from('users').select('id, prenom, nom, email').in('id', idsUsers) : { data: [] };
+    const parId = Object.fromEntries((users || []).map(u => [u.id, u]));
+    const nomDe = (u) => u ? ((u.prenom || '') + ' ' + (u.nom || '')).trim() || u.email : null;
+
+    res.json({
+      total: count || 0, page, par_page: PAR_PAGE,
+      demandes: liste.map(d => {
+        const siens = devis.filter(v => v.demande_id === d.id);
+        const retenu = siens.find(v => v.statut === 'accepte');
+        const paies = paiements.filter(p => p.demande_id === d.id)
+          .sort((a, b) => (RANG_PAIEMENT[b.statut] || 0) - (RANG_PAIEMENT[a.statut] || 0));
+        return {
+          ...d,
+          client: nomDe(parId[d.client_id]),
+          client_email: parId[d.client_id] ? parId[d.client_id].email : null,
+          pro: retenu ? nomDe(parId[retenu.societe_id]) : null,
+          nb_devis: siens.length,
+          prix_retenu: retenu ? Number(retenu.prix_ttc) : null,
+          paiement: paies[0] ? { id: paies[0].id, statut: paies[0].statut,
+            montant_ttc: Number(paies[0].montant_ttc), montant_rembourse: Number(paies[0].montant_rembourse || 0) } : null,
+          en_litige: !!d.contestation_le
+        };
+      })
+    });
+  } catch (e) {
+    erreurServeur(res, 'GET /api/admin/demandes', e);
+  }
+});
+
+// Le dossier complet d'une demande : tout ce qui s'est passé, dans l'ordre.
+app.get('/api/admin/demandes/:id', adminAuth, async (req, res) => {
+  try {
+    const { data: d } = await supabase.from('demandes').select('*').eq('id', req.params.id).maybeSingle();
+    if (!d) return res.status(404).json({ error: 'Cette demande n\'existe pas.' });
+    const [devisRes, paiementsRes, signalementsRes, messagesRes, evaluationsRes] = await Promise.all([
+      supabase.from('devis').select('*').eq('demande_id', d.id).order('created_at', { ascending: true }),
+      supabase.from('paiements').select('id, statut, montant_ttc, commission, montant_societe, montant_rembourse, numero_facture, numero_avoir, transfert_automatique, transfert_erreur, created_at, libere_le, societe_id, code_tentatives')
+        .eq('demande_id', d.id).order('created_at', { ascending: true }),
+      supabase.from('signalements').select('id, motif, description, statut, created_at, reporter_id').eq('demande_id', d.id).order('created_at', { ascending: true }),
+      supabase.from('messages').select('id, contenu, type, expediteur_id, created_at').eq('demande_id', d.id).order('created_at', { ascending: false }).limit(60),
+      supabase.from('evaluations').select('note, commentaire, evaluateur_id, evalue_id, created_at').eq('demande_id', d.id)
+    ]);
+    const devis = devisRes.data || [];
+    const idsUsers = [...new Set([d.client_id].concat(devis.map(v => v.societe_id)).filter(Boolean))];
+    const { data: users } = await supabase.from('users')
+      .select('id, prenom, nom, email, telephone, type, note_moyenne, taux_fiabilite, suspendu').in('id', idsUsers);
+    const parId = Object.fromEntries((users || []).map(u => [u.id, u]));
+    let notes = null;
+    try { notes = d.notes ? JSON.parse(d.notes) : null; } catch (e) { notes = null; }
+    const { photos_avant, photos_apres, ...demandeSansPhotos } = d;
+    res.json({
+      demande: { ...demandeSansPhotos, notes,
+        nb_photos_avant: (() => { try { return (JSON.parse(photos_avant || '[]') || []).length; } catch (e) { return 0; } })(),
+        nb_photos_apres: (() => { try { return (JSON.parse(photos_apres || '[]') || []).length; } catch (e) { return 0; } })() },
+      client: parId[d.client_id] || null,
+      devis: devis.map(v => ({ ...v, pro: parId[v.societe_id] || null })),
+      paiements: paiementsRes.data || [],
+      signalements: signalementsRes.data || [],
+      messages: (messagesRes.data || []).reverse().map(m => ({
+        ...m, auteur: m.expediteur_id === d.client_id ? 'client' : (m.expediteur_id ? 'pro' : 'systeme')
+      })),
+      evaluations: evaluationsRes.data || [],
+      preuves: preuvesDePresence(d)
+    });
+  } catch (e) {
+    erreurServeur(res, 'GET /api/admin/demandes/:id', e);
+  }
+});
+
+// ── LES PAIEMENTS ──────────────────────────────────────────────────────────
+// « À surveiller » rassemble ce qui demande une action : opposition bancaire,
+// versement échoué, opération restée en cours.
+app.get('/api/admin/paiements', adminAuth, async (req, res) => {
+  try {
+    const filtre = String(req.query.filtre || 'a_surveiller');
+    const PAR_PAGE = 50;
+    const page = Math.max(0, parseInt(req.query.page, 10) || 0);
+    let requete = supabase.from('paiements')
+      .select('id, demande_id, devis_id, client_id, societe_id, statut, montant_ttc, commission, montant_societe, montant_rembourse, numero_facture, transfert_automatique, transfert_erreur, transfert_tentatives, created_at, libere_le',
+              { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(page * PAR_PAGE, page * PAR_PAGE + PAR_PAGE - 1);
+    if (filtre === 'a_surveiller') {
+      requete = requete.or('statut.eq.bloque,statut.eq.liberation_en_cours,statut.eq.remboursement_en_cours,and(statut.eq.paye,transfert_erreur.not.is.null)');
+    } else if (filtre === 'paye') requete = requete.eq('statut', 'paye');
+    else if (filtre === 'libere') requete = requete.eq('statut', 'libere');
+    else if (filtre === 'rembourse') requete = requete.in('statut', ['rembourse', 'rembourse_partiel']);
+    else if (filtre === 'bloque') requete = requete.eq('statut', 'bloque');
+    else requete = requete.neq('statut', 'en_attente');
+
+    const { data, count, error } = await requete;
+    if (error) return res.status(500).json({ error: 'Lecture impossible : ' + error.message });
+    const liste = data || [];
+    const idsUsers = [...new Set(liste.flatMap(p => [p.client_id, p.societe_id]).filter(Boolean))];
+    const idsDemandes = [...new Set(liste.map(p => p.demande_id).filter(Boolean))];
+    const [usersRes, demandesRes] = await Promise.all([
+      idsUsers.length ? supabase.from('users').select('id, prenom, nom, email').in('id', idsUsers) : { data: [] },
+      idsDemandes.length ? supabase.from('demandes').select('id, prestation, statut, contestation_le, creneau').in('id', idsDemandes) : { data: [] }
+    ]);
+    const u = Object.fromEntries((usersRes.data || []).map(x => [x.id, x]));
+    const dm = Object.fromEntries((demandesRes.data || []).map(x => [x.id, x]));
+    const nomDe = (x) => x ? ((x.prenom || '') + ' ' + (x.nom || '')).trim() || x.email : null;
+    res.json({
+      total: count || 0, page, par_page: PAR_PAGE,
+      paiements: liste.map(p => {
+        const demande = dm[p.demande_id] || null;
+        // Ce que l'administrateur peut faire, décidé ICI (et revérifié par
+        // chaque route d'action) : l'écran n'affiche que des boutons valides.
+        const actions = [];
+        if (['paye', 'libere', 'rembourse_partiel', 'bloque'].includes(p.statut)) actions.push('rembourser');
+        if (p.statut === 'bloque') actions.push('debloquer');
+        if (p.statut === 'paye' && demande && demande.statut === 'terminee' && !demande.contestation_le) actions.push('verser');
+        return {
+          ...p,
+          client: nomDe(u[p.client_id]), pro: nomDe(u[p.societe_id]),
+          prestation: demande ? demande.prestation : null,
+          demande_statut: demande ? demande.statut : null,
+          en_litige: !!(demande && demande.contestation_le),
+          restant_remboursable: Math.round((Number(p.montant_ttc) - Number(p.montant_rembourse || 0)) * 100) / 100,
+          actions
+        };
+      })
+    });
+  } catch (e) {
+    erreurServeur(res, 'GET /api/admin/paiements', e);
+  }
+});
+
+// Remettre un paiement « bloqué » (opposition bancaire gagnée) dans l'état
+// « payé », d'où le cycle normal reprend.
+app.post('/api/admin/paiements/:id/debloquer', adminAuth, async (req, res) => {
+  try {
+    const motif = String((req.body && req.body.motif) || '').trim();
+    if (!motif) return res.status(400).json({ error: 'Indiquez le motif.' });
+    const { data: p } = await supabase.from('paiements').select('id, demande_id, client_id, statut, created_at').eq('id', req.params.id).maybeSingle();
+    if (!p) return res.status(404).json({ error: 'Ce paiement n\'existe pas.' });
+    // Seul « bloqué » (opposition bancaire) se débloque ici. Un versement « en
+    // cours » peut être réellement en train de partir : le remettre à « payé »
+    // risquerait un second virement — cela se vérifie dans Stripe.
+    if (p.statut !== 'bloque') return res.status(409).json({ error: 'Ce paiement n\'est pas bloqué.' });
+    // L'opposition doit être GAGNÉE chez Stripe : sinon la banque a repris
+    // l'argent, et le verser au prestataire le ferait payer deux fois.
+    const { data: complet } = await supabase.from('paiements')
+      .select('stripe_payment_intent_id, transfert_automatique').eq('id', p.id).maybeSingle();
+    if (complet && complet.stripe_payment_intent_id) {
+      try {
+        const oppositions = await stripe.disputes.list({ payment_intent: complet.stripe_payment_intent_id, limit: 10 });
+        const nonGagnees = (oppositions.data || []).filter((x) => x.status !== 'won');
+        if (nonGagnees.length) {
+          return res.status(409).json({ error: 'L\'opposition n\'est pas gagnée chez Stripe (état : ' + nonGagnees.map((x) => x.status).join(', ') + '). Le paiement reste bloqué.' });
+        }
+      } catch (e) {
+        return res.status(502).json({ error: 'Impossible de vérifier l\'opposition chez Stripe : ' + e.message });
+      }
+    }
+    // Un virement déjà parti (opposition arrivée en plein versement) : le
+    // paiement redevient « versé », pas « payé » — sinon il serait reversé.
+    let cible = 'paye';
+    if (complet && !complet.transfert_automatique) {
+      try {
+        const virements = await stripe.transfers.list({ transfer_group: 'demande_' + p.demande_id, limit: 5 });
+        if ((virements.data || []).some((v) => !v.reversed)) cible = 'libere';
+      } catch (e) {
+        return res.status(502).json({ error: 'Impossible de vérifier les virements chez Stripe : ' + e.message });
+      }
+    }
+    const ok = await reserverLigne('paiements', p.id, [p.statut], cible);
+    if (!ok) return res.status(409).json({ error: 'Ce paiement vient de changer d\'état. Rechargez.' });
+    await supabase.from('signalements').insert({
+      demande_id: p.demande_id, reporter_id: p.client_id,
+      motif: 'Administration — paiement débloqué', description: motif.slice(0, 1000), statut: 'traite'
+    });
+    res.json({ message: cible === 'libere'
+      ? 'Opposition gagnée. Le versement au prestataire avait déjà eu lieu : le paiement est marqué « versé ».'
+      : 'Opposition gagnée. Le paiement repasse à « encaissé » : le cycle normal reprend (code de fin ou clôture automatique).' });
+  } catch (e) {
+    erreurServeur(res, 'POST /api/admin/paiements/:id/debloquer', e);
+  }
+});
+
+// Verser au prestataire à la main : relance d'un virement échoué, sur une
+// prestation terminée et sans litige.
+app.post('/api/admin/paiements/:id/verser', adminAuth, async (req, res) => {
+  try {
+    const motif = String((req.body && req.body.motif) || '').trim();
+    if (!motif) return res.status(400).json({ error: 'Indiquez le motif.' });
+    const { data: p } = await supabase.from('paiements').select('id, demande_id, client_id, societe_id, statut').eq('id', req.params.id).maybeSingle();
+    if (!p) return res.status(404).json({ error: 'Ce paiement n\'existe pas.' });
+    if (p.statut !== 'paye') return res.status(409).json({ error: 'Seul un paiement « payé » peut être versé.' });
+    const { data: d } = await supabase.from('demandes').select('statut, contestation_le').eq('id', p.demande_id).maybeSingle();
+    if (!d || d.statut !== 'terminee') return res.status(409).json({ error: 'La prestation n\'est pas terminée : le versement se fait au code de fin ou à la clôture automatique.' });
+    if (d.contestation_le) return res.status(409).json({ error: 'Un litige est en cours : tranchez-le depuis l\'écran Litiges.' });
+    const { data: ouverts } = await supabase.from('signalements').select('id').eq('demande_id', p.demande_id).eq('statut', 'nouveau').limit(1);
+    if (ouverts && ouverts.length) return res.status(409).json({ error: 'Un signalement est ouvert sur cette prestation : traitez-le d\'abord.' });
+    await supabase.from('signalements').insert({
+      demande_id: p.demande_id, reporter_id: p.client_id,
+      motif: 'Administration — versement relancé', description: motif.slice(0, 1000), statut: 'traite'
+    });
+    const r = await verserAuPrestataire(p.id);
+    if (!r || r.erreur) return res.status(502).json({ error: 'Le versement a échoué : ' + ((r && r.erreur) || 'raison inconnue') });
+    await supabase.from('paiements').update({ transfert_erreur: null }).eq('id', p.id);
+    res.json({ message: 'Versement effectué au prestataire.' });
+  } catch (e) {
+    erreurServeur(res, 'POST /api/admin/paiements/:id/verser', e);
+  }
+});
+
+// ── LA FICHE D'UN COMPTE ──────────────────────────────────────────────────
+app.get('/api/admin/users/:id', adminAuth, async (req, res) => {
+  try {
+    const { data: u } = await supabase.from('users')
+      .select('id, prenom, nom, email, telephone, type, disponible, suspendu, compte_supprime, created_at, note_moyenne, taux_fiabilite, nombre_annulations_pro, absences_constatees, siret, siret_statut, siret_doublon, raison_sociale, adresse_facturation, email_verifie, stripe_account_id, assurance_rc_pro, assurance_compagnie, ville_memorisee, code_parrainage')
+      .eq('id', req.params.id).maybeSingle();
+    if (!u) return res.status(404).json({ error: 'Ce compte n\'existe pas.' });
+    const estPro = isProType(u.type);
+    const [demandesRes, devisRes, paiementsRes, signalementsRes, documentsRes] = await Promise.all([
+      supabase.from('demandes').select('id, prestation, statut, creneau, created_at, contestation_le').eq('client_id', u.id).order('created_at', { ascending: false }).limit(30),
+      estPro ? supabase.from('devis').select('id, demande_id, statut, prix_ttc, created_at').eq('societe_id', u.id).order('created_at', { ascending: false }).limit(30) : { data: [] },
+      supabase.from('paiements').select('id, demande_id, statut, montant_ttc, montant_societe, montant_rembourse, created_at')
+        .or(`client_id.eq.${u.id},societe_id.eq.${u.id}`).neq('statut', 'en_attente').order('created_at', { ascending: false }).limit(30),
+      supabase.from('signalements').select('id, motif, description, statut, created_at, reporter_id, signale_id')
+        .or(`reporter_id.eq.${u.id},signale_id.eq.${u.id}`).order('created_at', { ascending: false }).limit(30),
+      estPro ? supabase.from('documents_pro').select('id, type, face, statut, created_at, date_expiration').eq('pro_id', u.id).order('created_at', { ascending: false }) : { data: [] }
+    ]);
+    const { stripe_account_id, ...visible } = u;
+    const regle = estPro ? await prestataireEnRegle(u.id).catch(() => null) : null;
+    res.json({
+      compte: { ...visible, est_pro: estPro, paiements_configures: !!stripe_account_id },
+      en_regle: regle,
+      demandes: demandesRes.data || [],
+      devis: devisRes.data || [],
+      paiements: paiementsRes.data || [],
+      signalements: signalementsRes.data || [],
+      documents: (documentsRes.data || []).map(d => ({ ...d, type_libelle: (TYPES_DOCUMENTS[d.type] || {}).libelle || d.type }))
+    });
+  } catch (e) {
+    erreurServeur(res, 'GET /api/admin/users/:id', e);
+  }
+});
+
 // Liste des utilisateurs, avec recherche simple par email/nom — pour retrouver rapidement un
 // compte à superviser sans avoir à ouvrir Supabase.
 app.get('/api/admin/users', adminAuth, async (req, res) => {
@@ -10367,7 +10836,7 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     const debut = page * PAR_PAGE;
 
     let requete = supabase.from('users')
-      .select('id, prenom, nom, email, telephone, type, disponible, compte_supprime, created_at, note_moyenne, taux_fiabilite, siret, siret_statut, siret_doublon',
+      .select('id, prenom, nom, email, telephone, type, disponible, suspendu, compte_supprime, created_at, note_moyenne, taux_fiabilite, siret, siret_statut, siret_doublon',
               { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(debut, debut + PAR_PAGE - 1);
@@ -10376,6 +10845,13 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     // parenthèses et jokers en changeaient la structure ; on les retire.
     const rechercheSure = String(recherche || '').replace(/[,()%*\\"]/g, ' ').trim().slice(0, 100);
     if (rechercheSure) requete = requete.or(`email.ilike.%${rechercheSure}%,prenom.ilike.%${rechercheSure}%,nom.ilike.%${rechercheSure}%`);
+    // Filtre par population — liste fermée, jamais la saisie brute.
+    const filtreType = String(req.query.type || '');
+    if (filtreType === 'client') requete = requete.eq('type', 'client');
+    else if (filtreType === 'entreprise') requete = requete.eq('type', 'entreprise');
+    else if (filtreType === 'pro') requete = requete.in('type', ['pro', 'societe', 'professionnel']);
+    else if (filtreType === 'suspendus') requete = requete.eq('suspendu', true);
+    else if (filtreType === 'supprimes') requete = requete.eq('compte_supprime', true);
 
     const { data, count } = await requete;
 
@@ -10394,8 +10870,23 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
 // client, qui n'ont pas cette notion de disponibilité.
 app.patch('/api/admin/users/:id/disponibilite', adminAuth, async (req, res) => {
   try {
-    const { disponible } = req.body;
+    const { disponible, motif } = req.body;
+    const { data: cible } = await supabase.from('users').select('id, type').eq('id', req.params.id).maybeSingle();
+    if (!cible) return res.status(404).json({ error: 'Ce compte n\'existe pas.' });
+    if (!isProType(cible.type)) return res.status(400).json({ error: 'Seuls les comptes prestataires peuvent être suspendus.' });
     await supabase.from('users').update({ disponible: !!disponible, suspendu: !disponible }).eq('id', req.params.id);
+    // La trace : qui a été suspendu, quand, pourquoi.
+    if (motif && String(motif).trim()) {
+      await supabase.from('signalements').insert({
+        reporter_id: req.params.id, signale_id: req.params.id,
+        motif: disponible ? 'Administration — compte réactivé' : 'Administration — compte suspendu',
+        description: String(motif).trim().slice(0, 1000), statut: 'traite'
+      });
+    }
+    envoyerNotificationPush(req.params.id, disponible
+      ? { titre: 'Votre compte est réactivé', corps: 'Vous pouvez de nouveau recevoir des demandes.', url: '/#accueil' }
+      : { titre: 'Votre compte est suspendu', corps: 'Contactez le support Gleam pour en savoir plus.', url: '/#profil' }
+    ).catch(() => {});
     res.json({ message: disponible ? 'Compte réactivé.' : 'Compte suspendu.' });
   } catch (e) {
     erreurServeur(res, 'PATCH /api/admin/users/:id/disponibilite', e);
@@ -10805,10 +11296,49 @@ process.on('uncaughtException', function(err) {
 // Il ne faut ni réessayer — aucune tentative n'aboutira, la première écoute
 // pour de bon — ni mourir, ce qui tuerait le serveur qui fonctionne.
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LE WEBHOOK STRIPE SE CONFIGURE TOUT SEUL
+//
+// Le serveur traite trois événements : le paiement réussi, l'opposition
+// bancaire (charge.dispute.created) et le remboursement fait hors de Gleam
+// (charge.refunded). Encore faut-il que Stripe les envoie : au démarrage, on
+// vérifie le point de terminaison qui pointe vers /webhooks/stripe et on lui
+// ajoute ceux qui manquent. Rien n'est retiré, rien n'est créé — un nouveau
+// point aurait un autre secret que STRIPE_WEBHOOK_SECRET.
+//
+// Cela vaut aussi pour le passage aux clés réelles : au premier démarrage avec
+// la clé live, le webhook live est complété de la même façon.
+// ═══════════════════════════════════════════════════════════════════════════
+const EVENEMENTS_STRIPE = ['payment_intent.succeeded', 'charge.dispute.created', 'charge.refunded'];
+async function configurerWebhookStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) return;
+  try {
+    const liste = await stripe.webhookEndpoints.list({ limit: 100 });
+    const nos = (liste.data || []).filter((w) => /\/webhooks\/stripe\/?(\?|$)/.test(w.url));
+    if (!nos.length) {
+      console.warn('⚠️  Webhook Stripe : aucun point de terminaison vers /webhooks/stripe — à créer dans le tableau de bord Stripe.');
+      return;
+    }
+    for (const w of nos) {
+      const actuels = w.enabled_events || [];
+      if (actuels.includes('*')) { console.log('✅ Webhook Stripe ' + w.id + ' : reçoit déjà tous les événements.'); continue; }
+      const manquants = EVENEMENTS_STRIPE.filter((e) => !actuels.includes(e));
+      if (!manquants.length) { console.log('✅ Webhook Stripe ' + w.id + ' : événements à jour.'); continue; }
+      await stripe.webhookEndpoints.update(w.id, { enabled_events: actuels.concat(manquants) });
+      console.log('✅ Webhook Stripe ' + w.id + ' : événements ajoutés → ' + manquants.join(', '));
+    }
+  } catch (e) {
+    console.warn('⚠️  Webhook Stripe non configuré automatiquement (' + e.message + ') — '
+      + 'ajoutez à la main ' + EVENEMENTS_STRIPE.join(', ') + '.');
+  }
+}
+
 function demarrerServeur() {
   serveurHttp = app.listen(PORT, function() {
     console.log('✨ Gleam API démarrée sur le port ' + PORT);
     console.log('   Environnement : ' + (process.env.NODE_ENV || 'development'));
+    // Après le démarrage : un Stripe lent ne doit jamais retarder l'ouverture.
+    setTimeout(() => { configurerWebhookStripe().catch(() => {}); }, 3000);
   });
 
   serveurHttp.on('error', function(err) {
