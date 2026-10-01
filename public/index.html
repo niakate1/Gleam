@@ -7130,10 +7130,24 @@ function dessinerIcones() {
   }
 }
 
-function escapeHtml(s){if(s===null||s===undefined)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML}
+// SÉCURITÉ : échappe aussi les guillemets. L'ancienne version (textContent →
+// innerHTML) laissait passer " et ' : sûre dans un texte, dangereuse dans un
+// attribut — src="…", value="…", title="…".
+function escapeHtml(s){if(s===null||s===undefined)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+// Adresse d'image affichable : lien https, blob local, ou image base64 stricte.
+// Tout le reste (javascript:, guillemets injectés…) est écarté.
+function urlImageSure(u){u=String(u==null?'':u);if(/^https:\/\/[^\s"'<>]+$/i.test(u)||/^blob:https?:\/\/[^\s"'<>]+$/i.test(u)||/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/]+={0,2}$/.test(u))return escapeHtml(u);return''}
 function escAttr(s){// Les guillemets doubles, < et > sont désormais neutralisés : sans cela, un
 // prénom contenant un guillemet permettait de sortir de l'attribut HTML.
-var str=String(s===null||s===undefined?'':s);return str.split('\\').join('\\\\').split("'").join("\\'").split('"').join('&quot;').split('<').join('&lt;').split('>').join('&gt;');}
+// SÉCURITÉ : pour une chaîne JavaScript placée DANS un attribut HTML
+// (onclick="f('…')"). Deux couches, dans cet ordre : échappement JavaScript,
+// puis échappement HTML. L'ancienne version n'échappait pas « & » : le
+// navigateur décodait « &#39; » en apostrophe AVANT d'exécuter le code, ce qui
+// sortait de la chaîne — un prénom ou un type de prestation piégé exécutait du
+// code chez l'autre partie.
+var str=String(s===null||s===undefined?'':s);
+str=str.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/[\r\n\u2028\u2029]/g,' ');
+return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 // Lecture sûre d'une réponse fetch : gère les cas où le corps n'est pas du JSON valide
 // (ex: erreur 413 "payload too large", erreur 502 Railway, page HTML d'erreur, etc.)
@@ -8007,7 +8021,7 @@ function compressImage(file,maxDim,quality){
 // sinon un cercle coloré avec l'initiale du prénom — jamais un espace vide.
 function miniAvatarHtml(photo,name){
   if(photo){
-    return '<div class="mini-avatar"><img class="avatar-photo" src="'+photo+'" alt=""></div>';
+    return '<div class="mini-avatar"><img class="avatar-photo" src="'+urlImageSure(photo)+'" alt=""></div>';
   }
   var initiale=(name||'?').trim().charAt(0).toUpperCase()||'?';
   return '<div class="mini-avatar">'+escapeHtml(initiale)+'</div>';
@@ -8017,7 +8031,7 @@ function miniAvatarHtml(photo,name){
 function renderProfileAvatar(innerId,photo,fallbackEmoji){
   var el=document.getElementById(innerId);
   if(!el)return;
-  if(photo){el.innerHTML='<img class="avatar-photo" src="'+photo+'" alt="">'}
+  if(photo){el.innerHTML='<img class="avatar-photo" src="'+urlImageSure(photo)+'" alt="">'}
   else{
     // Les initiales plutôt qu'un emoji (👤, 🏢) : même principe que l'en-tête
     // d'accueil, et un rendu identique sur tous les téléphones.
@@ -8103,7 +8117,7 @@ function ouvrirPhotoPleinEcran(src){
   overlay.onclick=function(){fermer()};
   // L'adresse est échappée : une photo dont le nom contiendrait une apostrophe
   // ou un guillemet casserait le balisage, et l'image ne s'afficherait pas.
-  overlay.innerHTML='<img src="'+escapeHtml(src)+'" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain">'+
+  overlay.innerHTML='<img src="'+urlImageSure(src)+'" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain">'+
     '<button style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;'+
     'background:rgba(255,255,255,.16);border:none;color:#fff;width:40px;height:40px;'+
     'border-radius:50%;font-size:20px;cursor:pointer;backdrop-filter:blur(8px)" aria-label="Fermer">✕</button>';
@@ -8352,7 +8366,7 @@ async function loadDemandes(silent){
         ? 'cocherDemande(event,\''+escAttr(d.id)+'\')'
         : 'openDetail(\''+escAttr(d.id)+'\')';
 
-      html+='<div class="demand-row fade-in-item" data-demande="'+escAttr(d.id)+'" style="animation-delay:'+(i*0.04)+'s;'+urgentStyle
+      html+='<div class="demand-row fade-in-item" data-demande="'+escapeHtml(d.id)+'" style="animation-delay:'+(i*0.04)+'s;'+urgentStyle
         + (pris ? 'background:var(--vert-selection);' : '')
         + '" onclick="'+actionClic+'">'+
         caseCoche+
@@ -8714,7 +8728,7 @@ function renderDevisClientCards(){
         var photosAvantHtml='';
         if(v.photos_avant&&v.photos_avant.length){
           photosAvantHtml='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px"><i data-lucide="camera" class="ico-txt"></i> Photos avant intervention</div>'+
-            '<div style="display:flex;gap:6px;overflow-x:auto">'+v.photos_avant.map(function(ph){return '<img src="'+ph+'" style="width:70px;height:70px;border-radius:8px;object-fit:cover;flex-shrink:0" onclick="ouvrirPhotoPleinEcran(this.src)">'}).join('')+'</div></div>';
+            '<div style="display:flex;gap:6px;overflow-x:auto">'+v.photos_avant.map(function(ph){return '<img src="'+urlImageSure(ph)+'" style="width:70px;height:70px;border-radius:8px;object-fit:cover;flex-shrink:0" onclick="ouvrirPhotoPleinEcran(this.src)">'}).join('')+'</div></div>';
         // Même correction que côté prestataire : le champ porte le suffixe « _le »,
       // et il est sur la DEMANDE, pas sur le devis. Sans cela, le client ne voyait
       // jamais la confirmation que le prestataire avait commencé.
@@ -8742,10 +8756,10 @@ function renderDevisClientCards(){
         if((v.photos_avant&&v.photos_avant.length)||(v.photos_apres&&v.photos_apres.length)){
           photosHtml='<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">';
           if(v.photos_avant&&v.photos_avant.length){
-            photosHtml+='<div><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Avant</div><div style="display:flex;gap:6px">'+v.photos_avant.map(function(ph){return '<img src="'+ph+'" style="width:60px;height:60px;border-radius:8px;object-fit:cover" onclick="ouvrirPhotoPleinEcran(this.src)">'}).join('')+'</div></div>';
+            photosHtml+='<div><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Avant</div><div style="display:flex;gap:6px">'+v.photos_avant.map(function(ph){return '<img src="'+urlImageSure(ph)+'" style="width:60px;height:60px;border-radius:8px;object-fit:cover" onclick="ouvrirPhotoPleinEcran(this.src)">'}).join('')+'</div></div>';
           }
           if(v.photos_apres&&v.photos_apres.length){
-            photosHtml+='<div><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Après</div><div style="display:flex;gap:6px">'+v.photos_apres.map(function(ph){return '<img src="'+ph+'" style="width:60px;height:60px;border-radius:8px;object-fit:cover" onclick="ouvrirPhotoPleinEcran(this.src)">'}).join('')+'</div></div>';
+            photosHtml+='<div><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Après</div><div style="display:flex;gap:6px">'+v.photos_apres.map(function(ph){return '<img src="'+urlImageSure(ph)+'" style="width:60px;height:60px;border-radius:8px;object-fit:cover" onclick="ouvrirPhotoPleinEcran(this.src)">'}).join('')+'</div></div>';
           }
           photosHtml+='</div>';
         }
@@ -9745,7 +9759,7 @@ function renderProDemandesCards(){
       // occurrence sera de nouveau ouverte à tous les pros, rien ne lui garantit de la récupérer.
       // L'annoncer dans ce cas créerait une fausse attente de business répété, sans rien assurer.
       (d.recurrence&&d.pro_prefere_id===currentUser.id?'<div style="background:var(--light);color:var(--p);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;display:inline-block;margin-bottom:6px"><i data-lucide="repeat" class="ico-txt"></i> Prestation récurrente qui vous est adressée en priorité</div>':'')+
-      '<div class="dc-info"><span><i data-lucide="map-pin"></i></span>'+escapeHtml(d.adresse)+(typeof d.distance_km==='number'?' <strong style="color:var(--p)">— à '+d.distance_km+' km</strong>':'')+'</div>'+
+      '<div class="dc-info"><span><i data-lucide="map-pin"></i></span>'+escapeHtml(d.adresse)+(d.adresse_masquee?' <span style="color:var(--gray);font-size:12px">(adresse exacte après paiement)</span>':'')+(typeof d.distance_km==='number'?' <strong style="color:var(--p)">— à '+d.distance_km+' km</strong>':'')+'</div>'+
       (d.creneau?'<div class="dc-info"><span><i data-lucide="calendar"></i></span>'+formatCreneau(d.creneau)+'</div>':'')+
       (d.notes?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+tryParseNotes(d.notes)+'</div>':'')+
       (hasPhotos?'<div class="photo-previews" style="margin-top:8px" id="photos-pro-'+safeId+'"></div>':'')+
@@ -10763,7 +10777,7 @@ function renderProDevisCards(){
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
           '<div style="font-weight:700;font-size:15px;text-transform:capitalize">'+ICONS_get(v.demande&&v.demande.prestation)+' '+escapeHtml(libellePrestation(v.demande&&v.demande.prestation))+'</div>'+badge+
         '</div>'+
-        '<div style="font-size:12px;color:var(--gray)"><i data-lucide="map-pin" class="ico-txt"></i> '+escapeHtml(v.demande&&v.demande.adresse||'')+'</div>'+
+        '<div style="font-size:12px;color:var(--gray)"><i data-lucide="map-pin" class="ico-txt"></i> '+escapeHtml(v.demande&&v.demande.adresse||'')+(v.demande&&v.demande.adresse_masquee?' (adresse exacte après paiement)':'')+'</div>'+
         (v.demande&&v.demande.creneau?'<div style="font-size:12px;color:var(--gray);margin-top:2px"><i data-lucide="calendar" class="ico-txt"></i> '+formatCreneau(v.demande.creneau)+'</div>':'')+
         (detailsClient?'<div style="font-size:12px;color:var(--gray);margin-top:6px;background:var(--surface-alt);padding:8px;border-radius:8px">'+detailsClient+'</div>':'')+
         (photosClient.length?'<div class="photo-previews" style="margin-top:8px" id="photos-mesdevis-'+safeVId+'"></div>':'')+
@@ -10960,14 +10974,14 @@ function ouvrirFacturation(){
     '</p>'+
     '<div class="field-group"><label>Numéro SIRET</label>'+
       '<input type="text" id="f-siret" inputmode="numeric" maxlength="20" placeholder="14 chiffres" '+
-        'value="'+escAttr(u.siret||'')+'">'+
+        'value="'+escapeHtml(u.siret||'')+'">'+
       '<div class="retour-siret" id="retour-f-siret"></div></div>'+
     '<div class="field-group"><label>Raison sociale</label>'+
-      '<input type="text" id="f-raison" placeholder="Nom de votre société" value="'+escAttr(u.raison_sociale||'')+'"></div>'+
+      '<input type="text" id="f-raison" placeholder="Nom de votre société" value="'+escapeHtml(u.raison_sociale||'')+'"></div>'+
     '<div class="field-group"><label>Adresse de facturation</label>'+
-      '<input type="text" id="f-adresse" placeholder="Numéro, rue, code postal, ville" value="'+escAttr(u.adresse_facturation||'')+'"></div>'+
+      '<input type="text" id="f-adresse" placeholder="Numéro, rue, code postal, ville" value="'+escapeHtml(u.adresse_facturation||'')+'"></div>'+
     '<div class="field-group"><label>N° de TVA intracommunautaire <span class="optional">(facultatif)</span></label>'+
-      '<input type="text" id="f-tva" placeholder="FR12345678901" value="'+escAttr(u.tva_intracom||'')+'"></div>'+
+      '<input type="text" id="f-tva" placeholder="FR12345678901" value="'+escapeHtml(u.tva_intracom||'')+'"></div>'+
     '<button class="modal-send-btn" onclick="enregistrerFacturation()">Enregistrer</button>';
   document.getElementById('modal-overlay').classList.add('open');
 
@@ -11096,7 +11110,7 @@ function ouvrirJustificatifs(){
     '</p>'+
     '<div class="field-group"><label>Numéro SIRET</label>'+
       '<input type="text" id="j-siret" inputmode="numeric" maxlength="20" '+
-        'placeholder="14 chiffres" value="'+escAttr(siret)+'">'+
+        'placeholder="14 chiffres" value="'+escapeHtml(siret)+'">'+
       '<div class="retour-siret" id="retour-j-siret"></div></div>'+
     '<div class="field-group">'+
       '<label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin-top:0">'+
@@ -11105,9 +11119,9 @@ function ouvrirJustificatifs(){
         'responsabilité civile professionnelle en cours de validité</span>'+
       '</label></div>'+
     '<div class="field-group"><label>Compagnie <span class="optional">(facultatif)</span></label>'+
-      '<input type="text" id="j-compagnie" placeholder="Ex : AXA" value="'+escAttr(currentUser&&currentUser.assurance_compagnie||'')+'"></div>'+
+      '<input type="text" id="j-compagnie" placeholder="Ex : AXA" value="'+escapeHtml(currentUser&&currentUser.assurance_compagnie||'')+'"></div>'+
     '<div class="field-group"><label>N° de police <span class="optional">(facultatif)</span></label>'+
-      '<input type="text" id="j-police" placeholder="Ex : 1234567" value="'+escAttr(currentUser&&currentUser.assurance_police||'')+'"></div>'+
+      '<input type="text" id="j-police" placeholder="Ex : 1234567" value="'+escapeHtml(currentUser&&currentUser.assurance_police||'')+'"></div>'+
     '<button class="modal-send-btn" onclick="enregistrerJustificatifs()">Enregistrer</button>';
   document.getElementById('modal-overlay').classList.add('open');
   // Écouteur attaché après insertion : plus lisible qu'un attribut inline,
@@ -11316,7 +11330,7 @@ async function chargerDocumentsPro(){
         var action=(doc&&doc.statut==='valide')?'' :
           '<label class="bouton-document">'+
             '<input type="file" accept="image/*,application/pdf" capture="environment" '+
-              'data-type="'+escAttr(item.type)+'" data-face="'+escAttr(f.face)+'" style="display:none">'+
+              'data-type="'+escapeHtml(item.type)+'" data-face="'+escapeHtml(f.face)+'" style="display:none">'+
             (doc?'Renvoyer':'Photographier')+
           '</label>';
 
@@ -12176,7 +12190,7 @@ function renderConvList(container,data,role){
         var photo=c.autre_partie&&c.autre_partie.photo;
         chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne,id:c.autre_partie&&c.autre_partie.id};
         html+='<div class="conv-row fade-in-item" style="animation-delay:'+(idx++*0.04)+'s;opacity:0.75" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(name)+'\')">'+
-          '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
+          '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+urlImageSure(photo)+'" alt="">':ICONS_get(c.prestation))+'</div>'+
           '<div class="conv-body"><div class="conv-name">'+escapeHtml(name)+'</div>'+
           '<div class="conv-preview">Prestation terminée — consulter l\'historique</div></div>'+
           '<div class="conv-time"><i data-lucide="flag" style="width:14px;height:14px"></i></div></div>';
@@ -12193,7 +12207,7 @@ function convRowHtml(c,idx){
   var photo=c.autre_partie&&c.autre_partie.photo;
   chatPartnerInfo[c.demande_id]={photo:photo,note:c.autre_partie&&c.autre_partie.note_moyenne,id:c.autre_partie&&c.autre_partie.id};
   return'<div class="conv-row fade-in-item" style="animation-delay:'+((idx||0)*0.04)+'s" onclick="goToChat(\''+escAttr(c.demande_id)+'\',\''+escAttr(nameRaw)+'\')">'+
-    '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+photo+'" alt="">':ICONS_get(c.prestation))+'</div>'+
+    '<div class="conv-avatar">'+(photo?'<img class="avatar-photo" src="'+urlImageSure(photo)+'" alt="">':ICONS_get(c.prestation))+'</div>'+
     '<div class="conv-body"><div class="conv-name">'+escapeHtml(nameRaw)+(unread?'<span class="conv-dot" style="display:inline-block;vertical-align:middle"></span>':'')+'</div><div class="conv-preview">'+escapeHtml(preview)+'</div></div>'+
     '<div class="conv-time">'+time+'</div></div>';
 }
@@ -12205,7 +12219,7 @@ function goToChat(demandeId,otherName){
   var info=chatPartnerInfo[demandeId]||{};
   var avatarEl=document.getElementById('chat-avatar');
   if(avatarEl){
-    if(info.photo){avatarEl.innerHTML='<img class="avatar-photo" src="'+info.photo+'" alt="">'}
+    if(info.photo){avatarEl.innerHTML='<img class="avatar-photo" src="'+urlImageSure(info.photo)+'" alt="">'}
     else{avatarEl.textContent=(otherName||'?').trim().charAt(0).toUpperCase()||'?'}
   }
   var subEl=document.getElementById('chat-subtitle');
@@ -12526,7 +12540,7 @@ function remplirRecapPaiement(montant, devis) {
       zonePro.style.display = 'flex';
       zonePro.innerHTML =
           (p.photo_url
-            ? '<img src="' + escAttr(p.photo_url) + '" alt="" style="width:44px;height:44px;'
+            ? '<img src="' + urlImageSure(p.photo_url) + '" alt="" style="width:44px;height:44px;'
               + 'border-radius:50%;object-fit:cover;flex-shrink:0">'
             : '<div style="width:44px;height:44px;border-radius:50%;background:var(--p);'
               + 'color:#fff;display:flex;align-items:center;justify-content:center;'
@@ -12644,6 +12658,8 @@ async function openPayment(devisId,montant,devis){
   try{
     const r=await fetch(API+'/api/paiements/intent',{method:'POST',headers:authHeaders(),body:JSON.stringify({devis_id:devisId})});
     const d=await safeJson(r);
+    // Déjà payé (confirmation arrivée en retard) : ce n'est pas une erreur.
+    if(r.status===409&&d&&d.deja_paye){closePayment();toast('✅ '+(d.error||'Paiement bien reçu.'),5000);loadDevis();return}
     if(!r.ok){document.getElementById('payment-error').textContent=d.error||'Erreur';document.getElementById('payment-error').classList.add('show');return}
     if(!d.client_secret||!d.publishable_key){document.getElementById('payment-error').textContent='Réponse de paiement invalide.';document.getElementById('payment-error').classList.add('show');return}
     if(d.reduction_parrainage){
@@ -13632,7 +13648,7 @@ async function ajouterFavori(proId,proName,btn){
     const r=await fetch(API+'/api/favoris',{method:'POST',headers:authHeaders(),body:JSON.stringify({pro_id:proId})});
     const d=await safeJson(r);
     if(!r.ok){toast(messageErreur(r, d));if(btn)btn.disabled=false;return}
-    toast('⭐ '+escapeHtml(proName)+' ajouté à vos favoris !');
+    toast('⭐ '+proName+' ajouté à vos favoris !');
     if(btn){btn.innerHTML='<i data-lucide="star" style="width:14px;height:14px;vertical-align:-2px;fill:currentColor"></i> Dans vos favoris';if(window.lucide)dessinerIcones()}
   }catch(e){toast(friendlyNetworkError(e));if(btn)btn.disabled=false}
   // La liste en mémoire doit suivre : sans cela, le bouton resterait affiché
@@ -16925,7 +16941,9 @@ function traiterAncreEntrante(){
 
   // Une demande précise : c'est le cas le plus fréquent — devis reçu, paiement
   // confirmé, avis à laisser, nouveau message. Tous pointent ici.
-  var surDemande = ancre.match(/^demande-(.+)$/);
+  // SÉCURITÉ : seul un identifiant (UUID) est accepté — « ../x » faisait
+  // appeler une autre route de l'API avec la session de l'utilisateur.
+  var surDemande = ancre.match(/^demande-([0-9a-fA-F-]{36})$/);
   if (surDemande) {
     var id = surDemande[1];
     consommer();
