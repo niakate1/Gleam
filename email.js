@@ -258,6 +258,20 @@ const templates = {
     })
   }),
 
+  // Document refusé → Pro : ce qu'il doit renvoyer, et pourquoi.
+  document_refuse: (d) => ({
+    subject: 'Un document est à renvoyer',
+    html: wrapTemplate({
+      title: `Bonjour ${d.prenom},`,
+      body: `<p>Nous avons examiné votre <strong>${d.document}</strong> et ne pouvons pas le valider en l'état.</p>
+             <p><strong>Motif :</strong> ${d.motif}${d.commentaire ? `<br/><strong>Précision :</strong> ${d.commentaire}` : ''}</p>
+             <p>Déposez un nouveau document depuis votre profil : il sera vérifié rapidement.</p>`,
+      ctaLabel: 'Renvoyer le document',
+      compteId: d.compteId,
+      ctaUrl: `${APP_URL}#profil`
+    })
+  }),
+
   // 6. Prestation confirmée → Client + Pro
   prestation_confirmee: (d) => ({
     subject: `Prestation confirmée : ${d.prestation}`,
