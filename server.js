@@ -673,7 +673,22 @@ const auth = async (req, res, next) => {
     if (etat.supprime) {
       return res.status(401).json({ error: 'Ce compte a été supprimé.' });
     }
-    if (etat.validesApres && charge.iat && charge.iat < Math.floor(etat.validesApres / 1000)) {
+    // ── LA SECONDE NE SUFFIT PAS ─────────────────────────────────────────
+    // `iat` est en secondes entières. Un jeton volé, émis dans la même
+    // seconde que la réinitialisation, passait le test « iat < seconde de
+    // révocation » et restait valable sept jours.
+    //
+    // Les jetons portent désormais `emis_le`, à la milliseconde, signé comme
+    // le reste : on compare à l'instant exact de la révocation. Aucune
+    // migration — `jetons_valides_apres` est déjà un horodatage précis.
+    //
+    // Les jetons plus anciens, sans `emis_le`, sont jugés à la seconde, en
+    // prudence : émis dans la seconde de la révocation, ils sont refusés.
+    // Au pire, une reconnexion — jamais un jeton volé encore accepté.
+    const revoque = etat.validesApres && (typeof charge.emis_le === 'number'
+      ? charge.emis_le < etat.validesApres
+      : (charge.iat && charge.iat <= Math.floor(etat.validesApres / 1000)));
+    if (revoque) {
       return res.status(401).json({ error: 'Votre session a expiré ou n\'est plus valide. Reconnectez-vous pour continuer.' });
     }
   }
@@ -1729,7 +1744,8 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       enregistrerVerificationSiret(data.id, siret).catch(() => {});
     }
 
-    const token = jwt.sign({ id: data.id, email: data.email, type: data.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    // `emis_le` : l'instant d'émission à la milliseconde (voir `auth`).
+    const token = jwt.sign({ id: data.id, email: data.email, type: data.type, emis_le: Date.now() }, process.env.JWT_SECRET, { expiresIn: '7d' });
     // ── LE CODE DE VÉRIFICATION NE DOIT PAS PARTIR AVEC LA RÉPONSE ────────
     // `...data` renvoyait la ligne ENTIÈRE telle qu'insérée — y compris
     // `email_verif_code` et `email_verif_expire`, créés quelques lignes plus
@@ -1797,7 +1813,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     }
     if (!user) return res.status(500).json({ error: 'Ce compte n\'existe plus. S\'il s\'agit du vôtre, reconnectez-vous ; sinon, la personne a supprimé son compte.' });
 
-    const token = jwt.sign({ id: user.id, email: user.email, type: user.type }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    // `emis_le` : l'instant d'émission à la milliseconde (voir `auth`).
+    const token = jwt.sign({ id: user.id, email: user.email, type: user.type, emis_le: Date.now() }, process.env.JWT_SECRET, { expiresIn: '7d' });
     // Le jeton part AUSSI en cookie HttpOnly : le JavaScript ne peut pas le lire,
     // donc une faille XSS ne le vole plus. Il reste dans la réponse le temps que
     // les sessions déjà ouvertes migrent.
@@ -2454,6 +2471,21 @@ function prestationsInvalides(liste) {
   return null;
 }
 
+// Le libellé d'une demande — « 2 voiture + canape » plutôt que « voiture +
+// voiture + canape » (voir la création). Partagé avec la modification : elle
+// répétait le mot à chaque article, et onze voitures dépassaient les cent
+// caractères de la colonne — la modification échouait.
+function libellePrestations(listePrestations) {
+  const compteParType = {};
+  for (const p of listePrestations) {
+    const t = p.type || 'autre';
+    compteParType[t] = (compteParType[t] || 0) + 1;
+  }
+  return Object.keys(compteParType)
+    .map(t => (compteParType[t] > 1 ? compteParType[t] + ' ' + t : t))
+    .join(' + ');
+}
+
 app.post('/api/demandes', auth, async (req, res) => {
   try {
     const { type, prestations, address, date, time, flexibility, description, details, photos, pro_prefere_id, latitude, longitude, recurrence } = req.body;
@@ -2542,14 +2574,7 @@ app.post('/api/demandes', auth, async (req, res) => {
     // Le libellé reste une CLÉ technique — sans accent, en minuscules. Il est
     // affiché tel quel dans les listes, et `libellePrestation()` côté client
     // s'occupe de le rendre lisible.
-    const compteParType = {};
-    for (const p of listePrestations) {
-      const t = p.type || 'autre';
-      compteParType[t] = (compteParType[t] || 0) + 1;
-    }
-    const prestationLabel = Object.keys(compteParType)
-      .map(t => (compteParType[t] > 1 ? compteParType[t] + ' ' + t : t))
-      .join(' + ');
+    const prestationLabel = libellePrestations(listePrestations);
 
     // Les photos partent dans le dépôt de fichiers ; seuls leurs chemins sont
     // conservés en base. Le dossier est tiré au hasard : l'identifiant de la
@@ -2582,13 +2607,19 @@ app.post('/api/demandes', auth, async (req, res) => {
     // Deux minutes : au-delà, une demande identique est probablement voulue —
     // deux voitures à nettoyer au même endroit, par exemple.
     const ilYaDeuxMinutes = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data: doublon } = await supabase.from('demandes')
+    //
+    // Sans date, `creneau` vaut null : `.eq('creneau', null)` produit
+    // « creneau = NULL », qui n'est jamais vrai en SQL — le garde-fou ne
+    // voyait aucun doublon. Il faut « creneau IS NULL ».
+    let requeteDoublon = supabase.from('demandes')
       .select('id')
       .eq('client_id', req.user.id)
       .eq('adresse', address)
-      .eq('creneau', creneau)
-      .gte('created_at', ilYaDeuxMinutes)
-      .maybeSingle();
+      .gte('created_at', ilYaDeuxMinutes);
+    requeteDoublon = creneau === null
+      ? requeteDoublon.is('creneau', null)
+      : requeteDoublon.eq('creneau', creneau);
+    const { data: doublon } = await requeteDoublon.maybeSingle();
 
     if (doublon) {
       // On renvoie la demande EXISTANTE plutôt qu'une erreur : du point de vue
@@ -2710,6 +2741,10 @@ async function creerProchaineOccurrenceRecurrente(demandeId) {
       notes: demande.notes,
       numero_anonyme: 'Client #' + Math.floor(1000 + Math.random() * 9000),
       pro_prefere_id: demande.pro_prefere_id,
+      // Même règle qu'à la création : un favori sans fin d'exclusivité rendait
+      // l'occurrence invisible À VIE pour les autres prestataires s'il ne
+      // répondait pas.
+      exclusivite_jusqu_a: demande.pro_prefere_id ? finExclusivite(dateStr + ' à ' + heureStr) : null,
       latitude: demande.latitude,
       longitude: demande.longitude,
       statut: 'en_attente',
@@ -2976,7 +3011,7 @@ async function relancerDemandesSansDevis() {
       if (count && count > 0) continue;
 
       const { data: client } = await supabase.from('users')
-        .select('email, prenom, compte_supprime').eq('id', demande.client_id).maybeSingle();
+        .select('id, email, prenom, compte_supprime').eq('id', demande.client_id).maybeSingle();
 
       if (client && client.email && !client.compte_supprime) {
         sendEmail('demande_sans_devis_client', client.email, {
@@ -3385,7 +3420,7 @@ async function cloturerPrestationsOubliees() {
                     HEURES_AVANT_CLOTURE_AUTO + ' h sans code.');
 
         const { data: client } = await supabase.from('users')
-          .select('prenom, email').eq('id', d.client_id).maybeSingle();
+          .select('id, prenom, email').eq('id', d.client_id).maybeSingle();
         if (client) {
           sendEmail('prestation_validee_automatiquement', client.email, {
             compteId: client.id,
@@ -3905,9 +3940,12 @@ async function reprendreVirementsEchoues() {
   try {
     const ilYaUneHeure = new Date(Date.now() - 3600 * 1000).toISOString();
 
+    // Deux sortes d'échecs : le versement d'une prestation (« paye »), et la
+    // part retenue d'une annulation tardive (« rembourse_partiel », argent
+    // resté chez Gleam) — cette dernière n'était jamais reprise.
     const { data: aReprendre, error } = await supabase.from('paiements')
-      .select('id, demande_id, transfert_tentatives')
-      .eq('statut', 'paye')
+      .select('id, demande_id, statut, transfert_tentatives')
+      .or('statut.eq.paye,' + FILTRE_PART_RETENUE_ECHOUEE)
       .not('transfert_erreur', 'is', null)
       .lt('transfert_tentative_le', ilYaUneHeure)
       .lt('transfert_tentatives', 5)
@@ -3921,6 +3959,16 @@ async function reprendreVirementsEchoues() {
 
     let repris = 0;
     for (const p of aReprendre) {
+      if (p.statut === 'rembourse_partiel') {
+        // La part retenue : la prestation est annulée, il n'y a rien à
+        // terminer — seulement le virement à refaire, sur la ligne complète.
+        const { data: ligne } = await supabase.from('paiements').select('*').eq('id', p.id).maybeSingle();
+        if (!ligne || !partRetenueNonVersee(ligne)) continue;
+        const r = await verserPartRetenue(ligne, ligne.montant_societe);
+        if (r && r.ok) repris++;
+        continue;
+      }
+
       // La prestation doit être terminée : un paiement encore en cours n'a
       // rien à verser, et sa présence ici serait un autre défaut.
       const { data: demande } = await supabase.from('demandes')
@@ -4754,7 +4802,7 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
     if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
       return res.status(400).json({ error: 'Impossible de modifier : un devis a déjà été accepté pour cette demande.' });
 
-    const { prestations, address, date, time, flexibility } = req.body;
+    const { prestations, address, date, time, flexibility, latitude, longitude } = req.body;
     if (!address) return res.status(400).json({ error: 'Indiquez l\'adresse où doit avoir lieu la prestation.' });
     if (String(address).length > 300) return res.status(400).json({ error: 'Adresse trop longue.' });
     const erreurCreneau = validerCreneauFutur(date, time);
@@ -4767,8 +4815,37 @@ app.patch('/api/demandes/:id', auth, async (req, res) => {
 
     const updateData = { adresse: address, creneau: creneau };
     if (listePrestations) {
-      updateData.prestation = listePrestations.map(p => p.type).join(' + ');
-      updateData.notes = JSON.stringify({ flexibility: flexibility || '', prestations: listePrestations, modifiee: true });
+      updateData.prestation = libellePrestations(listePrestations);
+      // Les notes portent aussi les photos de la demande : les réécrire de
+      // zéro les faisait disparaître à la première modification. On repart
+      // donc des anciennes notes, et on ne remplace que ce qui a changé.
+      let anciennesNotes = {};
+      try {
+        const lues = JSON.parse(demande.notes || '{}');
+        if (lues && typeof lues === 'object' && !Array.isArray(lues)) anciennesNotes = lues;
+      } catch (e) { /* notes anciennes au format libre : rien à conserver */ }
+      updateData.notes = JSON.stringify({ ...anciennesNotes, flexibility: flexibility || '', prestations: listePrestations, modifiee: true });
+    }
+
+    // ── NOUVELLE ADRESSE, NOUVELLE POSITION ──────────────────────────────
+    // La position restait celle de l'ancienne adresse : la distance à
+    // l'arrivée du prestataire, et le ciblage des zones, se calculaient sur
+    // un lieu où la prestation n'a plus lieu. Même règle qu'à la création :
+    // coordonnées fournies par l'autocomplétion, sinon géocodage au serveur,
+    // sinon aucune — plutôt qu'une position fausse.
+    if (address !== demande.adresse) {
+      let coordonnees = {
+        latitude: (typeof latitude === 'number' && !isNaN(latitude)) ? latitude : null,
+        longitude: (typeof longitude === 'number' && !isNaN(longitude)) ? longitude : null
+      };
+      if (coordonnees.latitude === null || coordonnees.longitude === null) {
+        const trouve = await geocoderAdresse(address);
+        coordonnees = trouve
+          ? { latitude: trouve.latitude, longitude: trouve.longitude }
+          : { latitude: null, longitude: null };
+      }
+      updateData.latitude = coordonnees.latitude;
+      updateData.longitude = coordonnees.longitude;
     }
     // Si la demande était expirée, la relancer avec un nouveau créneau doit bien la remettre "en
     // attente" — sinon elle reste invisible pour les pros (leur liste n'affiche jamais les
@@ -4855,6 +4932,9 @@ app.post('/api/demandes/:id/relancer-recurrente', auth, async (req, res) => {
       notes: demande.notes,
       numero_anonyme: 'Client #' + Math.floor(1000 + Math.random() * 9000),
       pro_prefere_id: proPrefereId,
+      // Exclusivité bornée, comme à la création — sinon la demande resterait
+      // réservée au favori indéfiniment.
+      exclusivite_jusqu_a: proPrefereId ? finExclusivite(dateStr + ' à ' + heureStr) : null,
       latitude: demande.latitude,
       longitude: demande.longitude,
       statut: 'en_attente',
@@ -5028,12 +5108,104 @@ app.post('/api/demandes/:id/repondre-creneau', auth, async (req, res) => {
 //     comme si la prestation avait eu lieu normalement)
 // Si `heuresRestantes` n'est pas fourni (annulation à l'initiative du PRO), remboursement toujours
 // intégral — ce n'est jamais au client de payer les frais d'une annulation qu'il n'a pas décidée.
+// ── LA PART DU PRESTATAIRE SUR UNE ANNULATION TARDIVE ─────────────────────
+// Ne concerne que les paiements restés chez Gleam (pas de charge à
+// destination) : avec une charge à destination, la part du pro est déjà sur
+// son compte et Stripe n'en reprend que le prorata.
+//
+// Mêmes conventions que finaliserPrestation : clé d'idempotence par
+// tentative, et un échec laisse une trace (transfert_erreur) au lieu de
+// disparaître. Le remboursement du client, lui, est déjà fait : on ne le
+// remet pas en cause pour un virement à refaire.
+//
+// ── UN ÉCHEC ICI DOIT ÊTRE REPRIS, PAS SEULEMENT NOTÉ ──────────────────────
+// La trace était posée sur une ligne « rembourse_partiel » — un statut que ni
+// la reprise automatique, ni le compteur « virements échoués », ni le filtre
+// « à surveiller » ne regardaient. Le prestataire n'était jamais payé, et
+// « Mes gains » lui affichait pourtant la somme comme reçue.
+//
+// Les trois regardent désormais aussi ces lignes (voir partRetenueNonVersee),
+// et la fonction rend son résultat pour que la reprise sache si elle a abouti.
+async function verserPartRetenue(paiement, montantPro) {
+  if (paiement.transfert_automatique || paiement.stripe_transfer_id) return { ok: true, rien: true };
+  const centimes = Math.round((parseFloat(montantPro) || 0) * 100);
+  if (centimes <= 0) return { ok: true, rien: true };
+  const tentatives = paiement.transfert_tentatives || 0;
+  const { data: pro } = await supabase.from('users').select('id, stripe_account_id').eq('id', paiement.societe_id).maybeSingle();
+  if (!pro || !pro.stripe_account_id) {
+    await supabase.from('paiements').update({
+      transfert_erreur: 'Paiements du prestataire non configurés',
+      transfert_tentative_le: new Date().toISOString(),
+      transfert_tentatives: tentatives + 1
+    }).eq('id', paiement.id);
+    return { erreur: 'Paiements du prestataire non configurés' };
+  }
+
+  // ── LE VIREMENT EST RATTACHÉ À LA CHARGE DU CLIENT ──────────────────────
+  // Avec `source_transaction`, Stripe prélève le virement sur les fonds de
+  // CE paiement, même s'ils ne sont pas encore disponibles sur le solde de
+  // la plateforme — c'est la cause la plus courante d'échec (« solde
+  // insuffisant »). La ligne ne garde pas l'identifiant de la charge : on le
+  // lit sur l'intention de paiement. Introuvable, on vire sans, comme avant.
+  let sourceTransaction = null;
+  if (paiement.stripe_payment_intent_id) {
+    try {
+      const intention = await stripe.paymentIntents.retrieve(paiement.stripe_payment_intent_id);
+      const charge = intention && intention.latest_charge;
+      sourceTransaction = typeof charge === 'string' ? charge : (charge && charge.id) || null;
+    } catch (e) {
+      console.warn('Charge du paiement introuvable, virement sans source_transaction :', e.message);
+    }
+  }
+
+  try {
+    const params = {
+      amount: centimes,
+      currency: 'eur',
+      destination: pro.stripe_account_id,
+      transfer_group: `demande_${paiement.demande_id}`
+    };
+    if (sourceTransaction) params.source_transaction = sourceTransaction;
+    // Le montant fait partie de la clé : deux annulations de part et d'autre
+    // du seuil des 2 h partageaient la même clé pour deux montants différents
+    // (Stripe refuse alors la seconde, ou rejoue la première à tort).
+    await stripe.transfers.create(params,
+      { idempotencyKey: 'versement-retenue-' + paiement.id + '-' + tentatives + '-' + centimes });
+    await supabase.from('paiements').update({ libere_le: new Date().toISOString(), transfert_erreur: null }).eq('id', paiement.id);
+    return { ok: true };
+  } catch (stripeErr) {
+    console.error('Virement de la part retenue échoué:', stripeErr);
+    await supabase.from('paiements').update({
+      transfert_erreur: String(stripeErr.message || 'inconnue').slice(0, 300),
+      transfert_tentative_le: new Date().toISOString(),
+      transfert_tentatives: tentatives + 1
+    }).eq('id', paiement.id);
+    return { erreur: stripeErr.message || 'Virement impossible.' };
+  }
+}
+
+// Une part retenue (annulation tardive, remboursement partiel) que Gleam
+// détient encore et n'a pas versée au prestataire. Même définition pour la
+// reprise, la console et « Mes gains ».
+const FILTRE_PART_RETENUE_ECHOUEE = 'and(statut.eq.rembourse_partiel,transfert_automatique.eq.false,stripe_transfer_id.is.null,transfert_erreur.not.is.null)';
+function partRetenueNonVersee(p) {
+  return p.statut === 'rembourse_partiel' && !p.transfert_automatique && !p.stripe_transfer_id
+    && !p.libere_le && (parseFloat(p.montant_societe) || 0) > 0;
+}
+
 async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
   // `options.arbitrage` : décision de l'administrateur après examen du litige.
   // Elle tranche — la suspension « en attente d'arbitrage » ne s'applique plus.
   const arbitrage = !!(options && options.arbitrage);
   const { data: paiement } = await supabase.from('paiements').select('*').eq('demande_id', demandeId).eq('statut', 'paye').maybeSingle();
-  if (!paiement) return { rembourse: false };
+  if (!paiement) {
+    // Un versement ou un remboursement est déjà parti (ou vient d'aboutir) :
+    // l'appelant ne doit pas annoncer une annulation qui n'a pas eu lieu.
+    const { data: dejaPris } = await supabase.from('paiements').select('id')
+      .eq('demande_id', demandeId).in('statut', ['liberation_en_cours', 'remboursement_en_cours', 'libere']).limit(1);
+    if (dejaPris && dejaPris.length) return { rembourse: false, conflit: true };
+    return { rembourse: false };
+  }
 
   // ── UNE ARRIVÉE CONTESTÉE NE SE FACTURE PAS AU CLIENT ──────────────────
   // Le barème pénalise les annulations tardives : moins de deux heures avant
@@ -5132,8 +5304,26 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
     else if (heuresRestantes < 24) pourcentage = 0.7;
   }
 
+  // ── LA LIGNE EST RÉSERVÉE AVANT TOUT MOUVEMENT D'ARGENT ────────────────
+  // Le statut était écrit sans condition, APRÈS le remboursement. Pendant ce
+  // temps, la saisie du code pouvait réserver le même paiement et verser 85 €
+  // au prestataire — puis l'annulation lui virait encore sa part retenue.
+  // Deux annulations simultanées passaient aussi toutes les deux.
+  //
+  // Même verrou que verserAuPrestataire : une seule requête gagne, les
+  // autres s'arrêtent avant d'avoir touché à Stripe.
+  const reserve = await reserverLigne('paiements', paiement.id, ['paye'], 'remboursement_en_cours');
+  if (!reserve) return { rembourse: false, conflit: true };
+  const rendreLaLigne = () => supabase.from('paiements').update({ statut: 'paye' })
+    .eq('id', paiement.id).eq('statut', 'remboursement_en_cours');
+
   if (pourcentage === 0) {
     await supabase.from('paiements').update({ statut: 'rembourse_partiel', montant_rembourse: 0 }).eq('id', paiement.id);
+
+    // Paiement resté chez Gleam (pas de charge à destination) : le statut
+    // « rembourse_partiel » le sort de toute libération, le prestataire ne
+    // toucherait jamais sa part. On la lui vire ici, en entier.
+    await verserPartRetenue(paiement, parseFloat(paiement.montant_societe) || 0);
 
     // Pas d'avoir ici : le client annule à moins de deux heures, rien ne lui
     // est rendu. La facture reste due en totalité — il n'y a rien à annuler.
@@ -5142,6 +5332,7 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
     return { rembourse: false, fraisRetenus: true, montantRetenu: paiement.montant_ttc };
   }
 
+  let rembourseChezStripe = false;
   try {
     // Vérifié dans la documentation officielle de Stripe : SANS instruction explicite, Stripe ne
     // reprend RIEN sur la part déjà transférée au pro lors d'un remboursement — le pro garderait
@@ -5167,6 +5358,7 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
     await stripe.refunds.create(paramsRemboursement, {
       idempotencyKey: 'rembourser-' + paiement.id + '-' + Math.round(pourcentage * 100) + '-' + (paiement.montant_rembourse || 0)
     });
+    rembourseChezStripe = true;
     const montantEffectivementRembourse = Math.round(paiement.montant_ttc * pourcentage * 100) / 100;
 
     // Plutôt que de recalculer à la main ce que le pro garde réellement (la mécanique interne de
@@ -5175,7 +5367,30 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
     // vrai montant final, une fois la reprise effectuée. Ça élimine tout risque de mauvais calcul
     // de notre côté : on rapporte fidèlement ce que Stripe confirme, jamais une estimation.
     // Remboursement total : la part du pro est intégralement reprise.
-    let montantProCorrige = pourcentage >= 1 ? 0 : paiement.montant_societe;
+    // ── SI STRIPE NE RÉPOND PAS, LE PRORATA, PAS LA PART ENTIÈRE ──────────
+    // Par défaut on gardait `montant_societe` tel quel : une lecture du
+    // transfert en échec (ou un identifiant de transfert absent) laissait
+    // 85 € sur un paiement dont le pro ne garde que 25,50 €. Le prorata est
+    // une estimation, mais une estimation juste ; la lecture Stripe, quand
+    // elle réussit, la remplace plus bas.
+    let montantProCorrige = pourcentage >= 1 ? 0
+      : partReelleBrute({ ...paiement, montant_rembourse: montantEffectivementRembourse }, 'montant_societe');
+
+    // ── PAIEMENT SANS RÉPARTITION : LA PART DU PRO SE CALCULE ICI ─────────
+    // Sans charge à destination, il n'y a pas de transfert à relire chez
+    // Stripe : `montant_societe` restait à 85 € alors que Gleam n'avait plus
+    // que 30 € en main — et, le paiement n'étant plus « paye », aucune
+    // libération ne virait jamais rien au prestataire.
+    //
+    // Sa part de ce qui est retenu suit la même proportion que sa part du
+    // total (85 % de 30 € = 25,50 €), et c'est ce montant qu'on lui vire.
+    if (pourcentage < 1 && !paiement.transfert_automatique && !paiement.stripe_transfer_id) {
+      const total = parseFloat(paiement.montant_ttc) || 0;
+      const retenu = Math.max(0, total - montantEffectivementRembourse);
+      montantProCorrige = total > 0
+        ? Math.round((parseFloat(paiement.montant_societe) || 0) * (retenu / total) * 100) / 100
+        : 0;
+    }
     if (paiement.stripe_transfer_id) {
       try {
         const transfert = await stripe.transfers.retrieve(paiement.stripe_transfer_id);
@@ -5186,7 +5401,8 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
           montantFeeRetenu = (fee.amount - fee.amount_refunded) / 100;
         }
         // Le pro garde le montant net du transfert, une fois la commission encore due déduite
-        montantProCorrige = Math.round((montantTransfereNet - montantFeeRetenu) * 100) / 100;
+        // (jamais négatif : la base refuse un montant_societe < 0).
+        montantProCorrige = Math.max(0, Math.round((montantTransfereNet - montantFeeRetenu) * 100) / 100);
       } catch (e) {
         console.error('Lecture du montant réel chez Stripe échouée, montant non recalculé:', e.message);
       }
@@ -5197,6 +5413,8 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
       montant_rembourse: montantEffectivementRembourse,
       montant_societe: montantProCorrige
     }).eq('id', paiement.id);
+
+    if (pourcentage < 1) await verserPartRetenue(paiement, montantProCorrige);
 
     // Un remboursement produit un avoir : la facture d'origine reste dans la
     // séquence, et l'avoir dit ce qui a été annulé.
@@ -5232,6 +5450,11 @@ async function rembourserPaiementSiPaye(demandeId, heuresRestantes, options) {
     };
   } catch (e) {
     console.error('Remboursement Stripe échoué:', e);
+    // Stripe a refusé : rien n'a bougé, la ligne repart de « paye » et une
+    // nouvelle tentative reste possible. Si le remboursement est passé et que
+    // c'est la suite qui a échoué, on ne rend surtout pas la ligne : elle
+    // reste visible (« à surveiller ») plutôt que d'être remboursée deux fois.
+    if (!rembourseChezStripe) await rendreLaLigne();
     return { rembourse: false, erreur: true };
   }
 }
@@ -5299,7 +5522,11 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
     // AUCUNE SUSPENSION AUTOMATIQUE : trois absences peuvent venir d'un
     // téléphone cassé, d'un accident, d'une hospitalisation. Le compteur sert
     // à REGARDER. Avec quatre prestataires, un chiffre visible suffit.
-    if (devisAccepte && !demande.prestation_demarree_le) {
+    //
+    // Et SEULEMENT sur une prestation payée (« en_cours ») : sur un devis
+    // accepté jamais réglé, le prestataire n'avait aucune raison de venir —
+    // rien n'était confirmé. Ce n'est pas une absence.
+    if (devisAccepte && demande.statut === 'en_cours' && !demande.prestation_demarree_le) {
       const instantPrestation = instantDuCreneau(demande.creneau);
       if (instantPrestation && Date.now() > instantPrestation) {
         const { data: pro } = await supabase.from('users')
@@ -5322,6 +5549,17 @@ app.post('/api/demandes/:id/annuler-client', auth, async (req, res) => {
 
     // Si la prestation était déjà payée (en cours), applique le barème de frais avant d'annuler
     const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id, heuresRestantes) : { rembourse: false };
+
+    // ── UNE AUTRE OPÉRATION EST DÉJÀ PASSÉE ───────────────────────────────
+    // Un second appui sur « Annuler », ou le code de fin saisi au même
+    // instant : le paiement a été pris par l'autre requête. On ne touche à
+    // rien — sinon la demande serait « annulée » sur un paiement versé.
+    if (remboursement && remboursement.conflit) {
+      return res.status(409).json({
+        error: 'Cette prestation est déjà en cours de traitement (annulation ou validation). '
+             + 'Rechargez la page pour voir son état.'
+      });
+    }
 
     // ── UNE ANNULATION NE DOIT PAS EFFACER UN LITIGE EN COURS ─────────────
     // `rembourserPaiementSiPaye` peut SUSPENDRE le remboursement : le
@@ -5664,7 +5902,12 @@ app.post('/api/devis', auth, async (req, res) => {
       }
     }
     if (!demande) return res.status(404).json({ error: 'Cette demande n\'existe plus. Elle a sans doute été supprimée ou annulée par le client.' });
-    if (demande.statut === 'acceptee' || demande.statut === 'en_cours' || demande.statut === 'terminee' || demande.statut === 'annulee_client')
+    // Liste BLANCHE plutôt que liste noire : seule une demande encore ouverte
+    // (en attente ou déjà chiffrée par d'autres) peut recevoir un devis.
+    // Avant, une demande « expiree » passait le filtre, et l'envoi du devis
+    // la repassait en « devis_recus » — elle ressuscitait avec un créneau
+    // déjà dépassé.
+    if (demande.statut !== 'en_attente' && demande.statut !== 'devis_recus')
       return res.status(400).json({ error: 'Cette demande n\'est plus disponible.' });
 
     // ── SÉCURITÉ : LES MÊMES RÈGLES QUE LA LISTE DES DEMANDES ──────────────
@@ -5697,7 +5940,9 @@ app.post('/api/devis', auth, async (req, res) => {
     }).select().single();
 
     if (error) { console.error('Erreur Supabase, message technique complet:', error); return res.status(400).json({ error: traduireErreurSupabase(error.message) }); }
-    await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', demande_id);
+    // Garde-fou : on ne repasse en « devis_recus » qu'une demande encore
+    // ouverte (elle a pu expirer ou être annulée entre la lecture et ici).
+    await supabase.from('demandes').update({ statut: 'devis_recus' }).eq('id', demande_id).in('statut', ['en_attente', 'devis_recus']);
 
     // 📧 Email 2/8 : nouveau devis reçu → client
     const { data: client } = await supabase.from('users').select('id, email, prenom').eq('id', demande.client_id).single();
@@ -5834,13 +6079,29 @@ app.get('/api/devis/mes-devis-recus', auth, async (req, res) => {
         prestation_demarree: demandeInfo ? Boolean(demandeInfo.prestation_demarree_le) : false,
         creneau: demandeInfo ? demandeInfo.creneau : null,
         creneau_propose: demandeInfo ? demandeInfo.creneau_propose : null,
-        creneau_propose_par: demandeInfo ? demandeInfo.creneau_propose_par : null
+        creneau_propose_par: demandeInfo ? demandeInfo.creneau_propose_par : null,
+        // ── L'ADRESSE ET LE DÉTAIL ÉTAIENT LUS, PUIS JETÉS ────────────────
+        // La requête les chargeait pour le devis imprimable, mais la réponse
+        // ne les reprenait pas : l'écran de paiement lit `devis.adresse`, le
+        // devis imprimable `devis.demande.adresse` et `devis.demande.notes` —
+        // tous trois vides. On fournit les deux formes.
+        //
+        // Pas de masquage ici : c'est le client, propriétaire de la demande,
+        // qui lit sa propre adresse.
+        adresse: demandeInfo ? demandeInfo.adresse : null,
+        demande: {
+          ...(d.demande && typeof d.demande === 'object' ? d.demande : {}),
+          adresse: demandeInfo ? demandeInfo.adresse : null,
+          notes: demandeInfo ? demandeInfo.notes : null
+        }
       };
     });
 
-    // Les photos avant/après voyagent ici à la racine de chaque devis, et non
-    // dans un objet `demande` : le lot est donc signé tel quel.
+    // Les photos avant/après voyagent ici à la racine de chaque devis : le lot
+    // est signé tel quel. Les photos de la demande, elles, sont dans
+    // `demande.notes` — signées à leur tour, comme partout ailleurs.
     await signerPhotosDesDemandes(enriched);
+    await signerPhotosDesDemandes(enriched.map(e => e.demande));
 
     res.json(enriched);
   } catch (e) {
@@ -6105,6 +6366,12 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     // de remettre la demande en circulation pour d'autres pros
     const remboursement = demande.statut === 'en_cours' ? await rembourserPaiementSiPaye(demande.id) : { rembourse: false };
 
+    // Paiement pris au même instant par une autre opération (code de fin,
+    // annulation du client) : rien n'a été fait, on le dit tel quel.
+    if (remboursement && remboursement.conflit) {
+      return res.status(409).json({ error: 'Cette prestation est déjà en cours de traitement. Rechargez la page pour voir son état.' });
+    }
+
     // Le client DOIT être remboursé avant que la demande ne reparte vers
     // d'autres prestataires : sinon elle serait rouverte avec un paiement
     // encore encaissé, et le client paierait deux fois.
@@ -6135,6 +6402,25 @@ app.post('/api/devis/:id/annuler-pro', auth, async (req, res) => {
     // en a plus aucun, la demande redevient "en attente" (comme neuve) ; sinon elle reste
     // "devis_recus" puisque le client a encore d'autres offres à consulter.
     await supabase.from('devis').update({ statut: 'annule_pro' }).eq('id', req.params.id);
+
+    // ── ACCEPTÉ MAIS PAS ENCORE PAYÉ : L'INTENTION DOIT TOMBER AUSSI ──────
+    // Le client pouvait encore régler l'intention de paiement déjà ouverte
+    // sur ce devis retiré. Même traitement que le refus côté client : on
+    // l'annule chez Stripe, et la ligne « en_attente » disparaît avec elle.
+    // Un paiement qui aboutirait quand même est remboursé comme orphelin.
+    if (demande.statut !== 'en_cours') {
+      const { data: ouvertes } = await supabase.from('paiements')
+        .select('stripe_payment_intent_id').eq('devis_id', devis.id).eq('statut', 'en_attente');
+      for (const o of (ouvertes || [])) {
+        if (o.stripe_payment_intent_id) {
+          const annulee = await stripe.paymentIntents.cancel(o.stripe_payment_intent_id).then(() => true, () => false);
+          if (annulee) {
+            await supabase.from('paiements').delete()
+              .eq('stripe_payment_intent_id', o.stripe_payment_intent_id).eq('statut', 'en_attente');
+          }
+        }
+      }
+    }
     const { data: autresDevisActifs } = await supabase.from('devis').select('id').eq('demande_id', devis.demande_id).eq('statut', 'envoye');
     const nouveauStatut = (autresDevisActifs && autresDevisActifs.length) ? 'devis_recus' : 'en_attente';
     await supabase.from('demandes').update({ statut: nouveauStatut }).eq('id', devis.demande_id);
@@ -6400,6 +6686,12 @@ function preuvesDePresence(demande) {
   const preuves = [];
 
   if (demande.code_saisi_par_pro) preuves.push('le code de validation a été saisi');
+
+  // La parole du client vaut preuve : il a lui-même confirmé l'arrivée.
+  // Sans cela, un client ayant répondu « oui » après l'avertissement de
+  // +6 h était quand même remboursé d'office à +24 h — contre ce qu'il
+  // venait de déclarer, et aux dépens d'un prestataire bel et bien venu.
+  if (demande.arrivee_confirmee_client === true) preuves.push('le client a confirmé l\'arrivée');
 
   const avant = demande.photos_avant;
   const apres = demande.photos_apres;
@@ -7778,7 +8070,12 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
     from('demandes').select('id, prestation, adresse, contestation_le, reponse_pro_le').in('id', demandeIds);
     const demandesMap = {};
     (demandes || []).forEach(d => { demandesMap[d.id] = d; });
-    const totalLibere = paiements.filter(p => p.statut === 'libere' || p.statut === 'rembourse_partiel')
+    // ── UNE PART RETENUE NON VERSÉE N'EST PAS « REÇUE » ──────────────────
+    // Sur un paiement resté chez Gleam, l'annulation tardive passe la ligne en
+    // « rembourse_partiel » AVANT que la part du prestataire ne lui soit virée.
+    // Si ce virement échoue, il n'a rien touché — et l'écran lui affichait
+    // « Reçu ». Ces lignes vont dans « En attente » jusqu'au virement.
+    const totalLibere = paiements.filter(p => p.statut === 'libere' || (p.statut === 'rembourse_partiel' && !partRetenueNonVersee(p)))
       // ── UN REMBOURSEMENT REPREND AUSSI SUR LE PRESTATAIRE ──────────────
       // On additionnait `montant_societe` tel quel. Un paiement de 100 €
       // remboursé de moitié affichait 85 € de gains, alors que le prestataire
@@ -7797,7 +8094,7 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
     };
 
     const totalEnAttente = paiements
-      .filter(p => p.statut === 'paye' && !estEnLitige(p))
+      .filter(p => (p.statut === 'paye' && !estEnLitige(p)) || partRetenueNonVersee(p))
       // Un paiement « paye » peut déjà avoir été partiellement remboursé.
       .reduce((a, p) => a + partReelle(p, 'montant_societe'), 0);
 
@@ -7818,9 +8115,15 @@ app.get('/api/paiements/mes-gains', auth, async (req, res) => {
     //   2  reçu                   historique
     //
     // À rang égal, le plus récent d'abord — c'est ce qu'on cherche en premier.
-    const enrichis = paiements.map(p => ({ ...p, demande: demandesMap[p.demande_id] || null }));
+    // L'écran lit `statut` pour choisir son libellé : une part retenue non
+    // versée y est présentée comme un paiement en attente (« paye »), le vrai
+    // statut restant lisible dans `statut_reel`.
+    const enrichis = paiements.map(p => partRetenueNonVersee(p)
+      ? { ...p, statut: 'paye', statut_reel: p.statut, versement_en_attente: true, demande: demandesMap[p.demande_id] || null }
+      : { ...p, demande: demandesMap[p.demande_id] || null });
 
     const rangGain = (p) => {
+      if (p.versement_en_attente) return 1;
       if (p.statut === 'paye') return estEnLitige(p) ? 0 : 1;
       return 2;
     };
@@ -8267,7 +8570,11 @@ app.post('/api/demandes/:id/confirmer-arrivee', auth, async (req, res) => {
     // Ce signalement était accepté à tout moment, même la veille. Il servait
     // à contourner les frais d'annulation tardive : on déclarait l'absence une
     // heure avant le créneau, puis on annulait « sans frais ».
-    if (!estVenu && !demande.prestation_demarree_le) {
+    // Une arrivée que seul le client a enregistrée (voir plus bas : pas de
+    // `arrivee_qualite`) ne lève pas ce garde-fou — sinon « oui » puis « non »
+    // le contournerait.
+    const arriveeDeclareeParLePro = !!demande.prestation_demarree_le && !!demande.arrivee_qualite;
+    if (!estVenu && !arriveeDeclareeParLePro) {
       const instant = instantDuCreneau(demande.creneau);
       if (instant && Date.now() < instant + 60 * 60 * 1000) {
         return res.status(409).json({
@@ -8277,8 +8584,31 @@ app.post('/api/demandes/:id/confirmer-arrivee', auth, async (req, res) => {
       }
     }
 
+    // ── « IL EST BIEN VENU », AVANT QUE LE PRESTATAIRE L'AIT DÉCLARÉ ───────
+    // La confirmation du client vaut preuve de présence : la clôture « sans
+    // arrivée » ne remboursait donc plus. Mais la clôture des 48 h exige un
+    // début de prestation, et aucun ne serait jamais posé — l'argent restait
+    // bloqué, ni versé ni rendu, sans que personne ne le voie.
+    //
+    // On rattrape le début ici, comme la saisie du code le fait, et on lève
+    // l'avertissement éventuel : la clôture normale suit son cours. Même
+    // fenêtre que la déclaration du prestataire (pas plus de deux heures
+    // avant le créneau) : une confirmation de la veille ne vaut rien.
+    const miseAJour = { arrivee_confirmee_client: estVenu };
+    if (estVenu && !demande.prestation_demarree_le) {
+      const instant = instantDuCreneau(demande.creneau);
+      if (instant && Date.now() < instant - 2 * 3600 * 1000) {
+        return res.status(409).json({
+          error: 'Vous pourrez confirmer la venue du prestataire à partir de '
+               + dateParis(new Date(instant - 2 * 3600 * 1000)) + '.'
+        });
+      }
+      miseAJour.prestation_demarree_le = new Date().toISOString();
+      miseAJour.contestation_le = null;
+    }
+
     await supabase.from('demandes')
-      .update({ arrivee_confirmee_client: estVenu })
+      .update(miseAJour)
       .eq('id', demande.id);
 
     if (estVenu) {
@@ -8304,8 +8634,11 @@ app.post('/api/demandes/:id/confirmer-arrivee', auth, async (req, res) => {
       .update({ contestation_le: new Date().toISOString() })
       .eq('id', demande.id);
 
-    // Les preuves décident de la suite.
-    const preuves = preuvesDePresence(demande);
+    // Les preuves décident de la suite — sur les valeurs À JOUR : `demande` a
+    // été lu avant l'écriture. Un client ayant répondu « oui » puis « non »
+    // y figurait encore comme confirmant la venue, et le prestataire lisait
+    // « Votre présence est étayée » au moment même où on la contestait.
+    const preuves = preuvesDePresence({ ...demande, ...miseAJour });
 
     // Le prestataire est prévenu IMMÉDIATEMENT — c'est ce qui lui donne une
     // chance de se rattraper s'il a simplement oublié de cliquer.
@@ -8938,7 +9271,10 @@ app.get('/api/admin/mes-revenus', adminAuth, async (req, res) => {
       // `montant_ttc` et `montant_rembourse` : partReelle() a besoin des deux
       // pour calculer le prorata restant après un remboursement.
       .select('montant_ttc, montant_ttc, commission, montant_societe, montant_rembourse, statut, created_at, numero_facture')
-      .in('statut', ['paye', 'libere'])
+      // « rembourse_partiel » compte aussi : la part retenue sur une annulation
+      // tardive ou un geste commercial est bel et bien encaissée. partReelle()
+      // n'en garde que ce qui reste après remboursement.
+      .in('statut', ['paye', 'libere', 'rembourse_partiel'])
       .gte('created_at', annee + '-01-01T00:00:00.000Z')
       .lt('created_at', (annee + 1) + '-01-01T00:00:00.000Z')
       .limit(20000);
@@ -9084,7 +9420,10 @@ app.get('/api/admin/declaration-annuelle', adminAuth, async (req, res) => {
       // `montant_ttc` et `montant_rembourse` : sans eux, une prestation
       // remboursée serait déclarée à l'administration pour son montant entier.
       .select('id, demande_id, societe_id, montant_ttc, montant_ttc, montant_societe, commission, montant_rembourse, statut, created_at')
-      .in('statut', ['paye', 'libere'])
+      // Un remboursement PARTIEL laisse un revenu : ce que le prestataire a
+      // gardé sur une annulation tardive se déclare. partReelle() en déduit
+      // la part rendue au client.
+      .in('statut', ['paye', 'libere', 'rembourse_partiel'])
       .gte('created_at', debut).lt('created_at', fin)
       .limit(20000);
 
@@ -10089,7 +10428,7 @@ app.get('/api/admin/stats', adminAuth, async (req, res) => {
     const { count: nbSignalementsOuverts } = await supabase.from('signalements').select('id', { count: 'exact', head: true }).eq('statut', 'nouveau');
     const { data: paiementsLiberes } = // `montant_rembourse` est indispensable : sans lui, partReelle() ne peut
       // rien déduire et renvoie le montant brut.
-      await supabase.from('paiements').select('montant_ttc, commission, montant_rembourse').in('statut', ['libere', 'paye']);
+      await supabase.from('paiements').select('montant_ttc, commission, montant_rembourse').in('statut', ['libere', 'paye', 'rembourse_partiel']);
     // ── LES REMBOURSEMENTS SONT DÉDUITS ─────────────────────────────────
     // Un paiement remboursé de moitié comptait pour son montant entier : le
     // chiffre d'affaires et la commission affichés étaient supérieurs à ce qui
@@ -10245,19 +10584,82 @@ app.post('/api/admin/paiements/:id/rembourser', adminAuth, async (req, res) => {
     }
 
     const nouveauTotal = (dejaCentimes + centimes) / 100;
+    const integral = nouveauTotal * 100 >= totalCentimes;
+
+    // ── LA PART DU PRESTATAIRE SUIT LE REMBOURSEMENT ──────────────────────
+    // `montant_societe` restait à sa valeur d'origine. Or partReelle() le lit
+    // tel quel sur un « rembourse_partiel », en le supposant déjà corrigé :
+    // revenus, déclaration annuelle et statistiques comptaient au prestataire
+    // une part que Stripe venait de lui reprendre.
+    //
+    // Même méthode que l'annulation client : on relit chez Stripe le transfert
+    // et la commission après reprise, plutôt que de recalculer à la main.
+    let montantProCorrige = integral ? 0 : paiement.montant_societe;
+    const reparti = !!(paiement.transfert_automatique || paiement.stripe_transfer_id);
+
+    // ── PAR DÉFAUT, LE PRORATA ────────────────────────────────────────────
+    // Sur une charge à destination, si la lecture Stripe échoue (ou s'il n'y
+    // a pas d'identifiant de transfert), on gardait la part ENTIÈRE sur une
+    // ligne « rembourse_partiel » — que partReelle lit telle quelle. Le
+    // prorata de ce qui reste est la bonne estimation ; la lecture Stripe,
+    // quand elle réussit, la remplace.
+    //
+    // ── ET SUR UN PAIEMENT RESTÉ CHEZ GLEAM, ENCORE À VERSER ─────────────
+    // Même raisonnement que l'annulation tardive : le paiement quitte
+    // « paye », plus aucune libération ne le versera. La part du prestataire
+    // devient sa proportion de ce qui est retenu, et on la lui vire.
+    // Seulement s'il était « paye » : déjà versé (« libere »), il a touché sa
+    // part, et on ne la lui reprend pas ici.
+    const aVerserIci = !integral && !reparti && statutAvant === 'paye';
+    if (!integral && (reparti || aVerserIci)) {
+      montantProCorrige = statutAvant === 'rembourse_partiel'
+        // Déjà corrigé une fois : on réduit ce qui restait, au prorata.
+        ? (totalCentimes - dejaCentimes > 0
+            ? Math.round((parseFloat(paiement.montant_societe) || 0) * ((totalCentimes - dejaCentimes - centimes) / (totalCentimes - dejaCentimes)) * 100) / 100
+            : 0)
+        : partReelleBrute({ ...paiement, montant_rembourse: nouveauTotal }, 'montant_societe');
+    }
+    if (!integral && paiement.stripe_transfer_id) {
+      try {
+        const transfert = await stripe.transfers.retrieve(paiement.stripe_transfer_id);
+        const montantTransfereNet = (transfert.amount - transfert.amount_reversed) / 100;
+        let montantFeeRetenu = 0;
+        if (paiement.stripe_application_fee_id) {
+          const fee = await stripe.applicationFees.retrieve(paiement.stripe_application_fee_id);
+          montantFeeRetenu = (fee.amount - fee.amount_refunded) / 100;
+        }
+        // Jamais négatif : la base le refuserait, et la ligne resterait bloquée
+        // en « remboursement_en_cours ».
+        montantProCorrige = Math.max(0, Math.round((montantTransfereNet - montantFeeRetenu) * 100) / 100);
+      } catch (e) {
+        console.error('Lecture du montant réel chez Stripe échouée, montant non recalculé:', e.message);
+      }
+    }
+
     await supabase.from('paiements').update({
-      statut: nouveauTotal * 100 >= totalCentimes ? 'rembourse' : 'rembourse_partiel',
-      montant_rembourse: nouveauTotal
+      statut: integral ? 'rembourse' : 'rembourse_partiel',
+      montant_rembourse: nouveauTotal,
+      montant_societe: montantProCorrige
     }).eq('id', paiement.id);
+
+    if (aVerserIci) await verserPartRetenue(paiement, montantProCorrige);
 
     // Un remboursement produit un avoir : la facture d'origine reste dans la
     // séquence, et l'avoir dit ce qui a été annulé.
     await attribuerNumeroAvoir(paiement.id, nouveauTotal);
 
     // Remboursé en totalité : un litige éventuel n'a plus d'objet.
-    if (nouveauTotal * 100 >= totalCentimes) {
+    if (integral) {
       await supabase.from('demandes').update({ contestation_le: null, reponse_pro_le: null })
         .eq('id', paiement.demande_id).not('contestation_le', 'is', null);
+
+      // Et la prestation est close côté client, comme après un arbitrage
+      // « rembourser » : laissée « en_cours », la clôture automatique des
+      // 48 h la passait à « terminée » et annonçait au client que le
+      // prestataire avait été réglé. Une prestation déjà terminée garde
+      // son statut : on n'efface pas l'historique d'un geste commercial.
+      await supabase.from('demandes').update({ statut: 'annulee_client' })
+        .eq('id', paiement.demande_id).in('statut', ['acceptee', 'en_cours']);
     }
 
     // La trace : dans six mois, il faudra savoir pourquoi.
@@ -10287,46 +10689,104 @@ app.post('/api/admin/paiements/:id/rembourser', adminAuth, async (req, res) => {
   }
 });
 
+// ── UNE SEULE RÈGLE POUR LA LISTE ET POUR LA PASTILLE ─────────────────────
+// La pastille de la console comptait toute demande portant `contestation_le`,
+// la liste écartait les dossiers déjà réglés : la pastille annonçait « 1 »
+// devant une liste vide. Les deux passent désormais par cette fonction.
+//
+// ── TROIS LECTURES, PAS 1 + 2N ─────────────────────────────────────────────
+// La pastille interroge cette fonction chaque minute, pour chaque onglet
+// ouvert de la console. Elle lisait le paiement puis la réclamation de chaque
+// dossier, l'un après l'autre : 201 requêtes pour 100 dossiers. Les paiements
+// et les réclamations sont désormais lus en une fois pour tous les dossiers.
+//
+// ── LES PLUS RÉCENTS D'ABORD, PUIS L'ORDRE D'AFFICHAGE ────────────────────
+// Le tri croissant avec une limite de 100 gardait les PLUS ANCIENS marqueurs.
+// Or un dossier réglé garde parfois son `contestation_le` (geste commercial
+// partiel, réclamation close…) : une centaine de vieux dossiers suffisaient à
+// pousser le litige du jour hors de la liste — et hors de la pastille. On lit
+// les plus récents (limite relevée), puis on rend l'ordre habituel, le plus
+// ancien litige en tête.
+const LITIGES_LUS_AU_PLUS = 300;
+async function dossiersEnLitige() {
+  const { data: lues } = await supabase.from('demandes')
+    .select('*')
+    .not('contestation_le', 'is', null)
+    .order('contestation_le', { ascending: false })
+    .limit(LITIGES_LUS_AU_PLUS);
+  const demandes = (lues || []).slice().reverse();
+  if (!demandes.length) return [];
+
+  // Les filtres `in` partent dans l'adresse de la requête : on découpe par
+  // paquets pour rester loin des limites de longueur d'URL.
+  const ids = demandes.map(d => d.id);
+  const paquets = [];
+  for (let i = 0; i < ids.length; i += 150) paquets.push(ids.slice(i, i + 150));
+  const lire = (fabrique) => Promise.all(paquets.map(fabrique))
+    .then(rs => rs.flatMap(r => (r && r.data) || []));
+  const [tousPaiements, reclamations] = await Promise.all([
+    lire(p => supabase.from('paiements')
+      .select('id, demande_id, montant_ttc, montant_societe, commission, statut, societe_id, client_id, montant_rembourse, created_at')
+      .in('demande_id', p).order('created_at', { ascending: false })),
+    lire(p => supabase.from('signalements')
+      .select('id, demande_id, description, created_at')
+      .in('demande_id', p)
+      .ilike('motif', 'Réclamation du prestataire%')
+      .order('created_at', { ascending: true }))
+  ]);
+
+  // Même choix que paiementPrincipal : le paiement le plus « avancé », et à
+  // rang égal le plus récent (le tri par date est déjà fait par la base).
+  const paiementsParDemande = new Map();
+  for (const p of tousPaiements) {
+    if (!paiementsParDemande.has(p.demande_id)) paiementsParDemande.set(p.demande_id, []);
+    paiementsParDemande.get(p.demande_id).push(p);
+  }
+  const reclamationParDemande = new Map();
+  for (const r of reclamations) {
+    if (!reclamationParDemande.has(r.demande_id)) reclamationParDemande.set(r.demande_id, r);
+  }
+
+  const dossiers = [];
+  for (const d of demandes) {
+    // `montant_rembourse` : une prestation partiellement remboursée doit
+    // afficher son montant RESTANT dans la carte de litige, pas son montant
+    // d'origine — sinon on arbitre sur une somme qui n'existe plus.
+    // Une demande peut porter d'anciennes tentatives « en_attente » : on
+    // retient le paiement réellement encaissé.
+    const siens = paiementsParDemande.get(d.id) || [];
+    const paiement = siens.slice(0, 20)
+      .sort((a, b) => (RANG_PAIEMENT[b.statut] || 0) - (RANG_PAIEMENT[a.statut] || 0))[0] || null;
+
+    // ── UN DOSSIER RÉGLÉ PEUT ÊTRE ROUVERT ──────────────────────────────
+    // J'écartais tous les paiements réglés. Or la réclamation du prestataire
+    // intervient précisément APRÈS un remboursement : elle n'apparaissait
+    // donc jamais ici.
+    //
+    // Il écrivait dans le vide, et vous ne voyiez rien.
+    //
+    // On garde l'exclusion — un dossier clos n'a rien à faire dans cette
+    // liste — sauf s'il a été explicitement rouvert par une réclamation.
+    if (!paiement) continue;
+
+    const r = reclamationParDemande.get(d.id);
+    const reclamation = r ? { id: r.id, description: r.description, created_at: r.created_at } : null;
+
+    const regle = ['rembourse', 'rembourse_partiel', 'libere'].includes(paiement.statut);
+    if (regle && !reclamation) continue;
+
+    dossiers.push({ d, paiement, reclamation, regle });
+  }
+  return dossiers;
+}
+
 app.get('/api/admin/litiges', adminAuth, async (req, res) => {
   try {
-    const { data: demandes } = await supabase.from('demandes')
-      .select('*')
-      .not('contestation_le', 'is', null)
-      .order('contestation_le', { ascending: true })
-      .limit(100);
-
-    if (!demandes || !demandes.length) return res.json([]);
+    const dossiers = await dossiersEnLitige();
+    if (!dossiers.length) return res.json([]);
 
     const litiges = [];
-    for (const d of demandes) {
-      // `montant_rembourse` : une prestation partiellement remboursée doit
-      // afficher son montant RESTANT dans la carte de litige, pas son montant
-      // d'origine — sinon on arbitre sur une somme qui n'existe plus.
-      // Une demande peut porter d'anciennes tentatives « en_attente » : on
-      // retient le paiement réellement encaissé.
-      const paiement = await paiementPrincipal(d.id,
-        'id, montant_ttc, montant_societe, commission, statut, societe_id, client_id, montant_rembourse, created_at');
-
-      // ── UN DOSSIER RÉGLÉ PEUT ÊTRE ROUVERT ──────────────────────────────
-      // J'écartais tous les paiements réglés. Or la réclamation du prestataire
-      // intervient précisément APRÈS un remboursement : elle n'apparaissait
-      // donc jamais ici.
-      //
-      // Il écrivait dans le vide, et vous ne voyiez rien.
-      //
-      // On garde l'exclusion — un dossier clos n'a rien à faire dans cette
-      // liste — sauf s'il a été explicitement rouvert par une réclamation.
-      if (!paiement) continue;
-
-      const { data: reclamation } = await supabase.from('signalements')
-        .select('id, description, created_at')
-        .eq('demande_id', d.id)
-        .ilike('motif', 'Réclamation du prestataire%')
-        .maybeSingle();
-
-      const regle = ['rembourse', 'rembourse_partiel', 'libere'].includes(paiement.statut);
-      if (regle && !reclamation) continue;
-
+    for (const { d, paiement, reclamation, regle } of dossiers) {
       const { data: client } = await supabase.from('users')
         .select('prenom, nom, email').eq('id', d.client_id).maybeSingle();
       const { data: pro } = paiement.societe_id
@@ -10586,11 +11046,15 @@ app.get('/api/admin/a-traiter', adminAuth, async (req, res) => {
     const compter = (requete) => requete.then(r => r.count || 0, () => 0);
     const ilYaUneHeure = new Date(Date.now() - 3600 * 1000).toISOString();
     const [litiges, documents, signalements, bloques, virementsEchoues, coinces, aPayer] = await Promise.all([
-      compter(supabase.from('demandes').select('id', { count: 'exact', head: true }).not('contestation_le', 'is', null)),
+      // Même règle que la liste des litiges (voir dossiersEnLitige) : un
+      // dossier déjà réglé, sans réclamation, n'attend plus de décision.
+      dossiersEnLitige().then(l => l.length, () => 0),
       compter(supabase.from('documents_pro').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente')),
       compter(supabase.from('signalements').select('id', { count: 'exact', head: true }).eq('statut', 'nouveau')),
       compter(supabase.from('paiements').select('id', { count: 'exact', head: true }).eq('statut', 'bloque')),
-      compter(supabase.from('paiements').select('id', { count: 'exact', head: true }).eq('statut', 'paye').not('transfert_erreur', 'is', null)),
+      // Les parts retenues non versées comptent aussi : sinon personne ne les voit.
+      compter(supabase.from('paiements').select('id', { count: 'exact', head: true })
+        .or('and(statut.eq.paye,transfert_erreur.not.is.null),' + FILTRE_PART_RETENUE_ECHOUEE)),
       compter(supabase.from('paiements').select('id', { count: 'exact', head: true })
         .in('statut', ['liberation_en_cours', 'remboursement_en_cours']).lt('created_at', ilYaUneHeure)),
       compter(supabase.from('devis').select('id', { count: 'exact', head: true }).eq('statut', 'accepte').not('paiement_avant', 'is', null))
@@ -10722,12 +11186,13 @@ app.get('/api/admin/paiements', adminAuth, async (req, res) => {
     const PAR_PAGE = 50;
     const page = Math.max(0, parseInt(req.query.page, 10) || 0);
     let requete = supabase.from('paiements')
-      .select('id, demande_id, devis_id, client_id, societe_id, statut, montant_ttc, commission, montant_societe, montant_rembourse, numero_facture, transfert_automatique, transfert_erreur, transfert_tentatives, created_at, libere_le',
+      .select('id, demande_id, devis_id, client_id, societe_id, statut, montant_ttc, commission, montant_societe, montant_rembourse, numero_facture, transfert_automatique, transfert_erreur, transfert_tentatives, created_at, libere_le, stripe_transfer_id',
               { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(page * PAR_PAGE, page * PAR_PAGE + PAR_PAGE - 1);
     if (filtre === 'a_surveiller') {
-      requete = requete.or('statut.eq.bloque,statut.eq.liberation_en_cours,statut.eq.remboursement_en_cours,and(statut.eq.paye,transfert_erreur.not.is.null)');
+      requete = requete.or('statut.eq.bloque,statut.eq.liberation_en_cours,statut.eq.remboursement_en_cours,and(statut.eq.paye,transfert_erreur.not.is.null),'
+        + FILTRE_PART_RETENUE_ECHOUEE);
     } else if (filtre === 'paye') requete = requete.eq('statut', 'paye');
     else if (filtre === 'libere') requete = requete.eq('statut', 'libere');
     else if (filtre === 'rembourse') requete = requete.in('statut', ['rembourse', 'rembourse_partiel']);
@@ -10757,8 +11222,11 @@ app.get('/api/admin/paiements', adminAuth, async (req, res) => {
         if (p.statut === 'bloque') actions.push('debloquer');
         if (p.statut === 'paye' && demande && !demande.contestation_le
             && (demande.statut === 'terminee' || (demande.statut === 'en_cours' && demande.code_saisi_par_pro))) actions.push('verser');
+        // Part retenue dont le virement a échoué : elle se relance d'ici aussi.
+        if (p.transfert_erreur && partRetenueNonVersee(p)) actions.push('verser');
+        const { stripe_transfer_id, ...visible } = p;
         return {
-          ...p,
+          ...visible,
           client: nomDe(u[p.client_id]), pro: nomDe(u[p.societe_id]),
           prestation: demande ? demande.prestation : null,
           demande_statut: demande ? demande.statut : null,
@@ -10833,6 +11301,23 @@ app.post('/api/admin/paiements/:id/verser', adminAuth, async (req, res) => {
     if (!motif) return res.status(400).json({ error: 'Indiquez le motif.' });
     const { data: p } = await supabase.from('paiements').select('id, demande_id, client_id, societe_id, statut').eq('id', req.params.id).maybeSingle();
     if (!p) return res.status(404).json({ error: 'Ce paiement n\'existe pas.' });
+
+    // La part retenue d'une annulation tardive, dont le virement a échoué :
+    // la prestation est annulée, seul le virement est à refaire.
+    if (p.statut === 'rembourse_partiel') {
+      const { data: ligne } = await supabase.from('paiements').select('*').eq('id', p.id).maybeSingle();
+      if (!ligne || !ligne.transfert_erreur || !partRetenueNonVersee(ligne)) {
+        return res.status(409).json({ error: 'Rien n\'est à verser au prestataire sur ce paiement.' });
+      }
+      await supabase.from('signalements').insert({
+        demande_id: p.demande_id, reporter_id: p.client_id,
+        motif: 'Administration — versement relancé', description: motif.slice(0, 1000), statut: 'traite'
+      });
+      const r = await verserPartRetenue(ligne, ligne.montant_societe);
+      if (!r || r.erreur) return res.status(502).json({ error: 'Le versement a échoué : ' + ((r && r.erreur) || 'raison inconnue') });
+      return res.json({ message: 'Part retenue versée au prestataire.' });
+    }
+
     if (p.statut !== 'paye') return res.status(409).json({ error: 'Seul un paiement « payé » peut être versé.' });
     const { data: d } = await supabase.from('demandes').select('statut, contestation_le, code_saisi_par_pro').eq('id', p.demande_id).maybeSingle();
     // Terminée, OU code de fin saisi (le versement a échoué juste après) :
@@ -11022,9 +11507,24 @@ const DOSSIER_PUBLIC = chemin.join(__dirname, 'public');
 //
 // Interdire server.js et email.js aurait laissé passer le prochain fichier
 // ajouté. On énumère ce qui DOIT être servi, et rien d'autre.
+//
+// La liste suit le contenu RÉEL de public/. Il y manquait les icônes de
+// l'application et les pages légales et d'aide : sur Railway, ces adresses
+// renvoyaient index.html — icône d'installation cassée, CGU introuvables.
+//
+// Volontairement une liste écrite à la main, pas une lecture du dossier :
+// un fichier de test déposé dans public/ deviendrait public sans que
+// personne ne l'ait décidé. comptes-test.html en est la preuve — il reste
+// EXCLU.
 const FICHIERS_PUBLICS = new Set([
-  '/index.html', '/sw.js', '/manifest.json', '/manifest.webmanifest',
-  '/favicon.ico', '/apple-touch-icon.png', '/robots.txt'
+  // L'application
+  '/index.html', '/sw.js', '/manifest.json',
+  // La console d'administration (ses appels restent protégés par adminAuth)
+  '/admin.html',
+  // Pages d'information et pages légales
+  '/aide.html', '/cgu.html', '/confidentialite.html', '/mentions-legales.html',
+  // Icônes et logo
+  '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/gleam-logo.svg'
 ]);
 
 function estPublic(url) {
