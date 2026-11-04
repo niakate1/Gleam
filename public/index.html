@@ -10419,36 +10419,6 @@ async function verifierConfigurationPro(){
   // parcours de démarrage couvre désormais entièrement son rôle.
   return chargerParcoursDemarrage();
 }
-async function _ancienRappelConfigurationPro(){
-  var box=document.getElementById('pro-rappel-config');
-  if(!box||!currentUser)return;
-  var manques=[];
-  if(typeof currentUser.latitude!=='number'||typeof currentUser.rayon_intervention_km!=='number')
-    manques.push({texte:'votre zone d\'intervention',action:"ouvrirZoneIntervention()",bouton:'Régler ma zone'});
-  try{
-    const r=await fetchGroupe(API+'/api/societes/tarifs',{headers:authHeaders()});
-    if(r.ok){
-      const t=await safeJson(r);
-      var aucun=(!t.tarifs||!Object.keys(t.tarifs).length)&&(!t.tarifs_unitaires||!Object.keys(t.tarifs_unitaires).length);
-      if(aucun)manques.push({texte:'vos tarifs',action:"goProTab('pro-tarifs')",bouton:'Saisir mes tarifs'});
-    }
-  }catch(e){}
-  if(!manques.length){box.innerHTML='';return}
-
-  var premier=manques[0];
-  var quoi=manques.map(function(m){return m.texte}).join(' et ');
-  box.innerHTML='<div class="rappel-config">'+
-    '<i data-lucide="settings"></i>'+
-    '<div class="texte">Il vous reste à renseigner <strong>'+quoi+'</strong>. '+
-      (manques.length>1
-        ? 'Sans zone, vous recevez des demandes trop éloignées ; sans tarifs, vous n\'apparaissez pas dans l\'estimation de prix montrée aux clients.'
-        : (premier.bouton==='Régler ma zone'
-            ? 'Sans elle, vous recevez toutes les demandes, y compris celles situées à l\'autre bout du pays.'
-            : 'Sans eux, vous n\'apparaissez pas dans l\'estimation de prix montrée aux clients avant leur inscription.'))+
-      '<br><button onclick="'+premier.action+'">'+premier.bouton+'</button>'+
-    '</div></div>';
-  if(window.lucide)dessinerIcones();
-}
 
 async function loadProDevisCount(){
   try{
@@ -11648,6 +11618,14 @@ async function envoyerDevis(demandeId){
       return;
     }
 
+    // ── SIRET OU ASSURANCE MANQUANTS : ON OUVRE LE FORMULAIRE ────────────
+    // Le serveur répond 403 avec `justificatifs_manquants` (['siret'],
+    // ['assurance'] ou les deux). Le prestataire ne recevait qu'un toast, sans
+    // savoir où les renseigner : `traiterDevisRefuse` existait mais n'était
+    // jamais appelée. Le bouton est rétabli — une fois les justificatifs
+    // enregistrés, il pourra renvoyer son devis sans ressaisir le prix.
+    // L'autre 403 (`manques` : paiements ou documents) garde son message.
+    if(r.status===403&&traiterDevisRefuse(d)){if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}return}
     if(!r.ok){toast(messageErreur(r, d));if(btn){btn.disabled=false;btn.textContent='Envoyer mon devis'}return}
     vibrer('succes');
     toast('✅ Devis envoyé au client !');
@@ -12512,6 +12490,17 @@ async function sendChatMsg(){
 // bouton ne réagit pas assez vite et qu'on insiste.
 var paiementEnPreparation = false;
 
+// ── LE MONTANT RÉELLEMENT DÉBITÉ ────────────────────────────────────────────
+// Après une erreur de carte, le libellé du bouton était reconstruit à partir
+// du texte de `payment-total`. Avec une réduction de parrainage, ce bloc
+// contient l'ancien prix barré ET le nouveau : le bouton devenait
+// « Payer 120 €108.00 € ». On garde donc le montant débité dans une variable,
+// fixée par `openPayment`, et le libellé se reconstruit toujours depuis elle.
+var montantADebiter = null;
+function libelleBoutonPayer(){
+  return montantADebiter != null ? 'Payer ' + montantADebiter + ' €' : 'Payer maintenant';
+}
+
 // ── CE QU'ON PAIE, AVANT DE PAYER ───────────────────────────────────────────
 // L'écran affichait « Montant : 150 € TTC » sur une ligne. Les applications
 // les mieux faites rappellent d'abord la prestation, la date et l'adresse.
@@ -12528,7 +12517,16 @@ function remplirRecapPaiement(montant, devis) {
   // carte rassure — c'est ce que font Uber et Doctolib.
   var zonePro = document.getElementById('payment-pro');
   if (zonePro) {
-    var nomPro = p.nom_societe || p.societe || p.prenom || '';
+    // Le serveur (GET /api/devis/mes-devis-recus) envoie `prenom`, `nom` et
+    // `photo` — jamais `nom_societe`, `societe` ni `photo_url`. Ces anciens
+    // noms ne trouvaient donc rien : la photo n'apparaissait jamais, et le
+    // nom se réduisait au prénom. Ils restent en repli, au cas où une autre
+    // route les fournirait encore.
+    var nomPro = p.nom_societe || p.societe
+      || ((p.prenom || '') + ' ' + (p.nom || '')).trim() || '';
+    // Vérifiée AVANT de choisir entre photo et initiale : une adresse refusée
+    // par `urlImageSure` donnerait sinon une image vide au lieu de l'initiale.
+    var photoPro = urlImageSure(p.photo || p.photo_url || '');
     if (nomPro) {
       var initiale = nomPro.charAt(0).toUpperCase();
       // `noteAffichable` est la fonction unique qui décide : elle écarte les
@@ -12539,8 +12537,8 @@ function remplirRecapPaiement(montant, devis) {
 
       zonePro.style.display = 'flex';
       zonePro.innerHTML =
-          (p.photo_url
-            ? '<img src="' + urlImageSure(p.photo_url) + '" alt="" style="width:44px;height:44px;'
+          (photoPro
+            ? '<img src="' + photoPro + '" alt="" style="width:44px;height:44px;'
               + 'border-radius:50%;object-fit:cover;flex-shrink:0">'
             : '<div style="width:44px;height:44px;border-radius:50%;background:var(--p);'
               + 'color:#fff;display:flex;align-items:center;justify-content:center;'
@@ -12654,14 +12652,27 @@ async function openPayment(devisId,montant,devis){
   document.getElementById('payment-error').classList.remove('show');
   document.getElementById('payment-overlay').classList.add('open');
   document.getElementById('payment-btn').disabled=false;
-  document.getElementById('payment-btn').textContent='Payer '+montant+' €';
+  montantADebiter=montant;
+  document.getElementById('payment-btn').textContent=libelleBoutonPayer();
   try{
     const r=await fetch(API+'/api/paiements/intent',{method:'POST',headers:authHeaders(),body:JSON.stringify({devis_id:devisId})});
     const d=await safeJson(r);
     // Déjà payé (confirmation arrivée en retard) : ce n'est pas une erreur.
     if(r.status===409&&d&&d.deja_paye){closePayment();toast('✅ '+(d.error||'Paiement bien reçu.'),5000);loadDevis();return}
-    if(!r.ok){document.getElementById('payment-error').textContent=d.error||'Erreur';document.getElementById('payment-error').classList.add('show');return}
-    if(!d.client_secret||!d.publishable_key){document.getElementById('payment-error').textContent='Réponse de paiement invalide.';document.getElementById('payment-error').classList.add('show');return}
+    // ── FACTURATION INCOMPLÈTE : ON MÈNE AU FORMULAIRE ──────────────────
+    // Un compte entreprise sans raison sociale, SIRET ou adresse de
+    // facturation reçoit un 403 portant `facturation_manquante` (la liste des
+    // champs). L'écran se contentait d'afficher le message, sous un bouton
+    // « Payer » resté actif qui ne faisait plus rien : l'entreprise était
+    // bloquée sans savoir où aller. On ferme le paiement et on ouvre le
+    // formulaire — il suffira de rappuyer sur « Payer » ensuite.
+    if(r.status===403&&d&&Array.isArray(d.facturation_manquante)&&d.facturation_manquante.length){
+      closePayment();
+      traiterPaiementRefuse(d);
+      return;
+    }
+    if(!r.ok){echecPreparationPaiement((d&&d.error)||'Erreur');return}
+    if(!d.client_secret||!d.publishable_key){echecPreparationPaiement('Réponse de paiement invalide.');return}
     if(d.reduction_parrainage){
       // ── LA RÉDUCTION S'AFFICHE DANS LE RÉCAPITULATIF ────────────────────
       // Elle visait `payment-sub`, un élément que j'avais retiré de la page.
@@ -12682,8 +12693,9 @@ async function openPayment(devisId,montant,devis){
           + '<i data-lucide="gift" class="ico-txt"></i> Réduction de parrainage appliquée</div>');
       }
       // Le bouton doit dire le montant RÉELLEMENT débité.
+      montantADebiter=montantReduit;
       var btnP=document.getElementById('payment-btn');
-      if(btnP)btnP.textContent='Payer '+montantReduit+' €';
+      if(btnP)btnP.textContent=libelleBoutonPayer();
     }
     currentPaymentIntent=d.client_secret;
     if(!stripeInstance)stripeInstance=Stripe(d.publishable_key);
@@ -12737,7 +12749,17 @@ async function openPayment(devisId,montant,devis){
 
     // `elements` sert à la confirmation : on le garde sous la main.
     stripeElements = elements;
-  }catch(e){document.getElementById('payment-error').textContent=friendlyNetworkError(e);document.getElementById('payment-error').classList.add('show')}
+  }catch(e){echecPreparationPaiement(friendlyNetworkError(e))}
+}
+// Le paiement n'a pas pu être préparé : aucun formulaire Stripe n'est monté,
+// et `confirmPayment` sortirait sans rien dire. Le bouton est donc désactivé
+// — un bouton actif qui ne réagit pas laisse croire à une panne. Il redevient
+// actif à la prochaine ouverture de l'écran.
+function echecPreparationPaiement(message){
+  var err=document.getElementById('payment-error');
+  if(err){err.textContent=message;err.classList.add('show')}
+  var btn=document.getElementById('payment-btn');
+  if(btn)btn.disabled=true;
 }
 function closePayment(){
   document.getElementById('payment-overlay').classList.remove('open');
@@ -12745,7 +12767,7 @@ function closePayment(){
   // Le groupe `elements` doit être libéré aussi : le garder pointerait vers
   // un élément détruit, et la prochaine confirmation échouerait.
   stripeElements=null;
-  currentPaymentIntent=null;currentDevisId=null;
+  currentPaymentIntent=null;currentDevisId=null;montantADebiter=null;
 }
 async function confirmPayment(){
   // `stripeElements` s'ajoute aux gardes : sans lui, confirmPayment
@@ -12800,13 +12822,13 @@ async function confirmPayment(){
   }catch(e){
     document.getElementById('payment-error').textContent=friendlyNetworkError(e);
     document.getElementById('payment-error').classList.add('show');
-    btn.disabled=false;btn.textContent='Payer '+(document.getElementById('payment-total')?document.getElementById('payment-total').textContent:'maintenant');
+    btn.disabled=false;btn.textContent=libelleBoutonPayer();
     return;
   }
   if(result.error){
     document.getElementById('payment-error').textContent=result.error.message;
     document.getElementById('payment-error').classList.add('show');
-    btn.disabled=false;btn.textContent='Payer '+(document.getElementById('payment-total')?document.getElementById('payment-total').textContent:'maintenant');
+    btn.disabled=false;btn.textContent=libelleBoutonPayer();
     return;
   }
   if(result.paymentIntent&&result.paymentIntent.status==='succeeded'){
@@ -12815,13 +12837,13 @@ async function confirmPayment(){
       if(!cr.ok){
         document.getElementById('payment-error').textContent='Paiement effectué mais la confirmation a échoué. Contactez le support.';
         document.getElementById('payment-error').classList.add('show');
-        btn.disabled=false;btn.textContent='Payer '+(document.getElementById('payment-total')?document.getElementById('payment-total').textContent:'maintenant');
+        btn.disabled=false;btn.textContent=libelleBoutonPayer();
         return;
       }
     }catch(e){
       document.getElementById('payment-error').textContent='Paiement effectué mais la confirmation a échoué. Contactez le support.';
       document.getElementById('payment-error').classList.add('show');
-      btn.disabled=false;btn.textContent='Payer '+(document.getElementById('payment-total')?document.getElementById('payment-total').textContent:'maintenant');
+      btn.disabled=false;btn.textContent=libelleBoutonPayer();
       return;
     }
     closePayment();
@@ -13055,52 +13077,6 @@ var MAX_ARTICLES=5;
 // quantité se règle dans le questionnaire.
 var TYPES_QUANTITE_INTERNE = ['vitres', 'tapis'];
 
-// ── LE NOM AU SINGULIER, DANS LA PHRASE ─────────────────────────────────────
-// « + Ajouter un autre Voiture » se lit mal. Quelques noms suffisent : les
-// autres prestations n'acceptent pas les doublons.
-var NOMS_ARTICLE = {
-  voiture: 'véhicule',
-  canape: 'canapé',
-  matelas: 'matelas',
-  terrasse: 'espace',
-  toiture: 'toit',
-  piscine: 'bassin',
-  autre: 'article'
-};
-
-function nomArticle(type) {
-  return NOMS_ARTICLE[type] || 'article';
-}
-
-// ── AJOUTER UN ARTICLE SANS PERDRE CE QUI VIENT D'ÊTRE SAISI ────────────────
-// Le client a décrit sa première voiture. En cliquant, on enregistre ce
-// qu'il a répondu, on ajoute une place dans la file, et on rouvre un
-// formulaire VIERGE pour la suivante.
-//
-// C'est exactement ce que fait déjà `sendDemand` entre deux prestations
-// différentes — on réutilise le même chemin plutôt que d'en écrire un second
-// qui finirait par diverger.
-function ajouterArticleEtRecommencer(type) {
-  if (selectedServices.length >= MAX_ARTICLES) {
-    toast('Cinq articles au maximum par demande.');
-    return;
-  }
-
-  // La file doit exister : un client qui n'a coché qu'une carte n'est pas
-  // encore passé par startMultiServiceFlow.
-  if (!multiFlow.active) {
-    multiFlow = { active: true, queue: [type], current: 0, results: [] };
-  }
-
-  // On insère le nouvel article JUSTE APRÈS celui en cours, pour que les
-  // véhicules restent groupés plutôt que renvoyés en fin de file.
-  selectedServices.push(type);
-  multiFlow.queue.splice(multiFlow.current + 1, 0, type);
-
-  // `sendDemand` enregistre les réponses courantes et passe à la suivante.
-  sendDemand(type);
-}
-
 function accepteDoublons(svc) {
   return TYPES_QUANTITE_INTERNE.indexOf(svc) < 0;
 }
@@ -13218,14 +13194,6 @@ function startMultiServiceFlow(){
   multiFlow={active:true,queue:selectedServices.slice(),current:0,results:[]};
   photos=[];
   openServiceForm(multiFlow.queue[0]);
-}
-function openService(type){
-  photos=[];
-  multiFlow={active:false,queue:[],current:0,results:[]};
-  openServiceForm(type);
-}
-function comingSoon(label){
-  toast('🔧 '+label+' — bientôt disponible.');
 }
 async function showMesAvis(){
   var sousTitre=isPro()?'Ce que vos clients disent de vous':'Ce que vos prestataires disent de vous';
@@ -13549,11 +13517,13 @@ async function confirmerRelanceRecurrente(demandeId){
 function ouvrirReprogrammer(demandeId){
   var today=localDateISO(new Date());
   var opts='';
-  opts = optionsHoraires();
+  // Même défaut que la demande : le premier créneau que la validation accepte.
+  var creneau = premierCreneauLibre();
+  opts = optionsHoraires(creneau.heure);
   document.getElementById('modal-body').innerHTML='<div class="modal-title"><i data-lucide="calendar-clock" style="width:20px;height:20px;vertical-align:-4px"></i> Reprogrammer</div>'+
     '<div class="modal-sub">L\'autre partie devra confirmer ce nouveau créneau.</div>'+
     '<div class="field-group"><label>Nouvelle date et heure</label>'+
-    '<div class="datetime-row"><input type="date" id="reprog-date" min="'+today+'" value="'+today+'"><select id="reprog-time">'+opts+'</select></div></div>'+
+    '<div class="datetime-row"><input type="date" id="reprog-date" min="'+today+'" value="'+creneau.date+'"><select id="reprog-time">'+opts+'</select></div></div>'+
     '<button class="modal-send-btn" id="reprog-btn" onclick="proposerCreneau(\''+escAttr(demandeId)+'\')">Envoyer la proposition</button>';
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -15352,7 +15322,8 @@ function optionsHoraires(heureChoisie) {
     { nom: 'Nuit (fin)',   de: 22, a: 24 }
   ];
   // 9h00 par défaut : c'est le créneau le plus demandé, et ouvrir le menu sur
-  // « 0h00 » serait déroutant.
+  // « 0h00 » serait déroutant. Les formulaires passent désormais le premier
+  // créneau encore libre (voir `premierCreneauLibre`).
   var defaut = heureChoisie || '9h00';
   var opts = '';
   MOMENTS.forEach(function (bloc) {
@@ -15369,13 +15340,36 @@ function optionsHoraires(heureChoisie) {
   return opts;
 }
 
+// ── LE CRÉNEAU PROPOSÉ D'OFFICE DOIT ÊTRE ACCEPTABLE ─────────────────────────
+// Le formulaire s'ouvrait toujours sur « aujourd'hui, 9h00 ». Passé 9 heures,
+// « Suivant » refusait aussitôt : « Cette heure est déjà passée ». Le client
+// devait corriger un choix qu'il n'avait pas fait.
+//
+// On propose donc le premier créneau qui passera la vérification : même pas
+// d'une demi-heure que la liste, même règle (pas avant maintenant). À 10h07,
+// c'est 10h30 ; à 10h00 pile, 10h00. Si la journée est finie (après 23h30),
+// c'est demain, à 9h00 — le créneau le plus demandé.
+function premierCreneauLibre(maintenant){
+  maintenant = maintenant || new Date();
+  var minutes = maintenant.getHours() * 60 + maintenant.getMinutes()
+              + (maintenant.getSeconds() || maintenant.getMilliseconds() ? 1 : 0);
+  var prochain = Math.ceil(minutes / 30) * 30;
+  if (prochain < 24 * 60) {
+    return { date: localDateISO(maintenant),
+             heure: Math.floor(prochain / 60) + 'h' + (prochain % 60 ? '30' : '00') };
+  }
+  var demain = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate() + 1);
+  return { date: localDateISO(demain), heure: '9h00' };
+}
+
 function blocDateHeure(today){
   var opts='';
-  opts = optionsHoraires();
+  var creneau = premierCreneauLibre();
+  opts = optionsHoraires(creneau.heure);
   var libelles=['Heure exacte','\u00b1 30 min','\u00b1 1 heure','Matin\u00e9e','Apr\u00e8s-midi','Toute la journ\u00e9e'];
   var flexBtns=libelles.map(function(l,i){return'<button class="flex-opt'+(i===0?' sel':'')+'" onclick="selFlex(this)">'+l+'</button>'}).join('');
   return '<div class="field-group"><label>\ud83d\udcc5 Date et heure souhait\u00e9es</label>'+
-    '<div class="datetime-row"><input type="date" id="f-date" min="'+today+'" value="'+today+'"><select id="f-time">'+opts+'</select></div>'+
+    '<div class="datetime-row"><input type="date" id="f-date" min="'+today+'" value="'+creneau.date+'"><select id="f-time">'+opts+'</select></div>'+
     '<label style="margin-top:12px">Flexibilit\u00e9 <span class="optional">(optionnel)</span></label>'+
     '<div class="flex-opts">'+flexBtns+'</div></div>';
 }
@@ -16454,9 +16448,6 @@ function selOpt(btn){
 // comme "poils d'animaux" ou "coffre à nettoyer aussi", contrairement à selOpt() qui n'autorise
 // qu'un seul choix à la fois dans son groupe.
 function toggleOption(btn){btn.classList.toggle('sel')}
-function getOptionsSelectionnees(groupe){
-  return Array.from(document.querySelectorAll('[data-group="'+groupe+'"].sel')).map(function(b){return b.getAttribute('data-option-val')});
-}
 function selFlex(btn){document.querySelectorAll('.flex-opt').forEach(function(b){b.classList.remove('sel')});btn.classList.add('sel')}
 
 async function handlePhotos(input){
