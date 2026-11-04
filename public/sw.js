@@ -34,7 +34,7 @@
 // aux utilisateurs déjà venus.
 //
 // La date suffit : une par jour de déploiement.
-const VERSION = 'gleam-sw-2026-09-30-securite';
+const VERSION = 'gleam-sw-2026-10-19-tests';
 
 // L'installation est désormais gérée plus bas, avec le précache de la
 // coquille : deux gestionnaires `install` s'exécuteraient tous les deux, et le
@@ -98,10 +98,19 @@ const COQUILLE = [
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE_COQUILLE)
-      .then(function (cache) { return cache.addAll(COQUILLE); })
-      // Un fichier absent ne doit pas empêcher l'installation : mieux vaut un
-      // cache partiel que pas de service worker du tout.
-      .catch(function (e) { console.warn('[Gleam] Précache partiel :', e); })
+      // Fichier par fichier, et non cache.addAll() : addAll est tout-ou-rien.
+      // Un seul 404 (c'était le cas de gleam-logo.svg) annulait le précache
+      // ENTIER — index.html compris — et le .catch avalait l'échec sans bruit.
+      // Ici, chaque fichier réussit ou échoue seul.
+      .then(function (cache) {
+        return Promise.all(COQUILLE.map(function (f) {
+          return cache.add(f).catch(function (e) {
+            // Un fichier absent ne doit pas empêcher l'installation : mieux
+            // vaut un cache partiel que pas de service worker du tout.
+            console.warn('[Gleam] Précache : ' + f + ' ignoré —', e);
+          });
+        }));
+      })
   );
   self.skipWaiting();
 });
